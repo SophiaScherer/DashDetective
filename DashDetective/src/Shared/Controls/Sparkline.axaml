@@ -6,31 +6,18 @@
       A lightweight line chart. Feed it a Points string ("x,y x,y …") and a Stroke.
 
       Two vertical-scaling modes:
-      • Auto-fit (default): the Viewbox stretches the polyline's own bounds to fill the
+      • Auto-fit (default): the Viewbox below stretches the polyline's own bounds to fill the
         control, so the vertical scale follows the data's min/max. Used by all the static
         sample sparklines.
       • Fixed range: set YMin and YMax to pin the vertical axis (e.g. 0–100 for a CPU %
-        chart). The line is then drawn into a Canvas whose logical height is the axis span,
-        so the Viewbox scales by the axis rather than the data. Smaller y = top, matching
-        the auto-fit convention.
+        chart). The Viewbox is hidden and the line is drawn directly in Render() against the
+        control's pixel size, so it reads on a stable axis. Smaller y = top, matching the
+        auto-fit convention.
     -->
-    <Panel>
-        <!-- Auto-fit path (unchanged legacy behaviour). -->
-        <Viewbox x:Name="AutoBox" Stretch="Fill" HorizontalAlignment="Stretch">
-            <Polyline x:Name="AutoLine"
-                      Stroke="{Binding #Root.Stroke}"
-                      StrokeThickness="{Binding #Root.StrokeThickness}"
-                      StrokeLineCap="Round" StrokeJoin="Round"/>
-        </Viewbox>
-
-        <!-- Fixed-range path (active only when YMin/YMax are set). -->
-        <Viewbox x:Name="FixedBox" Stretch="Fill" HorizontalAlignment="Stretch" IsVisible="False">
-            <Canvas x:Name="FixedSurface">
-                <Polyline x:Name="FixedLine"
-                          Stroke="{Binding #Root.Stroke}"
-                          StrokeThickness="{Binding #Root.StrokeThickness}"
-                          StrokeLineCap="Round" StrokeJoin="Round"/>
-            </Canvas>
-        </Viewbox>
-    </Panel>
+    <Viewbox x:Name="AutoBox" Stretch="Fill" HorizontalAlignment="Stretch">
+        <Polyline x:Name="AutoLine"
+                  Stroke="{Binding #Root.Stroke}"
+                  StrokeThickness="{Binding #Root.StrokeThickness}"
+                  StrokeLineCap="Round" StrokeJoin="Round"/>
+    </Viewbox>
 </UserControl>

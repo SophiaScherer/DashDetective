@@ -3,7 +3,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Dashboard"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="920"
+             x:DataType="vm:DashboardViewModel"
              x:Class="DashDetective.Tabs.Dashboard.DashboardView">
 
     <!-- Layout only: static sample data. Surfaces/typography come from src/Shared/Styles;
@@ -35,10 +37,10 @@
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
-                        <TextBlock Grid.Column="1" Text="23%" FontSize="12" Foreground="{StaticResource Accent}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{StaticResource Accent}"/>
                     </Grid>
                     <controls:Sparkline Height="130" Stroke="{StaticResource Accent}"
-                                        Points="0,70 4,66 8,72 12,55 16,63 20,40 24,58 28,35 32,52 36,28 40,46 44,60 48,38 52,54 56,30 60,48 64,26 68,44 72,58 76,34 80,50 84,24 88,42 92,56 96,32 100,46"/>
+                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="panel">
