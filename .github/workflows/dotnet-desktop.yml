@@ -1,0 +1,79 @@
+# This workflow builds, tests, and publishes the DashDetective Avalonia
+# desktop application, which targets .NET (net10.0).
+#
+# Unlike the stock "WPF/WinForms" desktop template, Avalonia builds entirely
+# with the cross-platform `dotnet` CLI and does not use a Windows Application
+# Packaging (WAP / .wapproj) project or MSIX signing. The MSBuild/MSIX steps
+# from that template have therefore been removed.
+#
+# The job currently runs on Windows only. To go cross-platform later, add
+# `ubuntu-latest` and/or `macos-latest` to the `os` matrix below.
+#
+# For more information on GitHub Actions, refer to https://github.com/features/actions
+
+name: .NET Desktop (Avalonia)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+        # Runs on Windows for now. To build cross-platform later, add
+        # ubuntu-latest and/or macos-latest to this list.
+        os: [windows-latest]
+        # - ubuntu-latest
+        # - macos-latest
+
+    runs-on: ${{ matrix.os }}  # For a list of available runner types, refer to
+                               # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+
+    env:
+      Solution_Name: DashDetective.sln
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Install the .NET SDK (must match the project's TargetFramework: net10.0)
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # Restore NuGet dependencies for the solution
+    - name: Restore dependencies
+      run: dotnet restore $env:Solution_Name
+
+    # Build the solution
+    - name: Build
+      run: dotnet build $env:Solution_Name --configuration ${{ matrix.configuration }} --no-restore
+
+    # Execute all unit tests in the solution.
+    # No test project exists yet; this is a no-op today and will pick up tests
+    # automatically once a test project is added to the solution.
+    - name: Execute unit tests
+      run: dotnet test $env:Solution_Name --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+
+    # Publish the Release build so the compiled app can be downloaded from the run
+    - name: Publish
+      if: matrix.configuration == 'Release'
+      run: dotnet publish DashDetective/DashDetective.csproj --configuration Release --no-build --output publish
+
+    # Upload the published output: https://github.com/marketplace/actions/upload-a-build-artifact
+    - name: Upload build artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: DashDetective-${{ matrix.os }}
+        path: publish
