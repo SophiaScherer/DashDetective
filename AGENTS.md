@@ -66,30 +66,47 @@ Before performing any of the following, stop and ask first:
 
 ## Design Document
 
-There is (or will be) a design document describing UI/UX intent, layout, and behavior for
+There is a design document describing UI/UX intent, layout, and behavior for
 each feature. You may read and update this document as part of feature work on the current
-feature(s). Location: `/docs/DESIGN/>`.
+feature(s). Location: `/docs/DESIGN/`.
 
 ## Folder Structure
 
-Each main feature gets its own top-level folder under the project. Example (only Dashboard
-and Settings currently exist):
+Source lives under `DashDetective/src/`, split into three areas: shared building blocks,
+the application shell, and one folder per feature ("tab"). Only Dashboard and Settings
+currently exist.
 
 ```
 /DashDetective
-  /Dashboard
-  /Settings
-  /FileExplorer      (not yet started)
-  /Processes         (not yet started)
-  /Performance       (not yet started)
-  /Network           (not yet started)
-  /Storage           (not yet started)
-  /Hardware          (not yet started)
-  MainWindow.axaml / MainWindow.axaml.cs   (default window — shared, edit carefully)
+  Program.cs, App.axaml(.cs), app.manifest, Assets/   (bootstrap — project root)
+  /src
+    /Shared                     (cross-cutting, feature-agnostic)
+      ViewModelBase.cs
+      /Styles
+        Palette.axaml           (colour brushes; merged in App.axaml)
+        SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons…)
+      /Controls
+        Sparkline, StatCard, InfoRow   (reusable widgets)
+    /Shell                      (the app frame — the "default window")
+      MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
+      /Navigation
+        NavItem.cs, Icons.cs
+    /Tabs                       (one self-contained folder per feature)
+      /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
+      /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
+      (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
 
-Keep feature folders self-contained: views, view models, and feature-specific helpers for a
-feature live inside that feature's folder rather than being scattered project-wide.
+Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
+`DashDetective.Shell`, `DashDetective.Shell.Navigation`, `DashDetective.Tabs.<Feature>`.
+The `ViewLocator` maps a `*ViewModel` to its `*View` by name, so a tab's View and ViewModel
+must share a namespace.
+
+Rules of thumb:
+- Anything reused by more than one tab (styling, colours, widgets) belongs in `src/Shared`.
+- Keep each tab self-contained: its view, view model, and feature-specific helpers live in
+  its own folder under `src/Tabs`, not scattered project-wide.
+- The shell (sidebar/toolbar/navigation) is shared — edit carefully.
 
 ## Working Style
 
