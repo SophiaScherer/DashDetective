@@ -3,94 +3,26 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="720"
-             x:Class="DashDetective.Settings.SettingsView">
+             x:Class="DashDetective.Tabs.Settings.SettingsView">
 
-    <UserControl.Resources>
-        <SolidColorBrush x:Key="PanelBg" Color="#1c1c1c"/>
-        <SolidColorBrush x:Key="FieldBg" Color="#141414"/>
-        <SolidColorBrush x:Key="Hairline" Color="#FFFFFF" Opacity="0.06"/>
-        <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.05"/>
-        <SolidColorBrush x:Key="Sub" Color="#FFFFFF" Opacity="0.45"/>
-        <SolidColorBrush x:Key="Muted" Color="#FFFFFF" Opacity="0.7"/>
-        <SolidColorBrush x:Key="Accent" Color="#4cc2ff"/>
-        <SolidColorBrush x:Key="OnAccentText" Color="#06263a"/>
-        <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.16"/>
-        <SolidColorBrush x:Key="FaintText" Color="#FFFFFF" Opacity="0.35"/>
-    </UserControl.Resources>
-
+    <!-- Layout only: controls are static and not wired to preferences yet.
+         Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
     <UserControl.Styles>
-        <Style Selector="Border.section">
-            <Setter Property="Background" Value="{StaticResource PanelBg}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="9"/>
-            <Setter Property="Padding" Value="18"/>
-        </Style>
-        <Style Selector="TextBlock.sectionTitle">
-            <Setter Property="FontSize" Value="13.5"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
         <Style Selector="TextBlock.settingName">
             <Setter Property="FontSize" Value="13"/>
         </Style>
         <Style Selector="TextBlock.settingDesc">
             <Setter Property="FontSize" Value="11.5"/>
-            <Setter Property="Foreground" Value="{StaticResource Sub}"/>
-        </Style>
-        <!-- Segmented control container -->
-        <Style Selector="Border.segments">
-            <Setter Property="Background" Value="{StaticResource FieldBg}"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="Padding" Value="3"/>
-        </Style>
-        <Style Selector="Border.seg">
-            <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="14,6"/>
-        </Style>
-        <Style Selector="Border.seg.selected">
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
-        </Style>
-        <Style Selector="Border.seg TextBlock">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
-        </Style>
-        <Style Selector="Border.seg.selected TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource OnAccentText}"/>
-        </Style>
-        <!-- Pill toggle -->
-        <Style Selector="Border.toggle">
-            <Setter Property="Width" Value="40"/>
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="CornerRadius" Value="11"/>
-        </Style>
-        <!-- Secondary / primary action buttons -->
-        <Style Selector="Button.action">
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="16,9"/>
-            <Setter Property="FontSize" Value="12.5"/>
-            <Setter Property="Background" Value="#12FFFFFF"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#1FFFFFFF"/>
-        </Style>
-        <Style Selector="Button.primary">
-            <Setter Property="Background" Value="{StaticResource Accent}"/>
-            <Setter Property="Foreground" Value="{StaticResource OnAccentText}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#66d0ff"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSubtle}"/>
         </Style>
     </UserControl.Styles>
 
     <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
 
         <!-- ===== Appearance ===== -->
-        <Border Classes="section">
+        <Border Classes="panel" Padding="18">
             <StackPanel Spacing="16">
-                <TextBlock Classes="sectionTitle" Text="Appearance"/>
+                <TextBlock Classes="panelTitle" Text="Appearance"/>
 
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
@@ -112,13 +44,13 @@
                         <TextBlock Classes="settingDesc" Text="Applied to charts and highlights"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Border Width="24" Height="24" CornerRadius="6" Background="#4cc2ff"
-                                BorderThickness="2" BorderBrush="White"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="#6ccb5f"
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Accent}"
+                                BorderThickness="2" BorderBrush="{StaticResource TextStrong}"/>
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Green}"
                                 BorderThickness="2" BorderBrush="Transparent"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="#c58fff"
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Purple}"
                                 BorderThickness="2" BorderBrush="Transparent"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="#ff8a5c"
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Orange}"
                                 BorderThickness="2" BorderBrush="Transparent"/>
                     </StackPanel>
                 </Grid>
@@ -126,9 +58,9 @@
         </Border>
 
         <!-- ===== Monitoring ===== -->
-        <Border Classes="section">
+        <Border Classes="panel" Padding="18">
             <StackPanel Spacing="16">
-                <TextBlock Classes="sectionTitle" Text="Monitoring"/>
+                <TextBlock Classes="panelTitle" Text="Monitoring"/>
 
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
@@ -153,7 +85,7 @@
                             <TextBlock Classes="settingDesc" Text="Alert on threshold breaches"/>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="toggle" Background="{StaticResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="White" HorizontalAlignment="Right" Margin="0,0,3,0"/>
+                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -165,7 +97,7 @@
                             <TextBlock Classes="settingDesc" Text="Warn when CPU or RAM exceeds 90%"/>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="toggle" Background="{StaticResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -177,7 +109,7 @@
                             <TextBlock Classes="settingDesc" Text="Keep console running in background"/>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="toggle" Background="{StaticResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="White" HorizontalAlignment="Right" Margin="0,0,3,0"/>
+                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -189,7 +121,7 @@
                             <TextBlock Classes="settingDesc" Text="Start with Windows"/>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="toggle" Background="{StaticResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -197,9 +129,9 @@
         </Border>
 
         <!-- ===== Export & Data ===== -->
-        <Border Classes="section">
+        <Border Classes="panel" Padding="18">
             <StackPanel Spacing="14">
-                <TextBlock Classes="sectionTitle" Text="Export &amp; Data"/>
+                <TextBlock Classes="panelTitle" Text="Export &amp; Data"/>
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <Button Classes="action primary" Content="Export report (PDF)"/>
                     <Button Classes="action" Content="Export CSV"/>
@@ -208,7 +140,7 @@
             </StackPanel>
         </Border>
 
-        <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{StaticResource FaintText}"
+        <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{StaticResource TextFaint}"
                    Text="System Information Console v3.2.1 · Build 24019 · © 2026"/>
     </StackPanel>
 </UserControl>

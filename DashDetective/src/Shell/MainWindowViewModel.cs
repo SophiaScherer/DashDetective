@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using DashDetective.Dashboard;
-using DashDetective.Settings;
+using DashDetective.Shared;
+using DashDetective.Shell.Navigation;
+using DashDetective.Tabs.Dashboard;
+using DashDetective.Tabs.Settings;
 
-namespace DashDetective.ViewModels;
+namespace DashDetective.Shell;
 
 public partial class MainWindowViewModel : ViewModelBase {
     private readonly DashboardViewModel _dashboard = new();

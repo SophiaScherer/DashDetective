@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace DashDetective.Dashboard;
+namespace DashDetective.Tabs.Dashboard;
 
 public partial class DashboardView : UserControl {
     public DashboardView() {

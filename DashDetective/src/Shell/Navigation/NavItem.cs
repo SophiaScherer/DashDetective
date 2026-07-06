@@ -3,8 +3,9 @@ using System.Windows.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Shared;
 
-namespace DashDetective.ViewModels;
+namespace DashDetective.Shell.Navigation;
 
 /// <summary>
 /// A single entry in the sidebar navigation. Carries the page it activates plus

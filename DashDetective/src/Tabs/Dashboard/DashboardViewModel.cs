@@ -1,6 +1,6 @@
-using DashDetective.ViewModels;
+using DashDetective.Shared;
 
-namespace DashDetective.Dashboard;
+namespace DashDetective.Tabs.Dashboard;
 
 /// <summary>
 /// View model for the Dashboard page. Layout only for now — live metrics and

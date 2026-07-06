@@ -1,6 +1,6 @@
-using DashDetective.ViewModels;
+using DashDetective.Shared;
 
-namespace DashDetective.Settings;
+namespace DashDetective.Tabs.Settings;
 
 /// <summary>
 /// View model for the Settings page. Layout only for now — the controls are not

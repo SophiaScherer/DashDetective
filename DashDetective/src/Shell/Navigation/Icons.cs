@@ -1,6 +1,6 @@
 using Avalonia.Media;
 
-namespace DashDetective.ViewModels;
+namespace DashDetective.Shell.Navigation;
 
 /// <summary>
 /// Shared navigation icon geometries. Paths are authored in an 18x18 coordinate

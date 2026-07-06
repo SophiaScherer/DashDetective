@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace DashDetective.Settings;
+namespace DashDetective.Tabs.Settings;
 
 public partial class SettingsView : UserControl {
     public SettingsView() {
