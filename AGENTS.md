@@ -68,7 +68,7 @@ Before performing any of the following, stop and ask first:
 
 There is (or will be) a design document describing UI/UX intent, layout, and behavior for
 each feature. You may read and update this document as part of feature work on the current
-feature(s). Location: `<TODO: fill in path once created, e.g. /docs/DESIGN.md>`.
+feature(s). Location: `/docs/DESIGN/>`.
 
 ## Folder Structure
 
