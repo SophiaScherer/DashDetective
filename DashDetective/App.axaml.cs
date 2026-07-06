@@ -4,8 +4,7 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
-using DashDetective.ViewModels;
-using DashDetective.Views;
+using DashDetective.Shell;
 
 namespace DashDetective;
 
