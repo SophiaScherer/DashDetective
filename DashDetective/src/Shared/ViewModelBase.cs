@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace DashDetective.ViewModels;
+namespace DashDetective.Shared;
 
 public abstract class ViewModelBase : ObservableObject {
 }

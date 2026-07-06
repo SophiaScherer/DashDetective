@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.Sparkline"
+             x:Name="Root" x:CompileBindings="False">
+    <!--
+      A lightweight line chart. Feed it a Points string ("x,y x,y …") and a Stroke.
+      The Viewbox stretches the fixed-coordinate polyline to fill the control, so
+      callers just set a Height. Currently fed static sample data.
+    -->
+    <Viewbox Stretch="Fill" HorizontalAlignment="Stretch">
+        <Polyline x:Name="Line"
+                  Stroke="{Binding #Root.Stroke}"
+                  StrokeThickness="{Binding #Root.StrokeThickness}"
+                  StrokeLineCap="Round" StrokeJoin="Round"/>
+    </Viewbox>
+</UserControl>

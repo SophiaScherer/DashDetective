@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.InfoRow"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- A key/value line with a bottom hairline. Used in System Information and future spec lists. -->
+    <Border Classes="infoRow">
+        <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Classes="infoKey" Text="{Binding #Root.Key}"/>
+            <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding #Root.Value}"/>
+        </Grid>
+    </Border>
+</UserControl>

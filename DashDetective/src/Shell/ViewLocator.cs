@@ -2,9 +2,9 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using DashDetective.ViewModels;
+using DashDetective.Shared;
 
-namespace DashDetective;
+namespace DashDetective.Shell;
 
 /// <summary>
 /// Given a view model, returns the corresponding view if possible.
