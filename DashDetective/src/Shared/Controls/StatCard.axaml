@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             x:Class="DashDetective.Shared.Controls.StatCard"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- A dashboard metric card: label, colour dot, big value + unit, caption, sparkline. -->
+    <Border Classes="card">
+        <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="cardLabel" Text="{Binding #Root.Label}"/>
+                <Rectangle Grid.Column="1" Width="8" Height="8" RadiusX="2" RadiusY="2"
+                           Fill="{Binding #Root.Accent}"/>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Classes="cardValue" Text="{Binding #Root.Value}"/>
+                <TextBlock Classes="cardUnit" Text="{Binding #Root.Unit}"
+                           VerticalAlignment="Bottom" Margin="0,0,0,4"/>
+            </StackPanel>
+            <TextBlock Classes="cardSub" Text="{Binding #Root.Sub}"/>
+            <controls:Sparkline Height="34" StrokeThickness="1.4"
+                                Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"/>
+        </StackPanel>
+    </Border>
+</UserControl>
