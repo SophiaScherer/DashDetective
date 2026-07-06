@@ -66,9 +66,9 @@ Before performing any of the following, stop and ask first:
 
 ## Design Document
 
-There is a design document describing UI/UX intent, layout, and behavior for
-each feature. You may read and update this document as part of feature work on the current
-feature(s). Location: `/docs/DESIGN/`.
+There is an attached design document describing UI/UX intent, layout, and behavior for
+each feature. You may read this document as part of feature work on the current
+feature(s).
 
 ## Folder Structure
 
