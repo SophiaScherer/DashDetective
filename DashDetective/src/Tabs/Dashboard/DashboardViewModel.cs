@@ -35,6 +35,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
 
     [ObservableProperty] private string _memoryValueText = "0";
     [ObservableProperty] private string _memorySubText = "";
+    [ObservableProperty] private string _memoryUtilizationText = "";
     [ObservableProperty] private string _memoryPoints = "";
 
     public DashboardViewModel() {
@@ -182,6 +183,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         MemoryValueText = usedGb.ToString("F1", CultureInfo.InvariantCulture);
         MemorySubText = totalGb > 0
             ? $"{rounded.ToString(CultureInfo.InvariantCulture)}% of {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
+            : "";
+        MemoryUtilizationText = totalGb > 0
+            ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
         MemoryPoints = BuildMemoryPoints();
     }
