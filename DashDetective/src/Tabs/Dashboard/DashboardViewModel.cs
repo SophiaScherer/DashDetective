@@ -13,7 +13,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// View model for the Dashboard page. Currently drives the live CPU surfaces; the other
 /// metrics remain static placeholders in the view until they are implemented.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase {
+public partial class DashboardViewModel : ViewModelBase, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -43,11 +43,18 @@ public partial class DashboardViewModel : ViewModelBase {
     }
 
     private async Task LoadCpuInfoAsync() {
-        var info = await CpuInfoProvider.GetAsync();
-        // Constructed on the UI thread, so the continuation resumes there — safe to bind.
-        CpuModelShort = ShortenCpuName(info.Name);
-        CpuModelText = FormatCpuModel(info);
-        CpuCoresText = FormatCpuCores(info);
+        // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
+        // path so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await CpuInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            CpuModelShort = ShortenCpuName(info.Name);
+            CpuModelText = FormatCpuModel(info);
+            CpuCoresText = FormatCpuCores(info);
+        } catch {
+            CpuModelShort = "Unknown CPU";
+            CpuModelText = "Unknown CPU";
+        }
     }
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
@@ -65,7 +72,17 @@ public partial class DashboardViewModel : ViewModelBase {
             : $"{info.LogicalCores} threads";
 
     private void OnCpuTick(object? sender, EventArgs e) {
-        var value = _cpuSampler.Sample();
+        double value;
+        try {
+            value = _cpuSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host). Show a neutral placeholder
+            // and stop polling rather than throwing on the UI thread every second.
+            CpuValueText = "—";
+            CpuPercentText = "—";
+            _cpuTimer.Stop();
+            return;
+        }
 
         // Shift the window left by one and append the newest sample at the end.
         Array.Copy(_cpuHistory, 1, _cpuHistory, 0, _cpuHistory.Length - 1);
@@ -119,5 +136,11 @@ public partial class DashboardViewModel : ViewModelBase {
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>Stops the sampling timer. Safe to call more than once.</summary>
+    public void Dispose() {
+        _cpuTimer.Stop();
+        _cpuTimer.Tick -= OnCpuTick;
     }
 }
