@@ -75,7 +75,7 @@
                         <StackPanel Grid.Column="1">
                             <controls:InfoRow Key="Build" Value="26100.1150"/>
                             <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
-                            <controls:InfoRow Key="RAM" Value="32 GB DDR5-6000"/>
+                            <controls:InfoRow Key="RAM" Value="{Binding MemoryModelText}"/>
                             <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
                             <controls:InfoRow Key="Motherboard" Value="ROG Z790-E"/>
                         </StackPanel>

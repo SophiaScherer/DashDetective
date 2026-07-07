@@ -37,6 +37,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _memorySubText = "";
     [ObservableProperty] private string _memoryUtilizationText = "";
     [ObservableProperty] private string _memoryPoints = "";
+    [ObservableProperty] private string _memoryModelText = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -57,6 +58,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
+        _ = LoadMemoryInfoAsync();
     }
 
     private async Task LoadCpuInfoAsync() {
@@ -72,6 +74,29 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
             CpuModelShort = "Unknown CPU";
             CpuModelText = "Unknown CPU";
         }
+    }
+
+    private async Task LoadMemoryInfoAsync() {
+        // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole
+        // path so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await MemoryInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            MemoryModelText = FormatMemoryModel(info);
+        } catch {
+            MemoryModelText = "Unknown RAM";
+        }
+    }
+
+    /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>
+    private static string FormatMemoryModel(MemoryStaticInfo info) {
+        if (info.TotalGb <= 0)
+            return "Unknown RAM";
+
+        var text = $"{info.TotalGb.ToString("F0", CultureInfo.InvariantCulture)} GB {info.TypeLabel}";
+        return info.SpeedMhz > 0
+            ? $"{text}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
+            : text;
     }
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
