@@ -30,6 +30,16 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - `Dashboard`
 - `Settings`
 
+**Implementation status within the active features:**
+
+- **Dashboard** — the **CPU surfaces are live and functional**: the CPU `StatCard`, the
+  "CPU Utilization" panel, and the System Information **CPU** and **Cores** rows all read the
+  real machine. Everything else on the Dashboard (Memory, GPU, Storage, Network cards and
+  charts, plus the non-CPU System Information rows) is **still static mock data** from the
+  design doc — leave it alone unless a task explicitly asks to wire it up.
+- **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
+  `SettingsViewModel` is empty).
+
 **Everything else (File Explorer, Processes, Performance, Network, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
@@ -66,9 +76,9 @@ Before performing any of the following, stop and ask first:
 
 ## Design Document
 
-There is a design document describing UI/UX intent, layout, and behavior for
-each feature. You may read and update this document as part of feature work on the current
-feature(s). Location: `/docs/DESIGN/`.
+There is an attached design document describing UI/UX intent, layout, and behavior for
+each feature. You may read this document as part of feature work on the current
+feature(s).
 
 ## Folder Structure
 
@@ -86,16 +96,25 @@ currently exist.
         Palette.axaml           (colour brushes; merged in App.axaml)
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons…)
       /Controls
-        Sparkline, StatCard, InfoRow   (reusable widgets)
+        Sparkline, StatCard, InfoRow   (reusable widgets; Sparkline auto-fits to its data
+                                        by default, or set YMin/YMax for a fixed axis —
+                                        StatCard forwards YMin/YMax to its inner sparkline)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
       /Navigation
         NavItem.cs, Icons.cs
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
+                                CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
+                                CpuInfoProvider.cs      (static CPU info via WMI, async)
+                                CpuStaticInfo.cs        (record for the WMI result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
+
+Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
+a second feature needs them (per the "keep each tab self-contained" rule). The live-CPU code
+above is the reference example.
 
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
 `DashDetective.Shell`, `DashDetective.Shell.Navigation`, `DashDetective.Tabs.<Feature>`.
@@ -107,6 +126,13 @@ Rules of thumb:
 - Keep each tab self-contained: its view, view model, and feature-specific helpers live in
   its own folder under `src/Tabs`, not scattered project-wide.
 - The shell (sidebar/toolbar/navigation) is shared — edit carefully.
+
+## Dependencies
+
+Beyond Avalonia + `CommunityToolkit.Mvvm`, the project references **`System.Management`**
+(added for the live-CPU work, with user approval) — it provides WMI access (`Win32_Processor`
+etc.). Reuse it for future hardware queries. Adding any *new* package still requires asking
+first (see Strict Working Boundaries).
 
 ## Working Style
 

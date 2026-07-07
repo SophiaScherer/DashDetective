@@ -3,7 +3,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Dashboard"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="920"
+             x:DataType="vm:DashboardViewModel"
              x:Class="DashDetective.Tabs.Dashboard.DashboardView">
 
     <!-- Layout only: static sample data. Surfaces/typography come from src/Shared/Styles;
@@ -12,9 +14,9 @@
 
         <!-- ===== Stat cards ===== -->
         <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
-            <controls:StatCard Grid.Column="0" Label="CPU" Value="23" Unit="%"
-                               Sub="Intel Core i9-14900K" Accent="{StaticResource Accent}"
-                               Points="0,22 5,18 10,24 15,14 20,20 25,10 30,17 35,9 40,15 45,7 50,13 55,19 60,11 65,17 70,8 75,14 80,6 85,12 90,17 95,9 100,13"/>
+            <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
+                               Sub="{Binding CpuModelShort}" Accent="{StaticResource Accent}"
+                               YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
             <controls:StatCard Grid.Column="1" Label="MEMORY" Value="17.2" Unit="GB"
                                Sub="54% of 32 GB" Accent="{StaticResource Purple}"
                                Points="0,14 5,13 10,15 15,12 20,14 25,11 30,13 35,10 40,12 45,9 50,11 55,13 60,10 65,12 70,9 75,11 80,8 85,10 90,12 95,9 100,11"/>
@@ -35,10 +37,10 @@
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
-                        <TextBlock Grid.Column="1" Text="23%" FontSize="12" Foreground="{StaticResource Accent}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{StaticResource Accent}"/>
                     </Grid>
                     <controls:Sparkline Height="130" Stroke="{StaticResource Accent}"
-                                        Points="0,70 4,66 8,72 12,55 16,63 20,40 24,58 28,35 32,52 36,28 40,46 44,60 48,38 52,54 56,30 60,48 64,26 68,44 72,58 76,34 80,50 84,24 88,42 92,56 96,32 100,46"/>
+                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="panel">
@@ -66,13 +68,13 @@
                         <StackPanel Grid.Column="0">
                             <controls:InfoRow Key="OS" Value="Windows 11 Pro 24H2"/>
                             <controls:InfoRow Key="Device" Value="WORKSTATION-A9"/>
-                            <controls:InfoRow Key="Cores" Value="24 (8P + 16E)"/>
+                            <controls:InfoRow Key="Cores" Value="{Binding CpuCoresText}"/>
                             <controls:InfoRow Key="GPU" Value="GeForce RTX 4080"/>
                             <controls:InfoRow Key="BIOS" Value="AMI F31d"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
                             <controls:InfoRow Key="Build" Value="26100.1150"/>
-                            <controls:InfoRow Key="CPU" Value="i9-14900K @ 3.2GHz"/>
+                            <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
                             <controls:InfoRow Key="RAM" Value="32 GB DDR5-6000"/>
                             <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
                             <controls:InfoRow Key="Motherboard" Value="ROG Z790-E"/>

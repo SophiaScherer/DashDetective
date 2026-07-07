@@ -4,11 +4,18 @@
              x:Name="Root" x:CompileBindings="False">
     <!--
       A lightweight line chart. Feed it a Points string ("x,y x,y …") and a Stroke.
-      The Viewbox stretches the fixed-coordinate polyline to fill the control, so
-      callers just set a Height. Currently fed static sample data.
+
+      Two vertical-scaling modes:
+      • Auto-fit (default): the Viewbox below stretches the polyline's own bounds to fill the
+        control, so the vertical scale follows the data's min/max. Used by all the static
+        sample sparklines.
+      • Fixed range: set YMin and YMax to pin the vertical axis (e.g. 0–100 for a CPU %
+        chart). The Viewbox is hidden and the line is drawn directly in Render() against the
+        control's pixel size, so it reads on a stable axis. Smaller y = top, matching the
+        auto-fit convention.
     -->
-    <Viewbox Stretch="Fill" HorizontalAlignment="Stretch">
-        <Polyline x:Name="Line"
+    <Viewbox x:Name="AutoBox" Stretch="Fill" HorizontalAlignment="Stretch">
+        <Polyline x:Name="AutoLine"
                   Stroke="{Binding #Root.Stroke}"
                   StrokeThickness="{Binding #Root.StrokeThickness}"
                   StrokeLineCap="Round" StrokeJoin="Round"/>

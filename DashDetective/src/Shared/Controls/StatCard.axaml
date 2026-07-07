@@ -18,7 +18,8 @@
             </StackPanel>
             <TextBlock Classes="cardSub" Text="{Binding #Root.Sub}"/>
             <controls:Sparkline Height="34" StrokeThickness="1.4"
-                                Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"/>
+                                Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"
+                                YMin="{Binding #Root.YMin}" YMax="{Binding #Root.YMax}"/>
         </StackPanel>
     </Border>
 </UserControl>
