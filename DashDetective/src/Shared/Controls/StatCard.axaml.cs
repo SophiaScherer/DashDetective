@@ -27,6 +27,12 @@ public partial class StatCard : UserControl {
     public static readonly StyledProperty<string?> PointsProperty =
         AvaloniaProperty.Register<StatCard, string?>(nameof(Points));
 
+    public static readonly StyledProperty<double?> YMinProperty =
+        AvaloniaProperty.Register<StatCard, double?>(nameof(YMin));
+
+    public static readonly StyledProperty<double?> YMaxProperty =
+        AvaloniaProperty.Register<StatCard, double?>(nameof(YMax));
+
     public StatCard() {
         InitializeComponent();
     }
@@ -65,5 +71,17 @@ public partial class StatCard : UserControl {
     public string? Points {
         get => GetValue(PointsProperty);
         set => SetValue(PointsProperty, value);
+    }
+
+    /// <summary>Optional fixed lower bound for the sparkline's vertical axis (see <see cref="Sparkline.YMin"/>).</summary>
+    public double? YMin {
+        get => GetValue(YMinProperty);
+        set => SetValue(YMinProperty, value);
+    }
+
+    /// <summary>Optional fixed upper bound for the sparkline's vertical axis (see <see cref="Sparkline.YMax"/>).</summary>
+    public double? YMax {
+        get => GetValue(YMaxProperty);
+        set => SetValue(YMaxProperty, value);
     }
 }

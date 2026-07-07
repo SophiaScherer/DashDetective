@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Shared;
@@ -20,8 +22,10 @@ public partial class DashboardViewModel : ViewModelBase {
     private readonly DispatcherTimer _cpuTimer;
 
     [ObservableProperty] private double _cpuPercent;
+    [ObservableProperty] private string _cpuValueText = "0";
     [ObservableProperty] private string _cpuPercentText = "0%";
     [ObservableProperty] private string _cpuPoints = "";
+    [ObservableProperty] private string _cpuModelShort = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -31,6 +35,15 @@ public partial class DashboardViewModel : ViewModelBase {
         _cpuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _cpuTimer.Tick += OnCpuTick;
         _cpuTimer.Start();
+
+        // Load static CPU hardware info off the UI thread; results are applied when ready.
+        _ = LoadCpuInfoAsync();
+    }
+
+    private async Task LoadCpuInfoAsync() {
+        var info = await CpuInfoProvider.GetAsync();
+        // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+        CpuModelShort = ShortenCpuName(info.Name);
     }
 
     private void OnCpuTick(object? sender, EventArgs e) {
@@ -44,9 +57,32 @@ public partial class DashboardViewModel : ViewModelBase {
     }
 
     private void UpdateCpu(double value) {
+        var rounded = Math.Round(value);
         CpuPercent = value;
-        CpuPercentText = $"{Math.Round(value)}%";
+        CpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
+        CpuPercentText = $"{rounded}%";
         CpuPoints = BuildCpuPoints();
+    }
+
+    /// <summary>
+    /// Trims WMI decoration ("(R)", "(TM)", "N-Core Processor", "CPU @ …GHz") from a
+    /// processor name so it fits the compact StatCard caption, e.g.
+    /// "AMD Ryzen 5 7600X 6-Core Processor" → "AMD Ryzen 5 7600X".
+    /// </summary>
+    private static string ShortenCpuName(string raw) {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "Unknown CPU";
+
+        var name = raw.Replace("(R)", "").Replace("(r)", "")
+                      .Replace("(TM)", "").Replace("(tm)", "");
+
+        var atIndex = name.IndexOf(" @", StringComparison.Ordinal);
+        if (atIndex >= 0)
+            name = name[..atIndex];
+
+        name = Regex.Replace(name, @"\s+\d+-Core Processor", "");
+        name = name.Replace(" Processor", "").Replace(" CPU", "");
+        return Regex.Replace(name, @"\s+", " ").Trim();
     }
 
     /// <summary>

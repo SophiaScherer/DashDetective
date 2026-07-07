@@ -14,9 +14,9 @@
 
         <!-- ===== Stat cards ===== -->
         <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
-            <controls:StatCard Grid.Column="0" Label="CPU" Value="23" Unit="%"
-                               Sub="Intel Core i9-14900K" Accent="{StaticResource Accent}"
-                               Points="0,22 5,18 10,24 15,14 20,20 25,10 30,17 35,9 40,15 45,7 50,13 55,19 60,11 65,17 70,8 75,14 80,6 85,12 90,17 95,9 100,13"/>
+            <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
+                               Sub="{Binding CpuModelShort}" Accent="{StaticResource Accent}"
+                               YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
             <controls:StatCard Grid.Column="1" Label="MEMORY" Value="17.2" Unit="GB"
                                Sub="54% of 32 GB" Accent="{StaticResource Purple}"
                                Points="0,14 5,13 10,15 15,12 20,14 25,11 30,13 35,10 40,12 45,9 50,11 55,13 60,10 65,12 70,9 75,11 80,8 85,10 90,12 95,9 100,11"/>
