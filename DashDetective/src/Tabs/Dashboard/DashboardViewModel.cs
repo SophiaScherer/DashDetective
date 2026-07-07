@@ -21,6 +21,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     private readonly double[] _cpuHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _cpuTimer;
 
+    private readonly MemoryUsageSampler _memorySampler = new();
+    private readonly double[] _memoryHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _memoryTimer;
+
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
     [ObservableProperty] private string _cpuPercentText = "0%";
@@ -28,6 +32,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _cpuModelShort = "";
     [ObservableProperty] private string _cpuModelText = "";
     [ObservableProperty] private string _cpuCoresText = "";
+
+    [ObservableProperty] private string _memoryValueText = "0";
+    [ObservableProperty] private string _memorySubText = "";
+    [ObservableProperty] private string _memoryUtilizationText = "";
+    [ObservableProperty] private string _memoryPoints = "";
+    [ObservableProperty] private string _memoryModelText = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -38,8 +48,17 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _cpuTimer.Tick += OnCpuTick;
         _cpuTimer.Start();
 
+        // Memory runs on its own timer so it stays independent of the CPU sampler: either can
+        // fail and stop without taking the other down.
+        UpdateMemory(_memorySampler.Sample());
+
+        _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _memoryTimer.Tick += OnMemoryTick;
+        _memoryTimer.Start();
+
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
+        _ = LoadMemoryInfoAsync();
     }
 
     private async Task LoadCpuInfoAsync() {
@@ -55,6 +74,29 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
             CpuModelShort = "Unknown CPU";
             CpuModelText = "Unknown CPU";
         }
+    }
+
+    private async Task LoadMemoryInfoAsync() {
+        // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole
+        // path so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await MemoryInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            MemoryModelText = FormatMemoryModel(info);
+        } catch {
+            MemoryModelText = "Unknown RAM";
+        }
+    }
+
+    /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>
+    private static string FormatMemoryModel(MemoryStaticInfo info) {
+        if (info.TotalGb <= 0)
+            return "Unknown RAM";
+
+        var text = $"{info.TotalGb.ToString("F0", CultureInfo.InvariantCulture)} GB {info.TypeLabel}";
+        return info.SpeedMhz > 0
+            ? $"{text}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
+            : text;
     }
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
@@ -138,9 +180,64 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         return sb.ToString();
     }
 
-    /// <summary>Stops the sampling timer. Safe to call more than once.</summary>
+    private void OnMemoryTick(object? sender, EventArgs e) {
+        MemorySample sample;
+        try {
+            sample = _memorySampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host). Show a neutral placeholder and
+            // stop polling rather than throwing on the UI thread every second.
+            MemoryValueText = "—";
+            MemorySubText = "";
+            _memoryTimer.Stop();
+            return;
+        }
+
+        // Shift the window left by one and append the newest load percentage at the end.
+        Array.Copy(_memoryHistory, 1, _memoryHistory, 0, _memoryHistory.Length - 1);
+        _memoryHistory[^1] = sample.LoadPercent;
+
+        UpdateMemory(sample);
+    }
+
+    private void UpdateMemory(MemorySample sample) {
+        var usedGb = sample.UsedBytes / (double)(1L << 30);
+        var totalGb = sample.TotalBytes / (double)(1L << 30);
+        var rounded = Math.Round(sample.LoadPercent);
+
+        MemoryValueText = usedGb.ToString("F1", CultureInfo.InvariantCulture);
+        MemorySubText = totalGb > 0
+            ? $"{rounded.ToString(CultureInfo.InvariantCulture)}% of {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
+            : "";
+        MemoryUtilizationText = totalGb > 0
+            ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
+            : "";
+        MemoryPoints = BuildMemoryPoints();
+    }
+
+    /// <summary>
+    /// Renders the memory history as a Sparkline "x,y" string, matching <see cref="BuildCpuPoints"/>:
+    /// x is the sample index; y is <c>100 − load</c> so higher usage sits at the top, paired with a
+    /// fixed 0–100 axis on the Sparkline.
+    /// </summary>
+    private string BuildMemoryPoints() {
+        var sb = new StringBuilder(_memoryHistory.Length * 8);
+        for (var i = 0; i < _memoryHistory.Length; i++) {
+            if (i > 0)
+                sb.Append(' ');
+            sb.Append(i.ToString(CultureInfo.InvariantCulture));
+            sb.Append(',');
+            sb.Append((100 - _memoryHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>Stops the sampling timers. Safe to call more than once.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
         _cpuTimer.Tick -= OnCpuTick;
+        _memoryTimer.Stop();
+        _memoryTimer.Tick -= OnMemoryTick;
     }
 }

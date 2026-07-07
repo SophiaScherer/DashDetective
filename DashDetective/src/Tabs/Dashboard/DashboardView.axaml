@@ -17,9 +17,9 @@
             <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
                                Sub="{Binding CpuModelShort}" Accent="{StaticResource Accent}"
                                YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
-            <controls:StatCard Grid.Column="1" Label="MEMORY" Value="17.2" Unit="GB"
-                               Sub="54% of 32 GB" Accent="{StaticResource Purple}"
-                               Points="0,14 5,13 10,15 15,12 20,14 25,11 30,13 35,10 40,12 45,9 50,11 55,13 60,10 65,12 70,9 75,11 80,8 85,10 90,12 95,9 100,11"/>
+            <controls:StatCard Grid.Column="1" Label="MEMORY" Value="{Binding MemoryValueText}" Unit="GB"
+                               Sub="{Binding MemorySubText}" Accent="{StaticResource Purple}"
+                               YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
             <controls:StatCard Grid.Column="2" Label="GPU" Value="38" Unit="%"
                                Sub="RTX 4080 · 52°C" Accent="{StaticResource Green}"
                                Points="0,18 5,16 10,19 15,13 20,17 25,12 30,15 35,10 40,14 45,11 50,13 55,16 60,12 65,15 70,10 75,13 80,9 85,12 90,15 95,11 100,13"/>
@@ -47,10 +47,10 @@
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
-                        <TextBlock Grid.Column="1" Text="17.2 / 32 GB" FontSize="12" Foreground="{StaticResource Purple}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{StaticResource Purple}"/>
                     </Grid>
                     <controls:Sparkline Height="130" Stroke="{StaticResource Purple}"
-                                        Points="0,48 4,46 8,50 12,44 16,47 20,42 24,45 28,40 32,44 36,38 40,42 44,46 48,40 52,44 56,39 60,43 64,37 68,41 72,45 76,39 80,43 84,36 88,40 92,44 96,38 100,42"/>
+                                        YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
                 </StackPanel>
             </Border>
         </Grid>
@@ -75,7 +75,7 @@
                         <StackPanel Grid.Column="1">
                             <controls:InfoRow Key="Build" Value="26100.1150"/>
                             <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
-                            <controls:InfoRow Key="RAM" Value="32 GB DDR5-6000"/>
+                            <controls:InfoRow Key="RAM" Value="{Binding MemoryModelText}"/>
                             <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
                             <controls:InfoRow Key="Motherboard" Value="ROG Z790-E"/>
                         </StackPanel>
