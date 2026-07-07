@@ -46,6 +46,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private double _gpuPercent;
     [ObservableProperty] private string _gpuValueText = "0";
     [ObservableProperty] private string _gpuPoints = "";
+    [ObservableProperty] private string _gpuModelShort = "";
+    [ObservableProperty] private string _gpuModelText = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -74,6 +76,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
+        _ = LoadGpuInfoAsync();
     }
 
     private async Task LoadCpuInfoAsync() {
@@ -101,6 +104,39 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         } catch {
             MemoryModelText = "Unknown RAM";
         }
+    }
+
+    private async Task LoadGpuInfoAsync() {
+        // GetAsync never throws (it falls back to GpuStaticInfo.Unknown), but guard the whole path
+        // so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await GpuInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            GpuModelShort = ShortenGpuName(info.Name);
+            GpuModelText = info.Name;
+        } catch {
+            GpuModelShort = "Unknown GPU";
+            GpuModelText = "Unknown GPU";
+        }
+    }
+
+    /// <summary>
+    /// Trims vendor decoration ("NVIDIA", "AMD", "(R)", "(TM)") from an adapter name so it fits the
+    /// compact StatCard caption, e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060",
+    /// "AMD Radeon(TM) Graphics" → "Radeon Graphics".
+    /// </summary>
+    private static string ShortenGpuName(string raw) {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "Unknown GPU";
+
+        var name = raw.Replace("(R)", "").Replace("(r)", "")
+                      .Replace("(TM)", "").Replace("(tm)", "");
+
+        foreach (var vendor in new[] { "NVIDIA ", "AMD ", "Intel " })
+            if (name.StartsWith(vendor, StringComparison.OrdinalIgnoreCase))
+                name = name[vendor.Length..];
+
+        return Regex.Replace(name, @"\s+", " ").Trim();
     }
 
     /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>

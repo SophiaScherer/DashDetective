@@ -21,7 +21,7 @@
                                Sub="{Binding MemorySubText}" Accent="{StaticResource Purple}"
                                YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
             <controls:StatCard Grid.Column="2" Label="GPU" Value="{Binding GpuValueText}" Unit="%"
-                               Sub="Detecting GPU…" Accent="{StaticResource Green}"
+                               Sub="{Binding GpuModelShort}" Accent="{StaticResource Green}"
                                YMin="0" YMax="100" Points="{Binding GpuPoints}"/>
             <controls:StatCard Grid.Column="3" Label="STORAGE" Value="68" Unit="%"
                                Sub="1.36 / 2.0 TB" Accent="{StaticResource Yellow}"
@@ -69,7 +69,7 @@
                             <controls:InfoRow Key="OS" Value="Windows 11 Pro 24H2"/>
                             <controls:InfoRow Key="Device" Value="WORKSTATION-A9"/>
                             <controls:InfoRow Key="Cores" Value="{Binding CpuCoresText}"/>
-                            <controls:InfoRow Key="GPU" Value="GeForce RTX 4080"/>
+                            <controls:InfoRow Key="GPU" Value="{Binding GpuModelText}"/>
                             <controls:InfoRow Key="BIOS" Value="AMI F31d"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">

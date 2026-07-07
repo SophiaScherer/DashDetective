@@ -32,11 +32,13 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
-- **Dashboard** — the **CPU and Memory surfaces are live and functional**. CPU: the CPU
+- **Dashboard** — the **CPU, Memory and GPU surfaces are live and functional**. CPU: the CPU
   `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
-  Information **RAM** row all read the real machine. Everything else on the Dashboard (GPU,
-  Storage, Network cards and charts, plus the remaining System Information rows) is **still
+  Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
+  % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
+  **temperature** and **multi-GPU** layout are not yet done. Everything else on the Dashboard
+  (Storage, Network cards and charts, plus the remaining System Information rows) is **still
   static mock data** from the design doc — leave it alone unless a task explicitly asks to
   wire it up.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
@@ -113,6 +115,9 @@ currently exist.
                                 MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
                                 MemoryInfoProvider.cs   (static RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
+                                GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters)
+                                GpuInfoProvider.cs      (static GPU name via WMI, async)
+                                GpuStaticInfo.cs        (record for the WMI result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
