@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -53,6 +54,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _gpuModelShort = "";
     [ObservableProperty] private string _gpuModelText = "";
 
+    [ObservableProperty] private string _storageValueText = "0";
+    [ObservableProperty] private string _storageSubText = "";
     [ObservableProperty] private string _storagePoints = "";
 
     public DashboardViewModel() {
@@ -80,7 +83,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _gpuTimer.Start();
 
         // Storage runs on its own timer for the same reason: independent of the other samplers.
-        UpdateStorage();
+        UpdateStorage(0);
 
         _storageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _storageTimer.Tick += OnStorageTick;
@@ -289,25 +292,63 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     }
 
     private void OnStorageTick(object? sender, EventArgs e) {
-        double value;
+        StorageSample sample;
         try {
-            value = _storageSampler.Sample();
+            sample = _storageSampler.Sample();
         } catch {
             // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters).
-            // Stop polling rather than throwing on the UI thread every second.
+            // Show a neutral placeholder and stop polling rather than throwing every second.
+            StorageValueText = "—";
+            StorageSubText = "";
             _storageTimer.Stop();
             return;
         }
 
-        // Shift the window left by one and append the newest sample at the end.
+        // Shift the window left by one and append the newest activity sample at the end.
         Array.Copy(_storageHistory, 1, _storageHistory, 0, _storageHistory.Length - 1);
-        _storageHistory[^1] = value;
+        _storageHistory[^1] = sample.ActivePercent;
 
-        UpdateStorage();
+        UpdateStorage(sample.ResponseMs);
     }
 
-    private void UpdateStorage() {
+    private void UpdateStorage(double responseMs) {
         StoragePoints = BuildStoragePoints();
+        StorageValueText = FormatResponseMs(responseMs);
+        UpdateStorageCapacity();
+    }
+
+    /// <summary>Formats the average disk response time for the headline, e.g. "0.4" (paired with the "ms" unit).</summary>
+    private static string FormatResponseMs(double ms) => ms.ToString("F1", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Reads the system drive's capacity via <see cref="DriveInfo"/> and updates the "used / total"
+    /// caption. DriveInfo is a cheap syscall, so this runs on every tick; any failure clears the
+    /// caption.
+    /// </summary>
+    private void UpdateStorageCapacity() {
+        try {
+            var root = Path.GetPathRoot(Environment.SystemDirectory);
+            var drive = string.IsNullOrEmpty(root) ? null : new DriveInfo(root);
+            if (drive is null || !drive.IsReady || drive.TotalSize <= 0) {
+                StorageSubText = "";
+                return;
+            }
+
+            var total = drive.TotalSize;
+            var used = total - drive.TotalFreeSpace;
+            StorageSubText = FormatCapacity(used, total);
+        } catch {
+            StorageSubText = "";
+        }
+    }
+
+    /// <summary>Formats used/total bytes as "1.36 / 2.0 TB" (or GB when total is under 1 TB).</summary>
+    private static string FormatCapacity(long usedBytes, long totalBytes) {
+        const double tb = 1L << 40;
+        const double gb = 1L << 30;
+        return totalBytes >= tb
+            ? $"{(usedBytes / tb).ToString("F2", CultureInfo.InvariantCulture)} / {(totalBytes / tb).ToString("F1", CultureInfo.InvariantCulture)} TB"
+            : $"{Math.Round(usedBytes / gb).ToString(CultureInfo.InvariantCulture)} / {Math.Round(totalBytes / gb).ToString(CultureInfo.InvariantCulture)} GB";
     }
 
     /// <summary>
