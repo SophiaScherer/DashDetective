@@ -29,6 +29,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     private readonly double[] _gpuHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _gpuTimer;
 
+    private readonly StorageUsageSampler _storageSampler = new();
+    private readonly double[] _storageHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _storageTimer;
+
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
     [ObservableProperty] private string _cpuPercentText = "0%";
@@ -48,6 +52,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _gpuPoints = "";
     [ObservableProperty] private string _gpuModelShort = "";
     [ObservableProperty] private string _gpuModelText = "";
+
+    [ObservableProperty] private string _storagePoints = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -72,6 +78,13 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _gpuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _gpuTimer.Tick += OnGpuTick;
         _gpuTimer.Start();
+
+        // Storage runs on its own timer for the same reason: independent of the other samplers.
+        UpdateStorage();
+
+        _storageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _storageTimer.Tick += OnStorageTick;
+        _storageTimer.Start();
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -275,6 +288,46 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         return sb.ToString();
     }
 
+    private void OnStorageTick(object? sender, EventArgs e) {
+        double value;
+        try {
+            value = _storageSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters).
+            // Stop polling rather than throwing on the UI thread every second.
+            _storageTimer.Stop();
+            return;
+        }
+
+        // Shift the window left by one and append the newest sample at the end.
+        Array.Copy(_storageHistory, 1, _storageHistory, 0, _storageHistory.Length - 1);
+        _storageHistory[^1] = value;
+
+        UpdateStorage();
+    }
+
+    private void UpdateStorage() {
+        StoragePoints = BuildStoragePoints();
+    }
+
+    /// <summary>
+    /// Renders the storage-activity history as a Sparkline "x,y" string, matching
+    /// <see cref="BuildCpuPoints"/>: x is the sample index; y is <c>100 − value</c> so higher
+    /// activity sits at the top, paired with a fixed 0–100 axis on the Sparkline.
+    /// </summary>
+    private string BuildStoragePoints() {
+        var sb = new StringBuilder(_storageHistory.Length * 8);
+        for (var i = 0; i < _storageHistory.Length; i++) {
+            if (i > 0)
+                sb.Append(' ');
+            sb.Append(i.ToString(CultureInfo.InvariantCulture));
+            sb.Append(',');
+            sb.Append((100 - _storageHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
+        }
+
+        return sb.ToString();
+    }
+
     private void OnMemoryTick(object? sender, EventArgs e) {
         MemorySample sample;
         try {
@@ -336,7 +389,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _memoryTimer.Tick -= OnMemoryTick;
         _gpuTimer.Stop();
         _gpuTimer.Tick -= OnGpuTick;
-        // Unlike the CPU/Memory samplers, the GPU sampler owns a PDH query handle to release.
+        _storageTimer.Stop();
+        _storageTimer.Tick -= OnStorageTick;
+        // Unlike the CPU/Memory samplers, the GPU and Storage samplers own PDH query handles.
         _gpuSampler.Dispose();
+        _storageSampler.Dispose();
     }
 }
