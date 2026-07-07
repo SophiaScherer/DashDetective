@@ -26,6 +26,8 @@ public partial class DashboardViewModel : ViewModelBase {
     [ObservableProperty] private string _cpuPercentText = "0%";
     [ObservableProperty] private string _cpuPoints = "";
     [ObservableProperty] private string _cpuModelShort = "";
+    [ObservableProperty] private string _cpuModelText = "";
+    [ObservableProperty] private string _cpuCoresText = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -44,7 +46,23 @@ public partial class DashboardViewModel : ViewModelBase {
         var info = await CpuInfoProvider.GetAsync();
         // Constructed on the UI thread, so the continuation resumes there — safe to bind.
         CpuModelShort = ShortenCpuName(info.Name);
+        CpuModelText = FormatCpuModel(info);
+        CpuCoresText = FormatCpuCores(info);
     }
+
+    /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
+    private static string FormatCpuModel(CpuStaticInfo info) {
+        var name = ShortenCpuName(info.Name);
+        return info.MaxClockMhz > 0
+            ? $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz"
+            : name;
+    }
+
+    /// <summary>Physical/logical core counts, e.g. "6 cores · 12 threads".</summary>
+    private static string FormatCpuCores(CpuStaticInfo info) =>
+        info.PhysicalCores > 0
+            ? $"{info.PhysicalCores} cores · {info.LogicalCores} threads"
+            : $"{info.LogicalCores} threads";
 
     private void OnCpuTick(object? sender, EventArgs e) {
         var value = _cpuSampler.Sample();

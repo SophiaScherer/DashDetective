@@ -68,13 +68,13 @@
                         <StackPanel Grid.Column="0">
                             <controls:InfoRow Key="OS" Value="Windows 11 Pro 24H2"/>
                             <controls:InfoRow Key="Device" Value="WORKSTATION-A9"/>
-                            <controls:InfoRow Key="Cores" Value="24 (8P + 16E)"/>
+                            <controls:InfoRow Key="Cores" Value="{Binding CpuCoresText}"/>
                             <controls:InfoRow Key="GPU" Value="GeForce RTX 4080"/>
                             <controls:InfoRow Key="BIOS" Value="AMI F31d"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
                             <controls:InfoRow Key="Build" Value="26100.1150"/>
-                            <controls:InfoRow Key="CPU" Value="i9-14900K @ 3.2GHz"/>
+                            <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
                             <controls:InfoRow Key="RAM" Value="32 GB DDR5-6000"/>
                             <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
                             <controls:InfoRow Key="Motherboard" Value="ROG Z790-E"/>
