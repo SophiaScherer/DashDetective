@@ -17,9 +17,9 @@
             <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
                                Sub="{Binding CpuModelShort}" Accent="{StaticResource Accent}"
                                YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
-            <controls:StatCard Grid.Column="1" Label="MEMORY" Value="17.2" Unit="GB"
-                               Sub="54% of 32 GB" Accent="{StaticResource Purple}"
-                               Points="0,14 5,13 10,15 15,12 20,14 25,11 30,13 35,10 40,12 45,9 50,11 55,13 60,10 65,12 70,9 75,11 80,8 85,10 90,12 95,9 100,11"/>
+            <controls:StatCard Grid.Column="1" Label="MEMORY" Value="{Binding MemoryValueText}" Unit="GB"
+                               Sub="{Binding MemorySubText}" Accent="{StaticResource Purple}"
+                               YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
             <controls:StatCard Grid.Column="2" Label="GPU" Value="38" Unit="%"
                                Sub="RTX 4080 · 52°C" Accent="{StaticResource Green}"
                                Points="0,18 5,16 10,19 15,13 20,17 25,12 30,15 35,10 40,14 45,11 50,13 55,16 60,12 65,15 70,10 75,13 80,9 85,12 90,15 95,11 100,13"/>
