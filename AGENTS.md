@@ -37,10 +37,10 @@ Not all of these exist yet. Only build what is listed below as "currently active
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
   Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
   % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
-  **temperature** and **multi-GPU** layout are not yet done. Everything else on the Dashboard
-  (Storage, Network cards and charts, plus the remaining System Information rows) is **still
-  static mock data** from the design doc — leave it alone unless a task explicitly asks to
-  wire it up.
+  **temperature** and **multi-GPU** layout are **deferred and out of scope for now** (research
+  notes under *Deferred Dashboard work* below). Everything else on the Dashboard (Storage,
+  Network cards and charts, plus the remaining System Information rows) is **still static mock
+  data** from the design doc — leave it alone unless a task explicitly asks to wire it up.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
@@ -48,6 +48,34 @@ Not all of these exist yet. Only build what is listed below as "currently active
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
+
+### Deferred Dashboard work — DO NOT build without an explicit task
+
+These were scoped and researched but are **intentionally not built**. The notes exist so the
+research isn't lost, not as a licence to start. Leave the GPU card as a single fixed card until
+a task explicitly reactivates this. Full plan:
+`C:\Users\User\.claude\plans\i-was-in-the-iridescent-pretzel.md`.
+
+- **GPU temperature** — would append `· <temp>°C` to the GPU card caption. No universal Windows
+  API; needs vendor SDKs (NVML / ADLX / IGCL) or a library, best-effort with graceful fallback.
+
+- **Multi-GPU layout** — on multi-GPU machines, render one card per GPU via a dynamic
+  `ObservableCollection` + `ItemsControl` in a single wrapping row, relocating the Storage/Network
+  cards to reflow. This is an **architecture change** (per the boundaries below, stop and get
+  sign-off first). Research findings from a part-built, since-discarded attempt:
+  - Per-GPU utilisation must be **attributed by adapter LUID**: the PDH `\GPU Engine(*)` and
+    `\GPU Adapter Memory(*)` counter instances are keyed by `luid_0x{High:x8}_0x{Low:x8}` but carry
+    no friendly name.
+  - **DXGI** (`dxgi.dll`, `CreateDXGIFactory1` → `EnumAdapters1` → `GetDesc1`) is the authoritative
+    LUID→name map; it also reports **true VRAM** (WMI `AdapterRAM` is capped at 4 GB) and flags
+    software adapters. It **must be called via raw vtable function pointers, not `[ComImport]`** —
+    built-in COM is disabled by a runtime feature switch (`NotSupportedException: Built-in COM has
+    been disabled`). The vtable approach needs no `unsafe` and no csproj change.
+  - `Win32_VideoController` has **no utilisation counter** and its `AdapterRAM` is 4 GB-capped, so
+    it's only good for the name; filter to physical adapters by `PNPDeviceID` starting with `PCI\`.
+  - The correct card set is **the LUIDs present in the PDH counters ∩ the DXGI adapter names, minus
+    software adapters**. DXGI can list one physical GPU under several LUIDs and also enumerates a
+    "Microsoft Basic Render Driver" (software) — both are noise to be discarded.
 
 ## Strict Working Boundaries
 
