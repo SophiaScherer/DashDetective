@@ -32,11 +32,13 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
-- **Dashboard** — the **CPU surfaces are live and functional**: the CPU `StatCard`, the
-  "CPU Utilization" panel, and the System Information **CPU** and **Cores** rows all read the
-  real machine. Everything else on the Dashboard (Memory, GPU, Storage, Network cards and
-  charts, plus the non-CPU System Information rows) is **still static mock data** from the
-  design doc — leave it alone unless a task explicitly asks to wire it up.
+- **Dashboard** — the **CPU and Memory surfaces are live and functional**. CPU: the CPU
+  `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
+  rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
+  Information **RAM** row all read the real machine. Everything else on the Dashboard (GPU,
+  Storage, Network cards and charts, plus the remaining System Information rows) is **still
+  static mock data** from the design doc — leave it alone unless a task explicitly asks to
+  wire it up.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
@@ -108,13 +110,18 @@ currently exist.
                                 CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
                                 CpuInfoProvider.cs      (static CPU info via WMI, async)
                                 CpuStaticInfo.cs        (record for the WMI result)
+                                MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
+                                MemoryInfoProvider.cs   (static RAM info via WMI, async)
+                                MemoryStaticInfo.cs     (record for the WMI result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
-a second feature needs them (per the "keep each tab self-contained" rule). The live-CPU code
-above is the reference example.
+a second feature needs them (per the "keep each tab self-contained" rule). The live-CPU and
+live-Memory code above is the reference example: each metric has its own 1 Hz `DispatcherTimer`
+and a 60-sample rolling buffer in `DashboardViewModel`, plus a feature-local sampler (Win32
+P/Invoke) and WMI provider.
 
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
 `DashDetective.Shell`, `DashDetective.Shell.Navigation`, `DashDetective.Tabs.<Feature>`.
@@ -130,9 +137,9 @@ Rules of thumb:
 ## Dependencies
 
 Beyond Avalonia + `CommunityToolkit.Mvvm`, the project references **`System.Management`**
-(added for the live-CPU work, with user approval) — it provides WMI access (`Win32_Processor`
-etc.). Reuse it for future hardware queries. Adding any *new* package still requires asking
-first (see Strict Working Boundaries).
+(added for the live-CPU work, with user approval) — it provides WMI access (`Win32_Processor`,
+`Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. Adding any *new* package
+still requires asking first (see Strict Working Boundaries).
 
 ## Working Style
 
