@@ -292,9 +292,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     }
 
     private void OnStorageTick(object? sender, EventArgs e) {
-        StorageSample sample;
+        double value;
         try {
-            sample = _storageSampler.Sample();
+            value = _storageSampler.Sample();
         } catch {
             // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters).
             // Show a neutral placeholder and stop polling rather than throwing every second.
@@ -306,19 +306,21 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
 
         // Shift the window left by one and append the newest activity sample at the end.
         Array.Copy(_storageHistory, 1, _storageHistory, 0, _storageHistory.Length - 1);
-        _storageHistory[^1] = sample.ActivePercent;
+        _storageHistory[^1] = value;
 
-        UpdateStorage(sample.ResponseMs);
+        UpdateStorage(value);
     }
 
-    private void UpdateStorage(double responseMs) {
+    /// <summary>
+    /// Updates the storage card from the latest activity reading: the headline shows Task Manager's
+    /// disk "Active time" (0–100 %), the sparkline shows its 60-second history, and the caption shows
+    /// system-drive capacity.
+    /// </summary>
+    private void UpdateStorage(double value) {
+        StorageValueText = Math.Round(value).ToString(CultureInfo.InvariantCulture);
         StoragePoints = BuildStoragePoints();
-        StorageValueText = FormatResponseMs(responseMs);
         UpdateStorageCapacity();
     }
-
-    /// <summary>Formats the average disk response time for the headline, e.g. "0.4" (paired with the "ms" unit).</summary>
-    private static string FormatResponseMs(double ms) => ms.ToString("F1", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Reads the system drive's capacity via <see cref="DriveInfo"/> and updates the "used / total"
