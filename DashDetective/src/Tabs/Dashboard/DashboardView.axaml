@@ -73,7 +73,7 @@
                             <controls:InfoRow Key="Build" Value="{Binding BuildText}"/>
                             <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
                             <controls:InfoRow Key="RAM" Value="{Binding MemoryModelText}"/>
-                            <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
+                            <controls:InfoRow Key="Uptime" Value="{Binding UptimeText}"/>
                             <controls:InfoRow Key="Motherboard" Value="{Binding MotherboardText}"/>
                         </StackPanel>
                     </Grid>

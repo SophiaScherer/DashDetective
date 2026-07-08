@@ -62,6 +62,8 @@
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="TextAlignment" Value="Right"/>
+        <!-- Test: wrap long values (e.g. full BIOS/motherboard names) to a new line instead of clipping. -->
+        <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
     <!-- ===== Segmented selector ===== -->

@@ -45,6 +45,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _networkTimer;
 
+    private readonly DispatcherTimer _uptimeTimer;
+
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
     [ObservableProperty] private string _cpuPercentText = "0%";
@@ -82,6 +84,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _biosText = "";
     [ObservableProperty] private string _buildText = "";
     [ObservableProperty] private string _motherboardText = "";
+    [ObservableProperty] private string _uptimeText = "";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -123,6 +126,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _networkTimer.Tick += OnNetworkTick;
         _networkTimer.Start();
+
+        // Uptime updates on a coarse 30 s cadence — the smallest displayed unit is minutes, so a
+        // faster tick would be wasted work. Seed once so it's correct on the first frame.
+        UpdateUptime();
+
+        _uptimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _uptimeTimer.Tick += OnUptimeTick;
+        _uptimeTimer.Start();
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -190,6 +201,28 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
             BuildText = "Unknown";
             MotherboardText = "Unknown motherboard";
         }
+    }
+
+    private void OnUptimeTick(object? sender, EventArgs e) => UpdateUptime();
+
+    /// <summary>
+    /// Refreshes the uptime readout from the system tick count. <see cref="Environment.TickCount64"/>
+    /// is milliseconds since boot and, unlike the 32-bit <c>TickCount</c>, does not wrap.
+    /// </summary>
+    private void UpdateUptime() =>
+        UptimeText = FormatUptime(TimeSpan.FromMilliseconds(Environment.TickCount64));
+
+    /// <summary>
+    /// Formats a duration as "Nd Nh Nm", dropping any leading zero units
+    /// (e.g. "3d 14h 22m", "5h 2m", "12m").
+    /// </summary>
+    private static string FormatUptime(TimeSpan uptime) {
+        var days = (int)uptime.TotalDays;
+        if (days > 0)
+            return $"{days}d {uptime.Hours}h {uptime.Minutes}m";
+        if (uptime.Hours > 0)
+            return $"{uptime.Hours}h {uptime.Minutes}m";
+        return $"{uptime.Minutes}m";
     }
 
     /// <summary>
@@ -572,6 +605,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _storageTimer.Tick -= OnStorageTick;
         _networkTimer.Stop();
         _networkTimer.Tick -= OnNetworkTick;
+        _uptimeTimer.Stop();
+        _uptimeTimer.Tick -= OnUptimeTick;
         // Unlike the CPU/Memory samplers, the GPU and Storage samplers own PDH query handles.
         // The network sampler is fully managed, so it needs no disposal.
         _gpuSampler.Dispose();
