@@ -26,9 +26,9 @@
             <controls:StatCard Grid.Column="3" Label="STORAGE" Value="{Binding StorageValueText}" Unit="%"
                                Sub="{Binding StorageSubText}" Accent="{StaticResource Yellow}"
                                YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
-            <controls:StatCard Grid.Column="4" Label="NETWORK" Value="31" Unit="Mbps"
-                               Sub="↑ 12 Mbps" Accent="{StaticResource Accent}"
-                               Points="0,20 5,15 10,23 15,12 20,19 25,9 30,16 35,7 40,14 45,18 50,10 55,17 60,6 65,15 70,11 75,19 80,8 85,14 90,17 95,10 100,13"/>
+            <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="Mbps"
+                               Sub="{Binding NetworkSubText}" Accent="{StaticResource Accent}"
+                               YMin="0" YMax="{Binding NetworkYMax}" Points="{Binding NetworkDownPoints}"/>
         </Grid>
 
         <!-- ===== Utilization charts ===== -->
@@ -87,26 +87,28 @@
                 <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Network Throughput"/>
-                        <TextBlock Grid.Column="1" Text="Ethernet" FontSize="11" Foreground="{StaticResource TextSubtle}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{StaticResource TextSubtle}"/>
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <StackPanel Spacing="1">
                             <TextBlock Text="↓ Download" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="31" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Accent}"/>
+                                <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Accent}"/>
                                 <TextBlock Text="Mbps" FontSize="11" Foreground="{StaticResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="1">
                             <TextBlock Text="↑ Upload" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="12" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Orange}"/>
+                                <TextBlock Text="{Binding NetworkUpText}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Orange}"/>
                                 <TextBlock Text="Mbps" FontSize="11" Foreground="{StaticResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                    <controls:Sparkline Height="96" Stroke="{StaticResource Accent}"
-                                        Points="0,60 5,48 10,66 15,38 20,58 25,30 30,50 35,26 40,44 45,56 50,32 55,52 60,22 65,46 70,34 75,58 80,28 85,44 90,54 95,32 100,42"/>
+                    <controls:Sparkline Height="96" Fill="True"
+                                        Stroke="{StaticResource Accent}" Points="{Binding NetworkDownPoints}"
+                                        Stroke2="{StaticResource Orange}" Points2="{Binding NetworkUpPoints}"
+                                        YMin="0" YMax="{Binding NetworkYMax}"/>
                 </StackPanel>
             </Border>
         </Grid>
