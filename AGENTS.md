@@ -32,8 +32,8 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
-- **Dashboard** — the **CPU, Memory, GPU and Storage surfaces are live and functional**. CPU: the
-  CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
+- **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
+  the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
   Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
   % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
@@ -41,9 +41,12 @@ Not all of these exist yet. Only build what is listed below as "currently active
   notes under *Deferred Dashboard work* below). Storage: the Storage `StatCard` shows live disk
   **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
   as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
-  no WMI). Everything else on the Dashboard (the **Network** card and its throughput chart, plus the
-  remaining System Information rows) is **still static mock data** from the design doc — leave it
-  alone unless a task explicitly asks to wire it up.
+  no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
+  in **Mbps** (dual series on one shared scale + gradient fill) with a live adapter-name caption, via
+  `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke — see the sampler note in
+  *Folder Structure*). Everything else on the Dashboard (the remaining System Information rows) is
+  **still static mock data** from the design doc — leave it alone unless a task explicitly asks to wire
+  it up.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
@@ -133,7 +136,10 @@ currently exist.
       /Controls
         Sparkline, StatCard, InfoRow   (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
-                                        StatCard forwards YMin/YMax to its inner sparkline)
+                                        StatCard forwards YMin/YMax to its inner sparkline.
+                                        Fixed-axis mode also supports an optional second series
+                                        (Points2/Stroke2) + gradient area fill (Fill), used by the
+                                        Network throughput panel for download+upload on one scale)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
       /Navigation
@@ -151,6 +157,10 @@ currently exist.
                                 GpuStaticInfo.cs        (record for the WMI result)
                                 StorageUsageSampler.cs  (live disk Active time % via PDH PhysicalDisk
                                                          counters; capacity caption uses DriveInfo, no WMI)
+                                NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface;
+                                                         samples ONE primary adapter — internet-facing,
+                                                         has a default gateway — NOT a sum of all adapters,
+                                                         see note below)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
@@ -159,7 +169,18 @@ Feature-specific helpers (samplers, providers) live in the tab folder, not `src/
 a second feature needs them (per the "keep each tab self-contained" rule). The live-CPU and
 live-Memory code above is the reference example: each metric has its own 1 Hz `DispatcherTimer`
 and a 60-sample rolling buffer in `DashboardViewModel`, plus a feature-local sampler (Win32
-P/Invoke) and WMI provider.
+P/Invoke) and WMI provider. The Network metric follows the same pattern but keeps **two** 60-sample
+buffers (download + upload) and computes a shared dynamic `YMax` so both series plot on one scale.
+
+**Network sampler gotcha (important).** `NetworkUsageSampler` samples a **single primary adapter**,
+never a sum of all adapters. On .NET, `NetworkInterface.GetAllNetworkInterfaces()` returns many
+virtual/filter/phantom adapters (Hyper-V, VirtualBox, WFP, …) that **mirror the physical NIC's byte
+counters**, so summing them multi-counts the same traffic (was ~8× too high vs Task Manager). Note a
+Windows PowerShell 5.1 probe will **not** reproduce this — .NET Framework returns far fewer adapters
+than modern .NET. The sampler selects the internet-facing adapter (Up, non-loopback/tunnel, has a
+usable default gateway, busiest by bytes), locks to its `Id` across ticks, and matches Task Manager's
+per-adapter numbers. When verifying throughput, always cross-check the actual value against Task
+Manager, not just "looks plausible".
 
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
 `DashDetective.Shell`, `DashDetective.Shell.Navigation`, `DashDetective.Tabs.<Feature>`.
@@ -176,7 +197,8 @@ Rules of thumb:
 
 Beyond Avalonia + `CommunityToolkit.Mvvm`, the project references **`System.Management`**
 (added for the live-CPU work, with user approval) — it provides WMI access (`Win32_Processor`,
-`Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. Adding any *new* package
+`Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. The live-Network work added
+**no** new package — it uses the in-box `System.Net.NetworkInformation`. Adding any *new* package
 still requires asking first (see Strict Working Boundaries).
 
 ## Working Style
