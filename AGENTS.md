@@ -44,9 +44,13 @@ Not all of these exist yet. Only build what is listed below as "currently active
   no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
   in **Mbps** (dual series on one shared scale + gradient fill) with a live adapter-name caption, via
   `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke — see the sampler note in
-  *Folder Structure*). Everything else on the Dashboard (the remaining System Information rows) is
-  **still static mock data** from the design doc — leave it alone unless a task explicitly asks to wire
-  it up.
+  *Folder Structure*). System Information: the whole panel now reads the real machine — **OS** edition +
+  feature update (WMI `Win32_OperatingSystem.Caption` + registry `DisplayVersion`), **Device**
+  (`Environment.MachineName`), **BIOS** (`Win32_BIOS`), **Motherboard** (`Win32_BaseBoard`), **Build**
+  (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
+  timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
+  the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
+  live — nothing on it is static mock** (only Settings remains layout-only).
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
@@ -139,7 +143,9 @@ currently exist.
                                         StatCard forwards YMin/YMax to its inner sparkline.
                                         Fixed-axis mode also supports an optional second series
                                         (Points2/Stroke2) + gradient area fill (Fill), used by the
-                                        Network throughput panel for download+upload on one scale)
+                                        Network throughput panel for download+upload on one scale.
+                                        InfoRow is a key/value row; long values wrap to multiple
+                                        lines (flush-right) instead of clipping — see SharedStyles infoVal)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
       /Navigation
@@ -161,6 +167,10 @@ currently exist.
                                                          samples ONE primary adapter — internet-facing,
                                                          has a default gateway — NOT a sum of all adapters,
                                                          see note below)
+                                SystemInfoProvider.cs   (static system identity — OS/device/BIOS/board/build —
+                                                         via WMI + registry, async; uptime is live off
+                                                         Environment.TickCount64 in the VM, no sampler file)
+                                SystemStaticInfo.cs     (record for the system-identity result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
@@ -171,6 +181,16 @@ live-Memory code above is the reference example: each metric has its own 1 Hz `D
 and a 60-sample rolling buffer in `DashboardViewModel`, plus a feature-local sampler (Win32
 P/Invoke) and WMI provider. The Network metric follows the same pattern but keeps **two** 60-sample
 buffers (download + upload) and computes a shared dynamic `YMax` so both series plot on one scale.
+
+The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
+(`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
+"Unknown …") reads the static identity facts once at startup into a `SystemStaticInfo` record. It
+also reads the **registry** (via the in-box `Microsoft.Win32.Registry` API) for the build revision
+(`UBR`) and feature-update label (`DisplayVersion`), which WMI does not expose. **Uptime** is the one
+live value with no sampler/provider — the VM formats `Environment.TickCount64` (the 64-bit,
+non-wrapping tick count) on its own coarse 30 s `DispatcherTimer` (uptime's smallest displayed unit is
+minutes). Verbose vendor strings (e.g. "American Megatrends International, LLC.") are shown **in full**;
+`InfoRow` wraps them flush-right rather than trimming.
 
 **Network sampler gotcha (important).** `NetworkUsageSampler` samples a **single primary adapter**,
 never a sum of all adapters. On .NET, `NetworkInterface.GetAllNetworkInterfaces()` returns many
@@ -200,6 +220,11 @@ Beyond Avalonia + `CommunityToolkit.Mvvm`, the project references **`System.Mana
 `Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. The live-Network work added
 **no** new package — it uses the in-box `System.Net.NetworkInformation`. Adding any *new* package
 still requires asking first (see Strict Working Boundaries).
+
+The System Information work reads the **registry** via the `Microsoft.Win32.Registry` API (build
+revision + feature-update label). On the `net10.0` target this API is **provided in-box — no package
+reference is needed** (adding the `Microsoft.Win32.Registry` package is redundant and raises an
+`NU1510` "unnecessary" warning). So it, too, added **no** new dependency.
 
 ## Working Style
 
