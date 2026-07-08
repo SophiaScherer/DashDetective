@@ -77,6 +77,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private double _networkYMax = MinNetworkScaleMbps;
     [ObservableProperty] private string _networkAdapterName = "Network";
 
+    [ObservableProperty] private string _osText = "";
+    [ObservableProperty] private string _deviceText = "";
+    [ObservableProperty] private string _biosText = "";
+    [ObservableProperty] private string _buildText = "";
+    [ObservableProperty] private string _motherboardText = "";
+
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
         // the first frame; real samples then shift in from the right, one per second.
@@ -122,6 +128,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadGpuInfoAsync();
+        _ = LoadSystemInfoAsync();
     }
 
     private async Task LoadCpuInfoAsync() {
@@ -162,6 +169,26 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         } catch {
             GpuModelShort = "Unknown GPU";
             GpuModelText = "Unknown GPU";
+        }
+    }
+
+    private async Task LoadSystemInfoAsync() {
+        // GetAsync never throws (it falls back to SystemStaticInfo.Unknown), but guard the whole
+        // path so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await SystemInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            OsText = info.Os;
+            DeviceText = info.Device;
+            BiosText = info.Bios;
+            BuildText = info.Build;
+            MotherboardText = info.Motherboard;
+        } catch {
+            OsText = "Unknown OS";
+            DeviceText = Environment.MachineName;
+            BiosText = "Unknown BIOS";
+            BuildText = "Unknown";
+            MotherboardText = "Unknown motherboard";
         }
     }
 
