@@ -60,24 +60,21 @@
 
             <Border Grid.Column="0" Classes="panel">
                 <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="System Information"/>
-                        <TextBlock Grid.Column="1" Text="Updated 2 min ago" FontSize="11" Foreground="{StaticResource TextSubtle}"/>
-                    </Grid>
+                    <TextBlock Classes="panelTitle" Text="System Information"/>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
                         <StackPanel Grid.Column="0">
-                            <controls:InfoRow Key="OS" Value="Windows 11 Pro 24H2"/>
-                            <controls:InfoRow Key="Device" Value="WORKSTATION-A9"/>
+                            <controls:InfoRow Key="OS" Value="{Binding OsText}"/>
+                            <controls:InfoRow Key="Device" Value="{Binding DeviceText}"/>
                             <controls:InfoRow Key="Cores" Value="{Binding CpuCoresText}"/>
                             <controls:InfoRow Key="GPU" Value="{Binding GpuModelText}"/>
-                            <controls:InfoRow Key="BIOS" Value="AMI F31d"/>
+                            <controls:InfoRow Key="BIOS" Value="{Binding BiosText}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
-                            <controls:InfoRow Key="Build" Value="26100.1150"/>
+                            <controls:InfoRow Key="Build" Value="{Binding BuildText}"/>
                             <controls:InfoRow Key="CPU" Value="{Binding CpuModelText}"/>
                             <controls:InfoRow Key="RAM" Value="{Binding MemoryModelText}"/>
-                            <controls:InfoRow Key="Uptime" Value="3d 14h 22m"/>
-                            <controls:InfoRow Key="Motherboard" Value="ROG Z790-E"/>
+                            <controls:InfoRow Key="Uptime" Value="{Binding UptimeText}"/>
+                            <controls:InfoRow Key="Motherboard" Value="{Binding MotherboardText}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

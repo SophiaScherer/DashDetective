@@ -62,6 +62,7 @@
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="TextAlignment" Value="Right"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
     <!-- ===== Segmented selector ===== -->
