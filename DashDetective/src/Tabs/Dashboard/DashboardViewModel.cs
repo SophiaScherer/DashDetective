@@ -18,6 +18,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
+    /// <summary>
+    /// Floor for the network throughput chart's shared vertical scale, in Mbps. Keeps an idle graph
+    /// pinned flat near the bottom (rather than amplifying counter noise) and avoids a zero span.
+    /// </summary>
+    private const double MinNetworkScaleMbps = 1.0;
+
     private readonly CpuUsageSampler _cpuSampler = new();
     private readonly double[] _cpuHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _cpuTimer;
@@ -33,6 +39,11 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     private readonly StorageUsageSampler _storageSampler = new();
     private readonly double[] _storageHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _storageTimer;
+
+    private readonly NetworkUsageSampler _networkSampler = new();
+    private readonly double[] _downHistory = new double[WindowSeconds];
+    private readonly double[] _upHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _networkTimer;
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
@@ -57,6 +68,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
     [ObservableProperty] private string _storageValueText = "0";
     [ObservableProperty] private string _storageSubText = "";
     [ObservableProperty] private string _storagePoints = "";
+
+    [ObservableProperty] private string _networkDownText = "0";
+    [ObservableProperty] private string _networkUpText = "0";
+    [ObservableProperty] private string _networkSubText = "↑ 0 Mbps";
+    [ObservableProperty] private string _networkDownPoints = "";
+    [ObservableProperty] private string _networkUpPoints = "";
+    [ObservableProperty] private double _networkYMax = MinNetworkScaleMbps;
+    [ObservableProperty] private string _networkAdapterName = "Network";
 
     public DashboardViewModel() {
         // The history array starts all-zero, so the chart is full-width (flat at 0%) from
@@ -88,6 +107,16 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _storageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _storageTimer.Tick += OnStorageTick;
         _storageTimer.Start();
+
+        // Network runs on its own timer for the same reason: independent of the other samplers.
+        // The adapter label is chosen once, at construction, from the busiest active adapter.
+        if (!string.IsNullOrWhiteSpace(_networkSampler.AdapterName))
+            NetworkAdapterName = _networkSampler.AdapterName;
+        UpdateNetwork(new NetworkSample(0, 0));
+
+        _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _networkTimer.Tick += OnNetworkTick;
+        _networkTimer.Start();
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -424,6 +453,86 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         return sb.ToString();
     }
 
+    private void OnNetworkTick(object? sender, EventArgs e) {
+        NetworkSample sample;
+        try {
+            sample = _networkSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. no readable adapters). Show a neutral placeholder and
+            // stop polling rather than throwing on the UI thread every second.
+            NetworkDownText = "—";
+            NetworkUpText = "—";
+            _networkTimer.Stop();
+            return;
+        }
+
+        // Shift both windows left by one and append the newest down/up rates at the end.
+        Array.Copy(_downHistory, 1, _downHistory, 0, _downHistory.Length - 1);
+        _downHistory[^1] = sample.DownMbps;
+        Array.Copy(_upHistory, 1, _upHistory, 0, _upHistory.Length - 1);
+        _upHistory[^1] = sample.UpMbps;
+
+        UpdateNetwork(sample);
+    }
+
+    /// <summary>
+    /// Updates the throughput readouts and both sparkline series. Download and upload share one
+    /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable; the scale
+    /// auto-fits to the busiest of the two 60-second windows, with headroom and a floor.
+    /// </summary>
+    private void UpdateNetwork(NetworkSample sample) {
+        NetworkDownText = FormatMbps(sample.DownMbps);
+        NetworkUpText = FormatMbps(sample.UpMbps);
+        NetworkSubText = $"↑ {NetworkUpText} Mbps";
+
+        var scale = ComputeNetworkScale();
+        NetworkYMax = scale;
+        NetworkDownPoints = BuildNetworkPoints(_downHistory, scale);
+        NetworkUpPoints = BuildNetworkPoints(_upHistory, scale);
+    }
+
+    /// <summary>
+    /// Shared upper bound for both series: the largest sample across both windows, plus ~15 % headroom
+    /// so the peak line doesn't touch the top edge, clamped to <see cref="MinNetworkScaleMbps"/>.
+    /// </summary>
+    private double ComputeNetworkScale() {
+        var max = 0.0;
+        for (var i = 0; i < WindowSeconds; i++) {
+            if (_downHistory[i] > max) max = _downHistory[i];
+            if (_upHistory[i] > max) max = _upHistory[i];
+        }
+
+        var scaled = max * 1.15;
+        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
+    }
+
+    /// <summary>Formats a rate for the readout: whole Mbps at ≥ 10, one decimal below (e.g. "93", "2.7").</summary>
+    private static string FormatMbps(double mbps) {
+        if (mbps < 0)
+            mbps = 0;
+        return mbps >= 10
+            ? Math.Round(mbps).ToString(CultureInfo.InvariantCulture)
+            : mbps.ToString("F1", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Renders a throughput history as a Sparkline "x,y" string against the shared <paramref name="yMax"/>:
+    /// x is the sample index; y is <c>yMax − value</c> so higher throughput sits at the top (smaller y =
+    /// top), paired with a fixed 0–<paramref name="yMax"/> axis on the Sparkline.
+    /// </summary>
+    private static string BuildNetworkPoints(double[] history, double yMax) {
+        var sb = new StringBuilder(history.Length * 8);
+        for (var i = 0; i < history.Length; i++) {
+            if (i > 0)
+                sb.Append(' ');
+            sb.Append(i.ToString(CultureInfo.InvariantCulture));
+            sb.Append(',');
+            sb.Append((yMax - history[i]).ToString("0.##", CultureInfo.InvariantCulture));
+        }
+
+        return sb.ToString();
+    }
+
     /// <summary>Stops the sampling timers. Safe to call more than once.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
@@ -434,7 +543,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _gpuTimer.Tick -= OnGpuTick;
         _storageTimer.Stop();
         _storageTimer.Tick -= OnStorageTick;
+        _networkTimer.Stop();
+        _networkTimer.Tick -= OnNetworkTick;
         // Unlike the CPU/Memory samplers, the GPU and Storage samplers own PDH query handles.
+        // The network sampler is fully managed, so it needs no disposal.
         _gpuSampler.Dispose();
         _storageSampler.Dispose();
     }
