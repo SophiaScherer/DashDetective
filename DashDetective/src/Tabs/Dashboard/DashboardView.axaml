@@ -23,9 +23,9 @@
             <controls:StatCard Grid.Column="2" Label="GPU" Value="{Binding GpuValueText}" Unit="%"
                                Sub="{Binding GpuModelShort}" Accent="{StaticResource Green}"
                                YMin="0" YMax="100" Points="{Binding GpuPoints}"/>
-            <controls:StatCard Grid.Column="3" Label="STORAGE" Value="68" Unit="%"
-                               Sub="1.36 / 2.0 TB" Accent="{StaticResource Yellow}"
-                               Points="0,15 5,15 10,14 15,15 20,14 25,15 30,14 35,15 40,14 45,15 50,14 55,15 60,14 65,15 70,14 75,15 80,14 85,15 90,14 95,15 100,14"/>
+            <controls:StatCard Grid.Column="3" Label="STORAGE" Value="{Binding StorageValueText}" Unit="%"
+                               Sub="{Binding StorageSubText}" Accent="{StaticResource Yellow}"
+                               YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
             <controls:StatCard Grid.Column="4" Label="NETWORK" Value="31" Unit="Mbps"
                                Sub="↑ 12 Mbps" Accent="{StaticResource Accent}"
                                Points="0,20 5,15 10,23 15,12 20,19 25,9 30,16 35,7 40,14 45,18 50,10 55,17 60,6 65,15 70,11 75,19 80,8 85,14 90,17 95,10 100,13"/>

@@ -32,15 +32,18 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
-- **Dashboard** — the **CPU, Memory and GPU surfaces are live and functional**. CPU: the CPU
-  `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
+- **Dashboard** — the **CPU, Memory, GPU and Storage surfaces are live and functional**. CPU: the
+  CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
   Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
   % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
   **temperature** and **multi-GPU** layout are **deferred and out of scope for now** (research
-  notes under *Deferred Dashboard work* below). Everything else on the Dashboard (Storage,
-  Network cards and charts, plus the remaining System Information rows) is **still static mock
-  data** from the design doc — leave it alone unless a task explicitly asks to wire it up.
+  notes under *Deferred Dashboard work* below). Storage: the Storage `StatCard` shows live disk
+  **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
+  as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
+  no WMI). Everything else on the Dashboard (the **Network** card and its throughput chart, plus the
+  remaining System Information rows) is **still static mock data** from the design doc — leave it
+  alone unless a task explicitly asks to wire it up.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
@@ -146,6 +149,8 @@ currently exist.
                                 GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters)
                                 GpuInfoProvider.cs      (static GPU name via WMI, async)
                                 GpuStaticInfo.cs        (record for the WMI result)
+                                StorageUsageSampler.cs  (live disk Active time % via PDH PhysicalDisk
+                                                         counters; capacity caption uses DriveInfo, no WMI)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
