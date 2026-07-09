@@ -7,10 +7,82 @@
              x:DataType="fe:FileExplorerViewModel"
              x:Class="DashDetective.Tabs.FileExplorer.FileExplorerView">
 
-    <!-- Scaffold. The tree / list / breadcrumb / details panes are added in later phases.
-         Surfaces and typography come from src/Shared/Styles. -->
-    <Border Classes="panel">
-        <TextBlock Classes="panelTitle" Text="File Explorer"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-    </Border>
+    <!-- Read-only three-pane browser. Phase 2 wires the folder tree (left); the centre file list
+         and right details pane are placeholders until Phases 3–4. Surfaces come from
+         src/Shared/Styles; selection/hover colours use theme resources. -->
+    <UserControl.Styles>
+        <!-- Tree rows: tighten spacing and recolour selection/hover to match the design comp
+             (AccentSoft selected, HoverOverlay hover) instead of the Fluent defaults. -->
+        <Style Selector="TreeViewItem">
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+            <Setter Property="CornerRadius" Value="5"/>
+        </Style>
+        <!-- Suppress the Fluent default hover: a TreeViewItem's :pointerover is true whenever the
+             pointer is over any descendant, so it would grey the whole ancestor chain. -->
+        <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- Real hover: keyed off the row border's OWN pointerover, so only the directly
+             hovered row highlights (the border wraps just the header, not the children). -->
+        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- Selection is independent of hover and wins on the selected row. -->
+        <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="TreeViewItem TextBlock.nodeName">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected TextBlock.nodeName">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="210,*,260" ColumnSpacing="12">
+
+        <!-- ===== Folder tree ===== -->
+        <Border Grid.Column="0" Classes="panel" Padding="8">
+            <TreeView ItemsSource="{Binding RootNodes}"
+                      Background="Transparent" BorderThickness="0" Padding="0">
+                <TreeView.ItemContainerTheme>
+                    <ControlTheme TargetType="TreeViewItem" x:DataType="fe:FileSystemNode"
+                                  BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                    </ControlTheme>
+                </TreeView.ItemContainerTheme>
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fe:FileSystemNode">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Data="{Binding Glyph}" Stroke="{Binding IconBrush}"
+                                  StrokeThickness="1.3" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <TextBlock Classes="nodeName" Text="{Binding Name}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
+
+        <!-- ===== File list (Phase 3) ===== -->
+        <Border Grid.Column="1" Classes="panel">
+            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="{Binding CurrentPath, FallbackValue='Select a folder'}"/>
+        </Border>
+
+        <!-- ===== Details (Phase 4) ===== -->
+        <Border Grid.Column="2" Classes="panel">
+            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="Details"/>
+        </Border>
+    </Grid>
 </UserControl>
