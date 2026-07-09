@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -36,6 +37,32 @@ public static class ShellInterop {
         return isDirectory ? "File folder" : ExtensionLabel(path);
     }
 
+    /// <summary>
+    /// Opens a file with its default application, or a folder in Explorer, via the shell
+    /// (<c>UseShellExecute</c>). Soft-fails on a missing file / no association / access denied.
+    /// </summary>
+    public static void Open(string path) {
+        try {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        } catch {
+            // Nothing actionable — the item simply doesn't open.
+        }
+    }
+
+    /// <summary>
+    /// Shows the native Windows file/folder Properties dialog. Needs the owning window handle,
+    /// so it's invoked from the view code-behind (the pattern used by the Export dialog).
+    /// </summary>
+    public static void ShowProperties(IntPtr owner, string path) {
+        if (!OperatingSystem.IsWindows())
+            return;
+        try {
+            SHObjectProperties(owner, SHOP_FILEPATH, path, null);
+        } catch {
+            // Dialog couldn't be shown (item gone, shell busy) — ignore.
+        }
+    }
+
     // "config.json" -> "JSON File"; no extension -> "File".
     private static string ExtensionLabel(string path) {
         var ext = Path.GetExtension(path);
@@ -46,6 +73,7 @@ public static class ShellInterop {
     private const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
     private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
     private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+    private const uint SHOP_FILEPATH = 0x00000002;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO {
@@ -59,4 +87,9 @@ public static class ShellInterop {
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes,
                                                ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SHObjectProperties(IntPtr hwnd, uint shopObjectType,
+                                                  string pszObjectName, string? pszPropertyPage);
 }

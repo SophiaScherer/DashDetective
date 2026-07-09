@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
 
 namespace DashDetective.Tabs.FileExplorer;
@@ -85,10 +86,19 @@ public partial class FileExplorerViewModel : ViewModelBase {
     /// <summary>Selects a file-list row (drives the details pane in Phase 4).</summary>
     public void SelectEntry(FileEntry entry) => entry.IsSelected = true;
 
-    /// <summary>Activates a row: folders navigate into themselves. Files open in Phase 5.</summary>
+    /// <summary>Activates a row: folders navigate into themselves; files open in their default app.</summary>
     public void ActivateEntry(FileEntry entry) {
         if (entry.IsDirectory)
             SetCurrentFolder(entry.FullPath);
+        else
+            ShellInterop.Open(entry.FullPath);
+    }
+
+    /// <summary>Opens the selected entry (details-pane Open button).</summary>
+    [RelayCommand]
+    private void Open() {
+        if (SelectedEntry is { } entry)
+            ShellInterop.Open(entry.FullPath);
     }
 
     private void SetCurrentFolder(string path) {

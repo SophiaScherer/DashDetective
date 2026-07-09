@@ -276,6 +276,16 @@
                             <controls:InfoRow Key="Attributes" Value="{Binding SelectedEntry.AttributesText}"/>
                             <controls:InfoRow Key="Location" Value="{Binding SelectedEntry.Location}"/>
                         </StackPanel>
+
+                        <!-- Actions -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Classes="action primary" Content="Open"
+                                    Command="{Binding OpenCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            <Button Grid.Column="1" Classes="action" Content="Properties"
+                                    Click="OnPropertiesClick"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </Panel>

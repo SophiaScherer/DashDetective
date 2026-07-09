@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -7,6 +8,16 @@ namespace DashDetective.Tabs.FileExplorer;
 public partial class FileExplorerView : UserControl {
     public FileExplorerView() {
         InitializeComponent();
+    }
+
+    // The native Properties dialog needs the owning window handle, so it's invoked here rather
+    // than from the view model (the same reason the Export dialog lives in MainWindow.axaml.cs).
+    private void OnPropertiesClick(object? sender, RoutedEventArgs e) {
+        if (DataContext is not FileExplorerViewModel { SelectedEntry: { } entry })
+            return;
+
+        var handle = TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        ShellInterop.ShowProperties(handle, entry.FullPath);
     }
 
     // Single tap selects the row (drives the details pane); double tap activates it (a folder
