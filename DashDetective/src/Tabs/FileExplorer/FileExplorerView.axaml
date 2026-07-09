@@ -163,7 +163,17 @@
         </Grid>
 
         <!-- ===== Three panes ===== -->
-        <Grid Grid.Row="1" ColumnDefinitions="210,*,260" ColumnSpacing="12">
+        <!-- Fixed side panels + star middle, split by draggable GridSplitters. The 12px splitter
+             columns stand in for the old 12px ColumnSpacing. Widths reset each launch (no persist);
+             min/max keep the file list usable at the window's 920px minimum. -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" MinWidth="180" MaxWidth="420"/>  <!-- left tree -->
+                <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
+                <ColumnDefinition Width="*"   MinWidth="320"/>                 <!-- file list -->
+                <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
+                <ColumnDefinition Width="300" MinWidth="220" MaxWidth="460"/>  <!-- details -->
+            </Grid.ColumnDefinitions>
 
         <!-- ===== Folder tree ===== -->
         <Border Grid.Column="0" Classes="panel" Padding="8">
@@ -190,8 +200,10 @@
             </TreeView>
         </Border>
 
+        <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
+
         <!-- ===== File list ===== -->
-        <Border Grid.Column="1" Classes="panel" Padding="0" ClipToBounds="True">
+        <Border Grid.Column="2" Classes="panel" Padding="0" ClipToBounds="True">
             <Grid RowDefinitions="Auto,*">
 
                 <!-- Column header -->
@@ -240,8 +252,10 @@
             </Grid>
         </Border>
 
+        <GridSplitter Grid.Column="3" Classes="paneSplitter"/>
+
         <!-- ===== Details / preview ===== -->
-        <Border Grid.Column="2" Classes="panel">
+        <Border Grid.Column="4" Classes="panel">
             <Panel>
                 <!-- Empty state -->
                 <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
