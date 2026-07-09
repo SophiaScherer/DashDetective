@@ -50,7 +50,14 @@ Not all of these exist yet. Only build what is listed below as "currently active
   (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
   timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
   the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
-  live — nothing on it is static mock** (only Settings remains layout-only).
+  live — nothing on it is static mock** (only Settings remains layout-only). The shell **toolbar**
+  (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`),
+  a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
+  that forces an immediate re-read of every metric + static provider (`DashboardViewModel.RefreshNow`),
+  and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
+  (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
+  needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
+  uses the in-box `Avalonia.Platform.Storage` picker — no new package.
 - **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
   `SettingsViewModel` is empty).
 
