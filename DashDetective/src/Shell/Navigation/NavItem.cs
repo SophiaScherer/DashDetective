@@ -8,16 +8,12 @@ using DashDetective.Shared;
 namespace DashDetective.Shell.Navigation;
 
 /// <summary>
-/// A single entry in the sidebar navigation. Carries the page it activates plus
-/// the visual state (colours, indicator, weight) that changes with selection.
+/// A single entry in the sidebar navigation: the page it activates plus its selection state.
+/// The selected-state visuals (accent indicator/icon, highlight, weight) are driven from theme
+/// resources in MainWindow.axaml via <see cref="IsSelected"/>, so they follow the current theme
+/// and accent automatically.
 /// </summary>
 public partial class NavItem : ObservableObject {
-    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#4cc2ff"));
-    private static readonly IBrush SelectedBackground = new SolidColorBrush(Color.Parse("#4cc2ff"), 0.12);
-    private static readonly IBrush SelectedText = new SolidColorBrush(Colors.White);
-    private static readonly IBrush UnselectedText = new SolidColorBrush(Colors.White, 0.72);
-    private static readonly IBrush UnselectedIcon = new SolidColorBrush(Colors.White, 0.60);
-
     public NavItem(string label, string title, string subtitle, Geometry icon,
                    ViewModelBase page, Action<NavItem> onSelected) {
         Label = label;
@@ -36,18 +32,4 @@ public partial class NavItem : ObservableObject {
     public ICommand SelectCommand { get; }
 
     [ObservableProperty] private bool _isSelected;
-
-    public IBrush RowBackground => IsSelected ? SelectedBackground : Brushes.Transparent;
-    public IBrush TextForeground => IsSelected ? SelectedText : UnselectedText;
-    public IBrush IconBrush => IsSelected ? Accent : UnselectedIcon;
-    public double IndicatorHeight => IsSelected ? 18 : 0;
-    public FontWeight LabelWeight => IsSelected ? FontWeight.SemiBold : FontWeight.Normal;
-
-    partial void OnIsSelectedChanged(bool value) {
-        OnPropertyChanged(nameof(RowBackground));
-        OnPropertyChanged(nameof(TextForeground));
-        OnPropertyChanged(nameof(IconBrush));
-        OnPropertyChanged(nameof(IndicatorHeight));
-        OnPropertyChanged(nameof(LabelWeight));
-    }
 }

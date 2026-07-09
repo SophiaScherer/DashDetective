@@ -12,7 +12,10 @@
       Fixed series colours may stay {StaticResource}; everything else must be {DynamicResource}.
     -->
 
-    <!-- ===== Theme-invariant: series colours (fixed) ===== -->
+    <!-- ===== Theme-invariant: fixed accent-legend colours =====
+         The four accent choices, plus yellow. Used by the "Default" swatch's 2x2 legend and as
+         the default per-graph chart colours below. Fixed, so a running accent swap never changes them. -->
+    <SolidColorBrush x:Key="Blue" Color="#4cc2ff"/>
     <SolidColorBrush x:Key="Purple" Color="#c58fff"/>
     <SolidColorBrush x:Key="Green" Color="#6ccb5f"/>
     <SolidColorBrush x:Key="Yellow" Color="#ffcf4d"/>
@@ -26,6 +29,16 @@
     <!-- Colours (not brushes) for the brand-logo gradient stops. -->
     <Color x:Key="AccentColor">#4cc2ff</Color>
     <Color x:Key="AccentDeep">#2a7fd4</Color>
+
+    <!-- ===== Theme-invariant: chart series (swapped at runtime by ThemeService) =====
+         Each dashboard graph binds to one of these. In the "Default" look they hold the distinct
+         colours below; when a single accent is chosen, ThemeService sets them all to that accent. -->
+    <SolidColorBrush x:Key="ChartCpu" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="ChartMemory" Color="#c58fff"/>
+    <SolidColorBrush x:Key="ChartGpu" Color="#6ccb5f"/>
+    <SolidColorBrush x:Key="ChartStorage" Color="#ffcf4d"/>
+    <SolidColorBrush x:Key="ChartNetDown" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="ChartNetUp" Color="#ff8a5c"/>
 
     <ResourceDictionary.ThemeDictionaries>
 

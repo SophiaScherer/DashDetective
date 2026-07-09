@@ -34,6 +34,35 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
+        <!-- Sidebar nav row: selection-driven visuals, all sourced from theme/accent resources
+             so they follow the current theme and accent. Defaults are the unselected state. -->
+        <Style Selector="Button.nav Border.navRow">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.nav.selected Border.navRow">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Button.nav Rectangle.navIndicator">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Button.nav.selected Rectangle.navIndicator">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Button.nav Path.navIcon">
+            <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
+        </Style>
+        <Style Selector="Button.nav.selected Path.navIcon">
+            <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Button.nav TextBlock.navLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="Button.nav.selected TextBlock.navLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
         <!-- Small square icon buttons in the toolbar. -->
         <Style Selector="Button.toolIcon">
             <Setter Property="Background" Value="Transparent"/>
@@ -76,8 +105,8 @@
                     <Border Width="30" Height="30" CornerRadius="7">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Offset="0" Color="#4cc2ff"/>
-                                <GradientStop Offset="1" Color="#2a7fd4"/>
+                                <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
+                                <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
                             </LinearGradientBrush>
                         </Border.Background>
                         <Viewbox Width="16" Height="16">
@@ -96,21 +125,18 @@
                     <ItemsControl ItemsSource="{Binding NavItems}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="nav:NavItem">
-                                <Button Classes="nav" Command="{Binding SelectCommand}">
-                                    <Border Background="{Binding RowBackground}" CornerRadius="6"
-                                            Padding="11,9">
+                                <Button Classes="nav" Classes.selected="{Binding IsSelected}"
+                                        Command="{Binding SelectCommand}">
+                                    <Border Classes="navRow" CornerRadius="6" Padding="11,9">
                                         <Grid ColumnDefinitions="3,9,18,12,*" VerticalAlignment="Center">
-                                            <Rectangle Grid.Column="0" Width="3" RadiusX="1.5" RadiusY="1.5"
-                                                       Height="{Binding IndicatorHeight}" Fill="{DynamicResource Accent}"
+                                            <Rectangle Grid.Column="0" Classes="navIndicator" Width="3" Height="18"
+                                                       RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                        HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                            <Path Grid.Column="2" Width="18" Height="18" Stretch="None"
-                                                  Data="{Binding Icon}" Stroke="{Binding IconBrush}"
-                                                  StrokeThickness="1.4" StrokeLineCap="Round"
+                                            <Path Grid.Column="2" Classes="navIcon" Width="18" Height="18" Stretch="None"
+                                                  Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
                                                   StrokeJoin="Round" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Label}" FontSize="13"
-                                                       Foreground="{Binding TextForeground}"
-                                                       FontWeight="{Binding LabelWeight}"
-                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="4" Classes="navLabel" Text="{Binding Label}"
+                                                       FontSize="13" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Border>
                                 </Button>

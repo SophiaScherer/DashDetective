@@ -19,7 +19,7 @@ public partial class MainWindowViewModel : ViewModelBase {
 
     private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard = new();
-    private readonly SettingsViewModel _settings = new();
+    private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
     [ObservableProperty] private ViewModelBase _currentPage;
@@ -37,8 +37,10 @@ public partial class MainWindowViewModel : ViewModelBase {
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
     public MainWindowViewModel() {
-        // Apply the default appearance (Dark + Blue) through the single theming seam.
+        // Apply the default appearance (Dark + Blue) through the single theming seam,
+        // then hand the same service to the Settings page so its controls drive it.
         _theme.ApplyDefaults();
+        _settings = new SettingsViewModel(_theme);
 
         NavItems = new ObservableCollection<NavItem> {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",

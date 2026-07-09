@@ -2,10 +2,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:settings="using:DashDetective.Tabs.Settings"
              mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="720"
+             x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
 
-    <!-- Layout only: controls are static and not wired to preferences yet.
+    <!-- Appearance (Theme + Accent) is wired to SettingsViewModel via the ThemeService.
+         Monitoring and Export & Data below are still static layout.
          Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
     <UserControl.Styles>
         <Style Selector="TextBlock.settingName">
@@ -14,6 +17,33 @@
         <Style Selector="TextBlock.settingDesc">
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+
+        <!-- Chrome-less button wrapper so a whole segment / swatch is clickable. -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- Accent swatch + its selection ring. ClipToBounds so the four-colour legend of the
+             default option is clipped to the rounded corners. -->
+        <Style Selector="Border.swatch">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+        </Style>
+        <Style Selector="Border.swatch.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource TextStrong}"/>
         </Style>
     </UserControl.Styles>
 
@@ -30,11 +60,22 @@
                         <TextBlock Classes="settingDesc" Text="Choose the application color scheme"/>
                     </StackPanel>
                     <Border Grid.Column="1" Classes="segments">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Border Classes="seg selected"><TextBlock Text="Dark"/></Border>
-                            <Border Classes="seg"><TextBlock Text="Light"/></Border>
-                            <Border Classes="seg"><TextBlock Text="System"/></Border>
-                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding ThemeOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:ThemeOption">
+                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Border>
                 </Grid>
 
@@ -43,16 +84,31 @@
                         <TextBlock Classes="settingName" Text="Accent color"/>
                         <TextBlock Classes="settingDesc" Text="Applied to charts and highlights"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource Accent}"
-                                BorderThickness="2" BorderBrush="{DynamicResource TextStrong}"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Green}"
-                                BorderThickness="2" BorderBrush="Transparent"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Purple}"
-                                BorderThickness="2" BorderBrush="Transparent"/>
-                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Orange}"
-                                BorderThickness="2" BorderBrush="Transparent"/>
-                    </StackPanel>
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding AccentOptions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="settings:AccentOption">
+                                <Button Classes="pick" Command="{Binding SelectCommand}"
+                                        ToolTip.Tip="{Binding Preset.Name, FallbackValue='Default'}">
+                                    <Border Classes="swatch" Classes.selected="{Binding IsSelected}"
+                                            Background="{Binding Swatch}">
+                                        <!-- Four-colour legend, shown only for the Default option. -->
+                                        <Grid IsVisible="{Binding IsDefault}"
+                                              ColumnDefinitions="*,*" RowDefinitions="*,*">
+                                            <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource Blue}"/>
+                                            <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource Green}"/>
+                                            <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Purple}"/>
+                                            <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource Orange}"/>
+                                        </Grid>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </Grid>
             </StackPanel>
         </Border>
