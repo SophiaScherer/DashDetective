@@ -79,9 +79,90 @@
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="TextAlignment" Value="Right"/>
         </Style>
+
+        <!-- ===== Breadcrumb + filter chips ===== -->
+        <!-- Chrome-less button wrapper so a whole crumb / chip is clickable (as in Settings). -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.crumb">
+            <Setter Property="Padding" Value="2,0"/>
+        </Style>
+        <Style Selector="TextBlock.crumbText">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="TextBlock.crumbText.current">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
+        <Style Selector="Button.crumb:pointerover TextBlock.crumbText">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+        <Style Selector="TextBlock.crumbSep">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="210,*,260" ColumnSpacing="12">
+    <Grid RowDefinitions="Auto,*" RowSpacing="12">
+
+        <!-- ===== Breadcrumb + filters ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Border Grid.Column="0" Background="{DynamicResource FieldBackground}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6"
+                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True">
+                <ItemsControl ItemsSource="{Binding Crumbs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="fe:Crumb">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Classes="pick crumb" Command="{Binding SelectCommand}">
+                                    <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
+                                               Text="{Binding Label}"/>
+                                </Button>
+                                <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <Border Grid.Column="1" Classes="segments" VerticalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Filters}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="fe:FilterOption">
+                            <Button Classes="pick" Command="{Binding SelectCommand}">
+                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                    <TextBlock Text="{Binding Label}"/>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Grid>
+
+        <!-- ===== Three panes ===== -->
+        <Grid Grid.Row="1" ColumnDefinitions="210,*,260" ColumnSpacing="12">
 
         <!-- ===== Folder tree ===== -->
         <Border Grid.Column="0" Classes="panel" Padding="8">
@@ -126,7 +207,7 @@
 
                 <!-- Rows -->
                 <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl ItemsSource="{Binding VisibleEntries}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="fe:FileEntry">
                                 <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
@@ -163,5 +244,6 @@
             <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Text="Details"/>
         </Border>
+        </Grid>
     </Grid>
 </UserControl>

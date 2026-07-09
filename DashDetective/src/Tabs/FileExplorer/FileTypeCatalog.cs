@@ -44,5 +44,25 @@ public static class FileTypeCatalog {
         _ => Neutral,
     };
 
+    /// <summary>Coarse category used by the file-list filter chips.</summary>
+    public static FileCategory CategoryOf(string extension) => extension.ToLowerInvariant() switch {
+        ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".svg" or ".webp" or ".ico" or ".tiff"
+            => FileCategory.Image,
+        ".zip" or ".rar" or ".7z" or ".tar" or ".gz" or ".bz2" or ".xz"
+            => FileCategory.Archive,
+        ".doc" or ".docx" or ".rtf" or ".odt" or ".pdf" or ".txt" or ".md" or ".csv"
+            or ".xls" or ".xlsx" or ".ppt" or ".pptx" or ".json" or ".xml"
+            => FileCategory.Document,
+        _ => FileCategory.Other,
+    };
+
     private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
+}
+
+/// <summary>Coarse file grouping behind the All / Documents / Images / Archives filter.</summary>
+public enum FileCategory {
+    Document,
+    Image,
+    Archive,
+    Other,
 }

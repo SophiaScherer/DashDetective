@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Shared;
@@ -8,26 +10,45 @@ namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
 /// Read-only three-pane file browser (folder tree · file list · details). Built in phases:
-/// this currently drives the folder tree; the file list, breadcrumb, details and actions
-/// are layered on in later phases.
+/// this currently drives the folder tree, file list, breadcrumb and filters; the details pane
+/// and actions are layered on in later phases.
 /// </summary>
 public partial class FileExplorerViewModel : ViewModelBase {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
-    /// <summary>Entries of the currently selected folder (folders first, then files).</summary>
-    public ObservableCollection<FileEntry> Entries { get; } = new();
+    /// <summary>The current folder's entries after the active filter (folders first, then files).</summary>
+    public ObservableCollection<FileEntry> VisibleEntries { get; } = new();
+
+    /// <summary>Breadcrumb segments for the current path, root → leaf.</summary>
+    public ObservableCollection<Crumb> Crumbs { get; } = new();
+
+    /// <summary>The All / Documents / Images / Archives filter chips.</summary>
+    public ObservableCollection<FilterOption> Filters { get; }
 
     [ObservableProperty] private FileSystemNode? _selectedNode;
     [ObservableProperty] private FileEntry? _selectedEntry;
 
-    /// <summary>Full path of the currently selected folder (drives the list/breadcrumb later).</summary>
+    /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty] private string _currentPath = "";
+
+    // Full, unfiltered entries of the current folder; VisibleEntries is this through the filter.
+    private readonly List<FileEntry> _allEntries = new();
+    private FilterOption _selectedFilter;
 
     // Guards against a slow folder load overwriting the list after the user has moved on.
     private string _pendingPath = "";
 
     public FileExplorerViewModel() {
+        Filters = new ObservableCollection<FilterOption> {
+            new FilterOption("All", null, OnFilterSelected),
+            new FilterOption("Documents", FileCategory.Document, OnFilterSelected),
+            new FilterOption("Images", FileCategory.Image, OnFilterSelected),
+            new FilterOption("Archives", FileCategory.Archive, OnFilterSelected),
+        };
+        _selectedFilter = Filters[0];
+        _selectedFilter.IsSelected = true;
+
         // Load drives off the UI thread; the continuation resumes here (UI thread) to fill
         // the bound collection. Mirrors the Dashboard providers' fire-and-forget load.
         _ = LoadRootsAsync();
@@ -68,6 +89,7 @@ public partial class FileExplorerViewModel : ViewModelBase {
 
     private void SetCurrentFolder(string path) {
         CurrentPath = path;
+        RebuildCrumbs(path);
         _ = LoadEntriesAsync(path);
     }
 
@@ -84,10 +106,11 @@ public partial class FileExplorerViewModel : ViewModelBase {
         if (_pendingPath != path)
             return;
 
-        Entries.Clear();
         SelectedEntry = null;
+        _allEntries.Clear();
         foreach (var item in items)
-            Entries.Add(new FileEntry(item, OnEntrySelected));
+            _allEntries.Add(new FileEntry(item, OnEntrySelected));
+        ApplyFilter();
     }
 
     private void OnEntrySelected(FileEntry entry) {
@@ -96,6 +119,56 @@ public partial class FileExplorerViewModel : ViewModelBase {
             prev.IsSelected = false;
 
         SelectedEntry = entry;
-        // Phase 3b: double-clicking a folder navigates into it. Phase 4: build details.
+        // Phase 4: build the details pane off the selected entry.
     }
+
+    private void OnFilterSelected(FilterOption filter) {
+        if (ReferenceEquals(filter, _selectedFilter))
+            return;
+
+        _selectedFilter.IsSelected = false;
+        _selectedFilter = filter;
+        filter.IsSelected = true;
+        ApplyFilter();
+    }
+
+    // Folders always show; files show when the active filter is All or matches their category.
+    private void ApplyFilter() {
+        VisibleEntries.Clear();
+        foreach (var entry in _allEntries) {
+            if (_selectedFilter.Category is not { } category
+                || entry.IsDirectory
+                || FileTypeCatalog.CategoryOf(Path.GetExtension(entry.FullPath)) == category) {
+                VisibleEntries.Add(entry);
+            }
+        }
+
+        // Drop a selection that the filter just hid.
+        if (SelectedEntry is { } sel && !VisibleEntries.Contains(sel)) {
+            sel.IsSelected = false;
+            SelectedEntry = null;
+        }
+    }
+
+    private void RebuildCrumbs(string path) {
+        Crumbs.Clear();
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        // Climb from the folder to the drive root, then emit root → leaf.
+        var chain = new List<DirectoryInfo>();
+        for (var dir = new DirectoryInfo(path); dir is not null; dir = dir.Parent)
+            chain.Add(dir);
+        chain.Reverse();
+
+        for (var i = 0; i < chain.Count; i++) {
+            var dir = chain[i];
+            var isCurrent = i == chain.Count - 1;
+            // The drive root's Name is "C:\"; trim the separator so it reads "C:".
+            var label = dir.Parent is null ? dir.Name.TrimEnd(Path.DirectorySeparatorChar) : dir.Name;
+            Crumbs.Add(new Crumb(label, dir.FullName, isCurrent ? "" : "›", isCurrent, OnCrumbSelected));
+        }
+    }
+
+    private void OnCrumbSelected(Crumb crumb) => SetCurrentFolder(crumb.FullPath);
 }
