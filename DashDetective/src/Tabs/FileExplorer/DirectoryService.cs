@@ -15,12 +15,14 @@ public readonly record struct DirEntry(string Name, string FullPath);
 /// <summary>
 /// A file-list entry with its display strings already computed off the UI thread (type name,
 /// modified date, humanised size). <see cref="FileEntry"/> wraps this with the themed glyph and
-/// selection behaviour.
+/// selection behaviour. <paramref name="Size"/> (bytes; -1 for folders) and <paramref name="Modified"/>
+/// are the raw values the column sorting compares against — the display strings can't be ordered.
 /// </summary>
 public readonly record struct FileItem(
     string Name, string FullPath, bool IsDirectory,
     string TypeName, string ModifiedText, string SizeText, string Extension,
-    string CreatedText, string AttributesText);
+    string CreatedText, string AttributesText,
+    long Size, DateTime Modified);
 
 /// <summary>
 /// Async, soft-failing filesystem enumeration for the File Explorer. Mirrors the Dashboard
@@ -97,7 +99,8 @@ public static class DirectoryService {
                     dirs.Add(new FileItem(sub.Name, sub.FullName, true,
                         ShellInterop.GetTypeName(sub.FullName, true),
                         FormatDate(sub.LastWriteTime), "—", "",
-                        FormatDate(sub.CreationTime), FormatAttributes(sub.Attributes)));
+                        FormatDate(sub.CreationTime), FormatAttributes(sub.Attributes),
+                        -1, sub.LastWriteTime));
                 } catch {
                     // Skip an entry we can't read.
                 }
@@ -108,7 +111,8 @@ public static class DirectoryService {
                         ShellInterop.GetTypeName(f.FullName, false),
                         FormatDate(f.LastWriteTime), FileSizeFormatter.Format(f.Length),
                         f.Extension,
-                        FormatDate(f.CreationTime), FormatAttributes(f.Attributes)));
+                        FormatDate(f.CreationTime), FormatAttributes(f.Attributes),
+                        f.Length, f.LastWriteTime));
                 } catch {
                     // Skip an entry we can't read.
                 }

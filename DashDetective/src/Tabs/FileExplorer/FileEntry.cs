@@ -24,6 +24,8 @@ public partial class FileEntry : ObservableObject {
         CreatedText = item.CreatedText;
         AttributesText = item.AttributesText;
         Location = Path.GetDirectoryName(item.FullPath) ?? item.FullPath;
+        Size = item.Size;
+        Modified = item.Modified;
         (Glyph, IconBrush) = FileTypeCatalog.ForEntry(item.IsDirectory, item.Extension);
         _onSelected = onSelected;
     }
@@ -37,6 +39,10 @@ public partial class FileEntry : ObservableObject {
     public string CreatedText { get; }
     public string AttributesText { get; }
     public string Location { get; }
+
+    // Raw sort keys (the display strings above can't be ordered). Size is bytes, -1 for folders.
+    public long Size { get; }
+    public DateTime Modified { get; }
 
     public Geometry Glyph { get; }
     public IBrush IconBrush { get; }

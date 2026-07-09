@@ -27,6 +27,12 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>The All / Documents / Images / Archives filter chips.</summary>
     public ObservableCollection<FilterOption> Filters { get; }
 
+    /// <summary>Clickable file-list column headers, bound one-to-one to the header cells.</summary>
+    public SortColumn NameSort { get; }
+    public SortColumn TypeSort { get; }
+    public SortColumn ModifiedSort { get; }
+    public SortColumn SizeSort { get; }
+
     [ObservableProperty] private FileSystemNode? _selectedNode;
     [ObservableProperty] private FileEntry? _selectedEntry;
 
@@ -37,9 +43,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty] private string _currentPath = "";
 
-    // Full, unfiltered entries of the current folder; VisibleEntries is this through the filter.
+    // Full, unfiltered entries of the current folder; VisibleEntries is this through the filter + sort.
     private readonly List<FileEntry> _allEntries = new();
     private FilterOption _selectedFilter;
+
+    // Active sort. Default matches the service baseline (name, ascending); the header columns drive it.
+    private readonly SortColumn[] _sortColumns;
+    private FileSortKey _sortKey = FileSortKey.Name;
+    private bool _sortDescending;
 
     // Guards against a slow folder load overwriting the list after the user has moved on.
     private string _pendingPath = "";
@@ -53,6 +64,13 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         };
         _selectedFilter = Filters[0];
         _selectedFilter.IsSelected = true;
+
+        NameSort = new SortColumn(FileSortKey.Name, OnSort);
+        TypeSort = new SortColumn(FileSortKey.Type, OnSort);
+        ModifiedSort = new SortColumn(FileSortKey.Modified, OnSort);
+        SizeSort = new SortColumn(FileSortKey.Size, OnSort);
+        _sortColumns = new[] { NameSort, TypeSort, ModifiedSort, SizeSort };
+        UpdateSortIndicators();
 
         // Load drives off the UI thread; the continuation resumes here (UI thread) to fill
         // the bound collection. Mirrors the Dashboard providers' fire-and-forget load.
@@ -134,7 +152,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _allEntries.Clear();
         foreach (var item in items)
             _allEntries.Add(new FileEntry(item, OnEntrySelected));
-        ApplyFilter();
+        RebuildVisibleEntries();
     }
 
     private void OnEntrySelected(FileEntry entry) {
@@ -157,25 +175,70 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _selectedFilter.IsSelected = false;
         _selectedFilter = filter;
         filter.IsSelected = true;
-        ApplyFilter();
+        RebuildVisibleEntries();
+    }
+
+    // Clicking a header re-sorts: the same column flips direction, a new column adopts its
+    // Explorer-style default (text columns ascending, Modified/Size descending — newest/largest first).
+    private void OnSort(FileSortKey key) {
+        if (key == _sortKey) {
+            _sortDescending = !_sortDescending;
+        } else {
+            _sortKey = key;
+            _sortDescending = key is FileSortKey.Modified or FileSortKey.Size;
+        }
+        UpdateSortIndicators();
+        RebuildVisibleEntries();
+    }
+
+    // Tint + arrow follow the active column and direction.
+    private void UpdateSortIndicators() {
+        foreach (var col in _sortColumns) {
+            col.IsActive = col.Key == _sortKey;
+            col.Arrow = col.IsActive ? (_sortDescending ? "↓" : "↑") : "";
+        }
     }
 
     // Folders always show; files show when the active filter is All or matches their category.
-    private void ApplyFilter() {
-        VisibleEntries.Clear();
+    // The filtered set is then ordered by the active column.
+    private void RebuildVisibleEntries() {
+        var filtered = new List<FileEntry>(_allEntries.Count);
         foreach (var entry in _allEntries) {
             if (_selectedFilter.Category is not { } category
                 || entry.IsDirectory
                 || FileTypeCatalog.CategoryOf(Path.GetExtension(entry.FullPath)) == category) {
-                VisibleEntries.Add(entry);
+                filtered.Add(entry);
             }
         }
+        filtered.Sort(Compare);
+
+        VisibleEntries.Clear();
+        foreach (var entry in filtered)
+            VisibleEntries.Add(entry);
 
         // Drop a selection that the filter just hid.
         if (SelectedEntry is { } sel && !VisibleEntries.Contains(sel)) {
             sel.IsSelected = false;
             SelectedEntry = null;
         }
+    }
+
+    // Folders always precede files (the grouping is never inverted by direction); within a group,
+    // order by the active column, breaking ties by name, then apply the descending flag.
+    private int Compare(FileEntry a, FileEntry b) {
+        if (a.IsDirectory != b.IsDirectory)
+            return a.IsDirectory ? -1 : 1;
+
+        var cmp = _sortKey switch {
+            FileSortKey.Type => string.Compare(a.TypeName, b.TypeName, StringComparison.OrdinalIgnoreCase),
+            FileSortKey.Modified => a.Modified.CompareTo(b.Modified),
+            FileSortKey.Size => a.Size.CompareTo(b.Size),
+            _ => 0,
+        };
+        if (cmp == 0)
+            cmp = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+
+        return _sortDescending ? -cmp : cmp;
     }
 
     private void RebuildCrumbs(string path) {
