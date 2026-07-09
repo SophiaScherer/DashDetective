@@ -43,6 +43,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty] private string _currentPath = "";
 
+    /// <summary>Whether OS hidden/system entries (e.g. AppData) are shown in the list and tree.</summary>
+    [ObservableProperty] private bool _showHidden;
+
     // Full, unfiltered entries of the current folder; VisibleEntries is this through the filter + sort.
     private readonly List<FileEntry> _allEntries = new();
     private FilterOption _selectedFilter;
@@ -87,7 +90,16 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         RootNodes.Clear();
         foreach (var d in drives)
-            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, OnNodeSelected));
+            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, () => ShowHidden, OnNodeSelected));
+    }
+
+    // Toggling "show hidden" reloads the file list and rebuilds the tree from its roots (whose lazy
+    // nodes capture ShowHidden, so re-reading re-applies the setting). Expanded folders collapse —
+    // an acceptable trade for a rarely-flipped toggle.
+    partial void OnShowHiddenChanged(bool value) {
+        _ = LoadRootsAsync();
+        if (!string.IsNullOrEmpty(CurrentPath))
+            _ = LoadEntriesAsync(CurrentPath);
     }
 
     /// <summary>Toolbar Refresh for the File Explorer: re-read the current folder (picking up files
@@ -139,7 +151,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _pendingPath = path;
         IReadOnlyList<FileItem> items;
         try {
-            items = await DirectoryService.GetEntriesAsync(path);
+            items = await DirectoryService.GetEntriesAsync(path, ShowHidden);
         } catch {
             return;
         }

@@ -16,13 +16,16 @@ namespace DashDetective.Tabs.FileExplorer;
 /// </summary>
 public partial class FileSystemNode : ObservableObject {
     private readonly Action<FileSystemNode>? _onSelected;
+    // Read live on each lazy expand so the tree honors the current "show hidden" toggle.
+    private readonly Func<bool> _includeHidden;
     private bool _childrenLoaded;
 
     public FileSystemNode(string name, string fullPath, bool isDirectory,
-                          Action<FileSystemNode>? onSelected = null) {
+                          Func<bool> includeHidden, Action<FileSystemNode>? onSelected = null) {
         Name = name;
         FullPath = fullPath;
         IsDirectory = isDirectory;
+        _includeHidden = includeHidden;
         _onSelected = onSelected;
         if (isDirectory)
             Children.Add(LoadingPlaceholder());
@@ -55,19 +58,19 @@ public partial class FileSystemNode : ObservableObject {
     private async Task LoadChildrenAsync() {
         IReadOnlyList<DirEntry> subs;
         try {
-            subs = await DirectoryService.GetSubdirectoriesAsync(FullPath);
+            subs = await DirectoryService.GetSubdirectoriesAsync(FullPath, _includeHidden());
         } catch {
             Children.Clear();
             return;
         }
 
         // Runs back on the UI thread (the expand toggle originated there), so mutating the
-        // bound collection here is safe. Children inherit the same selection callback.
+        // bound collection here is safe. Children inherit the same hidden accessor + selection callback.
         Children.Clear();
         foreach (var s in subs)
-            Children.Add(new FileSystemNode(s.Name, s.FullPath, true, _onSelected));
+            Children.Add(new FileSystemNode(s.Name, s.FullPath, true, _includeHidden, _onSelected));
     }
 
     // A childless marker row shown until the real children are enumerated on expand.
-    private static FileSystemNode LoadingPlaceholder() => new("Loading…", "", false);
+    private static FileSystemNode LoadingPlaceholder() => new("Loading…", "", false, static () => false);
 }

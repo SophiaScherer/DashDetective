@@ -31,20 +31,26 @@ public readonly record struct FileItem(
 /// or disappearing folder yields a partial list instead of throwing.
 /// </summary>
 public static class DirectoryService {
-    // Hide OS hidden/system entries (as Explorer does by default) and never throw on an
-    // inaccessible child mid-enumeration.
-    private static readonly EnumerationOptions EnumOpts = new() {
+    // Default hides OS hidden/system entries (as Explorer does); the "show hidden" toggle swaps in
+    // options that reveal them. Both never throw on an inaccessible child mid-enumeration.
+    private static readonly EnumerationOptions HideSpecial = new() {
         IgnoreInaccessible = true,
         AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
     };
+    private static readonly EnumerationOptions ShowAll = new() {
+        IgnoreInaccessible = true,
+        AttributesToSkip = 0,
+    };
+
+    private static EnumerationOptions Options(bool includeHidden) => includeHidden ? ShowAll : HideSpecial;
 
     public static Task<IReadOnlyList<DriveEntry>> GetDrivesAsync() => Task.Run(ReadDrives);
 
-    public static Task<IReadOnlyList<DirEntry>> GetSubdirectoriesAsync(string path) =>
-        Task.Run(() => ReadSubdirectories(path));
+    public static Task<IReadOnlyList<DirEntry>> GetSubdirectoriesAsync(string path, bool includeHidden) =>
+        Task.Run(() => ReadSubdirectories(path, includeHidden));
 
-    public static Task<IReadOnlyList<FileItem>> GetEntriesAsync(string path) =>
-        Task.Run(() => ReadEntries(path));
+    public static Task<IReadOnlyList<FileItem>> GetEntriesAsync(string path, bool includeHidden) =>
+        Task.Run(() => ReadEntries(path, includeHidden));
 
     private static IReadOnlyList<DriveEntry> ReadDrives() {
         var drives = new List<DriveEntry>();
@@ -70,10 +76,11 @@ public static class DirectoryService {
         return drives;
     }
 
-    private static IReadOnlyList<DirEntry> ReadSubdirectories(string path) {
+    private static IReadOnlyList<DirEntry> ReadSubdirectories(string path, bool includeHidden) {
         var dirs = new List<DirEntry>();
+        var opts = Options(includeHidden);
         try {
-            foreach (var sub in new DirectoryInfo(path).EnumerateDirectories("*", EnumOpts)) {
+            foreach (var sub in new DirectoryInfo(path).EnumerateDirectories("*", opts)) {
                 try {
                     dirs.Add(new DirEntry(sub.Name, sub.FullName));
                 } catch {
@@ -89,12 +96,13 @@ public static class DirectoryService {
 
     // Folders first (both alphabetical), matching Explorer's default ordering. Each entry's
     // type name, date and size are computed here, off the UI thread.
-    private static IReadOnlyList<FileItem> ReadEntries(string path) {
+    private static IReadOnlyList<FileItem> ReadEntries(string path, bool includeHidden) {
         var dirs = new List<FileItem>();
         var files = new List<FileItem>();
+        var opts = Options(includeHidden);
         try {
             var di = new DirectoryInfo(path);
-            foreach (var sub in di.EnumerateDirectories("*", EnumOpts)) {
+            foreach (var sub in di.EnumerateDirectories("*", opts)) {
                 try {
                     dirs.Add(new FileItem(sub.Name, sub.FullName, true,
                         ShellInterop.GetTypeName(sub.FullName, true),
@@ -105,7 +113,7 @@ public static class DirectoryService {
                     // Skip an entry we can't read.
                 }
             }
-            foreach (var f in di.EnumerateFiles("*", EnumOpts)) {
+            foreach (var f in di.EnumerateFiles("*", opts)) {
                 try {
                     files.Add(new FileItem(f.Name, f.FullName, false,
                         ShellInterop.GetTypeName(f.FullName, false),
