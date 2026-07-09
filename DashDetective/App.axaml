@@ -2,8 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="DashDetective.App"
              xmlns:shell="using:DashDetective.Shell"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
+             <!-- Default is "Dark" (matches the design comp). ThemeService flips this to
+                  "Light" or "Default" (follow system) when the user changes the Theme setting. -->
 
     <Application.DataTemplates>
         <shell:ViewLocator/>

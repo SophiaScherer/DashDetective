@@ -11,7 +11,7 @@
         Title="DashDetective"
         Width="1180" Height="760"
         MinWidth="920" MinHeight="560"
-        Background="#141414"
+        Background="{DynamicResource AppBackground}"
         TransparencyLevelHint="None">
 
     <Design.DataContext>
@@ -45,13 +45,13 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="Button.toolIcon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#12FFFFFF"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
 
         <!-- The Live status pill (toggles pause/resume of live sampling). -->
         <Style Selector="Button.livePill">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Hairline}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Height" Value="34"/>
             <Setter Property="CornerRadius" Value="6"/>
@@ -59,15 +59,15 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="Button.livePill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#12FFFFFF"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
     </Window.Styles>
 
     <Grid ColumnDefinitions="236,*">
 
         <!-- ================= SIDEBAR ================= -->
-        <Border Grid.Column="0" Background="{StaticResource SidebarBackground}"
-                BorderBrush="{StaticResource Hairline}" BorderThickness="0,0,1,0">
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}"
+                BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
             <Grid RowDefinitions="Auto,*,Auto">
 
                 <!-- Brand -->
@@ -87,7 +87,7 @@
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center">
                         <TextBlock Text="System Console" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Information Suite" FontSize="11" Foreground="{StaticResource TextSubtle}"/>
+                        <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -101,7 +101,7 @@
                                             Padding="11,9">
                                         <Grid ColumnDefinitions="3,9,18,12,*" VerticalAlignment="Center">
                                             <Rectangle Grid.Column="0" Width="3" RadiusX="1.5" RadiusY="1.5"
-                                                       Height="{Binding IndicatorHeight}" Fill="{StaticResource Accent}"
+                                                       Height="{Binding IndicatorHeight}" Fill="{DynamicResource Accent}"
                                                        HorizontalAlignment="Left" VerticalAlignment="Center"/>
                                             <Path Grid.Column="2" Width="18" Height="18" Stretch="None"
                                                   Data="{Binding Icon}" Stroke="{Binding IconBrush}"
@@ -120,7 +120,7 @@
                 </ScrollViewer>
 
                 <!-- User footer -->
-                <Border Grid.Row="2" Padding="14,12" BorderBrush="{StaticResource Hairline}"
+                <Border Grid.Row="2" Padding="14,12" BorderBrush="{DynamicResource Hairline}"
                         BorderThickness="0,1,0,0">
                     <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                         <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
@@ -135,7 +135,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="1" Margin="10,0" VerticalAlignment="Center">
                             <TextBlock Text="Alex Mercer" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="Administrator" FontSize="10.5" Foreground="{StaticResource TextSubtle}"/>
+                            <TextBlock Text="Administrator" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                             <Ellipse Width="7" Height="7" Fill="#6ccb5f"/>
@@ -150,23 +150,23 @@
         <Grid Grid.Column="1" RowDefinitions="54,*">
 
             <!-- Toolbar -->
-            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}"
-                    BorderBrush="{StaticResource Hairline}" BorderThickness="0,0,0,1">
+            <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,0,1">
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0">
 
                     <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
                         <TextBlock Text="{Binding SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding SelectedNav.Subtitle}" FontSize="11"
-                                   Foreground="{StaticResource TextSubtle}"/>
+                                   Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
 
                     <!-- Search -->
                     <Border Grid.Column="1" MaxWidth="420" Height="34" Margin="16,0"
-                            HorizontalAlignment="Right" Background="{StaticResource FieldBackground}"
-                            BorderBrush="{StaticResource Hairline}" BorderThickness="1" CornerRadius="6">
+                            HorizontalAlignment="Right" Background="{DynamicResource FieldBackground}"
+                            BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
                         <Grid ColumnDefinitions="Auto,*" Margin="11,0">
                             <Path Grid.Column="0" Width="14" Height="14" Stretch="Uniform"
-                                  Stroke="{StaticResource TextTertiary}" StrokeThickness="1.4"
+                                  Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
                                   StrokeLineCap="Round" VerticalAlignment="Center"
                                   Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
                             <TextBox Grid.Column="1" Margin="9,0,0,0" BorderThickness="0"
@@ -182,29 +182,29 @@
                             <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                                 <Ellipse Width="8" Height="8" Fill="{Binding LiveDotBrush}"/>
                                 <TextBlock Text="{Binding LiveLabel}" FontSize="12"
-                                           Foreground="{StaticResource TextTertiary}"
+                                           Foreground="{DynamicResource TextTertiary}"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button Classes="toolIcon" ToolTip.Tip="Refresh" Command="{Binding RefreshCommand}">
-                            <Path Width="16" Height="16" Stretch="Uniform" Stroke="{StaticResource TextTertiary}"
+                            <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                   StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                   Data="M13,8 a5,5 0 1 1 -1.5,-3.5 M13,2.5 V5 H10.5"/>
                         </Button>
                         <Button Classes="toolIcon" ToolTip.Tip="Export" Click="OnExportClick">
-                            <Path Width="16" Height="16" Stretch="Uniform" Stroke="{StaticResource TextTertiary}"
+                            <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                   StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                   Data="M8,2 V10 M8,10 L5,7 M8,10 L11,7 M3,12 V13.5 H13 V12"/>
                         </Button>
-                        <Rectangle Width="1" Height="22" Fill="{StaticResource Hairline}" Margin="3,0"/>
-                        <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{StaticResource TextTertiary}"
+                        <Rectangle Width="1" Height="22" Fill="{DynamicResource Hairline}" Margin="3,0"/>
+                        <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{DynamicResource TextTertiary}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
             <!-- Page content -->
-            <ScrollViewer Grid.Row="1" Background="{StaticResource AppBackground}" Padding="22,20,22,30">
+            <ScrollViewer Grid.Row="1" Background="{DynamicResource AppBackground}" Padding="22,20,22,30">
                 <ContentControl Content="{Binding CurrentPage}"/>
             </ScrollViewer>
         </Grid>

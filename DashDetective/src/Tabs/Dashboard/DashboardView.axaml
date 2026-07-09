@@ -15,7 +15,7 @@
         <!-- ===== Stat cards ===== -->
         <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
             <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
-                               Sub="{Binding CpuModelShort}" Accent="{StaticResource Accent}"
+                               Sub="{Binding CpuModelShort}" Accent="{DynamicResource Accent}"
                                YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
             <controls:StatCard Grid.Column="1" Label="MEMORY" Value="{Binding MemoryValueText}" Unit="GB"
                                Sub="{Binding MemorySubText}" Accent="{StaticResource Purple}"
@@ -27,7 +27,7 @@
                                Sub="{Binding StorageSubText}" Accent="{StaticResource Yellow}"
                                YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
             <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="Mbps"
-                               Sub="{Binding NetworkSubText}" Accent="{StaticResource Accent}"
+                               Sub="{Binding NetworkSubText}" Accent="{DynamicResource Accent}"
                                YMin="0" YMax="{Binding NetworkYMax}" Points="{Binding NetworkDownPoints}"/>
         </Grid>
 
@@ -37,9 +37,9 @@
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
-                        <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{StaticResource Accent}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource Accent}"/>
                     </Grid>
-                    <controls:Sparkline Height="130" Stroke="{StaticResource Accent}"
+                    <controls:Sparkline Height="130" Stroke="{DynamicResource Accent}"
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
                 </StackPanel>
             </Border>
@@ -84,26 +84,26 @@
                 <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Network Throughput"/>
-                        <TextBlock Grid.Column="1" Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{StaticResource TextSubtle}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↓ Download" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="↓ Download" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Accent}"/>
-                                <TextBlock Text="Mbps" FontSize="11" Foreground="{StaticResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                                <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↑ Upload" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="↑ Upload" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <TextBlock Text="{Binding NetworkUpText}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Orange}"/>
-                                <TextBlock Text="Mbps" FontSize="11" Foreground="{StaticResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
                     <controls:Sparkline Height="96" Fill="True"
-                                        Stroke="{StaticResource Accent}" Points="{Binding NetworkDownPoints}"
+                                        Stroke="{DynamicResource Accent}" Points="{Binding NetworkDownPoints}"
                                         Stroke2="{StaticResource Orange}" Points2="{Binding NetworkUpPoints}"
                                         YMin="0" YMax="{Binding NetworkYMax}"/>
                 </StackPanel>

@@ -13,7 +13,7 @@
         </Style>
         <Style Selector="TextBlock.settingDesc">
             <Setter Property="FontSize" Value="11.5"/>
-            <Setter Property="Foreground" Value="{StaticResource TextSubtle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
     </UserControl.Styles>
 
@@ -44,8 +44,8 @@
                         <TextBlock Classes="settingDesc" Text="Applied to charts and highlights"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                        <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Accent}"
-                                BorderThickness="2" BorderBrush="{StaticResource TextStrong}"/>
+                        <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource Accent}"
+                                BorderThickness="2" BorderBrush="{DynamicResource TextStrong}"/>
                         <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Green}"
                                 BorderThickness="2" BorderBrush="Transparent"/>
                         <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource Purple}"
@@ -78,50 +78,50 @@
                 </Grid>
 
                 <!-- Toggle rows -->
-                <Border BorderBrush="{StaticResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="Desktop notifications"/>
                             <TextBlock Classes="settingDesc" Text="Alert on threshold breaches"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{StaticResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
+                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource Accent}">
+                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
                         </Border>
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{StaticResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="Resource alerts"/>
                             <TextBlock Classes="settingDesc" Text="Warn when CPU or RAM exceeds 90%"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{StaticResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource TrackOff}">
+                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
                         </Border>
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{StaticResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="Show in system tray"/>
                             <TextBlock Classes="settingDesc" Text="Keep console running in background"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{StaticResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
+                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource Accent}">
+                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
                         </Border>
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{StaticResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="Launch at startup"/>
                             <TextBlock Classes="settingDesc" Text="Start with Windows"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{StaticResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="{StaticResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource TrackOff}">
+                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -140,7 +140,7 @@
             </StackPanel>
         </Border>
 
-        <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{StaticResource TextFaint}"
+        <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextFaint}"
                    Text="System Information Console v3.2.1 · Build 24019 · © 2026"/>
     </StackPanel>
 </UserControl>
