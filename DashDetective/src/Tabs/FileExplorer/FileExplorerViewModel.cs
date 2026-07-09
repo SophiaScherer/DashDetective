@@ -29,6 +29,10 @@ public partial class FileExplorerViewModel : ViewModelBase {
     [ObservableProperty] private FileSystemNode? _selectedNode;
     [ObservableProperty] private FileEntry? _selectedEntry;
 
+    /// <summary>Whether the details pane has a file/folder to show.</summary>
+    public bool HasSelection => SelectedEntry is not null;
+    public bool HasNoSelection => SelectedEntry is null;
+
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty] private string _currentPath = "";
 
@@ -119,7 +123,11 @@ public partial class FileExplorerViewModel : ViewModelBase {
             prev.IsSelected = false;
 
         SelectedEntry = entry;
-        // Phase 4: build the details pane off the selected entry.
+    }
+
+    partial void OnSelectedEntryChanged(FileEntry? value) {
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(HasNoSelection));
     }
 
     private void OnFilterSelected(FilterOption filter) {

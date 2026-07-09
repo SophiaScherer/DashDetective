@@ -19,7 +19,8 @@ public readonly record struct DirEntry(string Name, string FullPath);
 /// </summary>
 public readonly record struct FileItem(
     string Name, string FullPath, bool IsDirectory,
-    string TypeName, string ModifiedText, string SizeText, string Extension);
+    string TypeName, string ModifiedText, string SizeText, string Extension,
+    string CreatedText, string AttributesText);
 
 /// <summary>
 /// Async, soft-failing filesystem enumeration for the File Explorer. Mirrors the Dashboard
@@ -95,7 +96,8 @@ public static class DirectoryService {
                 try {
                     dirs.Add(new FileItem(sub.Name, sub.FullName, true,
                         ShellInterop.GetTypeName(sub.FullName, true),
-                        FormatDate(sub.LastWriteTime), "—", ""));
+                        FormatDate(sub.LastWriteTime), "—", "",
+                        FormatDate(sub.CreationTime), FormatAttributes(sub.Attributes)));
                 } catch {
                     // Skip an entry we can't read.
                 }
@@ -105,7 +107,8 @@ public static class DirectoryService {
                     files.Add(new FileItem(f.Name, f.FullName, false,
                         ShellInterop.GetTypeName(f.FullName, false),
                         FormatDate(f.LastWriteTime), FileSizeFormatter.Format(f.Length),
-                        f.Extension));
+                        f.Extension,
+                        FormatDate(f.CreationTime), FormatAttributes(f.Attributes)));
                 } catch {
                     // Skip an entry we can't read.
                 }
@@ -127,6 +130,16 @@ public static class DirectoryService {
 
     private static string FormatDate(DateTime dt) =>
         dt.ToString("MMM dd, yyyy", CultureInfo.InvariantCulture);
+
+    // Terse flag letters, e.g. "A", "RA". Hidden/System entries are already filtered out.
+    private static string FormatAttributes(FileAttributes attributes) {
+        var flags = new System.Text.StringBuilder();
+        if ((attributes & FileAttributes.ReadOnly) != 0) flags.Append('R');
+        if ((attributes & FileAttributes.Hidden) != 0) flags.Append('H');
+        if ((attributes & FileAttributes.System) != 0) flags.Append('S');
+        if ((attributes & FileAttributes.Archive) != 0) flags.Append('A');
+        return flags.Length == 0 ? "—" : flags.ToString();
+    }
 
     private static string DriveTypeLabel(DriveType type) => type switch {
         DriveType.Fixed => "Local Disk",

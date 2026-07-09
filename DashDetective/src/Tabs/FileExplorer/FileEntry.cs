@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -20,6 +21,9 @@ public partial class FileEntry : ObservableObject {
         TypeName = item.TypeName;
         ModifiedText = item.ModifiedText;
         SizeText = item.SizeText;
+        CreatedText = item.CreatedText;
+        AttributesText = item.AttributesText;
+        Location = Path.GetDirectoryName(item.FullPath) ?? item.FullPath;
         (Glyph, IconBrush) = FileTypeCatalog.ForEntry(item.IsDirectory, item.Extension);
         _onSelected = onSelected;
     }
@@ -30,6 +34,9 @@ public partial class FileEntry : ObservableObject {
     public string TypeName { get; }
     public string ModifiedText { get; }
     public string SizeText { get; }
+    public string CreatedText { get; }
+    public string AttributesText { get; }
+    public string Location { get; }
 
     public Geometry Glyph { get; }
     public IBrush IconBrush { get; }
