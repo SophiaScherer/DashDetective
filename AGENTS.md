@@ -50,7 +50,7 @@ Not all of these exist yet. Only build what is listed below as "currently active
   (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
   timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
   the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
-  live — nothing on it is static mock** (only Settings remains layout-only). The shell **toolbar**
+  live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
   (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`),
   a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
   that forces an immediate re-read of every metric + static provider (`DashboardViewModel.RefreshNow`),
@@ -58,8 +58,14 @@ Not all of these exist yet. Only build what is listed below as "currently active
   (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
   needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
   uses the in-box `Avalonia.Platform.Storage` picker — no new package.
-- **Settings** — still entirely layout-only (static `Border`s standing in for controls; the
-  `SettingsViewModel` is empty).
+- **Settings** — the **Appearance** section is now live; the rest is still layout-only. The
+  **Theme** segmented control (Dark / Light / System) and the **Accent color** swatches are
+  data-bound to `SettingsViewModel` and applied at runtime through a single `ThemeService` (see
+  *Theming* below). The accent row's **first** swatch is a "Default" (multi-colour) option — a 2×2
+  four-colour square that restores the default look (each dashboard graph its own colour, highlight
+  blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
+  **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
+  `Border`s, not yet wired.
 
 **Everything else (File Explorer, Processes, Performance, Network, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
@@ -142,7 +148,9 @@ currently exist.
     /Shared                     (cross-cutting, feature-agnostic)
       ViewModelBase.cs
       /Styles
-        Palette.axaml           (colour brushes; merged in App.axaml)
+        Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
+                                 ResourceDictionary.ThemeDictionaries; accent + chart-series keys
+                                 sit top-level and are swapped at runtime — see Theming below)
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons…)
       /Controls
         Sparkline, StatCard, InfoRow   (reusable widgets; Sparkline auto-fits to its data
@@ -153,10 +161,16 @@ currently exist.
                                         Network throughput panel for download+upload on one scale.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal)
+    /Services                   (cross-cutting app services)
+      /Theming
+        ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
+        AppTheme.cs             (enum: System / Light / Dark)
+        AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
       /Navigation
-        NavItem.cs, Icons.cs
+        NavItem.cs, Icons.cs    (NavItem is a pure data model; its selection visuals are styled in
+                                 MainWindow.axaml via DynamicResource so they follow theme + accent)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
@@ -179,6 +193,8 @@ currently exist.
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
+                                ThemeOption.cs, AccentOption.cs  (selectable item VMs for the
+                                                                  Appearance controls, like NavItem)
       (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
 
@@ -209,8 +225,24 @@ usable default gateway, busiest by bytes), locks to its `Id` across ticks, and m
 per-adapter numbers. When verifying throughput, always cross-check the actual value against Task
 Manager, not just "looks plausible".
 
+**Theming (runtime light/dark + accent).** Colours live in `Palette.axaml` in three groups:
+*theme-variant* keys (surfaces, lines, text ramp, hover overlays) sit in
+`ResourceDictionary.ThemeDictionaries` under `Dark`/`Light` and flip with the app's `ThemeVariant`;
+the *accent set* (`Accent`, `AccentHover`, `OnAccent`, `AccentSoft`, `AccentColor`/`AccentDeep`) and the
+per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStorage`, `ChartNetDown`,
+`ChartNetUp`) sit top-level and are **swapped at runtime**. **Rule:** any key that can change at runtime
+must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours
+`Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeService` (`src/Services/Theming`) is the
+**only** code that writes to `Application.Current` — `ApplyTheme` sets the variant; `ApplyAccent` swaps
+the accent + sets every chart key to that colour; `ApplyDefaultAppearance` restores the multi-colour look
+(highlight blue, distinct graphs). It's constructed once in `MainWindowViewModel`, applied at startup, and
+handed to `SettingsViewModel`. Theming is **session-only** (no persistence, by choice). Note this feature
+deliberately touched shared styles + the shell (Palette/SharedStyles, MainWindow, NavItem) — theming is
+cross-cutting, so it lives in `src/Services`, not a tab.
+
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
-`DashDetective.Shell`, `DashDetective.Shell.Navigation`, `DashDetective.Tabs.<Feature>`.
+`DashDetective.Services.Theming`, `DashDetective.Shell`, `DashDetective.Shell.Navigation`,
+`DashDetective.Tabs.<Feature>`.
 The `ViewLocator` maps a `*ViewModel` to its `*View` by name, so a tab's View and ViewModel
 must share a namespace.
 
