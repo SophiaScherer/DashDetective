@@ -1,0 +1,295 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:fe="using:DashDetective.Tabs.FileExplorer"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
+             x:DataType="fe:FileExplorerViewModel"
+             x:Class="DashDetective.Tabs.FileExplorer.FileExplorerView">
+
+    <!-- Read-only three-pane browser. Phase 2 wires the folder tree (left); the centre file list
+         and right details pane are placeholders until Phases 3–4. Surfaces come from
+         src/Shared/Styles; selection/hover colours use theme resources. -->
+    <UserControl.Styles>
+        <!-- Tree rows: tighten spacing and recolour selection/hover to match the design comp
+             (AccentSoft selected, HoverOverlay hover) instead of the Fluent defaults. -->
+        <Style Selector="TreeViewItem">
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+            <Setter Property="CornerRadius" Value="5"/>
+        </Style>
+        <!-- Suppress the Fluent default hover: a TreeViewItem's :pointerover is true whenever the
+             pointer is over any descendant, so it would grey the whole ancestor chain. -->
+        <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- Real hover: keyed off the row border's OWN pointerover, so only the directly
+             hovered row highlights (the border wraps just the header, not the children). -->
+        <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- Selection is independent of hover and wins on the selected row. -->
+        <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="TreeViewItem TextBlock.nodeName">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected TextBlock.nodeName">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
+
+        <!-- ===== File list ===== -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="Border.fileRow">
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.fileRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.fileRow.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Border.fileRow TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.fileRow TextBlock.cellName">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.fileRow TextBlock.cellMeta">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="Border.fileRow TextBlock.cellSize">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+
+        <!-- ===== Breadcrumb + filter chips ===== -->
+        <!-- Chrome-less button wrapper so a whole crumb / chip is clickable (as in Settings). -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.crumb">
+            <Setter Property="Padding" Value="2,0"/>
+        </Style>
+        <Style Selector="TextBlock.crumbText">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="TextBlock.crumbText.current">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
+        <Style Selector="Button.crumb:pointerover TextBlock.crumbText">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+        <Style Selector="TextBlock.crumbSep">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
+            <Setter Property="Margin" Value="5,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="12">
+
+        <!-- ===== Breadcrumb + filters ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Border Grid.Column="0" Background="{DynamicResource FieldBackground}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6"
+                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True">
+                <ItemsControl ItemsSource="{Binding Crumbs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="fe:Crumb">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Classes="pick crumb" Command="{Binding SelectCommand}">
+                                    <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
+                                               Text="{Binding Label}"/>
+                                </Button>
+                                <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <Border Grid.Column="1" Classes="segments" VerticalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Filters}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="fe:FilterOption">
+                            <Button Classes="pick" Command="{Binding SelectCommand}">
+                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                    <TextBlock Text="{Binding Label}"/>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Grid>
+
+        <!-- ===== Three panes ===== -->
+        <Grid Grid.Row="1" ColumnDefinitions="210,*,260" ColumnSpacing="12">
+
+        <!-- ===== Folder tree ===== -->
+        <Border Grid.Column="0" Classes="panel" Padding="8">
+            <TreeView ItemsSource="{Binding RootNodes}"
+                      Background="Transparent" BorderThickness="0" Padding="0">
+                <TreeView.ItemContainerTheme>
+                    <ControlTheme TargetType="TreeViewItem" x:DataType="fe:FileSystemNode"
+                                  BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                    </ControlTheme>
+                </TreeView.ItemContainerTheme>
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fe:FileSystemNode">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Path Data="{Binding Glyph}" Stroke="{Binding IconBrush}"
+                                  StrokeThickness="1.3" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <TextBlock Classes="nodeName" Text="{Binding Name}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
+
+        <!-- ===== File list ===== -->
+        <Border Grid.Column="1" Classes="panel" Padding="0" ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*">
+
+                <!-- Column header -->
+                <Border Grid.Row="0" Padding="14,10" BorderBrush="{DynamicResource Hairline}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="2.2*,1*,1.2*,0.9*" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Classes="colHead" Text="NAME"/>
+                        <TextBlock Grid.Column="1" Classes="colHead" Text="TYPE"/>
+                        <TextBlock Grid.Column="2" Classes="colHead" Text="MODIFIED"/>
+                        <TextBlock Grid.Column="3" Classes="colHead" Text="SIZE"
+                                   HorizontalAlignment="Right"/>
+                    </Grid>
+                </Border>
+
+                <!-- Rows -->
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding VisibleEntries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="fe:FileEntry">
+                                <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
+                                        Background="Transparent"
+                                        Tapped="OnEntryTapped" DoubleTapped="OnEntryDoubleTapped">
+                                    <Grid ColumnDefinitions="2.2*,1*,1.2*,0.9*" ColumnSpacing="8">
+                                        <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
+                                            <Path Grid.Column="0" Data="{Binding Glyph}"
+                                                  Stroke="{Binding IconBrush}" StrokeThickness="1.3"
+                                                  StrokeLineCap="Round" StrokeJoin="Round"
+                                                  Width="15" Height="15" Stretch="Uniform"
+                                                  VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                            <TextBlock Grid.Column="1" Classes="cellName"
+                                                       Text="{Binding Name}"/>
+                                        </Grid>
+                                        <TextBlock Grid.Column="1" Classes="cellMeta"
+                                                   Text="{Binding TypeName}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="2" Classes="cellMeta"
+                                                   Text="{Binding ModifiedText}"/>
+                                        <TextBlock Grid.Column="3" Classes="cellSize"
+                                                   Text="{Binding SizeText}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- ===== Details / preview ===== -->
+        <Border Grid.Column="2" Classes="panel">
+            <Panel>
+                <!-- Empty state -->
+                <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsVisible="{Binding HasNoSelection}"
+                           Text="Select a file to see details"/>
+
+                <!-- Details for the selected entry -->
+                <ScrollViewer IsVisible="{Binding HasSelection}"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="12">
+                        <!-- Preview swatch: scaled file glyph on a subtle panel (approximating the
+                             comp's hatch). -->
+                        <Border Height="120" CornerRadius="8"
+                                Background="{DynamicResource CardBackground}"
+                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1">
+                            <Path Data="{Binding SelectedEntry.Glyph}"
+                                  Stroke="{Binding SelectedEntry.IconBrush}" StrokeThickness="1.3"
+                                  StrokeLineCap="Round" StrokeJoin="Round"
+                                  Width="44" Height="44" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <TextBlock Text="{Binding SelectedEntry.Name}" FontSize="14"
+                                   FontWeight="SemiBold" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextStrong}"/>
+
+                        <StackPanel>
+                            <controls:InfoRow Key="Type" Value="{Binding SelectedEntry.TypeName}"/>
+                            <controls:InfoRow Key="Size" Value="{Binding SelectedEntry.SizeText}"/>
+                            <controls:InfoRow Key="Modified" Value="{Binding SelectedEntry.ModifiedText}"/>
+                            <controls:InfoRow Key="Created" Value="{Binding SelectedEntry.CreatedText}"/>
+                            <controls:InfoRow Key="Attributes" Value="{Binding SelectedEntry.AttributesText}"/>
+                            <controls:InfoRow Key="Location" Value="{Binding SelectedEntry.Location}"/>
+                        </StackPanel>
+
+                        <!-- Actions -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Grid.Column="0" Classes="action primary" Content="Open"
+                                    Command="{Binding OpenCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            <Button Grid.Column="1" Classes="action" Content="Properties"
+                                    Click="OnPropertiesClick"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Panel>
+        </Border>
+        </Grid>
+    </Grid>
+</UserControl>
