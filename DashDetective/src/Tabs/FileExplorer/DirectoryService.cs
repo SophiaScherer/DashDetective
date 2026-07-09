@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -10,6 +11,15 @@ public readonly record struct DriveEntry(string DisplayName, string RootPath);
 
 /// <summary>A subdirectory entry (name + full path).</summary>
 public readonly record struct DirEntry(string Name, string FullPath);
+
+/// <summary>
+/// A file-list entry with its display strings already computed off the UI thread (type name,
+/// modified date, humanised size). <see cref="FileEntry"/> wraps this with the themed glyph and
+/// selection behaviour.
+/// </summary>
+public readonly record struct FileItem(
+    string Name, string FullPath, bool IsDirectory,
+    string TypeName, string ModifiedText, string SizeText, string Extension);
 
 /// <summary>
 /// Async, soft-failing filesystem enumeration for the File Explorer. Mirrors the Dashboard
@@ -29,6 +39,9 @@ public static class DirectoryService {
 
     public static Task<IReadOnlyList<DirEntry>> GetSubdirectoriesAsync(string path) =>
         Task.Run(() => ReadSubdirectories(path));
+
+    public static Task<IReadOnlyList<FileItem>> GetEntriesAsync(string path) =>
+        Task.Run(() => ReadEntries(path));
 
     private static IReadOnlyList<DriveEntry> ReadDrives() {
         var drives = new List<DriveEntry>();
@@ -70,6 +83,50 @@ public static class DirectoryService {
         dirs.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
         return dirs;
     }
+
+    // Folders first (both alphabetical), matching Explorer's default ordering. Each entry's
+    // type name, date and size are computed here, off the UI thread.
+    private static IReadOnlyList<FileItem> ReadEntries(string path) {
+        var dirs = new List<FileItem>();
+        var files = new List<FileItem>();
+        try {
+            var di = new DirectoryInfo(path);
+            foreach (var sub in di.EnumerateDirectories("*", EnumOpts)) {
+                try {
+                    dirs.Add(new FileItem(sub.Name, sub.FullName, true,
+                        ShellInterop.GetTypeName(sub.FullName, true),
+                        FormatDate(sub.LastWriteTime), "—", ""));
+                } catch {
+                    // Skip an entry we can't read.
+                }
+            }
+            foreach (var f in di.EnumerateFiles("*", EnumOpts)) {
+                try {
+                    files.Add(new FileItem(f.Name, f.FullName, false,
+                        ShellInterop.GetTypeName(f.FullName, false),
+                        FormatDate(f.LastWriteTime), FileSizeFormatter.Format(f.Length),
+                        f.Extension));
+                } catch {
+                    // Skip an entry we can't read.
+                }
+            }
+        } catch {
+            // Unauthorized / path gone: return whatever we have.
+        }
+
+        dirs.Sort(NameCompare);
+        files.Sort(NameCompare);
+        var all = new List<FileItem>(dirs.Count + files.Count);
+        all.AddRange(dirs);
+        all.AddRange(files);
+        return all;
+    }
+
+    private static int NameCompare(FileItem a, FileItem b) =>
+        string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatDate(DateTime dt) =>
+        dt.ToString("MMM dd, yyyy", CultureInfo.InvariantCulture);
 
     private static string DriveTypeLabel(DriveType type) => type switch {
         DriveType.Fixed => "Local Disk",

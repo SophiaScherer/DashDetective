@@ -15,10 +15,17 @@ public partial class FileExplorerViewModel : ViewModelBase {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
+    /// <summary>Entries of the currently selected folder (folders first, then files).</summary>
+    public ObservableCollection<FileEntry> Entries { get; } = new();
+
     [ObservableProperty] private FileSystemNode? _selectedNode;
+    [ObservableProperty] private FileEntry? _selectedEntry;
 
     /// <summary>Full path of the currently selected folder (drives the list/breadcrumb later).</summary>
     [ObservableProperty] private string _currentPath = "";
+
+    // Guards against a slow folder load overwriting the list after the user has moved on.
+    private string _pendingPath = "";
 
     public FileExplorerViewModel() {
         // Load drives off the UI thread; the continuation resumes here (UI thread) to fill
@@ -48,6 +55,34 @@ public partial class FileExplorerViewModel : ViewModelBase {
 
         SelectedNode = node;
         CurrentPath = node.FullPath;
-        // Phase 3 wires the file list + breadcrumb off the selected folder.
+        _ = LoadEntriesAsync(node.FullPath);
+    }
+
+    private async Task LoadEntriesAsync(string path) {
+        _pendingPath = path;
+        IReadOnlyList<FileItem> items;
+        try {
+            items = await DirectoryService.GetEntriesAsync(path);
+        } catch {
+            return;
+        }
+
+        // Ignore a stale load if the user has since selected another folder.
+        if (_pendingPath != path)
+            return;
+
+        Entries.Clear();
+        SelectedEntry = null;
+        foreach (var item in items)
+            Entries.Add(new FileEntry(item, OnEntrySelected));
+    }
+
+    private void OnEntrySelected(FileEntry entry) {
+        // Single selection through our own source of truth, as with the tree.
+        if (SelectedEntry is { } prev && !ReferenceEquals(prev, entry))
+            prev.IsSelected = false;
+
+        SelectedEntry = entry;
+        // Phase 3b: double-clicking a folder navigates into it. Phase 4: build details.
     }
 }
