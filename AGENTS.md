@@ -29,6 +29,7 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 - `Dashboard`
 - `Settings`
+- `File Explorer`
 
 **Implementation status within the active features:**
 
@@ -66,8 +67,20 @@ Not all of these exist yet. Only build what is listed below as "currently active
   blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
   **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
   `Border`s, not yet wired.
+- **File Explorer** — **in progress**, built in phases (plan:
+  `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
+  browser matching the design comp: a folder **tree** (left, drives + lazy subfolders), a **file
+  list** (center) with a **breadcrumb** and **filter chips** (All / Documents / Images / Archives),
+  and a **details/preview** pane (right) with **Open** and **Properties** actions. Data comes from
+  `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*`, per-entry soft-fail);
+  friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME` only); icons are **themed vector glyphs**
+  (no `HICON`→bitmap); Open via `Process.Start(UseShellExecute)`; Properties via `SHObjectProperties`.
+  **No new dependencies** (Owner/ACL field intentionally omitted). This tab introduces the app's
+  **first hierarchical control** (`TreeView`) — an intentional, signed-off architecture addition. See
+  the *Folder Structure* block for the tab layout, and update the live/deferred status here as each
+  phase lands.
 
-**Everything else (File Explorer, Processes, Performance, Network, Storage, Hardware) is
+**Everything else (Processes, Performance, Network, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
@@ -195,7 +208,17 @@ currently exist.
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
                                 ThemeOption.cs, AccentOption.cs  (selectable item VMs for the
                                                                   Appearance controls, like NavItem)
-      (FileExplorer, Processes, Performance, Network, Storage, Hardware — not yet started)
+      /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
+                                DirectoryService.cs     (async System.IO enumeration: drives, lazy
+                                                         subdirectories, folder entries; per-entry
+                                                         soft-fail, Task.Run off the UI thread)
+                                FileSystemNode.cs       (tree-node item VM; lazy children on expand)
+                                FileEntry.cs            (file-list row item VM)
+                                FileSizeFormatter.cs    (humanize bytes KB/MB/GB/TB; folders → "—")
+                                FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
+                                ShellInterop.cs         (feature-local shell32 P/Invoke:
+                                                         SHGetFileInfo type name + SHObjectProperties)
+      (Processes, Performance, Network, Storage, Hardware — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until

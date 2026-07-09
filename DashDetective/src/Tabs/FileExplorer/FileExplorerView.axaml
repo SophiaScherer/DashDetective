@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:fe="using:DashDetective.Tabs.FileExplorer"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
+             x:DataType="fe:FileExplorerViewModel"
+             x:Class="DashDetective.Tabs.FileExplorer.FileExplorerView">
+
+    <!-- Scaffold. The tree / list / breadcrumb / details panes are added in later phases.
+         Surfaces and typography come from src/Shared/Styles. -->
+    <Border Classes="panel">
+        <TextBlock Classes="panelTitle" Text="File Explorer"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Border>
+</UserControl>
