@@ -91,6 +91,23 @@ Not all of these exist yet. Only build what is listed below as "currently active
   and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
   `TreeViewItem`'s `:pointerover` is true when the pointer is over any descendant).
 
+  **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
+  **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
+  `MainWindow.axaml` used to wrap *every* page, which left the panes unbounded in height so their own
+  scrollers never engaged (the whole tab scrolled as one). Pages that fill the viewport and manage
+  their own internal scrolling now implement the marker interface **`ISelfScrollingPage`**
+  (`src/Shared`); the shell binds its `ScrollViewer.VerticalScrollBarVisibility` to
+  **`MainWindowViewModel.CurrentPageScroll`**, which returns `Disabled` for those pages (so the child
+  is bounded to the viewport and each pane scrolls on its own) and `Auto` for everyone else
+  (Dashboard/Settings scroll as a whole page, unchanged). `FileExplorerViewModel` is the only
+  implementer so far. Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two
+  `GridSplitter`s (shared style **`GridSplitter.paneSplitter`** in `SharedStyles.axaml`); side panels
+  default to **240** (left) / **300** (right) with the middle list as `*`, and each side column carries
+  `MinWidth`/`MaxWidth` (plus `MinWidth="320"` on the list) so drags clamp sanely and the list never
+  collapses at the window's 920 px minimum. Widths are **session-only — they reset to the defaults each
+  launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
+  styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
+
 **Everything else (Processes, Performance, Network, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
@@ -171,11 +188,14 @@ currently exist.
   /src
     /Shared                     (cross-cutting, feature-agnostic)
       ViewModelBase.cs
+      ISelfScrollingPage.cs   (marker: a page that fills the viewport and scrolls its own panes, so
+                               the shell must NOT wrap it in a scroll region — see File Explorer)
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
                                  sit top-level and are swapped at runtime — see Theming below)
-        SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons…)
+        SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
+                                 paneSplitter (draggable divider between resizable panes)…)
       /Controls
         Sparkline, StatCard, InfoRow   (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
@@ -192,6 +212,9 @@ currently exist.
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
+                                (MainWindow's page-host ScrollViewer is conditional: its
+                                 VerticalScrollBarVisibility binds to MainWindowViewModel.CurrentPageScroll,
+                                 so ISelfScrollingPage pages self-scroll — see File Explorer)
       /Navigation
         NavItem.cs, Icons.cs    (NavItem is a pure data model; its selection visuals are styled in
                                  MainWindow.axaml via DynamicResource so they follow theme + accent)
