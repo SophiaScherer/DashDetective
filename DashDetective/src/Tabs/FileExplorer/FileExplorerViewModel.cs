@@ -14,7 +14,7 @@ namespace DashDetective.Tabs.FileExplorer;
 /// this currently drives the folder tree, file list, breadcrumb and filters; the details pane
 /// and actions are layered on in later phases.
 /// </summary>
-public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage {
+public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, IRefreshablePage {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
@@ -70,6 +70,16 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage {
         RootNodes.Clear();
         foreach (var d in drives)
             RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, OnNodeSelected));
+    }
+
+    /// <summary>Toolbar Refresh for the File Explorer: re-read the current folder (picking up files
+    /// added/removed on disk), or reload the drive roots if nothing is open yet. Reuses the same
+    /// load path as navigation, so the stale-load guard still applies.</summary>
+    public void Refresh() {
+        if (!string.IsNullOrEmpty(CurrentPath))
+            SetCurrentFolder(CurrentPath);
+        else
+            _ = LoadRootsAsync();
     }
 
     private void OnNodeSelected(FileSystemNode node) {
