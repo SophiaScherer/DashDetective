@@ -142,6 +142,83 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _ = LoadSystemInfoAsync();
     }
 
+    /// <summary>
+    /// Forces an immediate update of every metric and re-reads the static hardware/system info,
+    /// instead of waiting for the 1 Hz timers. Runs even while paused — a manual refresh should
+    /// still update once. Drives the shell's Refresh action.
+    /// </summary>
+    public void RefreshNow() {
+        OnCpuTick(this, EventArgs.Empty);
+        OnMemoryTick(this, EventArgs.Empty);
+        OnGpuTick(this, EventArgs.Empty);
+        OnStorageTick(this, EventArgs.Empty);
+        OnNetworkTick(this, EventArgs.Empty);
+        UpdateUptime();
+
+        _ = LoadCpuInfoAsync();
+        _ = LoadMemoryInfoAsync();
+        _ = LoadGpuInfoAsync();
+        _ = LoadSystemInfoAsync();
+    }
+
+    /// <summary>
+    /// Pauses or resumes all live sampling by stopping/starting the five metric timers plus the
+    /// uptime timer. Drives the shell's Live toggle; <see cref="RefreshNow"/> still works while
+    /// paused. A timer previously auto-stopped after a sampler failure will simply fail and
+    /// re-stop on resume — harmless.
+    /// </summary>
+    public void SetLive(bool live) {
+        if (live) {
+            _cpuTimer.Start();
+            _memoryTimer.Start();
+            _gpuTimer.Start();
+            _storageTimer.Start();
+            _networkTimer.Start();
+            _uptimeTimer.Start();
+        } else {
+            _cpuTimer.Stop();
+            _memoryTimer.Stop();
+            _gpuTimer.Stop();
+            _storageTimer.Stop();
+            _networkTimer.Stop();
+            _uptimeTimer.Stop();
+        }
+    }
+
+    /// <summary>
+    /// Builds a plain-text diagnostics report from the current on-screen values (no re-sampling),
+    /// for the shell's Export action. Mirrors the "Save Report as .txt" convention of tools like
+    /// msinfo32 and CPU-Z.
+    /// </summary>
+    public string BuildDiagnosticsReport() {
+        var sb = new StringBuilder();
+        sb.AppendLine("DashDetective — System Report");
+        sb.AppendLine($"Generated: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}");
+        sb.AppendLine();
+
+        sb.AppendLine("System");
+        AppendReportRow(sb, "OS", OsText);
+        AppendReportRow(sb, "Device", DeviceText);
+        AppendReportRow(sb, "Motherboard", MotherboardText);
+        AppendReportRow(sb, "BIOS", BiosText);
+        AppendReportRow(sb, "Build", BuildText);
+        AppendReportRow(sb, "Uptime", UptimeText);
+        sb.AppendLine();
+
+        sb.AppendLine("Live metrics");
+        AppendReportRow(sb, "CPU", $"{CpuValueText}%  ({CpuModelText})");
+        AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
+        AppendReportRow(sb, "GPU", $"{GpuValueText}%  ({GpuModelText})");
+        AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
+        AppendReportRow(sb, "Network", $"↓ {NetworkDownText} / ↑ {NetworkUpText} Mbps  ({NetworkAdapterName})");
+
+        return sb.ToString();
+    }
+
+    /// <summary>Appends a left-aligned "key: value" line for the diagnostics report.</summary>
+    private static void AppendReportRow(StringBuilder sb, string key, string value) =>
+        sb.AppendLine($"  {(key + ":").PadRight(14)}{value}");
+
     private async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
