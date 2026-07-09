@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
@@ -16,8 +17,9 @@ public partial class MainWindowViewModel : ViewModelBase {
     private static readonly IBrush LiveDot = new SolidColorBrush(Color.Parse("#6ccb5f"));
     private static readonly IBrush PausedDot = new SolidColorBrush(Color.Parse("#9aa0a6"));
 
+    private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard = new();
-    private readonly SettingsViewModel _settings = new();
+    private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
     [ObservableProperty] private ViewModelBase _currentPage;
@@ -35,6 +37,11 @@ public partial class MainWindowViewModel : ViewModelBase {
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
     public MainWindowViewModel() {
+        // Apply the default appearance (Dark + Blue) through the single theming seam,
+        // then hand the same service to the Settings page so its controls drive it.
+        _theme.ApplyDefaults();
+        _settings = new SettingsViewModel(_theme);
+
         NavItems = new ObservableCollection<NavItem> {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",
                         Icons.Dashboard, _dashboard, Navigate),

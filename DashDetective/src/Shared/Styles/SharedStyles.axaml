@@ -8,15 +8,15 @@
 
     <!-- ===== Surfaces ===== -->
     <Style Selector="Border.panel">
-        <Setter Property="Background" Value="{StaticResource PanelBackground}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource Hairline}"/>
+        <Setter Property="Background" Value="{DynamicResource PanelBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="9"/>
         <Setter Property="Padding" Value="16"/>
     </Style>
     <Style Selector="Border.card">
-        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource Hairline}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="9"/>
         <Setter Property="Padding" Value="13,12"/>
@@ -30,36 +30,36 @@
     <Style Selector="TextBlock.cardLabel">
         <Setter Property="FontSize" Value="11.5"/>
         <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardValue">
         <Setter Property="FontSize" Value="26"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
     </Style>
     <Style Selector="TextBlock.cardUnit">
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardSub">
         <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="{StaticResource TextSubtle}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
     <!-- ===== Key/value rows (used by the InfoRow widget) ===== -->
     <Style Selector="Border.infoRow">
-        <Setter Property="BorderBrush" Value="{StaticResource RowLine}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
         <Setter Property="BorderThickness" Value="0,0,0,1"/>
         <Setter Property="Padding" Value="0,7"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoKey">
         <Setter Property="FontSize" Value="12.5"/>
-        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoVal">
         <Setter Property="FontSize" Value="12.5"/>
         <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="TextAlignment" Value="Right"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
@@ -67,7 +67,7 @@
 
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
-        <Setter Property="Background" Value="{StaticResource FieldBackground}"/>
+        <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
         <Setter Property="CornerRadius" Value="7"/>
         <Setter Property="Padding" Value="3"/>
     </Style>
@@ -76,14 +76,14 @@
         <Setter Property="Padding" Value="14,6"/>
     </Style>
     <Style Selector="Border.seg.selected">
-        <Setter Property="Background" Value="{StaticResource Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="Border.seg TextBlock">
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
     </Style>
     <Style Selector="Border.seg.selected TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource OnAccent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
     </Style>
 
     <!-- ===== Pill toggle track ===== -->
@@ -98,19 +98,19 @@
         <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="Padding" Value="16,9"/>
         <Setter Property="FontSize" Value="12.5"/>
-        <Setter Property="Background" Value="#12FFFFFF"/>
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Button.action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#1FFFFFFF"/>
+        <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
     </Style>
     <Style Selector="Button.primary">
-        <Setter Property="Background" Value="{StaticResource Accent}"/>
-        <Setter Property="Foreground" Value="{StaticResource OnAccent}"/>
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+        <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
     </Style>
 </Styles>

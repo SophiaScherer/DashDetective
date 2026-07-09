@@ -1,37 +1,102 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-      Central colour palette for DashDetective. Every view/widget references these
-      keys instead of hardcoding hex values, so the theme can change in one place.
+      Central colour palette for DashDetective.
+
+      Three groups of keys:
+      • Theme-invariant (below): series colours and the accent set. Same in Light and Dark.
+        The accent keys are overwritten at runtime by ThemeService, so views must reference
+        them with {DynamicResource ...}.
+      • Theme-variant (ThemeDictionaries): surfaces, lines and the text ramp. These flip with
+        the app's ThemeVariant (Light/Dark), so views must reference them with {DynamicResource}.
+      Fixed series colours may stay {StaticResource}; everything else must be {DynamicResource}.
     -->
 
-    <!-- Accents & series colours -->
-    <SolidColorBrush x:Key="Accent" Color="#4cc2ff"/>
-    <SolidColorBrush x:Key="AccentHover" Color="#66d0ff"/>
-    <SolidColorBrush x:Key="OnAccent" Color="#06263a"/>
+    <!-- ===== Theme-invariant: fixed accent-legend colours =====
+         The four accent choices, plus yellow. Used by the "Default" swatch's 2x2 legend and as
+         the default per-graph chart colours below. Fixed, so a running accent swap never changes them. -->
+    <SolidColorBrush x:Key="Blue" Color="#4cc2ff"/>
     <SolidColorBrush x:Key="Purple" Color="#c58fff"/>
     <SolidColorBrush x:Key="Green" Color="#6ccb5f"/>
     <SolidColorBrush x:Key="Yellow" Color="#ffcf4d"/>
     <SolidColorBrush x:Key="Orange" Color="#ff8a5c"/>
 
-    <!-- Surfaces -->
-    <SolidColorBrush x:Key="AppBackground" Color="#141414"/>
-    <SolidColorBrush x:Key="SidebarBackground" Color="#1b1b1b"/>
-    <SolidColorBrush x:Key="PanelBackground" Color="#1c1c1c"/>
-    <SolidColorBrush x:Key="CardBackground" Color="#212121"/>
-    <SolidColorBrush x:Key="FieldBackground" Color="#141414"/>
+    <!-- ===== Theme-invariant: accent set (swapped at runtime by ThemeService) ===== -->
+    <SolidColorBrush x:Key="Accent" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="AccentHover" Color="#66d0ff"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#06263a"/>
+    <SolidColorBrush x:Key="AccentSoft" Color="#4cc2ff" Opacity="0.12"/>
+    <!-- Colours (not brushes) for the brand-logo gradient stops. -->
+    <Color x:Key="AccentColor">#4cc2ff</Color>
+    <Color x:Key="AccentDeep">#2a7fd4</Color>
 
-    <!-- Lines & tracks -->
-    <SolidColorBrush x:Key="Hairline" Color="#FFFFFF" Opacity="0.06"/>
-    <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.05"/>
-    <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.16"/>
+    <!-- ===== Theme-invariant: chart series (swapped at runtime by ThemeService) =====
+         Each dashboard graph binds to one of these. In the "Default" look they hold the distinct
+         colours below; when a single accent is chosen, ThemeService sets them all to that accent. -->
+    <SolidColorBrush x:Key="ChartCpu" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="ChartMemory" Color="#c58fff"/>
+    <SolidColorBrush x:Key="ChartGpu" Color="#6ccb5f"/>
+    <SolidColorBrush x:Key="ChartStorage" Color="#ffcf4d"/>
+    <SolidColorBrush x:Key="ChartNetDown" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="ChartNetUp" Color="#ff8a5c"/>
 
-    <!-- Text (decreasing emphasis) -->
-    <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" Opacity="0.90"/>
-    <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF" Opacity="0.72"/>
-    <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF" Opacity="0.62"/>
-    <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF" Opacity="0.50"/>
-    <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF" Opacity="0.45"/>
-    <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF" Opacity="0.35"/>
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ===================== DARK ===================== -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- Surfaces -->
+            <SolidColorBrush x:Key="AppBackground" Color="#141414"/>
+            <SolidColorBrush x:Key="SidebarBackground" Color="#1b1b1b"/>
+            <SolidColorBrush x:Key="PanelBackground" Color="#1c1c1c"/>
+            <SolidColorBrush x:Key="CardBackground" Color="#212121"/>
+            <SolidColorBrush x:Key="FieldBackground" Color="#141414"/>
+
+            <!-- Lines & tracks -->
+            <SolidColorBrush x:Key="Hairline" Color="#FFFFFF" Opacity="0.06"/>
+            <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.05"/>
+            <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.16"/>
+
+            <!-- Hover overlays (for icon buttons / faint fills) -->
+            <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.07"/>
+            <SolidColorBrush x:Key="HoverOverlayStrong" Color="#FFFFFF" Opacity="0.12"/>
+
+            <!-- Text (decreasing emphasis) -->
+            <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" Opacity="0.90"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF" Opacity="0.72"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF" Opacity="0.62"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF" Opacity="0.50"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF" Opacity="0.45"/>
+            <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF" Opacity="0.35"/>
+        </ResourceDictionary>
+
+        <!-- ===================== LIGHT ===================== -->
+        <ResourceDictionary x:Key="Light">
+            <!-- Surfaces (light greys; panels/cards raised to white) -->
+            <SolidColorBrush x:Key="AppBackground" Color="#eef0f2"/>
+            <SolidColorBrush x:Key="SidebarBackground" Color="#f7f8fa"/>
+            <SolidColorBrush x:Key="PanelBackground" Color="#ffffff"/>
+            <SolidColorBrush x:Key="CardBackground" Color="#ffffff"/>
+            <SolidColorBrush x:Key="FieldBackground" Color="#eceef1"/>
+
+            <!-- Lines & tracks -->
+            <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.10"/>
+            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.08"/>
+            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.20"/>
+
+            <!-- Hover overlays -->
+            <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
+            <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.09"/>
+
+            <!-- Text (decreasing emphasis) -->
+            <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.95"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.88"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.70"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.60"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.50"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.45"/>
+            <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>
