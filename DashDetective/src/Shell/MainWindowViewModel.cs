@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -38,6 +39,11 @@ public partial class MainWindowViewModel : ViewModelBase {
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
+    /// <summary>How the shell wraps the current page: self-scrolling pages (e.g. File Explorer)
+    /// fill the viewport and manage their own panes' scrolling, so the shell must not scroll them.</summary>
+    public ScrollBarVisibility CurrentPageScroll =>
+        CurrentPage is ISelfScrollingPage ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+
     public MainWindowViewModel() {
         // Apply the default appearance (Dark + Blue) through the single theming seam,
         // then hand the same service to the Settings page so its controls drive it.
@@ -66,6 +72,9 @@ public partial class MainWindowViewModel : ViewModelBase {
 
     private void UpdateClock() =>
         Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+    partial void OnCurrentPageChanged(ViewModelBase value) =>
+        OnPropertyChanged(nameof(CurrentPageScroll));
 
     partial void OnIsLiveChanged(bool value) {
         OnPropertyChanged(nameof(LiveLabel));

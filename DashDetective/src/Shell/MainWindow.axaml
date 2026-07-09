@@ -230,7 +230,8 @@
             </Border>
 
             <!-- Page content -->
-            <ScrollViewer Grid.Row="1" Background="{DynamicResource AppBackground}" Padding="22,20,22,30">
+            <ScrollViewer Grid.Row="1" Background="{DynamicResource AppBackground}" Padding="22,20,22,30"
+                          VerticalScrollBarVisibility="{Binding CurrentPageScroll}">
                 <ContentControl Content="{Binding CurrentPage}"/>
             </ScrollViewer>
         </Grid>

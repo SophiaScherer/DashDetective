@@ -14,7 +14,7 @@ namespace DashDetective.Tabs.FileExplorer;
 /// this currently drives the folder tree, file list, breadcrumb and filters; the details pane
 /// and actions are layered on in later phases.
 /// </summary>
-public partial class FileExplorerViewModel : ViewModelBase {
+public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 

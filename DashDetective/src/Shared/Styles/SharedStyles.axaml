@@ -14,6 +14,17 @@
         <Setter Property="CornerRadius" Value="9"/>
         <Setter Property="Padding" Value="16"/>
     </Style>
+    <!-- Draggable divider between resizable panes. Transparent grip that doubles as the
+         inter-panel gap; subtle highlight on hover. -->
+    <Style Selector="GridSplitter.paneSplitter">
+        <Setter Property="Width" Value="12"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="SizeWestEast"/>
+    </Style>
+    <Style Selector="GridSplitter.paneSplitter:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
