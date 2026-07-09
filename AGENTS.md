@@ -67,18 +67,29 @@ Not all of these exist yet. Only build what is listed below as "currently active
   blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
   **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
   `Border`s, not yet wired.
-- **File Explorer** — **in progress**, built in phases (plan:
+- **File Explorer** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
-  browser matching the design comp: a folder **tree** (left, drives + lazy subfolders), a **file
-  list** (center) with a **breadcrumb** and **filter chips** (All / Documents / Images / Archives),
-  and a **details/preview** pane (right) with **Open** and **Properties** actions. Data comes from
-  `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*`, per-entry soft-fail);
-  friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME` only); icons are **themed vector glyphs**
-  (no `HICON`→bitmap); Open via `Process.Start(UseShellExecute)`; Properties via `SHObjectProperties`.
-  **No new dependencies** (Owner/ACL field intentionally omitted). This tab introduces the app's
-  **first hierarchical control** (`TreeView`) — an intentional, signed-off architecture addition. See
-  the *Folder Structure* block for the tab layout, and update the live/deferred status here as each
-  phase lands.
+  browser matching the design comp: a folder **tree** (left, drives-as-roots + lazily-loaded
+  subfolders), a **file list** (centre) with a clickable **breadcrumb** and **filter chips**
+  (All / Documents / Images / Archives), and a **details/preview** pane (right) showing Type / Size /
+  Modified / Created / Attributes / Location with **Open** and **Properties** actions. Data comes from
+  `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*` with
+  `EnumerationOptions{IgnoreInaccessible, AttributesToSkip=Hidden|System}`, per-entry soft-fail off
+  the UI thread); friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES`);
+  icons are **themed vector glyphs** with fixed per-type colours (no `HICON`→bitmap); Open via
+  `Process.Start(UseShellExecute)` (also on double-click); Properties via `SHObjectProperties` invoked
+  from the view code-behind (needs the window `TopLevel` handle, like Export). **No new dependencies**
+  (Owner/ACL field intentionally omitted). Tree/list selection uses a per-item `IsSelected` +
+  callback (the NavItem pattern), with the VM enforcing single selection.
+
+  Notable choices / deferred bits: this tab introduces the app's **first hierarchical control**
+  (`TreeView`) — an intentional, signed-off architecture addition. Tree roots are **drives**, not a
+  synthetic "This PC" node. Navigating via the list/breadcrumb does **not** sync the tree selection
+  (deferred by choice). Filter chips reuse the shared **segmented control** (`Border.seg`), not the
+  comp's softer chip; the details **preview** is a solid themed swatch, not the comp's literal
+  diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
+  and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
+  `TreeViewItem`'s `:pointerover` is true when the pointer is over any descendant).
 
 **Everything else (Processes, Performance, Network, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
