@@ -54,8 +54,21 @@ public partial class FileExplorerViewModel : ViewModelBase {
             prev.IsSelected = false;
 
         SelectedNode = node;
-        CurrentPath = node.FullPath;
-        _ = LoadEntriesAsync(node.FullPath);
+        SetCurrentFolder(node.FullPath);
+    }
+
+    /// <summary>Selects a file-list row (drives the details pane in Phase 4).</summary>
+    public void SelectEntry(FileEntry entry) => entry.IsSelected = true;
+
+    /// <summary>Activates a row: folders navigate into themselves. Files open in Phase 5.</summary>
+    public void ActivateEntry(FileEntry entry) {
+        if (entry.IsDirectory)
+            SetCurrentFolder(entry.FullPath);
+    }
+
+    private void SetCurrentFolder(string path) {
+        CurrentPath = path;
+        _ = LoadEntriesAsync(path);
     }
 
     private async Task LoadEntriesAsync(string path) {
