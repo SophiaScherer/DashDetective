@@ -52,7 +52,9 @@ Not all of these exist yet. Only build what is listed below as "currently active
   timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
   the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
   live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
-  (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`),
+  (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`;
+  its `TextBlock` has a fixed `Width` + centred text so the proportional-font `HH:mm:ss` reserves constant
+  space and ticking never reflows the toolbar),
   a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
   that now refreshes **whichever page is active** through the `IRefreshablePage` marker interface
   (`src/Shared`) — on the Dashboard it forces an immediate re-read of every metric + static provider
