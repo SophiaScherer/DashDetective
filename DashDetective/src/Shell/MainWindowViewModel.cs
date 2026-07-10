@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -39,10 +38,17 @@ public partial class MainWindowViewModel : ViewModelBase {
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
-    /// <summary>How the shell wraps the current page: self-scrolling pages (e.g. File Explorer)
-    /// fill the viewport and manage their own panes' scrolling, so the shell must not scroll them.</summary>
-    public ScrollBarVisibility CurrentPageScroll =>
-        CurrentPage is ISelfScrollingPage ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+    /// <summary>Whether the current page manages its own scrolling (e.g. File Explorer): such pages
+    /// fill the viewport and scroll their own panes, so the shell hosts them in a bounded,
+    /// non-scrolling container instead of the page-scrolling <c>ScrollViewer</c>.</summary>
+    public bool CurrentPageSelfScrolls => CurrentPage is ISelfScrollingPage;
+
+    /// <summary>The current page routed to the scrolling host (null when it self-scrolls). Routing to
+    /// null keeps the inactive host empty so the view is only ever instantiated once.</summary>
+    public ViewModelBase? ScrollingPage => CurrentPage is ISelfScrollingPage ? null : CurrentPage;
+
+    /// <summary>The current page routed to the bounded, self-scrolling host (null otherwise).</summary>
+    public ViewModelBase? SelfScrollingPage => CurrentPage is ISelfScrollingPage ? CurrentPage : null;
 
     public MainWindowViewModel() {
         // Apply the default appearance (Dark + Blue) through the single theming seam,
@@ -73,8 +79,11 @@ public partial class MainWindowViewModel : ViewModelBase {
     private void UpdateClock() =>
         Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
-    partial void OnCurrentPageChanged(ViewModelBase value) =>
-        OnPropertyChanged(nameof(CurrentPageScroll));
+    partial void OnCurrentPageChanged(ViewModelBase value) {
+        OnPropertyChanged(nameof(CurrentPageSelfScrolls));
+        OnPropertyChanged(nameof(ScrollingPage));
+        OnPropertyChanged(nameof(SelfScrollingPage));
+    }
 
     partial void OnIsLiveChanged(bool value) {
         OnPropertyChanged(nameof(LiveLabel));
