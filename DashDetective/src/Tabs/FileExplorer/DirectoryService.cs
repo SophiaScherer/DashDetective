@@ -6,11 +6,13 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.FileExplorer;
 
-/// <summary>A drive shown as a tree root, e.g. "Local Disk (C:)".</summary>
-public readonly record struct DriveEntry(string DisplayName, string RootPath);
+/// <summary>A drive shown as a tree root, e.g. "Local Disk (C:)". <paramref name="HasChildren"/>
+/// says whether it has an expandable subfolder, so the tree only shows a chevron when it does.</summary>
+public readonly record struct DriveEntry(string DisplayName, string RootPath, bool HasChildren);
 
-/// <summary>A subdirectory entry (name + full path).</summary>
-public readonly record struct DirEntry(string Name, string FullPath);
+/// <summary>A subdirectory entry (name + full path). <paramref name="HasChildren"/> says whether it
+/// has an expandable subfolder, so the tree only shows a chevron when it does.</summary>
+public readonly record struct DirEntry(string Name, string FullPath, bool HasChildren);
 
 /// <summary>
 /// A file-list entry with its display strings already computed off the UI thread (type name,
@@ -65,7 +67,10 @@ public static class DirectoryService {
                         ? DriveTypeLabel(d.DriveType)
                         : d.VolumeLabel;
                     var letter = d.Name.TrimEnd(Path.DirectorySeparatorChar);
-                    drives.Add(new DriveEntry($"{label} ({letter})", d.RootDirectory.FullName));
+                    // Probe with the default (hidden-excluded) view — a ready drive effectively always
+                    // has a visible subfolder, so the chevron shows as expected.
+                    var root = d.RootDirectory.FullName;
+                    drives.Add(new DriveEntry($"{label} ({letter})", root, HasSubdirectory(root, HideSpecial)));
                 } catch {
                     // Skip a drive that can't be described (e.g. removed mid-scan).
                 }
@@ -82,7 +87,9 @@ public static class DirectoryService {
         try {
             foreach (var sub in new DirectoryInfo(path).EnumerateDirectories("*", opts)) {
                 try {
-                    dirs.Add(new DirEntry(sub.Name, sub.FullName));
+                    // Probe one level deeper (same hidden setting) so the child shows a chevron
+                    // only if it can actually be expanded.
+                    dirs.Add(new DirEntry(sub.Name, sub.FullName, HasSubdirectory(sub.FullName, opts)));
                 } catch {
                     // Skip an entry we can't read.
                 }
@@ -92,6 +99,18 @@ public static class DirectoryService {
         }
         dirs.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
         return dirs;
+    }
+
+    // True if the folder has at least one subdirectory visible under the given options. Stops at the
+    // first hit; soft-fails to false so an unreadable/denied folder is treated as a (chevron-less) leaf.
+    private static bool HasSubdirectory(string path, EnumerationOptions opts) {
+        try {
+            foreach (var _ in new DirectoryInfo(path).EnumerateDirectories("*", opts))
+                return true;
+        } catch {
+            // Unauthorized / path gone: treat as a leaf.
+        }
+        return false;
     }
 
     // Folders first (both alphabetical), matching Explorer's default ordering. Each entry's

@@ -90,7 +90,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         RootNodes.Clear();
         foreach (var d in drives)
-            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, () => ShowHidden, OnNodeSelected));
+            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren, () => ShowHidden, OnNodeSelected));
     }
 
     // Toggling "show hidden" reloads the file list and rebuilds the tree from its roots (whose lazy
