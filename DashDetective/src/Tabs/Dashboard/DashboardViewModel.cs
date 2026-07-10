@@ -14,7 +14,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// View model for the Dashboard page. Currently drives the live CPU surfaces; the other
 /// metrics remain static placeholders in the view until they are implemented.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase, IDisposable {
+public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -160,6 +160,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable {
         _ = LoadGpuInfoAsync();
         _ = LoadSystemInfoAsync();
     }
+
+    /// <summary>Toolbar Refresh for the Dashboard: an immediate re-sample of every metric.</summary>
+    public void Refresh() => RefreshNow();
 
     /// <summary>
     /// Pauses or resumes all live sampling by stopping/starting the five metric timers plus the

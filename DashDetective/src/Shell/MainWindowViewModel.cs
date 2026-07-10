@@ -88,9 +88,11 @@ public partial class MainWindowViewModel : ViewModelBase {
         _dashboard.SetLive(IsLive);
     }
 
-    /// <summary>Forces an immediate re-read of every Dashboard metric and static info.</summary>
+    /// <summary>Refreshes whichever page is current: the Dashboard re-samples its metrics, the File
+    /// Explorer reloads its current folder. Pages that don't implement <see cref="IRefreshablePage"/>
+    /// (e.g. Settings) simply ignore it.</summary>
     [RelayCommand]
-    private void Refresh() => _dashboard.RefreshNow();
+    private void Refresh() => (CurrentPage as IRefreshablePage)?.Refresh();
 
     /// <summary>
     /// Builds the plain-text diagnostics report for the Export action. Called from the window

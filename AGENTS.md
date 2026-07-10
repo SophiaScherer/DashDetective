@@ -54,8 +54,11 @@ Not all of these exist yet. Only build what is listed below as "currently active
   live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
   (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`),
   a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
-  that forces an immediate re-read of every metric + static provider (`DashboardViewModel.RefreshNow`),
-  and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
+  that now refreshes **whichever page is active** through the `IRefreshablePage` marker interface
+  (`src/Shared`) — on the Dashboard it forces an immediate re-read of every metric + static provider
+  (`DashboardViewModel.RefreshNow`), on the File Explorer it reloads the current folder, and pages that
+  don't implement it (Settings) simply ignore it (`MainWindowViewModel.Refresh` routes via
+  `CurrentPage as IRefreshablePage`) — and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
   (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
   needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
   uses the in-box `Avalonia.Platform.Storage` picker — no new package.
@@ -70,11 +73,13 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - **File Explorer** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
   browser matching the design comp: a folder **tree** (left, drives-as-roots + lazily-loaded
-  subfolders), a **file list** (centre) with a clickable **breadcrumb** and **filter chips**
-  (All / Documents / Images / Archives), and a **details/preview** pane (right) showing Type / Size /
+  subfolders), a **file list** (centre) with a clickable **breadcrumb**, **filter chips**
+  (All / Documents / Images / Archives), **sortable column headers**, and a **Show hidden** checkbox,
+  and a **details/preview** pane (right) showing Type / Size /
   Modified / Created / Attributes / Location with **Open** and **Properties** actions. Data comes from
   `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*` with
-  `EnumerationOptions{IgnoreInaccessible, AttributesToSkip=Hidden|System}`, per-entry soft-fail off
+  `EnumerationOptions{IgnoreInaccessible, AttributesToSkip=…}` — hidden/system entries are skipped by
+  default but shown when **Show hidden** is on, see below — per-entry soft-fail off
   the UI thread); friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES`);
   icons are **themed vector glyphs** with fixed per-type colours (no `HICON`→bitmap); Open via
   `Process.Start(UseShellExecute)` (also on double-click); Properties via `SHObjectProperties` invoked
@@ -90,6 +95,29 @@ Not all of these exist yet. Only build what is listed below as "currently active
   diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
   and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
   `TreeViewItem`'s `:pointerover` is true when the pointer is over any descendant).
+
+  **Sorting, hidden files & contextual refresh (enhancement).** Three follow-on features, all kept
+  tab-local except the shared refresh seam:
+  - **Column sorting.** The `NAME / TYPE / MODIFIED / SIZE` headers are clickable (`Button.pick`
+    cells bound to per-column `SortColumn` VMs — same selectable-item shape as `FilterOption`); the
+    active column tints to `Accent` and shows a `↑`/`↓` arrow. Sorting lives in the **view model**, not
+    the service: `FileItem`/`FileEntry` now carry the **raw** `long Size` (-1 for folders) and
+    `DateTime Modified` keys alongside the display strings (the pre-formatted strings can't be ordered).
+    `FileExplorerViewModel.RebuildVisibleEntries` (renamed from `ApplyFilter`) filters then `Compare`-sorts;
+    `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
+    active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
+    adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
+  - **Show hidden.** A themed `CheckBox` (next to the filter chips) bound to
+    `FileExplorerViewModel.ShowHidden`. `DirectoryService` now takes a `bool includeHidden` (picking
+    between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
+    so lazy expands honor the live setting. Toggling reloads the list **and** rebuilds the tree from its
+    roots (expanded folders collapse — an accepted trade for a rarely-flipped toggle). The checkbox style
+    recolours the Fluent template parts (`Border#NormalRectangle`, `Path#CheckGlyph`) and is local to the
+    view (the app's only checkbox — promote to `SharedStyles` if reused).
+  - **Contextual Refresh.** `FileExplorerViewModel` implements `IRefreshablePage` (`src/Shared`, the same
+    marker-interface idea as `ISelfScrollingPage`); `Refresh()` re-reads the current folder via the
+    existing `SetCurrentFolder`/`LoadEntriesAsync` path so the toolbar button picks up files added/removed
+    on disk. See the toolbar note in the Dashboard bullet for the shell-side routing.
 
   **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
   **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
@@ -190,6 +218,8 @@ currently exist.
       ViewModelBase.cs
       ISelfScrollingPage.cs   (marker: a page that fills the viewport and scrolls its own panes, so
                                the shell must NOT wrap it in a scroll region — see File Explorer)
+      IRefreshablePage.cs     (marker: a page the toolbar Refresh routes to; Refresh() re-reads its
+                               data — Dashboard re-samples, File Explorer reloads the current folder)
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
@@ -243,11 +273,20 @@ currently exist.
                                 ThemeOption.cs, AccentOption.cs  (selectable item VMs for the
                                                                   Appearance controls, like NavItem)
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
+                                                        (VM implements ISelfScrollingPage +
+                                                         IRefreshablePage; owns filter, sort + ShowHidden
+                                                         state and RebuildVisibleEntries)
                                 DirectoryService.cs     (async System.IO enumeration: drives, lazy
                                                          subdirectories, folder entries; per-entry
-                                                         soft-fail, Task.Run off the UI thread)
-                                FileSystemNode.cs       (tree-node item VM; lazy children on expand)
-                                FileEntry.cs            (file-list row item VM)
+                                                         soft-fail, Task.Run off the UI thread; takes
+                                                         includeHidden to reveal hidden/system entries.
+                                                         FileItem carries raw Size/Modified sort keys)
+                                FileSystemNode.cs       (tree-node item VM; lazy children on expand;
+                                                         threads a Func<bool> includeHidden accessor)
+                                FileEntry.cs            (file-list row item VM; exposes raw Size/Modified)
+                                FileSortKey.cs          (enum: Name / Type / Modified / Size)
+                                SortColumn.cs           (clickable-header VM: Key + SortCommand + IsActive
+                                                         + Arrow — same shape as FilterOption)
                                 FileSizeFormatter.cs    (humanize bytes KB/MB/GB/TB; folders → "—")
                                 FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
                                 ShellInterop.cs         (feature-local shell32 P/Invoke:
