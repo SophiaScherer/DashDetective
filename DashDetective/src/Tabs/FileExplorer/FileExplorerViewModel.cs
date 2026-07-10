@@ -46,6 +46,11 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Whether OS hidden/system entries (e.g. AppData) are shown in the list and tree.</summary>
     [ObservableProperty] private bool _showHidden;
 
+    /// <summary>When on, collapsing a tree node also collapses all of its descendants, so
+    /// re-expanding it shows a clean single level instead of the branch's prior expansion state.
+    /// Read live by each node on collapse; no reload needed since only future gestures are affected.</summary>
+    [ObservableProperty] private bool _collapseChildrenWithParent;
+
     // Full, unfiltered entries of the current folder; VisibleEntries is this through the filter + sort.
     private readonly List<FileEntry> _allEntries = new();
     private FilterOption _selectedFilter;
@@ -90,7 +95,8 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         RootNodes.Clear();
         foreach (var d in drives)
-            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren, () => ShowHidden, OnNodeSelected));
+            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren,
+                                             () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
     }
 
     // Toggling "show hidden" reloads the file list and rebuilds the tree from its roots (whose lazy

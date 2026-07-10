@@ -210,6 +210,9 @@
                                 <!-- Reveals OS hidden/system entries in list + tree. -->
                                 <CheckBox Classes="optionCheck" Content="Show hidden"
                                           IsChecked="{Binding ShowHidden}"/>
+                                <!-- Collapsing a parent also collapses everything under it. -->
+                                <CheckBox Classes="optionCheck" Content="Collapse children with parent"
+                                          IsChecked="{Binding CollapseChildrenWithParent}"/>
                             </StackPanel>
                         </Flyout>
                     </Button.Flyout>
