@@ -229,11 +229,19 @@
                 </Grid>
             </Border>
 
-            <!-- Page content -->
-            <ScrollViewer Grid.Row="1" Background="{DynamicResource AppBackground}" Padding="22,20,22,30"
-                          VerticalScrollBarVisibility="{Binding CurrentPageScroll}">
-                <ContentControl Content="{Binding CurrentPage}"/>
-            </ScrollViewer>
+            <!-- Page content: normal pages get an outer scroll region; self-scrolling pages
+                 (File Explorer) get a bounded, non-scrolling host so their panes scroll on their own.
+                 Content is routed so only the active host is populated (view built once). -->
+            <Panel Grid.Row="1" Background="{DynamicResource AppBackground}">
+                <ScrollViewer Padding="22,20,22,30"
+                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding !CurrentPageSelfScrolls}">
+                    <ContentControl Content="{Binding ScrollingPage}"/>
+                </ScrollViewer>
+                <ContentControl Margin="22,20,22,30"
+                                Content="{Binding SelfScrollingPage}"
+                                IsVisible="{Binding CurrentPageSelfScrolls}"/>
+            </Panel>
         </Grid>
     </Grid>
 </Window>
