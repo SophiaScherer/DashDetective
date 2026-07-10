@@ -124,11 +124,15 @@ Not all of these exist yet. Only build what is listed below as "currently active
   `MainWindow.axaml` used to wrap *every* page, which left the panes unbounded in height so their own
   scrollers never engaged (the whole tab scrolled as one). Pages that fill the viewport and manage
   their own internal scrolling now implement the marker interface **`ISelfScrollingPage`**
-  (`src/Shared`); the shell binds its `ScrollViewer.VerticalScrollBarVisibility` to
-  **`MainWindowViewModel.CurrentPageScroll`**, which returns `Disabled` for those pages (so the child
-  is bounded to the viewport and each pane scrolls on its own) and `Auto` for everyone else
-  (Dashboard/Settings scroll as a whole page, unchanged). `FileExplorerViewModel` is the only
-  implementer so far. Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two
+  (`src/Shared`); the shell hosts them **outside** the page-scrolling `ScrollViewer`, in a plain
+  `ContentControl` that the `*` grid row bounds to the viewport height (so the child is bounded and
+  each pane scrolls on its own). The page-host is a `Panel` with two mutually-exclusive
+  `ContentControl`s: the current page is routed to the scrolling host via
+  **`MainWindowViewModel.ScrollingPage`** or the bounded host via **`SelfScrollingPage`** (the other
+  is fed `null` so the view is only ever built once), toggled by **`CurrentPageSelfScrolls`**.
+  Dashboard/Settings scroll as a whole page (unchanged); `FileExplorerViewModel` is the only
+  self-scrolling implementer so far. (A `Disabled` `ScrollViewer` was tried first but does not
+  reliably bound its child, which clipped the bottom of long trees.) Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two
   `GridSplitter`s (shared style **`GridSplitter.paneSplitter`** in `SharedStyles.axaml`); side panels
   default to **240** (left) / **300** (right) with the middle list as `*`, and each side column carries
   `MinWidth`/`MaxWidth` (plus `MinWidth="320"` on the list) so drags clamp sanely and the list never
@@ -242,9 +246,10 @@ currently exist.
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
-                                (MainWindow's page-host ScrollViewer is conditional: its
-                                 VerticalScrollBarVisibility binds to MainWindowViewModel.CurrentPageScroll,
-                                 so ISelfScrollingPage pages self-scroll — see File Explorer)
+                                (MainWindow's page-host is a Panel with two mutually-exclusive hosts:
+                                 a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
+                                 (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
+                                 the viewport — see File Explorer)
       /Navigation
         NavItem.cs, Icons.cs    (NavItem is a pure data model; its selection visuals are styled in
                                  MainWindow.axaml via DynamicResource so they follow theme + accent)
