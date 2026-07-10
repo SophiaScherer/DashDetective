@@ -223,8 +223,10 @@
                                   Data="M8,2 V10 M8,10 L5,7 M8,10 L11,7 M3,12 V13.5 H13 V12"/>
                         </Button>
                         <Rectangle Width="1" Height="22" Fill="{DynamicResource Hairline}" Margin="3,0"/>
+                        <!-- Fixed width so the proportional-font HH:mm:ss (digit widths differ as it
+                             ticks) reserves constant space and never reflows the toolbar. -->
                         <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{DynamicResource TextTertiary}"
-                                   VerticalAlignment="Center"/>
+                                   VerticalAlignment="Center" Width="58" TextAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
