@@ -36,9 +36,26 @@
                 </StackPanel>
             </Border>
             <Border Grid.Column="2" Classes="panel">
-                <StackPanel>
+                <StackPanel Spacing="10">
                     <TextBlock Classes="panelTitle" Text="Throughput"/>
-                    <TextBlock Classes="placeholder" Text="Download / upload"/>
+                    <StackPanel Orientation="Horizontal" Spacing="18">
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                            <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
+                            <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                            <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
+                            <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <controls:Sparkline Height="70" Fill="True"
+                                        Stroke="{DynamicResource ChartNetDown}" Points="{Binding DownPoints}"
+                                        YMin="0" YMax="{Binding DownYMax}"/>
+                    <controls:Sparkline Height="60" Fill="True"
+                                        Stroke="{DynamicResource ChartNetUp}" Points="{Binding UpPoints}"
+                                        YMin="0" YMax="{Binding UpYMax}"/>
                 </StackPanel>
             </Border>
         </Grid>

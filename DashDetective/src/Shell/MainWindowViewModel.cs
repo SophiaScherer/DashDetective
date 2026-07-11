@@ -93,11 +93,14 @@ public partial class MainWindowViewModel : ViewModelBase {
         OnPropertyChanged(nameof(LiveDotBrush));
     }
 
-    /// <summary>Pauses/resumes all live metric sampling on the Dashboard.</summary>
+    /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
+    /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
+    /// is needed here.</summary>
     [RelayCommand]
     private void ToggleLive() {
         IsLive = !IsLive;
-        _dashboard.SetLive(IsLive);
+        foreach (var item in Nav.NavItems)
+            (item.Page as ILiveSamplingPage)?.SetLive(IsLive);
     }
 
     /// <summary>Refreshes whichever page is current: the Dashboard re-samples its metrics, the File
