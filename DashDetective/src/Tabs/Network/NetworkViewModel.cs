@@ -1,6 +1,8 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.Network;
@@ -26,10 +28,15 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Floor for a series' vertical scale so idle traffic isn't drawn as a huge spike.</summary>
     private const double MinScaleMbps = 1.0;
 
+    /// <summary>Cadence for re-reading adapters + IP config. Adapters change rarely (plug/unplug,
+    /// connect/disconnect), so a coarse tick is plenty — like the Dashboard's 30 s uptime timer.</summary>
+    private static readonly TimeSpan AdapterInterval = TimeSpan.FromSeconds(5);
+
     private readonly NetworkUsageSampler _networkSampler = new();
     private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _networkTimer;
+    private readonly DispatcherTimer _adapterTimer;
 
     [ObservableProperty] private string _downText = "0";
     [ObservableProperty] private string _upText = "0";
@@ -37,6 +44,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     [ObservableProperty] private string _upPoints = "";
     [ObservableProperty] private double _downYMax = MinScaleMbps;
     [ObservableProperty] private double _upYMax = MinScaleMbps;
+
+    /// <summary>The machine's network adapters (physical + virtual), for the Adapters panel.</summary>
+    public ObservableCollection<AdapterInfo> Adapters { get; } = new();
+
+    /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
+    [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
 
     public NetworkViewModel() {
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
@@ -46,6 +59,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _networkTimer.Tick += OnNetworkTick;
         _networkTimer.Start();
+
+        // Adapters + IP config load once off the UI thread, then refresh on a coarse timer.
+        _ = LoadAdaptersAsync();
+
+        _adapterTimer = new DispatcherTimer { Interval = AdapterInterval };
+        _adapterTimer.Tick += OnAdapterTick;
+        _adapterTimer.Start();
     }
 
     private void OnNetworkTick(object? sender, EventArgs e) {
@@ -123,23 +143,53 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         return sb.ToString();
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample. Runs even while paused (a manual refresh
-    /// should still update once), matching the Dashboard.</summary>
-    public void Refresh() => OnNetworkTick(this, EventArgs.Empty);
+    private void OnAdapterTick(object? sender, EventArgs e) => _ = LoadAdaptersAsync();
 
-    /// <summary>Pauses/resumes live throughput sampling. Drives the shell's Live pill;
-    /// <see cref="Refresh"/> still works while paused.</summary>
-    public void SetLive(bool live) {
-        if (live)
-            _networkTimer.Start();
-        else
-            _networkTimer.Stop();
+    /// <summary>
+    /// Reads the adapters + primary IP config off the UI thread and applies the result. The provider
+    /// never throws (it falls back to an empty list / <see cref="IpConfigInfo.Unknown"/>), but the
+    /// whole path is guarded so a surprise can't take down the app via an unobserved task exception.
+    /// The small adapter list is rebuilt wholesale — cheap and flicker-free at this size/cadence.
+    /// </summary>
+    private async Task LoadAdaptersAsync() {
+        try {
+            var snapshot = await AdapterInfoProvider.GetAsync();
+            // GetAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
+            Adapters.Clear();
+            foreach (var adapter in snapshot.Adapters)
+                Adapters.Add(adapter);
+            IpConfig = snapshot.PrimaryConfig;
+        } catch {
+            Adapters.Clear();
+            IpConfig = IpConfigInfo.Unknown;
+        }
     }
 
-    /// <summary>Stops the sampling timer. Safe to call more than once. The network sampler is fully
-    /// managed, so it needs no disposal.</summary>
+    /// <summary>Toolbar Refresh: an immediate re-sample and adapter re-read. Runs even while paused (a
+    /// manual refresh should still update once), matching the Dashboard.</summary>
+    public void Refresh() {
+        OnNetworkTick(this, EventArgs.Empty);
+        _ = LoadAdaptersAsync();
+    }
+
+    /// <summary>Pauses/resumes live throughput sampling and adapter polling. Drives the shell's Live
+    /// pill; <see cref="Refresh"/> still works while paused.</summary>
+    public void SetLive(bool live) {
+        if (live) {
+            _networkTimer.Start();
+            _adapterTimer.Start();
+        } else {
+            _networkTimer.Stop();
+            _adapterTimer.Stop();
+        }
+    }
+
+    /// <summary>Stops the timers. Safe to call more than once. The network sampler is fully managed,
+    /// so it needs no disposal.</summary>
     public void Dispose() {
         _networkTimer.Stop();
         _networkTimer.Tick -= OnNetworkTick;
+        _adapterTimer.Stop();
+        _adapterTimer.Tick -= OnAdapterTick;
     }
 }

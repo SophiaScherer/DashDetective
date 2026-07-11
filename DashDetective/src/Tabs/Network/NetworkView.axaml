@@ -11,11 +11,31 @@
     <!-- Phase 0 scaffold: the six-panel layout from the design comp with placeholder content.
          Panels are filled with live data in later phases. Surfaces/typography come from
          src/Shared/Styles. -->
+    <!-- Monospace token is tab-local: no mono font is used elsewhere in the app yet. Promote to
+         SharedStyles if a second feature needs it. Used for IP/address values that read better
+         column-aligned (IP config, connection endpoints, ping/DNS console output). -->
+    <UserControl.Resources>
+        <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <Style Selector="TextBlock.placeholder">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
             <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+        <!-- One IP Configuration key/value row: muted key on the left, monospace value on the right. -->
+        <Style Selector="TextBlock.ipKey">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.ipVal">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </UserControl.Styles>
 
@@ -24,15 +44,52 @@
         <!-- ===== Row 1: Adapters · IP Configuration · Throughput ===== -->
         <Grid ColumnDefinitions="*,*,1.1*" ColumnSpacing="16">
             <Border Grid.Column="0" Classes="panel">
-                <StackPanel>
+                <StackPanel Spacing="8">
                     <TextBlock Classes="panelTitle" Text="Adapters"/>
-                    <TextBlock Classes="placeholder" Text="Network adapters"/>
+                    <ItemsControl ItemsSource="{Binding Adapters}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AdapterInfo">
+                                <Border BorderBrush="{DynamicResource RowLine}"
+                                        BorderThickness="0,0,0,1" Padding="0,9">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"
+                                                 Fill="{Binding DotBrush}"/>
+                                        <StackPanel Grid.Column="1" Margin="11,0,8,0" Spacing="1">
+                                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium"
+                                                       Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="11"
+                                                       Foreground="{DynamicResource TextSubtle}" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11.5" TextAlignment="Right"
+                                                       Foreground="{Binding StatusBrush}"/>
+                                            <TextBlock Text="{Binding SpeedText}" FontSize="11" TextAlignment="Right"
+                                                       Foreground="{DynamicResource TextSubtle}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="panel">
-                <StackPanel>
+                <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="IP Configuration"/>
-                    <TextBlock Classes="placeholder" Text="Primary adapter addressing"/>
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="ipKey" Text="IPv4 Address"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Ipv4}"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="ipKey" Text="Subnet Mask"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.SubnetMask}"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="ipKey" Text="Gateway"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Gateway}"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="ipKey" Text="DNS"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dns}"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="ipKey" Text="MAC"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Mac}"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="ipKey" Text="DHCP"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dhcp}"/>
+                    </Grid>
                 </StackPanel>
             </Border>
             <Border Grid.Column="2" Classes="panel">
