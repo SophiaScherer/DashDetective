@@ -220,7 +220,10 @@
                      while the menu is open; click the toggle again to close. -->
                 <Panel>
                     <ToggleButton x:Name="OptionsButton" Classes="optionsToggle" Content="Options ▾"/>
-                    <Popup PlacementTarget="{Binding #OptionsButton}"
+                    <!-- Overlay-free popup keeps the rest of the window hoverable; close-on-outside-
+                         click is emulated in code-behind (see OnWindowPointerPressed) instead of the
+                         light-dismiss overlay that would block that hover. -->
+                    <Popup x:Name="OptionsPopup" PlacementTarget="{Binding #OptionsButton}"
                            Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                            IsLightDismissEnabled="False"
                            IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
