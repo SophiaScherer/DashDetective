@@ -155,10 +155,10 @@
         </Style>
 
         <!-- ===== Options toggle button ===== -->
-        <!-- Chrome to match the breadcrumb field: hairline border, opens the view-options flyout. -->
-        <Style Selector="Button.optionsToggle">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        <!-- A ToggleButton drives the view-options popup open/closed. Chrome matches the breadcrumb
+             field; the Fluent checked/hover fills are overridden so it always reads as a plain
+             button rather than an accent-filled toggle. -->
+        <Style Selector="ToggleButton.optionsToggle">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12,7"/>
@@ -166,7 +166,20 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <Style Selector="Button.optionsToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="ToggleButton.optionsToggle /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        </Style>
+        <Style Selector="ToggleButton.optionsToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+        </Style>
+        <!-- Open state: subtle fill so the toggle reads as active, never the accent default. -->
+        <Style Selector="ToggleButton.optionsToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+        </Style>
+        <Style Selector="ToggleButton.optionsToggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
         </Style>
@@ -202,11 +215,19 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
                         VerticalAlignment="Center">
                 <!-- View-options dropdown: groups the checkbox toggles behind one button so the bar
-                     stays uncluttered as options are added. -->
-                <Button Classes="optionsToggle" Content="Options ▾">
-                    <Button.Flyout>
-                        <Flyout Placement="BottomEdgeAlignedRight">
-                            <StackPanel Spacing="10" Margin="4">
+                     stays uncluttered as options are added. A ToggleButton drives a plain Popup
+                     (no light-dismiss overlay) so the rest of the window keeps receiving hover
+                     while the menu is open; click the toggle again to close. -->
+                <Panel>
+                    <ToggleButton x:Name="OptionsButton" Classes="optionsToggle" Content="Options ▾"/>
+                    <Popup PlacementTarget="{Binding #OptionsButton}"
+                           Placement="BottomEdgeAlignedRight" VerticalOffset="6"
+                           IsLightDismissEnabled="False"
+                           IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
+                        <Border Background="{DynamicResource CardBackground}"
+                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                CornerRadius="8" Padding="12" BoxShadow="0 8 24 0 #22000000">
+                            <StackPanel Spacing="10">
                                 <!-- Reveals OS hidden/system entries in list + tree. -->
                                 <CheckBox Classes="optionCheck" Content="Show hidden"
                                           IsChecked="{Binding ShowHidden}"/>
@@ -214,9 +235,9 @@
                                 <CheckBox Classes="optionCheck" Content="Collapse children with parent"
                                           IsChecked="{Binding CollapseChildrenWithParent}"/>
                             </StackPanel>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
+                        </Border>
+                    </Popup>
+                </Panel>
                 <Border Classes="segments" VerticalAlignment="Center">
                     <ItemsControl ItemsSource="{Binding Filters}">
                         <ItemsControl.ItemsPanel>
@@ -392,7 +413,7 @@
                             <controls:InfoRow Key="Modified" Value="{Binding SelectedEntry.ModifiedText}"/>
                             <controls:InfoRow Key="Created" Value="{Binding SelectedEntry.CreatedText}"/>
                             <controls:InfoRow Key="Attributes" Value="{Binding SelectedEntry.AttributesText}"/>
-                            <controls:InfoRow Key="Location" Value="{Binding SelectedEntry.Location}"/>
+                            <controls:ExpandablePathRow Key="Location" Value="{Binding SelectedEntry.FullPath}"/>
                         </StackPanel>
 
                         <!-- Actions -->
