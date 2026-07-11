@@ -68,6 +68,51 @@ public partial class FileSystemNode : ObservableObject {
         }
     }
 
+    /// <summary>
+    /// Re-reads this node's subfolders against the <em>current</em> hidden setting and merges them into
+    /// <see cref="Children"/> in place: surviving folders keep their instance (and so their expansion,
+    /// selection and any loaded subtree), newly-visible folders are inserted, and vanished ones removed.
+    /// A no-op until the node's children have loaded — an unexpanded node already reads the live setting
+    /// on its next lazy expand. Recurses into survivors that are themselves loaded. Used by the "show
+    /// hidden" toggle and the auto-refresh watcher to update the tree without collapsing it.
+    /// </summary>
+    public async Task SyncChildrenAsync() {
+        if (!_childrenLoaded)
+            return;
+
+        IReadOnlyList<DirEntry> subs;
+        try {
+            subs = await DirectoryService.GetSubdirectoriesAsync(FullPath, _includeHidden());
+        } catch {
+            return;
+        }
+
+        // Existing children and the freshly-read list are both sorted by name, and survivors keep their
+        // relative order, so one ordered pass aligns them: drop what's gone, then insert what's new at
+        // its sorted position (a stale "Loading…" placeholder has an empty path and so is dropped too).
+        var present = new HashSet<string>(subs.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var s in subs)
+            present.Add(s.FullPath);
+
+        for (var i = Children.Count - 1; i >= 0; i--)
+            if (!present.Contains(Children[i].FullPath))
+                Children.RemoveAt(i);
+
+        for (var i = 0; i < subs.Count; i++) {
+            var s = subs[i];
+            if (i < Children.Count &&
+                string.Equals(Children[i].FullPath, s.FullPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+            Children.Insert(i, new FileSystemNode(s.Name, s.FullPath, true, s.HasChildren,
+                                                  _includeHidden, _collapseChildren, _onSelected));
+        }
+
+        // Same-class private access lets a parent recurse into a loaded survivor's own subtree.
+        foreach (var child in Children)
+            if (child._childrenLoaded)
+                await child.SyncChildrenAsync();
+    }
+
     private async Task LoadChildrenAsync() {
         IReadOnlyList<DirEntry> subs;
         try {

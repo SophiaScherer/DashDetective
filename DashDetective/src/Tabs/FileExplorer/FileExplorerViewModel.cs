@@ -103,11 +103,12 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
                                              () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
     }
 
-    // Toggling "show hidden" reloads the file list and rebuilds the tree from its roots (whose lazy
-    // nodes capture ShowHidden, so re-reading re-applies the setting). Expanded folders collapse —
-    // an acceptable trade for a rarely-flipped toggle.
+    // Toggling "show hidden" reconciles each loaded tree branch in place (adding/removing hidden
+    // folders while keeping expansion and selection) and reloads the file list so its hidden files
+    // appear or disappear. The drive roots themselves never change, so they're not rebuilt.
     partial void OnShowHiddenChanged(bool value) {
-        _ = LoadRootsAsync();
+        foreach (var node in RootNodes)
+            _ = node.SyncChildrenAsync();
         if (!string.IsNullOrEmpty(CurrentPath))
             _ = LoadEntriesAsync(CurrentPath);
     }
