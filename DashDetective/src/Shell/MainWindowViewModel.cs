@@ -1,5 +1,4 @@
 using System;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -25,7 +24,6 @@ public partial class MainWindowViewModel : ViewModelBase {
     private readonly DispatcherTimer _clockTimer;
 
     [ObservableProperty] private ViewModelBase _currentPage;
-    [ObservableProperty] private NavItem _selectedNav;
 
     /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
     [ObservableProperty] private string _clock = "";
@@ -33,7 +31,9 @@ public partial class MainWindowViewModel : ViewModelBase {
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
     [ObservableProperty] private bool _isLive = true;
 
-    public ObservableCollection<NavItem> NavItems { get; }
+    /// <summary>The navigation bar: owns the nav items and selection; the shell hosts the page it
+    /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
+    public NavigationViewModel Nav { get; } = new();
 
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
@@ -54,20 +54,19 @@ public partial class MainWindowViewModel : ViewModelBase {
         // Apply the default appearance (Dark + Blue) through the single theming seam,
         // then hand the same service to the Settings page so its controls drive it.
         _theme.ApplyDefaults();
-        _settings = new SettingsViewModel(_theme);
+        _settings = new SettingsViewModel(_theme, Nav);
 
-        NavItems = new ObservableCollection<NavItem> {
+        // Build the nav items pointing their select callback at the nav VM, then let it own selection.
+        Nav.Initialize(new[] {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",
-                        Icons.Dashboard, _dashboard, Navigate),
+                        Icons.Dashboard, _dashboard, Nav.Navigate),
             new NavItem("File Explorer", "File Explorer", "Browse files and folders",
-                        Icons.FileExplorer, _fileExplorer, Navigate),
+                        Icons.FileExplorer, _fileExplorer, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",
-                        Icons.Settings, _settings, Navigate),
-        };
-
-        _selectedNav = NavItems[0];
-        _selectedNav.IsSelected = true;
-        _currentPage = _selectedNav.Page;
+                        Icons.Settings, _settings, Nav.Navigate),
+        });
+        _currentPage = Nav.SelectedNav.Page;
+        Nav.SelectionChanged += OnNavSelected;
 
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
@@ -109,13 +108,6 @@ public partial class MainWindowViewModel : ViewModelBase {
     /// </summary>
     public string BuildReport() => _dashboard.BuildDiagnosticsReport();
 
-    private void Navigate(NavItem item) {
-        if (item == SelectedNav)
-            return;
-
-        SelectedNav.IsSelected = false;
-        SelectedNav = item;
-        item.IsSelected = true;
-        CurrentPage = item.Page;
-    }
+    /// <summary>Hosts the page for whichever nav item the bar selected.</summary>
+    private void OnNavSelected(NavItem item) => CurrentPage = item.Page;
 }

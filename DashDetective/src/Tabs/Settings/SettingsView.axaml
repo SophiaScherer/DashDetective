@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:settings="using:DashDetective.Tabs.Settings"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
              mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="720"
              x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
@@ -110,6 +111,63 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Navigation ===== -->
+        <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the
+             on-bar collapse chevron and orientation menu. -->
+        <Border Classes="panel" Padding="18">
+            <StackPanel Spacing="16">
+                <TextBlock Classes="panelTitle" Text="Navigation"/>
+
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="settingName" Text="Position"/>
+                        <TextBlock Classes="settingDesc" Text="Which edge the navigation bar docks to"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Classes="segments">
+                        <ItemsControl ItemsSource="{Binding Nav.Positions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="nav:NavPositionOption">
+                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+
+                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="Collapse to icons"/>
+                            <TextBlock Classes="settingDesc" Text="Show only the icons in the navigation bar"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button Classes="pick" Command="{Binding Nav.ExpandCommand}">
+                                    <Border Classes="seg" Classes.selected="{Binding !Nav.IsCollapsed}">
+                                        <TextBlock Text="Expanded"/>
+                                    </Border>
+                                </Button>
+                                <Button Classes="pick" Command="{Binding Nav.CollapseCommand}">
+                                    <Border Classes="seg" Classes.selected="{Binding Nav.IsCollapsed}">
+                                        <TextBlock Text="Icons only"/>
+                                    </Border>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
             </StackPanel>
         </Border>
 

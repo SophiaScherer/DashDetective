@@ -33,6 +33,21 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
+- **Navigation bar (shell-level).** The sidebar is a self-contained, **collapsible and dockable**
+  component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
+  (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
+  so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
+  icons-only rail**, in any orientation. Two entry points drive the **same shared**
+  `NavigationViewModel`: on-bar controls (a collapse chevron + a three-dot **kebab** menu whose
+  `Flyout` — rendered in the window overlay layer, so it is **never clipped** by the rail — offers the
+  four dock positions), and a **Navigation** group in **Settings → Appearance** (Position + Collapse,
+  both segmented controls). Orientation/collapse and every derived layout value (dock edge, rail
+  thickness, item axis, label/brand/footer visibility, accent-indicator bar↔underline, scroll axis)
+  are **computed properties on the VM — no value converters**. `MainWindowViewModel` owns page routing
+  and delegates the bar to `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. State is
+  **session-only** (resets to Left/expanded each launch, like Theming); this is shared shell work, not
+  a tab-local change.
+
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
@@ -267,13 +282,22 @@ currently exist.
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
-                                (MainWindow's page-host is a Panel with two mutually-exclusive hosts:
+                                (MainWindow's root is a DockPanel hosting the NavigationView at the
+                                 user-chosen edge (DockPanel.Dock bound to Nav.Dock) + the main area.
+                                 MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
                                  the viewport — see File Explorer)
       /Navigation
-        NavItem.cs, Icons.cs    (NavItem is a pure data model; its selection visuals are styled in
-                                 MainWindow.axaml via DynamicResource so they follow theme + accent)
+        NavigationView.axaml(.cs)   (the collapsible/dockable nav-bar component; brand + item list +
+        NavigationViewModel.cs       footer + on-bar collapse/kebab controls. The VM owns Orientation +
+                                     IsCollapsed and exposes all layout as computed properties — Dock,
+                                     Rail sizes, ItemsOrientation, Hairline edge, scroll axis — no
+                                     converters. Selection/layout visuals are styled in
+                                     NavigationView.axaml via DynamicResource so they follow theme + accent)
+        NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries)
+        NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
+        NavPositionOption.cs        (selectable item VM for the position picker, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)

@@ -20,4 +20,25 @@ public static class Icons {
     // A folder with a raised left tab.
     public static readonly Geometry FileExplorer = Geometry.Parse(
         "M2.5,6 L6.5,6 L8,7.5 L15.5,7.5 L15.5,14 L2.5,14 Z");
+
+    // Single chevrons (stroked) used for the collapse/expand affordance.
+    public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
+    public static readonly Geometry ChevronRight = Geometry.Parse("M7,4 L12,9 L7,14");
+    public static readonly Geometry ChevronUp = Geometry.Parse("M4,11 L9,6 L14,11");
+    public static readonly Geometry ChevronDown = Geometry.Parse("M4,7 L9,12 L14,7");
+
+    // Vertical "three dots" kebab menu glyph (filled — render with Fill, not Stroke).
+    public static readonly Geometry Kebab = Geometry.Parse(
+        "M9,3 a1.4,1.4 0 1 0 0.01,0 Z M9,9 a1.4,1.4 0 1 0 0.01,0 Z M9,15 a1.4,1.4 0 1 0 0.01,0 Z");
+
+    /// <summary>
+    /// The chevron for the collapse toggle, pointing toward the docked edge when the bar is expanded
+    /// (i.e. the direction it will collapse) and away from it when collapsed (the direction it expands).
+    /// </summary>
+    public static Geometry Chevron(NavOrientation orientation, bool collapsed) => orientation switch {
+        NavOrientation.Left => collapsed ? ChevronRight : ChevronLeft,
+        NavOrientation.Right => collapsed ? ChevronLeft : ChevronRight,
+        NavOrientation.Top => collapsed ? ChevronDown : ChevronUp,
+        _ => collapsed ? ChevronUp : ChevronDown,
+    };
 }
