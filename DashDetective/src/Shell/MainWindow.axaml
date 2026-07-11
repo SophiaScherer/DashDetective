@@ -19,50 +19,8 @@
     </Design.DataContext>
 
     <Window.Styles>
-        <!-- Shell-only chrome. Shared brushes/styles come from App.axaml (src/Shared/Styles). -->
-        <!-- Strip default button chrome for the sidebar nav rows. -->
-        <Style Selector="Button.nav">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0,1"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
-
-        <!-- Sidebar nav row: selection-driven visuals, all sourced from theme/accent resources
-             so they follow the current theme and accent. Defaults are the unselected state. -->
-        <Style Selector="Button.nav Border.navRow">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
-        <Style Selector="Button.nav.selected Border.navRow">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-        </Style>
-        <Style Selector="Button.nav Rectangle.navIndicator">
-            <Setter Property="IsVisible" Value="False"/>
-        </Style>
-        <Style Selector="Button.nav.selected Rectangle.navIndicator">
-            <Setter Property="IsVisible" Value="True"/>
-        </Style>
-        <Style Selector="Button.nav Path.navIcon">
-            <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <Style Selector="Button.nav.selected Path.navIcon">
-            <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="Button.nav TextBlock.navLabel">
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="FontWeight" Value="Normal"/>
-        </Style>
-        <Style Selector="Button.nav.selected TextBlock.navLabel">
-            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-
+        <!-- Shell-only chrome. Shared brushes/styles come from App.axaml (src/Shared/Styles).
+             The sidebar nav-row styles now live with the NavigationView component. -->
         <!-- Small square icon buttons in the toolbar. -->
         <Style Selector="Button.toolIcon">
             <Setter Property="Background" Value="Transparent"/>
@@ -92,88 +50,15 @@
         </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="236,*">
+    <DockPanel LastChildFill="True">
 
         <!-- ================= SIDEBAR ================= -->
-        <Border Grid.Column="0" Background="{DynamicResource SidebarBackground}"
-                BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,*,Auto">
-
-                <!-- Brand -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11"
-                            Margin="18,16,18,14" VerticalAlignment="Center">
-                    <Border Width="30" Height="30" CornerRadius="7">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
-                                <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Viewbox Width="16" Height="16">
-                            <Path Fill="White"
-                                  Data="M2,2 H8 V8 H2 Z M10,2 H16 V8 H10 Z M2,10 H8 V16 H2 Z M10,10 H16 V16 H10 Z"/>
-                        </Viewbox>
-                    </Border>
-                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                        <TextBlock Text="System Console" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Navigation -->
-                <ScrollViewer Grid.Row="1" Padding="12,4" HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding NavItems}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="nav:NavItem">
-                                <Button Classes="nav" Classes.selected="{Binding IsSelected}"
-                                        Command="{Binding SelectCommand}">
-                                    <Border Classes="navRow" CornerRadius="6" Padding="11,9">
-                                        <Grid ColumnDefinitions="3,9,18,12,*" VerticalAlignment="Center">
-                                            <Rectangle Grid.Column="0" Classes="navIndicator" Width="3" Height="18"
-                                                       RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
-                                                       HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                            <Path Grid.Column="2" Classes="navIcon" Width="18" Height="18" Stretch="None"
-                                                  Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
-                                                  StrokeJoin="Round" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="4" Classes="navLabel" Text="{Binding Label}"
-                                                       FontSize="13" VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </Border>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <!-- User footer -->
-                <Border Grid.Row="2" Padding="14,12" BorderBrush="{DynamicResource Hairline}"
-                        BorderThickness="0,1,0,0">
-                    <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                        <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                    <GradientStop Offset="0" Color="#6ccb5f"/>
-                                    <GradientStop Offset="1" Color="#3f9c8f"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <TextBlock Text="AM" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="1" Margin="10,0" VerticalAlignment="Center">
-                            <TextBlock Text="Alex Mercer" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="Administrator" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                            <Ellipse Width="7" Height="7" Fill="#6ccb5f"/>
-                            <TextBlock Text="Online" FontSize="10.5" Foreground="#6ccb5f"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </Grid>
-        </Border>
+        <!-- The nav bar is a self-contained component; it docks to the edge it chooses and the
+             main area (the last child) fills the remaining space. -->
+        <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}"/>
 
         <!-- ================= MAIN ================= -->
-        <Grid Grid.Column="1" RowDefinitions="54,*">
+        <Grid RowDefinitions="54,*">
 
             <!-- Toolbar -->
             <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
@@ -181,8 +66,8 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0">
 
                     <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding SelectedNav.Subtitle}" FontSize="11"
+                        <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="11"
                                    Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
 
@@ -245,5 +130,5 @@
                                 IsVisible="{Binding CurrentPageSelfScrolls}"/>
             </Panel>
         </Grid>
-    </Grid>
+    </DockPanel>
 </Window>

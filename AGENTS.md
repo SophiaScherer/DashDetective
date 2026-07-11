@@ -33,6 +33,16 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **Implementation status within the active features:**
 
+- **Navigation bar (ACTIVE WORK — TEMPORARY NOTE).** The shell **sidebar** is currently being
+  reworked into a **collapsible, dockable** navigation component and is under active development.
+  It is being extracted from `MainWindow.axaml` into a self-contained component under
+  `src/Shell/Navigation/` (`NavigationView` + `NavigationViewModel`), and the shell root is moving
+  from a fixed two-column `Grid` to a `DockPanel` so the bar can dock to any edge (left/right/top/
+  bottom) and collapse to icons-only. This is **shell-level, cross-cutting** work (like the Theming
+  and File-Explorer scroll seams), not a tab-local change. State is **session-only** (resets to
+  Left/expanded each launch, matching Theming). *This bullet is temporary and will be replaced with
+  a permanent description when the work lands.*
+
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
