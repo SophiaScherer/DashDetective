@@ -108,8 +108,9 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
 
-    /// <summary>The chevron shown on the collapse toggle, pointing the way the bar will move.</summary>
-    public Geometry CollapseIcon => Icons.Chevron(Orientation, IsCollapsed);
+    /// <summary>The panel-split glyph shown on the collapse toggle, its rail indicating the way the bar
+    /// will move.</summary>
+    public Geometry CollapseIcon => Icons.PanelGlyph(Orientation, IsCollapsed);
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
