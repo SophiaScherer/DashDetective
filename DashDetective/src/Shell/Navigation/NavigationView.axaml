@@ -9,7 +9,10 @@
 
     <UserControl.Styles>
         <!-- Sidebar nav rows. Selection-driven visuals are all sourced from theme/accent resources
-             so they follow the current theme and accent. Defaults are the unselected state. -->
+             so they follow the current theme and accent. Defaults are the unselected state.
+             Layout that changes when the rail collapses is driven by the `.collapsed` class on the
+             root `Border.rail` (see the collapsed overrides below) rather than inline values, so the
+             style setters can win. -->
         <!-- Strip default button chrome for the nav rows. -->
         <Style Selector="Button.nav">
             <Setter Property="Background" Value="Transparent"/>
@@ -24,25 +27,27 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
-        <Style Selector="Button.nav Border.navRow">
+        <!-- Nav row surface + selection highlight. -->
+        <Style Selector="Border.rail Border.navRow">
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="11,9"/>
         </Style>
         <Style Selector="Button.nav.selected Border.navRow">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
-        <Style Selector="Button.nav Rectangle.navIndicator">
+        <Style Selector="Border.rail Rectangle.navIndicator">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
         <Style Selector="Button.nav.selected Rectangle.navIndicator">
             <Setter Property="IsVisible" Value="True"/>
         </Style>
-        <Style Selector="Button.nav Path.navIcon">
+        <Style Selector="Border.rail Path.navIcon">
             <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
         </Style>
         <Style Selector="Button.nav.selected Path.navIcon">
             <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
         </Style>
-        <Style Selector="Button.nav TextBlock.navLabel">
+        <Style Selector="Border.rail TextBlock.navLabel">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="FontWeight" Value="Normal"/>
         </Style>
@@ -50,16 +55,58 @@
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
+
+        <!-- Default (expanded) layout: icon+label pushed clear of the leading accent indicator. -->
+        <Style Selector="Border.rail StackPanel.navContent">
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rail StackPanel.brand">
+            <Setter Property="Margin" Value="18,16,18,14"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <!-- Collapsed (icons-only) overrides: hide labels, centre the icon and logo, drop the
+             leading gap so the 18px icon sits centred in the narrow rail. -->
+        <Style Selector="Border.rail.collapsed TextBlock.navLabel">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.rail.collapsed Border.navRow">
+            <Setter Property="Padding" Value="0,9"/>
+        </Style>
+        <Style Selector="Border.rail.collapsed StackPanel.navContent">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rail.collapsed StackPanel.brand">
+            <Setter Property="Margin" Value="0,16,0,14"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Temporary collapse/expand toggle (dev affordance; replaced by the real controls in a
+             later phase). -->
+        <Style Selector="Button.navToggleTemp">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.navToggleTemp:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
-    <Border Width="236" Background="{DynamicResource SidebarBackground}"
+    <Border Classes="rail" Classes.collapsed="{Binding IsCollapsed}"
+            Width="{Binding RailWidth}" Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
-        <Grid RowDefinitions="Auto,*,Auto">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
 
             <!-- Brand -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11"
-                        Margin="18,16,18,14" VerticalAlignment="Center">
+            <StackPanel Grid.Row="0" Classes="brand" Orientation="Horizontal" Spacing="11"
+                        VerticalAlignment="Center">
                 <Border Width="30" Height="30" CornerRadius="7">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -72,30 +119,40 @@
                               Data="M2,2 H8 V8 H2 Z M10,2 H16 V8 H10 Z M2,10 H8 V16 H2 Z M10,10 H16 V16 H10 Z"/>
                     </Viewbox>
                 </Border>
-                <StackPanel Spacing="1" VerticalAlignment="Center">
+                <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
                     <TextBlock Text="System Console" FontSize="13.5" FontWeight="SemiBold"/>
                     <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                 </StackPanel>
             </StackPanel>
 
+            <!-- Temporary collapse toggle (dev only) -->
+            <Button Grid.Row="1" Classes="navToggleTemp" Command="{Binding ToggleCollapseCommand}"
+                    HorizontalAlignment="Stretch" Margin="12,0,12,6" Height="30"
+                    ToolTip.Tip="Collapse or expand (temporary)">
+                <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                      StrokeThickness="1.5" StrokeLineCap="Round" Data="M3,5 H15 M3,9 H15 M3,13 H15"/>
+            </Button>
+
             <!-- Navigation -->
-            <ScrollViewer Grid.Row="1" Padding="12,4" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Grid.Row="2" Padding="12,4" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding NavItems}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="nav:NavItem">
                             <Button Classes="nav" Classes.selected="{Binding IsSelected}"
-                                    Command="{Binding SelectCommand}">
-                                <Border Classes="navRow" CornerRadius="6" Padding="11,9">
-                                    <Grid ColumnDefinitions="3,9,18,12,*" VerticalAlignment="Center">
-                                        <Rectangle Grid.Column="0" Classes="navIndicator" Width="3" Height="18"
+                                    Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Label}">
+                                <Border Classes="navRow" CornerRadius="6">
+                                    <Panel>
+                                        <Rectangle Classes="navIndicator" Width="3" Height="18"
                                                    RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                    HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                        <Path Grid.Column="2" Classes="navIcon" Width="18" Height="18" Stretch="None"
-                                              Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
-                                              StrokeJoin="Round" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="4" Classes="navLabel" Text="{Binding Label}"
-                                                   FontSize="13" VerticalAlignment="Center"/>
-                                    </Grid>
+                                        <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
+                                            <Path Classes="navIcon" Width="18" Height="18" Stretch="None"
+                                                  Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
+                                                  StrokeJoin="Round" VerticalAlignment="Center"/>
+                                            <TextBlock Classes="navLabel" Text="{Binding Label}"
+                                                       FontSize="13" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Panel>
                                 </Border>
                             </Button>
                         </DataTemplate>
@@ -104,10 +161,34 @@
             </ScrollViewer>
 
             <!-- User footer -->
-            <Border Grid.Row="2" Padding="14,12" BorderBrush="{DynamicResource Hairline}"
+            <Border Grid.Row="3" Padding="14,12" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,1,0,0">
-                <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
+                <Panel>
+                    <!-- Full user card (expanded) -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center"
+                          IsVisible="{Binding ShowFullFooter}">
+                        <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Offset="0" Color="#6ccb5f"/>
+                                    <GradientStop Offset="1" Color="#3f9c8f"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <TextBlock Text="AM" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="1" Margin="10,0" VerticalAlignment="Center">
+                            <TextBlock Text="Alex Mercer" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="Administrator" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                            <Ellipse Width="7" Height="7" Fill="#6ccb5f"/>
+                            <TextBlock Text="Online" FontSize="10.5" Foreground="#6ccb5f"/>
+                        </StackPanel>
+                    </Grid>
+                    <!-- Compact avatar (collapsed) -->
+                    <Border Width="32" Height="32" CornerRadius="16" HorizontalAlignment="Center"
+                            IsVisible="{Binding !ShowFullFooter}" ToolTip.Tip="Alex Mercer — Administrator">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                 <GradientStop Offset="0" Color="#6ccb5f"/>
@@ -117,15 +198,7 @@
                         <TextBlock Text="AM" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <StackPanel Grid.Column="1" Spacing="1" Margin="10,0" VerticalAlignment="Center">
-                        <TextBlock Text="Alex Mercer" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="Administrator" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                        <Ellipse Width="7" Height="7" Fill="#6ccb5f"/>
-                        <TextBlock Text="Online" FontSize="10.5" Foreground="#6ccb5f"/>
-                    </StackPanel>
-                </Grid>
+                </Panel>
             </Border>
         </Grid>
     </Border>
