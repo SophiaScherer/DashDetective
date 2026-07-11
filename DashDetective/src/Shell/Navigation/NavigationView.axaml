@@ -258,7 +258,7 @@
                           Data="{Binding CollapseIcon}"/>
                 </Button>
                 <Button x:Name="PositionButton" Classes="navCtl" ToolTip.Tip="Navigation position">
-                    <Path Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextTertiary}"
+                    <Path Width="18" Height="18" Stretch="None" Fill="{DynamicResource TextTertiary}"
                           Data="{x:Static nav:Icons.Kebab}"/>
                     <Button.Flyout>
                         <Flyout Placement="Top">
