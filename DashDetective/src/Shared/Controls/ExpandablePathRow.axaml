@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.ExpandablePathRow"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- A key/value row for long paths: collapsed to one truncated line with a "…" toggle that
+         reveals the full value wrapped onto its own line. Mirrors InfoRow's key column + hairline,
+         but keeps its own expand state so it can live next to plain InfoRows. -->
+    <Border Classes="infoRow">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock Classes="infoKey" Text="{Binding #Root.Key}" VerticalAlignment="Top"/>
+            <Panel Grid.Column="1">
+                <!-- Collapsed: single truncated line + the "…" affordance. -->
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4"
+                      IsVisible="{Binding !#Root.IsExpanded}">
+                    <TextBlock Grid.Column="0" Classes="infoVal pathVal" Text="{Binding #Root.Value}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                    <Button Grid.Column="1" Classes="pathToggle" Content="…" Click="OnToggle"
+                            ToolTip.Tip="Show full path"/>
+                </Grid>
+                <!-- Expanded: full path wrapped on its own line; clicking anywhere collapses it. -->
+                <Button Classes="pathToggle pathExpanded" IsVisible="{Binding #Root.IsExpanded}"
+                        Click="OnToggle" HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Left" ToolTip.Tip="Hide full path">
+                    <TextBlock Classes="infoVal pathVal" Text="{Binding #Root.Value}"
+                               TextWrapping="Wrap"/>
+                </Button>
+            </Panel>
+        </Grid>
+    </Border>
+</UserControl>

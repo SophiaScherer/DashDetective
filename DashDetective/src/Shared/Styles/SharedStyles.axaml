@@ -75,6 +75,32 @@
         <Setter Property="TextAlignment" Value="Right"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
+    <!-- Path values (ExpandablePathRow) read left-to-right, so left-align instead of the
+         right-aligned default above. Declared after infoVal so it wins the tie. -->
+    <Style Selector="Border.infoRow TextBlock.pathVal">
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="TextAlignment" Value="Left"/>
+    </Style>
+    <!-- Chrome-less toggle for the path row: the "…" affordance and the expanded click target.
+         Accent-tinted, no button box, so it reads as inline text rather than a control. -->
+    <Style Selector="Border.infoRow Button.pathToggle">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.infoRow Button.pathToggle /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.infoRow Button.pathToggle:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
 
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
