@@ -8,6 +8,8 @@ using Avalonia.VisualTree;
 namespace DashDetective.Tabs.FileExplorer;
 
 public partial class FileExplorerView : UserControl {
+    private FileExplorerViewModel? _boundViewModel;
+
     public FileExplorerView() {
         InitializeComponent();
 
@@ -18,6 +20,22 @@ public partial class FileExplorerView : UserControl {
         OptionsPopup.Opened += OnOptionsPopupOpened;
         OptionsPopup.Closed += OnOptionsPopupClosed;
     }
+
+    // Scroll-to-top on folder navigation is driven from the view model (it knows when the path
+    // actually changes); the view owns the ScrollViewer, so it listens for the request here.
+    protected override void OnDataContextChanged(EventArgs e) {
+        base.OnDataContextChanged(e);
+
+        if (_boundViewModel is not null)
+            _boundViewModel.ScrollToTopRequested -= OnScrollToTopRequested;
+
+        _boundViewModel = DataContext as FileExplorerViewModel;
+
+        if (_boundViewModel is not null)
+            _boundViewModel.ScrollToTopRequested += OnScrollToTopRequested;
+    }
+
+    private void OnScrollToTopRequested() => FileListScroll.ScrollToHome();
 
     private void OnOptionsPopupOpened(object? sender, EventArgs e) =>
         TopLevel.GetTopLevel(this)?.AddHandler(

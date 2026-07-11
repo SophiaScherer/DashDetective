@@ -27,6 +27,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>The All / Documents / Images / Archives filter chips.</summary>
     public ObservableCollection<FilterOption> Filters { get; }
 
+    /// <summary>Raised when the user navigates to a different folder (not on a same-folder reload
+    /// from sort/filter/Refresh), so the view can reset the file list back to the top.</summary>
+    public event Action? ScrollToTopRequested;
+
     /// <summary>Clickable file-list column headers, bound one-to-one to the header cells.</summary>
     public SortColumn NameSort { get; }
     public SortColumn TypeSort { get; }
@@ -148,9 +152,16 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     }
 
     private void SetCurrentFolder(string path) {
+        // Navigating to a *different* folder resets the list scroll to the top; a same-path reload
+        // (sort, filter, Refresh, auto-refresh) leaves the user where they were.
+        var isNavigation = !string.Equals(path, CurrentPath, StringComparison.OrdinalIgnoreCase);
+
         CurrentPath = path;
         RebuildCrumbs(path);
         _ = LoadEntriesAsync(path);
+
+        if (isNavigation)
+            ScrollToTopRequested?.Invoke();
     }
 
     private async Task LoadEntriesAsync(string path) {

@@ -347,7 +347,7 @@
                 </Border>
 
                 <!-- Rows -->
-                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                <ScrollViewer x:Name="FileListScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding VisibleEntries}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="fe:FileEntry">
