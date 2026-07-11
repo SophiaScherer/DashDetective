@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Network"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:NetworkViewModel"
+             x:Class="DashDetective.Tabs.Network.NetworkView">
+
+    <!-- Phase 0 scaffold: the six-panel layout from the design comp with placeholder content.
+         Panels are filled with live data in later phases. Surfaces/typography come from
+         src/Shared/Styles. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.placeholder">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="16">
+
+        <!-- ===== Row 1: Adapters · IP Configuration · Throughput ===== -->
+        <Grid ColumnDefinitions="*,*,1.1*" ColumnSpacing="16">
+            <Border Grid.Column="0" Classes="panel">
+                <StackPanel>
+                    <TextBlock Classes="panelTitle" Text="Adapters"/>
+                    <TextBlock Classes="placeholder" Text="Network adapters"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="panel">
+                <StackPanel>
+                    <TextBlock Classes="panelTitle" Text="IP Configuration"/>
+                    <TextBlock Classes="placeholder" Text="Primary adapter addressing"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="panel">
+                <StackPanel>
+                    <TextBlock Classes="panelTitle" Text="Throughput"/>
+                    <TextBlock Classes="placeholder" Text="Download / upload"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== Row 2: Active Connections · (Ping + DNS) ===== -->
+        <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
+            <Border Grid.Column="0" Classes="panel">
+                <StackPanel>
+                    <TextBlock Classes="panelTitle" Text="Active Connections"/>
+                    <TextBlock Classes="placeholder" Text="TCP / UDP connections"/>
+                </StackPanel>
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="12">
+                <Border Classes="panel">
+                    <StackPanel>
+                        <TextBlock Classes="panelTitle" Text="Ping"/>
+                        <TextBlock Classes="placeholder" Text="8.8.8.8"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="panel">
+                    <StackPanel>
+                        <TextBlock Classes="panelTitle" Text="DNS Lookup"/>
+                        <TextBlock Classes="placeholder" Text="example.com"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</UserControl>

@@ -9,6 +9,7 @@ using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
+using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Settings;
 
 namespace DashDetective.Shell;
@@ -20,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase {
     private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard = new();
     private readonly FileExplorerViewModel _fileExplorer = new();
+    private readonly NetworkViewModel _network = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
@@ -62,6 +64,8 @@ public partial class MainWindowViewModel : ViewModelBase {
                         Icons.Dashboard, _dashboard, Nav.Navigate),
             new NavItem("File Explorer", "File Explorer", "Browse files and folders",
                         Icons.FileExplorer, _fileExplorer, Nav.Navigate),
+            new NavItem("Network", "Network", "Adapters, connections & diagnostics",
+                        Icons.Network, _network, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });

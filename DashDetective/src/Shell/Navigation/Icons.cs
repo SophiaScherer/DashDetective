@@ -21,6 +21,13 @@ public static class Icons {
     public static readonly Geometry FileExplorer = Geometry.Parse(
         "M2.5,6 L6.5,6 L8,7.5 L15.5,7.5 L15.5,14 L2.5,14 Z");
 
+    // A globe: an outer circle crossed by the equator and two curved meridians.
+    public static readonly Geometry Network = Geometry.Parse(
+        "M9,2 A7,7 0 1 1 8.99,2 Z " +
+        "M2,9 H16 " +
+        "M9,2 C6.5,4 5.5,6.4 5.5,9 C5.5,11.6 6.5,14 9,16 " +
+        "M9,2 C11.5,4 12.5,6.4 12.5,9 C12.5,11.6 11.5,14 9,16");
+
     // Panel/sidebar-split glyph (stroked) used for the collapse/expand affordance, matching the design
     // document: a rounded panel outline with a thin divider carving off a narrow rail. The divider sits
     // on the side the bar will move toward, so the glyph reads directionally per dock edge and state.

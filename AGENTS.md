@@ -30,6 +30,7 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - `Dashboard`
 - `Settings`
 - `File Explorer`
+- `Network`
 
 **Implementation status within the active features:**
 
@@ -175,8 +176,17 @@ Not all of these exist yet. Only build what is listed below as "currently active
   collapses at the window's 920 px minimum. Widths are **session-only — they reset to the defaults each
   launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
   styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
+- **Network** — **in progress** (being built in phases; plan:
+  `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Target UI is the design
+  comp's Network page: six panels in two rows — **Adapters**, **IP Configuration**, **Throughput**
+  (row 1); **Active Connections**, **Ping**, **DNS Lookup** (row 2). The tab is always-on like the
+  Dashboard (VM constructed once in `MainWindowViewModel`), reuses the shared `Sparkline`, and adds
+  **no new NuGet packages**. **Phase 0 (done): scaffold** — the `Network` `NavItem` (globe icon) is
+  registered between File Explorer and Settings, and `src/Tabs/Network/` holds `NetworkView` +
+  `NetworkViewModel` (implements `IRefreshablePage`, currently a no-op) rendering the six-panel grid
+  with placeholder content. Live data is wired panel-by-panel in later phases.
 
-**Everything else (Processes, Performance, Network, Storage, Hardware) is
+**Everything else (Processes, Performance, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
@@ -346,7 +356,11 @@ currently exist.
                                 FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
                                 ShellInterop.cs         (feature-local shell32 P/Invoke:
                                                          SHGetFileInfo type name + SHObjectProperties)
-      (Processes, Performance, Network, Storage, Hardware — not yet started)
+      /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
+                                                        (VM implements IRefreshablePage; always-on like
+                                                         Dashboard. Phase 0: six-panel scaffold with
+                                                         placeholder content — live panels added by phase)
+      (Processes, Performance, Storage, Hardware — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
