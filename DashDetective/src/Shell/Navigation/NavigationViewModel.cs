@@ -38,6 +38,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// shell can route the item's page into the content host.</summary>
     public event Action<NavItem>? SelectionChanged;
 
+    /// <summary>Raised each time a dock position is chosen from the on-bar picker (even when it is the
+    /// already-selected edge), so the view can dismiss the picker flyout. UI-only; carries no state.</summary>
+    public event Action? PositionPicked;
+
     public NavigationViewModel() {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
@@ -128,7 +132,10 @@ public partial class NavigationViewModel : ViewModelBase {
     [RelayCommand]
     private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
 
-    private void SelectPosition(NavPositionOption option) => Orientation = option.Value;
+    private void SelectPosition(NavPositionOption option) {
+        Orientation = option.Value;
+        PositionPicked?.Invoke();
+    }
 
     private void SyncPositions() {
         foreach (var position in Positions)

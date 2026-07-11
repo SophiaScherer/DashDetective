@@ -257,7 +257,7 @@
                           StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                           Data="{Binding CollapseIcon}"/>
                 </Button>
-                <Button Classes="navCtl" ToolTip.Tip="Navigation position">
+                <Button x:Name="PositionButton" Classes="navCtl" ToolTip.Tip="Navigation position">
                     <Path Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextTertiary}"
                           Data="{x:Static nav:Icons.Kebab}"/>
                     <Button.Flyout>
