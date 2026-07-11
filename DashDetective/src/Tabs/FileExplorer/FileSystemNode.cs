@@ -72,18 +72,24 @@ public partial class FileSystemNode : ObservableObject {
     /// Re-reads this node's subfolders against the <em>current</em> hidden setting and merges them into
     /// <see cref="Children"/> in place: surviving folders keep their instance (and so their expansion,
     /// selection and any loaded subtree), newly-visible folders are inserted, and vanished ones removed.
-    /// A no-op until the node's children have loaded — an unexpanded node already reads the live setting
-    /// on its next lazy expand. Recurses into survivors that are themselves loaded. Used by the "show
-    /// hidden" toggle and the auto-refresh watcher to update the tree without collapsing it.
+    /// An unexpanded node stays lazy — its subtree isn't loaded — but its expander is kept honest, so a
+    /// folder that just gained (or lost) its first subfolder shows (or hides) its chevron. Recurses into
+    /// survivors that are themselves loaded. Used by the "show hidden" toggle and the auto-refresh
+    /// watcher to update the tree without collapsing it.
     /// </summary>
     public async Task SyncChildrenAsync() {
-        if (!_childrenLoaded)
-            return;
-
         IReadOnlyList<DirEntry> subs;
         try {
             subs = await DirectoryService.GetSubdirectoriesAsync(FullPath, _includeHidden());
         } catch {
+            return;
+        }
+
+        // Not yet expanded: don't load the subtree (keep it lazy), but seed or clear the "Loading…"
+        // placeholder so the chevron reflects whether the folder now has subfolders. The real children
+        // are read on the next lazy expand.
+        if (!_childrenLoaded) {
+            SetExpanderVisible(subs.Count > 0);
             return;
         }
 
@@ -128,6 +134,16 @@ public partial class FileSystemNode : ObservableObject {
         foreach (var s in subs)
             Children.Add(new FileSystemNode(s.Name, s.FullPath, true, s.HasChildren,
                                             _includeHidden, _collapseChildren, _onSelected));
+    }
+
+    // Adds or removes the placeholder that drives the chevron on an unexpanded node, so an empty folder
+    // that just gained its first subfolder (or lost its last) toggles its expander. Only ever touches
+    // the placeholder — a real, loaded subtree goes through the merge path in SyncChildrenAsync instead.
+    private void SetExpanderVisible(bool visible) {
+        if (visible && Children.Count == 0)
+            Children.Add(LoadingPlaceholder());
+        else if (!visible && Children.Count == 1 && string.IsNullOrEmpty(Children[0].FullPath))
+            Children.Clear();
     }
 
     // A childless marker row shown until the real children are enumerated on expand.

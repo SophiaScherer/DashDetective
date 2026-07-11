@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
@@ -67,6 +68,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // Guards against a slow folder load overwriting the list after the user has moved on.
     private string _pendingPath = "";
 
+    // Auto-refresh: one watcher, re-pointed at the open folder on each navigation, raises a debounced
+    // event when items are added/removed on disk. The page is a long-lived singleton that's never
+    // disposed, so the watcher simply lives for the app's lifetime — no teardown plumbing needed.
+    private readonly DirectoryWatcher _watcher = new();
+
+    // When set, the next folder load re-selects this path if it still exists (auto-refresh preserves
+    // the user's selection; navigation leaves it null so selection clears as before).
+    private string? _reselectPath;
+
     public FileExplorerViewModel() {
         Filters = new ObservableCollection<FilterOption> {
             new FilterOption("All", null, OnFilterSelected),
@@ -83,6 +93,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         SizeSort = new SortColumn(FileSortKey.Size, OnSort);
         _sortColumns = new[] { NameSort, TypeSort, ModifiedSort, SizeSort };
         UpdateSortIndicators();
+
+        // Fires on a timer thread — hop to the UI thread before touching bound collections.
+        _watcher.Changed += () => Dispatcher.UIThread.Post(ReloadCurrentFolderPreservingState);
 
         // Load drives off the UI thread; the continuation resumes here (UI thread) to fill
         // the bound collection. Mirrors the Dashboard providers' fire-and-forget load.
@@ -159,14 +172,45 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         CurrentPath = path;
         RebuildCrumbs(path);
+        _watcher.Watch(path);
         _ = LoadEntriesAsync(path);
 
         if (isNavigation)
             ScrollToTopRequested?.Invoke();
     }
 
+    // Auto-refresh: the open folder changed on disk. Reload its list (keeping the current selection by
+    // path if it survived) and reconcile the matching tree branch so new/removed subfolders show there
+    // too. It's a same-path reload, so SetCurrentFolder isn't involved and the scroll position is kept.
+    private void ReloadCurrentFolderPreservingState() {
+        if (string.IsNullOrEmpty(CurrentPath))
+            return;
+
+        _reselectPath = SelectedEntry?.FullPath;
+        _ = LoadEntriesAsync(CurrentPath);
+
+        if (FindNode(RootNodes, CurrentPath) is { } node)
+            _ = node.SyncChildrenAsync();
+    }
+
+    // Depth-first search for the tree node at a path; used to point tree updates at the open folder.
+    private static FileSystemNode? FindNode(IEnumerable<FileSystemNode> nodes, string path) {
+        foreach (var node in nodes) {
+            if (string.Equals(node.FullPath, path, StringComparison.OrdinalIgnoreCase))
+                return node;
+            if (FindNode(node.Children, path) is { } found)
+                return found;
+        }
+        return null;
+    }
+
     private async Task LoadEntriesAsync(string path) {
         _pendingPath = path;
+        // Consume the reselect request up front so only this load restores it (a navigation load,
+        // which leaves it null, still clears the selection below).
+        var reselect = _reselectPath;
+        _reselectPath = null;
+
         IReadOnlyList<FileItem> items;
         try {
             items = await DirectoryService.GetEntriesAsync(path, ShowHidden);
@@ -183,6 +227,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         foreach (var item in items)
             _allEntries.Add(new FileEntry(item, OnEntrySelected));
         RebuildVisibleEntries();
+
+        // Auto-refresh keeps the user's selection: re-select the same path if it survived the change.
+        if (reselect is not null)
+            foreach (var entry in VisibleEntries)
+                if (string.Equals(entry.FullPath, reselect, StringComparison.OrdinalIgnoreCase)) {
+                    entry.IsSelected = true;
+                    break;
+                }
     }
 
     private void OnEntrySelected(FileEntry entry) {
