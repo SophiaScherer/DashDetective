@@ -71,6 +71,10 @@ public partial class NavigationViewModel : ViewModelBase {
     public Orientation ItemsOrientation =>
         IsHorizontal ? Avalonia.Layout.Orientation.Horizontal : Avalonia.Layout.Orientation.Vertical;
 
+    /// <summary>How the item list sits on the cross axis: centred in a short horizontal bar, top-
+    /// aligned (just under the brand) in a tall vertical rail.</summary>
+    public VerticalAlignment ItemsVAlign => IsHorizontal ? VerticalAlignment.Center : VerticalAlignment.Top;
+
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
     public double RailWidth => IsHorizontal ? double.NaN : (IsCollapsed ? 64 : 236);
@@ -145,6 +149,7 @@ public partial class NavigationViewModel : ViewModelBase {
         OnPropertyChanged(nameof(BrandDock));
         OnPropertyChanged(nameof(FooterDock));
         OnPropertyChanged(nameof(ItemsOrientation));
+        OnPropertyChanged(nameof(ItemsVAlign));
         OnPropertyChanged(nameof(RailWidth));
         OnPropertyChanged(nameof(RailHeight));
         OnPropertyChanged(nameof(HairlineThickness));

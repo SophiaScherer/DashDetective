@@ -299,7 +299,8 @@
                 <ItemsControl ItemsSource="{Binding NavItems}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="{Binding ItemsOrientation}"/>
+                            <StackPanel Orientation="{Binding ItemsOrientation}"
+                                        VerticalAlignment="{Binding ItemsVAlign}"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
