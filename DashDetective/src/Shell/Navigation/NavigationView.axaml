@@ -182,9 +182,13 @@
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
         <DockPanel LastChildFill="True">
 
-            <!-- Brand -->
-            <StackPanel Classes="brand" DockPanel.Dock="{Binding BrandDock}" Orientation="Horizontal"
-                        Spacing="11" VerticalAlignment="Center">
+            <!-- Brand. Doubles as the drag handle: press and drag it to re-dock the bar to another
+                 window edge (see NavigationView.axaml.cs). -->
+            <StackPanel x:Name="BrandArea" Classes="brand" DockPanel.Dock="{Binding BrandDock}"
+                        Orientation="Horizontal" Spacing="11" VerticalAlignment="Center" Cursor="SizeAll"
+                        Background="Transparent" ToolTip.Tip="Drag to dock the navigation bar"
+                        PointerPressed="OnBrandPointerPressed" PointerMoved="OnBrandPointerMoved"
+                        PointerReleased="OnBrandPointerReleased" PointerCaptureLost="OnBrandPointerCaptureLost">
                 <Border Width="30" Height="30" CornerRadius="7">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">

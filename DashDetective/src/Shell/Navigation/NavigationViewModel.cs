@@ -137,6 +137,10 @@ public partial class NavigationViewModel : ViewModelBase {
         PositionPicked?.Invoke();
     }
 
+    /// <summary>Docks the bar to an edge chosen by a drag gesture. Same effect as the picker, so the
+    /// Settings control and on-bar flyout stay in sync via <see cref="OnOrientationChanged"/>.</summary>
+    public void DockTo(NavOrientation orientation) => Orientation = orientation;
+
     private void SyncPositions() {
         foreach (var position in Positions)
             position.IsSelected = position.Value == Orientation;
