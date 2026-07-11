@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Network;
 using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Dashboard;
