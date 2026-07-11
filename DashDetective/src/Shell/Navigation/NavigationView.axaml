@@ -9,10 +9,10 @@
 
     <UserControl.Styles>
         <!-- Sidebar nav rows. Selection-driven visuals are all sourced from theme/accent resources
-             so they follow the current theme and accent. Defaults are the unselected state.
-             Layout that changes when the rail collapses is driven by the `.collapsed` class on the
-             root `Border.rail` (see the collapsed overrides below) rather than inline values, so the
-             style setters can win. -->
+             so they follow the current theme and accent. Defaults are the unselected, expanded,
+             vertical state; the `.collapsed` and `.horizontal` classes on the root `Border.rail`
+             layer on the overrides. Anything that changes with state is set through styles (not
+             inline) so the more specific setter wins. -->
         <!-- Strip default button chrome for the nav rows. -->
         <Style Selector="Button.nav">
             <Setter Property="Background" Value="Transparent"/>
@@ -35,12 +35,26 @@
         <Style Selector="Button.nav.selected Border.navRow">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
+
+        <!-- Accent indicator: a vertical leading bar on a vertical rail; a bottom underline on a
+             horizontal bar. Only one is shown, and only when the row is selected. -->
         <Style Selector="Border.rail Rectangle.navIndicator">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
         <Style Selector="Button.nav.selected Rectangle.navIndicator">
             <Setter Property="IsVisible" Value="True"/>
         </Style>
+        <Style Selector="Border.rail Rectangle.navIndicatorH">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal Button.nav.selected Rectangle.navIndicator">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal Button.nav.selected Rectangle.navIndicatorH">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+
+        <!-- Icon + label colours. -->
         <Style Selector="Border.rail Path.navIcon">
             <Setter Property="Stroke" Value="{DynamicResource TextTertiary}"/>
         </Style>
@@ -56,7 +70,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
-        <!-- Default (expanded) layout: icon+label pushed clear of the leading accent indicator. -->
+        <!-- Default (expanded, vertical) layout: icon+label pushed clear of the leading indicator. -->
         <Style Selector="Border.rail StackPanel.navContent">
             <Setter Property="Margin" Value="12,0,0,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -67,8 +81,7 @@
             <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
 
-        <!-- Collapsed (icons-only) overrides: hide labels, centre the icon and logo, drop the
-             leading gap so the 18px icon sits centred in the narrow rail. -->
+        <!-- Collapsed (icons-only) overrides. -->
         <Style Selector="Border.rail.collapsed TextBlock.navLabel">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
@@ -84,6 +97,29 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
 
+        <!-- Horizontal (top/bottom) overrides: items flow sideways, icon+label centred, logo-only
+             brand, and the row spacing is symmetric. -->
+        <Style Selector="Border.rail.horizontal Border.navRow">
+            <Setter Property="Padding" Value="12,8"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal StackPanel.navContent">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal StackPanel.brand">
+            <Setter Property="Margin" Value="14,0,10,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Footer separator sits on the edge facing the content. -->
+        <Style Selector="Border.rail Border.footer">
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal Border.footer">
+            <Setter Property="BorderThickness" Value="1,0,0,0"/>
+        </Style>
+
         <!-- Temporary collapse/expand toggle (dev affordance; replaced by the real controls in a
              later phase). -->
         <Style Selector="Button.navToggleTemp">
@@ -93,20 +129,36 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
+        <Style Selector="Border.rail Button.navToggleTemp">
+            <Setter Property="Margin" Value="12,0,12,6"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal Button.navToggleTemp">
+            <Setter Property="Margin" Value="8,0,4,0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
         <Style Selector="Button.navToggleTemp:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
-    <Border Classes="rail" Classes.collapsed="{Binding IsCollapsed}"
-            Width="{Binding RailWidth}" Background="{DynamicResource SidebarBackground}"
-            BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
-        <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
+         inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
+         the middle, with the dock edges flipped for a horizontal bar. -->
+    <Border Classes="rail" Classes.collapsed="{Binding IsCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
+            Width="{Binding RailWidth}" Height="{Binding RailHeight}"
+            Background="{DynamicResource SidebarBackground}"
+            BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
+        <DockPanel LastChildFill="True">
 
             <!-- Brand -->
-            <StackPanel Grid.Row="0" Classes="brand" Orientation="Horizontal" Spacing="11"
-                        VerticalAlignment="Center">
+            <StackPanel Classes="brand" DockPanel.Dock="{Binding BrandDock}" Orientation="Horizontal"
+                        Spacing="11" VerticalAlignment="Center">
                 <Border Width="30" Height="30" CornerRadius="7">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -126,45 +178,27 @@
             </StackPanel>
 
             <!-- Temporary collapse toggle (dev only) -->
-            <Button Grid.Row="1" Classes="navToggleTemp" Command="{Binding ToggleCollapseCommand}"
-                    HorizontalAlignment="Stretch" Margin="12,0,12,6" Height="30"
+            <Button Classes="navToggleTemp" DockPanel.Dock="{Binding BrandDock}"
+                    Command="{Binding ToggleCollapseCommand}"
                     ToolTip.Tip="Collapse or expand (temporary)">
                 <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
                       StrokeThickness="1.5" StrokeLineCap="Round" Data="M3,5 H15 M3,9 H15 M3,13 H15"/>
             </Button>
 
-            <!-- Navigation -->
-            <ScrollViewer Grid.Row="2" Padding="12,4" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding NavItems}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="nav:NavItem">
-                            <Button Classes="nav" Classes.selected="{Binding IsSelected}"
-                                    Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Label}">
-                                <Border Classes="navRow" CornerRadius="6">
-                                    <Panel>
-                                        <Rectangle Classes="navIndicator" Width="3" Height="18"
-                                                   RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
-                                                   HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                        <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
-                                            <Path Classes="navIcon" Width="18" Height="18" Stretch="None"
-                                                  Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
-                                                  StrokeJoin="Round" VerticalAlignment="Center"/>
-                                            <TextBlock Classes="navLabel" Text="{Binding Label}"
-                                                       FontSize="13" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Panel>
-                                </Border>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+            <!-- Temporary orientation cycler (dev only): Left→Right→Top→Bottom -->
+            <Button Classes="navToggleTemp" DockPanel.Dock="{Binding BrandDock}"
+                    Command="{Binding CycleOrientationTempCommand}"
+                    ToolTip.Tip="Cycle dock edge (temporary)">
+                <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                      StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                      Data="M9,2 A7,7 0 1 1 2,9 M2,9 L4.5,6.5 M2,9 L4.5,11.5"/>
+            </Button>
 
             <!-- User footer -->
-            <Border Grid.Row="3" Padding="14,12" BorderBrush="{DynamicResource Hairline}"
-                    BorderThickness="0,1,0,0">
+            <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}" Padding="14,12"
+                    BorderBrush="{DynamicResource Hairline}">
                 <Panel>
-                    <!-- Full user card (expanded) -->
+                    <!-- Full user card (expanded, vertical) -->
                     <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center"
                           IsVisible="{Binding ShowFullFooter}">
                         <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16">
@@ -186,9 +220,10 @@
                             <TextBlock Text="Online" FontSize="10.5" Foreground="#6ccb5f"/>
                         </StackPanel>
                     </Grid>
-                    <!-- Compact avatar (collapsed) -->
+                    <!-- Compact avatar (collapsed or horizontal) -->
                     <Border Width="32" Height="32" CornerRadius="16" HorizontalAlignment="Center"
-                            IsVisible="{Binding !ShowFullFooter}" ToolTip.Tip="Alex Mercer — Administrator">
+                            VerticalAlignment="Center" IsVisible="{Binding !ShowFullFooter}"
+                            ToolTip.Tip="Alex Mercer — Administrator">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                 <GradientStop Offset="0" Color="#6ccb5f"/>
@@ -200,6 +235,43 @@
                     </Border>
                 </Panel>
             </Border>
-        </Grid>
+
+            <!-- Navigation (fills the remaining space) -->
+            <ScrollViewer Padding="12,4"
+                          VerticalScrollBarVisibility="{Binding ScrollV}"
+                          HorizontalScrollBarVisibility="{Binding ScrollH}">
+                <ItemsControl ItemsSource="{Binding NavItems}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="{Binding ItemsOrientation}"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="nav:NavItem">
+                            <Button Classes="nav" Classes.selected="{Binding IsSelected}"
+                                    Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Label}">
+                                <Border Classes="navRow" CornerRadius="6">
+                                    <Panel>
+                                        <Rectangle Classes="navIndicator" Width="3" Height="18"
+                                                   RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                        <Rectangle Classes="navIndicatorH" Width="18" Height="3"
+                                                   RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                                        <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
+                                            <Path Classes="navIcon" Width="18" Height="18" Stretch="None"
+                                                  Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
+                                                  StrokeJoin="Round" VerticalAlignment="Center"/>
+                                            <TextBlock Classes="navLabel" Text="{Binding Label}"
+                                                       FontSize="13" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </UserControl>

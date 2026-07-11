@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
@@ -12,13 +15,17 @@ namespace DashDetective.Shell.Navigation;
 /// Backs the shell's navigation bar: owns the nav items and the single-selection state, and raises
 /// <see cref="SelectionChanged"/> so the shell can host the selected page. Kept separate from
 /// <c>MainWindowViewModel</c> so the bar's layout state (dock edge, collapse) lives as one cohesive
-/// unit; the collapse and orientation options are added in later phases.
+/// unit. Orientation and collapse drive the bar's layout entirely through computed properties, so no
+/// value converters are needed. All state is session-only, matching the Theming conventions.
 /// </summary>
 public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty] private NavItem _selectedNav = null!;
 
     /// <summary>Whether the bar is collapsed to an icons-only rail. Session-only, like Theming.</summary>
     [ObservableProperty] private bool _isCollapsed;
+
+    /// <summary>Which window edge the bar docks to. Session-only, like Theming.</summary>
+    [ObservableProperty] private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
     public ObservableCollection<NavItem> NavItems { get; } = new();
@@ -27,31 +34,95 @@ public partial class NavigationViewModel : ViewModelBase {
     /// shell can route the item's page into the content host.</summary>
     public event Action<NavItem>? SelectionChanged;
 
-    /// <summary>Which window edge the bar docks to. Fixed to the left for now; user-selectable
-    /// orientation is added in a later phase.</summary>
-    public Dock Dock => Dock.Left;
-
     // ----- Computed layout (no converters; consumed by NavigationView bindings/styles) -----
 
-    /// <summary>Rail width: the full bar when expanded, a narrow icons-only rail when collapsed.</summary>
-    public double RailWidth => IsCollapsed ? 64 : 236;
+    /// <summary>Whether the bar runs horizontally (docked to the top or bottom edge).</summary>
+    public bool IsHorizontal => Orientation is NavOrientation.Top or NavOrientation.Bottom;
+
+    /// <summary>Which edge of the window the bar docks to.</summary>
+    public Dock Dock => Orientation switch {
+        NavOrientation.Left => Dock.Left,
+        NavOrientation.Right => Dock.Right,
+        NavOrientation.Top => Dock.Top,
+        _ => Dock.Bottom,
+    };
+
+    /// <summary>The edge the brand/toggle dock to inside the bar (start of the running axis).</summary>
+    public Dock BrandDock => IsHorizontal ? Dock.Left : Dock.Top;
+
+    /// <summary>The edge the footer docks to inside the bar (end of the running axis).</summary>
+    public Dock FooterDock => IsHorizontal ? Dock.Right : Dock.Bottom;
+
+    /// <summary>The axis the nav items flow along: horizontal for a top/bottom bar, else vertical.</summary>
+    public Orientation ItemsOrientation =>
+        IsHorizontal ? Avalonia.Layout.Orientation.Horizontal : Avalonia.Layout.Orientation.Vertical;
+
+    /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
+    /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
+    public double RailWidth => IsHorizontal ? double.NaN : (IsCollapsed ? 64 : 236);
+
+    /// <summary>Rail height. A fixed bar (full or collapsed) when horizontal; <see cref="double.NaN"/>
+    /// (auto) when vertical so it stretches to the docked edge.</summary>
+    public double RailHeight => IsHorizontal ? (IsCollapsed ? 54 : 64) : double.NaN;
+
+    /// <summary>The bar's separator hairline, drawn only on the edge that faces the content area.</summary>
+    public Thickness HairlineThickness => Orientation switch {
+        NavOrientation.Left => new Thickness(0, 0, 1, 0),
+        NavOrientation.Right => new Thickness(1, 0, 0, 0),
+        NavOrientation.Top => new Thickness(0, 0, 0, 1),
+        _ => new Thickness(0, 1, 0, 0),
+    };
+
+    /// <summary>Vertical scrollbar policy for the item list (only vertical bars scroll vertically).</summary>
+    public ScrollBarVisibility ScrollV => IsHorizontal ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+
+    /// <summary>Horizontal scrollbar policy for the item list (only horizontal bars scroll sideways).</summary>
+    public ScrollBarVisibility ScrollH => IsHorizontal ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
 
     /// <summary>Whether nav-item text labels are shown (hidden when collapsed to icons-only).</summary>
     public bool ShowLabels => !IsCollapsed;
 
-    /// <summary>Whether the brand wordmark (beside the logo tile) is shown.</summary>
-    public bool ShowBrandText => !IsCollapsed;
+    /// <summary>Whether the brand wordmark (beside the logo tile) is shown. Hidden when collapsed or
+    /// when horizontal (the short bar shows the logo only).</summary>
+    public bool ShowBrandText => !IsCollapsed && !IsHorizontal;
 
-    /// <summary>Whether the footer shows the full user card (vs. a compact avatar when collapsed).</summary>
-    public bool ShowFullFooter => !IsCollapsed;
+    /// <summary>Whether the footer shows the full user card (vs. a compact avatar). Full only on an
+    /// expanded vertical bar.</summary>
+    public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
     private void ToggleCollapse() => IsCollapsed = !IsCollapsed;
 
+    /// <summary>Docks the bar to the given window edge.</summary>
+    [RelayCommand]
+    private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
+
+    // TEMP (Phase 3 dev): cycles Left→Right→Top→Bottom so all four edges can be exercised before the
+    // real orientation controls land in Phase 4. Removed together with the temporary toggle button.
+    [RelayCommand]
+    private void CycleOrientationTemp() =>
+        Orientation = (NavOrientation)(((int)Orientation + 1) % 4);
+
     partial void OnIsCollapsedChanged(bool value) {
         OnPropertyChanged(nameof(RailWidth));
+        OnPropertyChanged(nameof(RailHeight));
         OnPropertyChanged(nameof(ShowLabels));
+        OnPropertyChanged(nameof(ShowBrandText));
+        OnPropertyChanged(nameof(ShowFullFooter));
+    }
+
+    partial void OnOrientationChanged(NavOrientation value) {
+        OnPropertyChanged(nameof(IsHorizontal));
+        OnPropertyChanged(nameof(Dock));
+        OnPropertyChanged(nameof(BrandDock));
+        OnPropertyChanged(nameof(FooterDock));
+        OnPropertyChanged(nameof(ItemsOrientation));
+        OnPropertyChanged(nameof(RailWidth));
+        OnPropertyChanged(nameof(RailHeight));
+        OnPropertyChanged(nameof(HairlineThickness));
+        OnPropertyChanged(nameof(ScrollV));
+        OnPropertyChanged(nameof(ScrollH));
         OnPropertyChanged(nameof(ShowBrandText));
         OnPropertyChanged(nameof(ShowFullFooter));
     }
