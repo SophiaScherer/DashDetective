@@ -1,13 +1,15 @@
 using System.Collections.ObjectModel;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shell.Navigation;
 
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
 /// Backs the Settings → Appearance section. Owns the Theme and Accent option lists and applies the
-/// user's choice through the shared <see cref="ThemeService"/> (the single theming seam). The rest
-/// of the Settings page (Monitoring, Export &amp; Data) is still static layout.
+/// user's choice through the shared <see cref="ThemeService"/> (the single theming seam), and exposes
+/// the shared <see cref="NavigationViewModel"/> so the Navigation controls drive the same bar state as
+/// the on-bar controls. The rest of the Settings page (Monitoring, Export &amp; Data) is still static.
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
@@ -15,8 +17,13 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<AccentOption> AccentOptions { get; }
 
-    public SettingsViewModel(ThemeService theme) {
+    /// <summary>The shell's navigation bar view-model — the single shared instance, so the Settings
+    /// Navigation controls and the on-bar controls stay in sync.</summary>
+    public NavigationViewModel Nav { get; }
+
+    public SettingsViewModel(ThemeService theme, NavigationViewModel nav) {
         _theme = theme;
+        Nav = nav;
 
         ThemeOptions = new ObservableCollection<ThemeOption> {
             new("Dark", AppTheme.Dark, SelectTheme),

@@ -54,7 +54,7 @@ public partial class MainWindowViewModel : ViewModelBase {
         // Apply the default appearance (Dark + Blue) through the single theming seam,
         // then hand the same service to the Settings page so its controls drive it.
         _theme.ApplyDefaults();
-        _settings = new SettingsViewModel(_theme);
+        _settings = new SettingsViewModel(_theme, Nav);
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
         Nav.Initialize(new[] {

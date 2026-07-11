@@ -120,29 +120,54 @@
             <Setter Property="BorderThickness" Value="1,0,0,0"/>
         </Style>
 
-        <!-- Temporary collapse/expand toggle (dev affordance; replaced by the real controls in a
-             later phase). -->
-        <Style Selector="Button.navToggleTemp">
+        <!-- On-bar control buttons (collapse chevron + orientation kebab). -->
+        <Style Selector="Button.navCtl">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.rail Button.navToggleTemp">
-            <Setter Property="Margin" Value="12,0,12,6"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Style Selector="Button.navCtl:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <Style Selector="Border.rail.horizontal Button.navToggleTemp">
-            <Setter Property="Margin" Value="8,0,4,0"/>
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="34"/>
+        <!-- The controls cluster: centred under the brand (vertical) or beside it (horizontal). -->
+        <Style Selector="Border.rail StackPanel.navCtls">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rail.horizontal StackPanel.navCtls">
+            <Setter Property="Margin" Value="4,0,8,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Button.navToggleTemp:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+
+        <!-- Chrome-less wrapper for the orientation preview tiles in the flyout. -->
+        <Style Selector="Button.pickTile">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pickTile /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.posTile">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Border.posTile.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
         </Style>
     </UserControl.Styles>
 
@@ -177,22 +202,53 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- Temporary collapse toggle (dev only) -->
-            <Button Classes="navToggleTemp" DockPanel.Dock="{Binding BrandDock}"
-                    Command="{Binding ToggleCollapseCommand}"
-                    ToolTip.Tip="Collapse or expand (temporary)">
-                <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
-                      StrokeThickness="1.5" StrokeLineCap="Round" Data="M3,5 H15 M3,9 H15 M3,13 H15"/>
-            </Button>
-
-            <!-- Temporary orientation cycler (dev only): Left→Right→Top→Bottom -->
-            <Button Classes="navToggleTemp" DockPanel.Dock="{Binding BrandDock}"
-                    Command="{Binding CycleOrientationTempCommand}"
-                    ToolTip.Tip="Cycle dock edge (temporary)">
-                <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
-                      StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                      Data="M9,2 A7,7 0 1 1 2,9 M2,9 L4.5,6.5 M2,9 L4.5,11.5"/>
-            </Button>
+            <!-- Bar controls: collapse chevron + orientation (kebab) menu. The kebab opens a Flyout,
+                 which renders in the window overlay layer, so it is never clipped by the rail no
+                 matter how narrow or short the bar is (unlike an in-bar popover). -->
+            <StackPanel Classes="navCtls" DockPanel.Dock="{Binding BrandDock}"
+                        Orientation="Horizontal" Spacing="2">
+                <Button Classes="navCtl" Command="{Binding ToggleCollapseCommand}"
+                        ToolTip.Tip="Collapse or expand navigation">
+                    <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                          Data="{Binding CollapseIcon}"/>
+                </Button>
+                <Button Classes="navCtl" ToolTip.Tip="Navigation position">
+                    <Path Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextTertiary}"
+                          Data="{x:Static nav:Icons.Kebab}"/>
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom">
+                            <StackPanel Spacing="10" Margin="2" MinWidth="176">
+                                <TextBlock Text="Navigation position" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextStrong}"/>
+                                <ItemsControl ItemsSource="{Binding Positions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="nav:NavPositionOption">
+                                            <Button Classes="pickTile" Command="{Binding SelectCommand}"
+                                                    ToolTip.Tip="{Binding Label}">
+                                                <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
+                                                    <Panel Margin="5">
+                                                        <Rectangle Fill="{DynamicResource Accent}"
+                                                                   Width="{Binding BarWidth}" Height="{Binding BarHeight}"
+                                                                   HorizontalAlignment="{Binding BarHAlign}"
+                                                                   VerticalAlignment="{Binding BarVAlign}"
+                                                                   RadiusX="1" RadiusY="1"/>
+                                                    </Panel>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
 
             <!-- User footer -->
             <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}" Padding="14,12"

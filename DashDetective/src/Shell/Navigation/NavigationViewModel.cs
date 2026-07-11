@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
@@ -30,9 +31,22 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
     public ObservableCollection<NavItem> NavItems { get; } = new();
 
+    /// <summary>The four dock-position choices, shared by the on-bar flyout and the Settings control.</summary>
+    public ObservableCollection<NavPositionOption> Positions { get; }
+
     /// <summary>Raised whenever the selected item changes (including the initial selection), so the
     /// shell can route the item's page into the content host.</summary>
     public event Action<NavItem>? SelectionChanged;
+
+    public NavigationViewModel() {
+        Positions = new ObservableCollection<NavPositionOption> {
+            new("Left", NavOrientation.Left, SelectPosition),
+            new("Top", NavOrientation.Top, SelectPosition),
+            new("Right", NavOrientation.Right, SelectPosition),
+            new("Bottom", NavOrientation.Bottom, SelectPosition),
+        };
+        SyncPositions();
+    }
 
     // ----- Computed layout (no converters; consumed by NavigationView bindings/styles) -----
 
@@ -90,19 +104,31 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
 
+    /// <summary>The chevron shown on the collapse toggle, pointing the way the bar will move.</summary>
+    public Geometry CollapseIcon => Icons.Chevron(Orientation, IsCollapsed);
+
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
     private void ToggleCollapse() => IsCollapsed = !IsCollapsed;
+
+    /// <summary>Expands the bar (used by the Settings control).</summary>
+    [RelayCommand]
+    private void Expand() => IsCollapsed = false;
+
+    /// <summary>Collapses the bar to icons-only (used by the Settings control).</summary>
+    [RelayCommand]
+    private void Collapse() => IsCollapsed = true;
 
     /// <summary>Docks the bar to the given window edge.</summary>
     [RelayCommand]
     private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
 
-    // TEMP (Phase 3 dev): cycles Left→Right→Top→Bottom so all four edges can be exercised before the
-    // real orientation controls land in Phase 4. Removed together with the temporary toggle button.
-    [RelayCommand]
-    private void CycleOrientationTemp() =>
-        Orientation = (NavOrientation)(((int)Orientation + 1) % 4);
+    private void SelectPosition(NavPositionOption option) => Orientation = option.Value;
+
+    private void SyncPositions() {
+        foreach (var position in Positions)
+            position.IsSelected = position.Value == Orientation;
+    }
 
     partial void OnIsCollapsedChanged(bool value) {
         OnPropertyChanged(nameof(RailWidth));
@@ -110,6 +136,7 @@ public partial class NavigationViewModel : ViewModelBase {
         OnPropertyChanged(nameof(ShowLabels));
         OnPropertyChanged(nameof(ShowBrandText));
         OnPropertyChanged(nameof(ShowFullFooter));
+        OnPropertyChanged(nameof(CollapseIcon));
     }
 
     partial void OnOrientationChanged(NavOrientation value) {
@@ -125,6 +152,8 @@ public partial class NavigationViewModel : ViewModelBase {
         OnPropertyChanged(nameof(ScrollH));
         OnPropertyChanged(nameof(ShowBrandText));
         OnPropertyChanged(nameof(ShowFullFooter));
+        OnPropertyChanged(nameof(CollapseIcon));
+        SyncPositions();
     }
 
     /// <summary>Populates the bar and selects the first item. Items must be created with
