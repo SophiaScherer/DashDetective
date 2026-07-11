@@ -109,17 +109,36 @@ Not all of these exist yet. Only build what is listed below as "currently active
     `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
     active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
     adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
-  - **Show hidden.** A themed `CheckBox` (next to the filter chips) bound to
-    `FileExplorerViewModel.ShowHidden`. `DirectoryService` now takes a `bool includeHidden` (picking
+  - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
+    `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
     between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
-    so lazy expands honor the live setting. Toggling reloads the list **and** rebuilds the tree from its
-    roots (expanded folders collapse — an accepted trade for a rarely-flipped toggle). The checkbox style
-    recolours the Fluent template parts (`Border#NormalRectangle`, `Path#CheckGlyph`) and is local to the
-    view (the app's only checkbox — promote to `SharedStyles` if reused).
+    so lazy expands honor the live setting. Toggling reloads the list **and** reconciles each loaded tree
+    branch **in place** via `FileSystemNode.SyncChildrenAsync` — surviving folders keep their instance
+    (so expansion and selection are preserved), newly-visible hidden folders are inserted and vanished
+    ones removed, and an unexpanded node's chevron is kept honest without loading its subtree. (This
+    replaced the earlier full `RootNodes.Clear()` rebuild that collapsed the whole tree on every toggle.)
+    The checkbox style recolours the Fluent template parts (`Border#NormalRectangle`, `Path#CheckGlyph`)
+    and is local to the view (the app's only checkbox — promote to `SharedStyles` if reused).
   - **Contextual Refresh.** `FileExplorerViewModel` implements `IRefreshablePage` (`src/Shared`, the same
     marker-interface idea as `ISelfScrollingPage`); `Refresh()` re-reads the current folder via the
     existing `SetCurrentFolder`/`LoadEntriesAsync` path so the toolbar button picks up files added/removed
     on disk. See the toolbar note in the Dashboard bullet for the shell-side routing.
+  - **Live auto-refresh.** Since the app is read-only, changes come from the user's own filesystem, so the
+    open folder updates itself without a manual refresh. `DirectoryWatcher` wraps a single
+    `FileSystemWatcher` (one directory, non-recursive), coalesces the OS's event bursts with a ~300 ms
+    debounce timer, and raises a UI-framework-agnostic `Changed` event; the VM holds one watcher,
+    **re-points** it at the open folder in `SetCurrentFolder`, and on `Changed` hops to the UI thread
+    (`Dispatcher.UIThread.Post`) into `ReloadCurrentFolderPreservingState`. That reload **keeps the
+    selection by path** (the `_reselectPath` captured/consumed in `LoadEntriesAsync`, cleared only if the
+    item is gone) and reconciles the matching tree node through the same `SyncChildrenAsync`, so new/removed
+    subfolders (and their chevrons) show in the left tree too. It's a same-path reload, so the scroll
+    position is kept (see below). The watcher is Windows-guarded and soft-failing (a vanished/denied path
+    stays idle); the page is a never-disposed singleton, so the one watcher lives for the app's lifetime.
+  - **Scroll-to-top on navigation.** Navigating to a *different* folder resets the file list to the top;
+    sort/filter/Refresh and auto-refresh of the *same* folder do not. The VM raises a `ScrollToTopRequested`
+    event from `SetCurrentFolder` **only when the target path differs** from the current one; the view
+    (which owns the named `FileListScroll` `ScrollViewer`) subscribes in `OnDataContextChanged` and calls
+    `ScrollToHome()`.
 
   **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
   **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
@@ -282,14 +301,19 @@ currently exist.
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
                                                         (VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
-                                                         state and RebuildVisibleEntries)
+                                                         state and RebuildVisibleEntries; drives live
+                                                         auto-refresh + scroll-to-top-on-navigation)
                                 DirectoryService.cs     (async System.IO enumeration: drives, lazy
                                                          subdirectories, folder entries; per-entry
                                                          soft-fail, Task.Run off the UI thread; takes
                                                          includeHidden to reveal hidden/system entries.
                                                          FileItem carries raw Size/Modified sort keys)
+                                DirectoryWatcher.cs     (debounced FileSystemWatcher over the open folder;
+                                                         raises Changed → VM auto-refreshes the list + tree.
+                                                         Windows-guarded, soft-failing, app-lifetime)
                                 FileSystemNode.cs       (tree-node item VM; lazy children on expand;
-                                                         threads a Func<bool> includeHidden accessor)
+                                                         threads a Func<bool> includeHidden accessor;
+                                                         SyncChildrenAsync reconciles a branch in place)
                                 FileEntry.cs            (file-list row item VM; exposes raw Size/Modified)
                                 FileSortKey.cs          (enum: Name / Type / Modified / Size)
                                 SortColumn.cs           (clickable-header VM: Key + SortCommand + IsActive
