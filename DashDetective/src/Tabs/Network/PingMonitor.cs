@@ -50,22 +50,25 @@ public sealed class PingMonitor : IDisposable {
         }
     }
 
-    /// <summary>Sends one ping and folds the result into the rolling window + console lines.</summary>
+    /// <summary>Sends one ping and folds the result into the rolling window + console lines. The target
+    /// is captured at the start of the send: if <see cref="SetTarget"/> switches hosts while this ping is
+    /// in flight, the (stale) reply is discarded rather than mixed into the new host's fresh window.</summary>
     public async Task SendAsync() {
+        var target = Target;
         string line;
         var ok = false;
         long rtt = 0;
 
         try {
-            var reply = await _ping.SendPingAsync(Target, TimeoutMs);
+            var reply = await _ping.SendPingAsync(target, TimeoutMs);
             if (reply.Status == IPStatus.Success) {
                 ok = true;
                 rtt = reply.RoundtripTime;
                 // Options (and thus TTL) can be null on some stacks / failure paths — omit TTL then.
                 var ttl = reply.Options?.Ttl;
                 line = ttl.HasValue
-                    ? $"Reply from {Target}: time={Format(rtt)}ms TTL={ttl.Value.ToString(CultureInfo.InvariantCulture)}"
-                    : $"Reply from {Target}: time={Format(rtt)}ms";
+                    ? $"Reply from {target}: time={Format(rtt)}ms TTL={ttl.Value.ToString(CultureInfo.InvariantCulture)}"
+                    : $"Reply from {target}: time={Format(rtt)}ms";
             } else {
                 line = "Request timed out.";
             }
@@ -73,6 +76,11 @@ public sealed class PingMonitor : IDisposable {
             // Offline / resolution failure / send error — record as a timeout, keep going.
             line = "Request timed out.";
         }
+
+        // The user switched targets while this ping was in flight — drop it so the new host's window
+        // (already cleared by SetTarget) isn't contaminated by the old host's result.
+        if (target != Target)
+            return;
 
         Push(_lines, line, LineCount);
         Push(_results, ok, WindowSize);
