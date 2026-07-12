@@ -31,14 +31,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Floor for a series' vertical scale so idle traffic isn't drawn as a huge spike.</summary>
     private const double MinScaleMbps = 1.0;
 
-    /// <summary>Rows shown per connections page before the user changes it.</summary>
-    private const int DefaultPageSize = 100;
-
-    /// <summary>Hard upper bound the user may set for the page size.</summary>
-    private const int MaxPageSize = 150;
-
-    /// <summary>Numbered pages shown either side of the current page in the pager (before ellipsis).</summary>
-    private const int PagerRadius = 2;
+    /// <summary>Fixed rows per connections page; users move through pages with the numbered pager.</summary>
+    private const int PageSize = 100;
 
     /// <summary>Cadence for re-reading adapters + IP config. Adapters change rarely (plug/unplug,
     /// connect/disconnect), so a coarse tick is plenty — like the Dashboard's 30 s uptime timer.</summary>
@@ -67,8 +61,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly List<ConnectionInfo> _allConnections = new();
     /// <summary>True active count from the last snapshot (may exceed <see cref="_allConnections"/> if capped).</summary>
     private int _connectionsTotal;
-    /// <summary>Effective page size (clamped to 1..<see cref="MaxPageSize"/>); the field applies into this.</summary>
-    private int _pageSize = DefaultPageSize;
     /// <summary>Current 1-based page.</summary>
     private int _currentPage = 1;
 
@@ -94,9 +86,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Count caption for the connections panel header (e.g. "142 active · page 2 of 3").</summary>
     [ObservableProperty] private string _connectionsSummary = "";
-
-    /// <summary>The "entries per page" field text. Applied (parsed + clamped) via <see cref="ApplyPageSizeCommand"/>.</summary>
-    [ObservableProperty] private string _pageSizeText = DefaultPageSize.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Google-style pager items (Prev · 1 … 4 5 6 … 20 · Next). Empty when there's one page.</summary>
     public ObservableCollection<PageLink> PageLinks { get; } = new();
@@ -288,22 +277,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
-    /// <summary>Applies the "entries per page" field: parses it, clamps to 1..<see cref="MaxPageSize"/>
-    /// (falling back to <see cref="DefaultPageSize"/> on junk), reflects the clamped value back into the
-    /// field, jumps to page 1, and re-pages immediately.</summary>
-    [RelayCommand]
-    private void ApplyPageSize() {
-        var size = DefaultPageSize;
-        if (int.TryParse(PageSizeText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
-            size = parsed;
-        size = Math.Clamp(size, 1, MaxPageSize);
-
-        _pageSize = size;
-        PageSizeText = size.ToString(CultureInfo.InvariantCulture);
-        _currentPage = 1;
-        RebuildPage();
-    }
-
     /// <summary>Pager callback: navigates to a page and re-pages immediately (so it feels instant rather
     /// than waiting for the next poll).</summary>
     private void GoToPage(int page) {
@@ -315,11 +288,11 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// and rebuilds the header caption + pager. Clamps the page if the list shrank underneath us.</summary>
     private void RebuildPage() {
         var available = _allConnections.Count;
-        var totalPages = Math.Max(1, (available + _pageSize - 1) / _pageSize);
+        var totalPages = Math.Max(1, (available + PageSize - 1) / PageSize);
         _currentPage = Math.Clamp(_currentPage, 1, totalPages);
 
-        var start = (_currentPage - 1) * _pageSize;
-        var count = Math.Clamp(available - start, 0, _pageSize);
+        var start = (_currentPage - 1) * PageSize;
+        var count = Math.Clamp(available - start, 0, PageSize);
         var slice = count > 0 ? _allConnections.GetRange(start, count) : (IReadOnlyList<ConnectionInfo>)Array.Empty<ConnectionInfo>();
         ReconcileConnections(slice);
 
@@ -338,37 +311,18 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                $"of {totalPages.ToString(CultureInfo.InvariantCulture)}";
     }
 
-    /// <summary>Rebuilds the Google-style pager: Prev · 1 … (window around current) … last · Next.
-    /// The first and last pages are always shown; ellipsis gaps fill the space between them and the
-    /// window. Hidden entirely when there's only one page.</summary>
+    /// <summary>Rebuilds the numbered pager (1, 2, 3, …). Every page fits on one row (the list is
+    /// capped at ten pages), so all numbers are shown with no ellipsis or arrows. Hidden entirely when
+    /// there's only one page.</summary>
     private void RebuildPageLinks(int totalPages) {
         PageLinks.Clear();
         PagerVisible = totalPages > 1;
         if (!PagerVisible)
             return;
 
-        PageLinks.Add(new PageLink("‹", _currentPage - 1, isCurrent: false,
-            isEnabled: _currentPage > 1, GoToPage));
-
-        var lo = Math.Max(2, _currentPage - PagerRadius);
-        var hi = Math.Min(totalPages - 1, _currentPage + PagerRadius);
-
-        AddPageNumber(1);
-        if (lo > 2)
-            PageLinks.Add(PageLink.Ellipsis());
-        for (var p = lo; p <= hi; p++)
-            AddPageNumber(p);
-        if (hi < totalPages - 1)
-            PageLinks.Add(PageLink.Ellipsis());
-        AddPageNumber(totalPages);
-
-        PageLinks.Add(new PageLink("›", _currentPage + 1, isCurrent: false,
-            isEnabled: _currentPage < totalPages, GoToPage));
+        for (var p = 1; p <= totalPages; p++)
+            PageLinks.Add(new PageLink(p, isCurrent: p == _currentPage, GoToPage));
     }
-
-    private void AddPageNumber(int page) =>
-        PageLinks.Add(new PageLink(page.ToString(CultureInfo.InvariantCulture),
-            page, isCurrent: page == _currentPage, isEnabled: true, GoToPage));
 
     /// <summary>Diffs <paramref name="incoming"/> (already sorted) into the observable collection by key.</summary>
     private void ReconcileConnections(IReadOnlyList<ConnectionInfo> incoming) {
