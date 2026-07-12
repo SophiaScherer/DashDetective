@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
@@ -32,11 +33,17 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// connect/disconnect), so a coarse tick is plenty — like the Dashboard's 30 s uptime timer.</summary>
     private static readonly TimeSpan AdapterInterval = TimeSpan.FromSeconds(5);
 
+    /// <summary>Cadence for the connections table. Netstat-style enumeration is heavier than a byte
+    /// counter, so it polls slower than the 1 Hz throughput sampler.</summary>
+    private static readonly TimeSpan ConnectionsInterval = TimeSpan.FromSeconds(2.5);
+
     private readonly NetworkUsageSampler _networkSampler = new();
     private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _networkTimer;
     private readonly DispatcherTimer _adapterTimer;
+    private readonly DispatcherTimer _connectionsTimer;
+    private bool _connectionsInFlight;
 
     [ObservableProperty] private string _downText = "0";
     [ObservableProperty] private string _upText = "0";
@@ -50,6 +57,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
     [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
+
+    /// <summary>Active TCP/UDP connections, for the Active Connections table. Updated in place.</summary>
+    public ObservableCollection<ConnectionRow> Connections { get; } = new();
+
+    /// <summary>Count caption for the connections panel header (e.g. "42 active").</summary>
+    [ObservableProperty] private string _connectionsSummary = "";
 
     public NetworkViewModel() {
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
@@ -66,6 +79,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _adapterTimer = new DispatcherTimer { Interval = AdapterInterval };
         _adapterTimer.Tick += OnAdapterTick;
         _adapterTimer.Start();
+
+        // Connections load once, then refresh on their own (slower) timer.
+        _ = LoadConnectionsAsync();
+
+        _connectionsTimer = new DispatcherTimer { Interval = ConnectionsInterval };
+        _connectionsTimer.Tick += OnConnectionsTick;
+        _connectionsTimer.Start();
     }
 
     private void OnNetworkTick(object? sender, EventArgs e) {
@@ -165,22 +185,90 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample and adapter re-read. Runs even while paused (a
-    /// manual refresh should still update once), matching the Dashboard.</summary>
+    private void OnConnectionsTick(object? sender, EventArgs e) => _ = LoadConnectionsAsync();
+
+    /// <summary>
+    /// Reads the connections snapshot off the UI thread and reconciles it into <see cref="Connections"/>
+    /// in place: rows that vanished are removed, survivors are updated (and moved to their new sorted
+    /// position), and new rows are inserted — so the table doesn't flicker or lose scroll position.
+    /// Guarded against overlap (a slow enumeration must not pile up ticks) and never throws.
+    /// </summary>
+    private async Task LoadConnectionsAsync() {
+        if (_connectionsInFlight)
+            return;
+        _connectionsInFlight = true;
+        try {
+            var snapshot = await ConnectionsProvider.GetAsync();
+            // Awaited on the UI thread, so the continuation resumes there — safe to touch the collection.
+            ReconcileConnections(snapshot.Rows);
+            ConnectionsSummary = BuildConnectionsSummary(snapshot.Total, snapshot.Rows.Count);
+        } catch {
+            Connections.Clear();
+            ConnectionsSummary = "Connections unavailable";
+        } finally {
+            _connectionsInFlight = false;
+        }
+    }
+
+    /// <summary>Header caption: the true active count, noting when the table is capped.</summary>
+    private static string BuildConnectionsSummary(int total, int shown) {
+        if (total == 0)
+            return "No active connections";
+        var count = total.ToString(CultureInfo.InvariantCulture);
+        return total > shown ? $"{count} active · showing {shown}" : $"{count} active";
+    }
+
+    /// <summary>Diffs <paramref name="incoming"/> (already sorted) into the observable collection by key.</summary>
+    private void ReconcileConnections(IReadOnlyList<ConnectionInfo> incoming) {
+        var incomingKeys = new HashSet<string>(incoming.Count);
+        foreach (var info in incoming)
+            incomingKeys.Add(info.Key);
+
+        // Drop rows that are no longer present.
+        for (var i = Connections.Count - 1; i >= 0; i--)
+            if (!incomingKeys.Contains(Connections[i].Key))
+                Connections.RemoveAt(i);
+
+        // Index the survivors for O(1) lookup.
+        var existing = new Dictionary<string, ConnectionRow>(Connections.Count);
+        foreach (var row in Connections)
+            existing[row.Key] = row;
+
+        // Walk the incoming order, placing each row at its target index.
+        for (var i = 0; i < incoming.Count; i++) {
+            var info = incoming[i];
+            if (existing.TryGetValue(info.Key, out var row)) {
+                row.Update(info);
+                var current = Connections.IndexOf(row);
+                if (current != i)
+                    Connections.Move(current, i);
+            } else {
+                var created = new ConnectionRow(info);
+                existing[info.Key] = created;
+                Connections.Insert(i, created);
+            }
+        }
+    }
+
+    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read and connections re-read. Runs
+    /// even while paused (a manual refresh should still update once), matching the Dashboard.</summary>
     public void Refresh() {
         OnNetworkTick(this, EventArgs.Empty);
         _ = LoadAdaptersAsync();
+        _ = LoadConnectionsAsync();
     }
 
-    /// <summary>Pauses/resumes live throughput sampling and adapter polling. Drives the shell's Live
-    /// pill; <see cref="Refresh"/> still works while paused.</summary>
+    /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
+    /// <see cref="Refresh"/> still works while paused.</summary>
     public void SetLive(bool live) {
         if (live) {
             _networkTimer.Start();
             _adapterTimer.Start();
+            _connectionsTimer.Start();
         } else {
             _networkTimer.Stop();
             _adapterTimer.Stop();
+            _connectionsTimer.Stop();
         }
     }
 
@@ -191,5 +279,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _networkTimer.Tick -= OnNetworkTick;
         _adapterTimer.Stop();
         _adapterTimer.Tick -= OnAdapterTick;
+        _connectionsTimer.Stop();
+        _connectionsTimer.Tick -= OnConnectionsTick;
     }
 }
