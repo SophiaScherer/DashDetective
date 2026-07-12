@@ -73,9 +73,50 @@
         <Style Selector="TextBlock.cpuCell.high">
             <Setter Property="Foreground" Value="#ff8a5c"/>
         </Style>
+
+        <!-- Summary-card value. -->
+        <Style Selector="TextBlock.sumValue">
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
     </UserControl.Styles>
 
-    <Border Classes="panel" Padding="0" ClipToBounds="True">
+    <Grid RowDefinitions="Auto,*" RowSpacing="14">
+
+        <!-- ===== Summary strip ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+            <Border Grid.Column="0" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="PROCESSES"/>
+                    <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
+                    <TextBlock Classes="cardSub" Text="{Binding ProcessBreakdownText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="CPU"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
+                               Text="{Binding CpuUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="MEMORY"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
+                               Text="{Binding MemoryUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="THREADS"/>
+                    <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== Process table ===== -->
+        <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
 
             <!-- Sticky column header -->
@@ -161,5 +202,6 @@
                 </StackPanel>
             </ScrollViewer>
         </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </UserControl>

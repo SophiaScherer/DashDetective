@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Processes;
@@ -31,6 +32,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly DispatcherTimer _timer;
     private bool _inFlight;
 
+    // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from
+    // the shared samplers (promoted to src/Services/SystemMetrics when this tab was activated).
+    private readonly CpuUsageSampler _cpuSampler = new();
+    private readonly MemoryUsageSampler _memorySampler = new();
+
     /// <summary>Foreground apps (own a visible window), updated in place by the keyed diff.</summary>
     public ObservableCollection<ProcessRow> Apps { get; } = new();
 
@@ -43,8 +49,27 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Group header caption for the Background section (e.g. "Background processes · 214").</summary>
     [ObservableProperty] private string _backgroundHeader = "Background processes";
 
+    // ----- Summary strip -----
+
+    /// <summary>Total live process count, for the Processes summary card.</summary>
+    [ObservableProperty] private string _totalProcessesText = "0";
+
+    /// <summary>Per-group breakdown under the total (e.g. "10 apps · 310 background").</summary>
+    [ObservableProperty] private string _processBreakdownText = "";
+
+    /// <summary>System-wide CPU utilisation, whole percent (e.g. "12%").</summary>
+    [ObservableProperty] private string _cpuUsageText = "0%";
+
+    /// <summary>System-wide physical-memory usage, whole percent (e.g. "49%").</summary>
+    [ObservableProperty] private string _memoryUsageText = "0%";
+
+    /// <summary>Total thread count across all processes (e.g. "2,418").</summary>
+    [ObservableProperty] private string _threadsText = "0";
+
     public ProcessesViewModel() {
-        // Load once immediately so the table isn't blank on arrival, then poll on the timer.
+        // Seed the system totals (memory is an absolute reading, so it's real at once; CPU needs an
+        // interval, so it reads 0 until the first tick), then load the list and start polling.
+        SampleSystemTotals();
         _ = LoadAsync();
 
         _timer = new DispatcherTimer { Interval = SampleInterval };
@@ -52,7 +77,28 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _timer.Start();
     }
 
-    private void OnTick(object? sender, EventArgs e) => _ = LoadAsync();
+    private void OnTick(object? sender, EventArgs e) {
+        SampleSystemTotals();
+        _ = LoadAsync();
+    }
+
+    /// <summary>Reads the system-wide CPU% and Memory% samplers (synchronous, negligible cost) and
+    /// updates the summary cards. Never throws.</summary>
+    private void SampleSystemTotals() {
+        double cpu;
+        try { cpu = _cpuSampler.Sample(); } catch { cpu = 0; }
+        CpuUsageText = FormatPercent(cpu);
+
+        MemorySample memory;
+        try { memory = _memorySampler.Sample(); } catch { memory = default; }
+        MemoryUsageText = FormatPercent(memory.LoadPercent);
+    }
+
+    private static string FormatPercent(double percent) {
+        if (percent < 0)
+            percent = 0;
+        return Math.Round(percent).ToString(CultureInfo.InvariantCulture) + "%";
+    }
 
     /// <summary>Reads the snapshot off the UI thread and applies it. Guarded against overlap (a slow
     /// enumeration must not pile up ticks) and never throws.</summary>
@@ -69,6 +115,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             Background.Clear();
             AppsHeader = "Apps";
             BackgroundHeader = "Background processes";
+            TotalProcessesText = "0";
+            ProcessBreakdownText = "";
+            ThreadsText = "0";
         } finally {
             _inFlight = false;
         }
@@ -79,11 +128,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private void ApplySnapshot(IReadOnlyList<ProcessInfo> processes) {
         var apps = new List<ProcessInfo>();
         var background = new List<ProcessInfo>();
+        var totalThreads = 0;
         foreach (var info in processes) {
             if (info.Category == ProcessCategory.App)
                 apps.Add(info);
             else
                 background.Add(info);
+            totalThreads += info.ThreadCount;
         }
 
         apps.Sort(CompareByNameThenPid);
@@ -94,6 +145,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
         AppsHeader = $"Apps · {apps.Count.ToString(CultureInfo.InvariantCulture)}";
         BackgroundHeader = $"Background processes · {background.Count.ToString(CultureInfo.InvariantCulture)}";
+
+        // Summary strip: total count + per-group breakdown + total threads (CPU%/Memory% come from
+        // the system samplers in SampleSystemTotals).
+        TotalProcessesText = (apps.Count + background.Count).ToString(CultureInfo.InvariantCulture);
+        ProcessBreakdownText = $"{apps.Count.ToString(CultureInfo.InvariantCulture)} apps · " +
+                               $"{background.Count.ToString(CultureInfo.InvariantCulture)} background";
+        ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
     }
 
     private static int CompareByNameThenPid(ProcessInfo a, ProcessInfo b) {

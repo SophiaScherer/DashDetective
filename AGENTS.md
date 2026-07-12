@@ -339,6 +339,13 @@ currently exist.
         ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+      /SystemMetrics
+        CpuUsageSampler.cs      (live total CPU % via GetSystemTimes; shared — Dashboard + Processes)
+        MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx; shared —
+                                 Dashboard + Processes. Both moved here from src/Tabs/Dashboard with
+                                 sign-off when the Processes tab needed the same system-wide readings,
+                                 the same precedent as NetworkUsageSampler. GPU/Storage samplers stay
+                                 in the Dashboard until a second tab needs them.)
       /Network
         NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
                                  adapter — internet-facing, has a default gateway — NOT a sum of all
@@ -367,10 +374,8 @@ currently exist.
         NavPositionOption.cs        (selectable item VM for the position picker, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
-                                CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
                                 CpuInfoProvider.cs      (static CPU info via WMI, async)
                                 CpuStaticInfo.cs        (record for the WMI result)
-                                MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
                                 MemoryInfoProvider.cs   (static RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
                                 GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters)

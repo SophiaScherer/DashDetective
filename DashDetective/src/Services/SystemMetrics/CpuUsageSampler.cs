@@ -1,11 +1,15 @@
 using System.Runtime.InteropServices;
 
-namespace DashDetective.Tabs.Dashboard;
+namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// Samples total (all-cores) CPU utilisation via the Win32 <c>GetSystemTimes</c> API.
 /// Each <see cref="Sample"/> call returns the average CPU load as a percentage (0–100)
 /// over the interval since the previous call. No dependencies, negligible per-sample cost.
+///
+/// Shared: the Dashboard and the Processes tab each own an instance (the Processes summary strip
+/// shows the same system-wide CPU% as the Dashboard). Moved here from src/Tabs/Dashboard with sign-off
+/// when the Processes tab was activated — the same precedent as <c>NetworkUsageSampler</c>.
 /// </summary>
 public sealed class CpuUsageSampler {
     [StructLayout(LayoutKind.Sequential)]

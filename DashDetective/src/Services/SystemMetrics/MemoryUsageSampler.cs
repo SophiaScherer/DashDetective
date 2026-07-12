@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace DashDetective.Tabs.Dashboard;
+namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// A single physical-memory snapshot: load as a percentage (0–100), plus used and total bytes.
@@ -11,6 +11,10 @@ public readonly record struct MemorySample(double LoadPercent, ulong UsedBytes, 
 /// Samples system physical-memory usage via the Win32 <c>GlobalMemoryStatusEx</c> API. Each
 /// <see cref="Sample"/> call returns an absolute snapshot (memory load percentage plus used/total
 /// bytes) at the moment of the call. No dependencies, negligible per-sample cost.
+///
+/// Shared: the Dashboard and the Processes tab each own an instance (the Processes summary strip
+/// shows the same system-wide Memory% as the Dashboard). Moved here from src/Tabs/Dashboard with
+/// sign-off when the Processes tab was activated — the same precedent as <c>NetworkUsageSampler</c>.
 /// </summary>
 public sealed class MemoryUsageSampler {
     [StructLayout(LayoutKind.Sequential)]
