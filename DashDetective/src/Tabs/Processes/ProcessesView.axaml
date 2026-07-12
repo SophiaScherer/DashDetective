@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DashDetective.Tabs.Processes"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:ProcessesViewModel"
+             x:Class="DashDetective.Tabs.Processes.ProcessesView">
+
+    <!-- Phase 0 placeholder: establishes the tab + routing. The live process table, summary strip,
+         sortable headers, End task and Properties are built in later phases. Surfaces/typography
+         come from src/Shared/Styles. -->
+    <StackPanel Spacing="16">
+        <Border Classes="panel">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="panelTitle" Text="Processes"/>
+                <TextBlock Classes="cardSub"
+                           Text="A live, Task-Manager-style process view is under construction."/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
