@@ -8,22 +8,26 @@
              x:DataType="vm:NetworkViewModel"
              x:Class="DashDetective.Tabs.Network.NetworkView">
 
-    <!-- Phase 0 scaffold: the six-panel layout from the design comp with placeholder content.
-         Panels are filled with live data in later phases. Surfaces/typography come from
-         src/Shared/Styles. -->
+    <!-- The design comp's Network page: six panels in two rows (Adapters · IP Configuration ·
+         Throughput / Active Connections · Ping · DNS Lookup). Surfaces/typography come from
+         src/Shared/Styles; the throughput charts reuse the shared Sparkline. -->
     <!-- Monospace token is tab-local: no mono font is used elsewhere in the app yet. Promote to
          SharedStyles if a second feature needs it. Used for IP/address values that read better
-         column-aligned (IP config, connection endpoints, ping/DNS console output). -->
+         column-aligned (IP config, connection endpoints, ping/DNS console output). ConsoleBg is a
+         fixed dark terminal surface (kept dark in BOTH themes) so the fixed green/blue console text
+         stays readable — a light inset would wash it out. -->
     <UserControl.Resources>
         <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
+        <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
+        <!-- Fixed console text colours (the surface is fixed-dark in both themes, so these can't
+             follow the theme ramp or they'd vanish on the dark inset). -->
+        <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
+        <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
+        <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
+        <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.placeholder">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
-            <Setter Property="Margin" Value="0,10,0,0"/>
-        </Style>
         <!-- One IP Configuration key/value row: muted key on the left, monospace value on the right. -->
         <Style Selector="TextBlock.ipKey">
             <Setter Property="FontSize" Value="12"/>
@@ -178,12 +182,12 @@
                             <TextBlock Text="{Binding PingTarget}" FontSize="11" VerticalAlignment="Bottom"
                                        Foreground="{DynamicResource TextSubtle}" Margin="0,0,0,1"/>
                         </StackPanel>
-                        <Border Background="{DynamicResource FieldBackground}" CornerRadius="6" Padding="10">
+                        <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
                             <StackPanel Spacing="3">
                                 <TextBlock Text="{Binding PingConsole}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="#6ccb5f" TextWrapping="NoWrap"/>
+                                           FontSize="11" Foreground="{StaticResource ConsoleGreen}" TextWrapping="NoWrap"/>
                                 <TextBlock Text="{Binding PingSummary}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                                           FontSize="11" Foreground="{StaticResource ConsoleMuted}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -195,12 +199,12 @@
                             <TextBlock Text="{Binding DnsHost}" FontSize="11" VerticalAlignment="Bottom"
                                        Foreground="{DynamicResource TextSubtle}" Margin="0,0,0,1"/>
                         </StackPanel>
-                        <Border Background="{DynamicResource FieldBackground}" CornerRadius="6" Padding="10">
+                        <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
                             <StackPanel Spacing="3">
                                 <TextBlock Text="{Binding DnsConsole}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="NoWrap"/>
+                                           FontSize="11" Foreground="{StaticResource ConsoleFg}" TextWrapping="NoWrap"/>
                                 <TextBlock Text="{Binding DnsFooter}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="#4cc2ff"/>
+                                           FontSize="11" Foreground="{StaticResource ConsoleBlue}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
