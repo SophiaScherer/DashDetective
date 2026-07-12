@@ -211,7 +211,8 @@
                     <!-- Whole page scrolls, so bound the table's own scroller or it never engages. Kept
                          compact enough that the panel + pager stay on-screen in the default (non-maximized)
                          window rather than pushing the pager below the fold. -->
-                    <ScrollViewer MaxHeight="240" HorizontalScrollBarVisibility="Disabled"
+                    <ScrollViewer x:Name="ConnectionsScroller" MaxHeight="240"
+                                  HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>

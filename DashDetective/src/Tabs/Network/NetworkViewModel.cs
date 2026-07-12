@@ -277,11 +277,16 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
+    /// <summary>Raised when the user navigates to a different connections page (not on the periodic
+    /// refresh), so the view can reset the list back to the top rather than keeping the old offset.</summary>
+    public event Action? ConnectionsPageChanged;
+
     /// <summary>Pager callback: navigates to a page and re-pages immediately (so it feels instant rather
-    /// than waiting for the next poll).</summary>
+    /// than waiting for the next poll), then signals the view to scroll the list to the top.</summary>
     private void GoToPage(int page) {
         _currentPage = page < 1 ? 1 : page;
         RebuildPage();
+        ConnectionsPageChanged?.Invoke();
     }
 
     /// <summary>Slices the full list to the current page, reconciles that slice into <see cref="Connections"/>,
