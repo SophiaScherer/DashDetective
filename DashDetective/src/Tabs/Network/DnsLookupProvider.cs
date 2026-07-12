@@ -14,33 +14,37 @@ namespace DashDetective.Tabs.Network;
 public sealed record DnsResult(string Console, string Footer);
 
 /// <summary>
-/// Resolves a fixed host (matching the design comp's diagnostics panel) via the in-box
-/// <see cref="Dns"/> API, timing the lookup. A one-shot query — run at startup and on toolbar Refresh
-/// — not a live loop. A bounded <see cref="CancellationTokenSource"/> caps the wait (an untokened
-/// lookup can hang ~10 s when offline). Never throws: failure yields a "could not resolve" note.
+/// Resolves a user-supplied host via the in-box <see cref="Dns"/> API, timing the lookup. A one-shot
+/// query — run at startup, on toolbar Refresh, and whenever the user submits a new host — not a live
+/// loop. A bounded <see cref="CancellationTokenSource"/> caps the wait (an untokened lookup can hang
+/// ~10 s when offline). Never throws: failure (or a blank host) yields a "could not resolve" note.
 /// </summary>
 public static class DnsLookupProvider {
-    /// <summary>The fixed lookup host, also shown as the panel caption.</summary>
-    public const string Host = "example.com";
+    /// <summary>The default lookup host, used until the user edits the field.</summary>
+    public const string DefaultHost = "example.com";
 
     private const int TimeoutMs = 3000;
     private const int MaxAddresses = 3;
 
-    public static Task<DnsResult> GetAsync() => ResolveAsync();
+    public static Task<DnsResult> GetAsync(string host) => ResolveAsync(host);
 
-    private static async Task<DnsResult> ResolveAsync() {
+    private static async Task<DnsResult> ResolveAsync(string host) {
+        host = host?.Trim() ?? "";
+        if (host.Length == 0)
+            return Failure(host);
+
         using var cts = new CancellationTokenSource(TimeoutMs);
         var start = DateTime.UtcNow;
         try {
-            var entry = await Dns.GetHostEntryAsync(Host, cts.Token);
+            var entry = await Dns.GetHostEntryAsync(host, cts.Token);
             var elapsedMs = (long)(DateTime.UtcNow - start).TotalMilliseconds;
 
             var addresses = entry.AddressList.Take(MaxAddresses).ToList();
             if (addresses.Count == 0)
-                return Failure();
+                return Failure(host);
 
             var sb = new StringBuilder();
-            sb.Append($"Name:    {Host}");
+            sb.Append($"Name:    {host}");
             foreach (var address in addresses) {
                 sb.Append('\n');
                 sb.Append($"Address: {address}");
@@ -51,7 +55,7 @@ public static class DnsLookupProvider {
             return new DnsResult(sb.ToString(), footer);
         } catch {
             // Timeout (cancelled), SocketException (offline / NXDOMAIN), etc.
-            return Failure();
+            return Failure(host);
         }
     }
 
@@ -63,5 +67,8 @@ public static class DnsLookupProvider {
         return hasV6 ? "AAAA" : "A";
     }
 
-    private static DnsResult Failure() => new($"Name:    {Host}", $"Could not resolve {Host}");
+    private static DnsResult Failure(string host) {
+        var name = host.Length == 0 ? "(none)" : host;
+        return new DnsResult($"Name:    {name}", $"Could not resolve {name}");
+    }
 }

@@ -8,16 +8,19 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// Continuously pings a fixed host (matching the design comp's diagnostics panel) via the in-box
-/// <see cref="Ping"/> API. One <see cref="Ping"/> instance is reused across sends — the owner must
-/// serialize calls (a <see cref="Ping"/> can't run two operations at once); the Network VM does this
-/// with an in-flight guard. Keeps a rolling window of results for an average-RTT / packet-loss
-/// summary and the last few reply lines for the console-style readout. Never throws: a failed send
-/// is recorded as a timeout.
+/// Continuously pings a user-supplied host via the in-box <see cref="Ping"/> API. One
+/// <see cref="Ping"/> instance is reused across sends — the owner must serialize calls (a
+/// <see cref="Ping"/> can't run two operations at once); the Network VM does this with an in-flight
+/// guard. Keeps a rolling window of results for an average-RTT / packet-loss summary and the last
+/// few reply lines for the console-style readout. Never throws: a failed send is recorded as a
+/// timeout. The target can be changed at runtime via <see cref="SetTarget"/>, which resets the window.
 /// </summary>
 public sealed class PingMonitor : IDisposable {
-    /// <summary>The fixed ping target, also shown as the panel caption.</summary>
-    public const string Target = "8.8.8.8";
+    /// <summary>The default ping target, used until the user edits the field.</summary>
+    public const string DefaultTarget = "8.8.8.8";
+
+    /// <summary>The current ping target. Change via <see cref="SetTarget"/> so the window resets.</summary>
+    public string Target { get; private set; } = DefaultTarget;
 
     private const int TimeoutMs = 1500;
     private const int WindowSize = 20; // rolling window for avg RTT + loss %
@@ -47,22 +50,25 @@ public sealed class PingMonitor : IDisposable {
         }
     }
 
-    /// <summary>Sends one ping and folds the result into the rolling window + console lines.</summary>
+    /// <summary>Sends one ping and folds the result into the rolling window + console lines. The target
+    /// is captured at the start of the send: if <see cref="SetTarget"/> switches hosts while this ping is
+    /// in flight, the (stale) reply is discarded rather than mixed into the new host's fresh window.</summary>
     public async Task SendAsync() {
+        var target = Target;
         string line;
         var ok = false;
         long rtt = 0;
 
         try {
-            var reply = await _ping.SendPingAsync(Target, TimeoutMs);
+            var reply = await _ping.SendPingAsync(target, TimeoutMs);
             if (reply.Status == IPStatus.Success) {
                 ok = true;
                 rtt = reply.RoundtripTime;
                 // Options (and thus TTL) can be null on some stacks / failure paths — omit TTL then.
                 var ttl = reply.Options?.Ttl;
                 line = ttl.HasValue
-                    ? $"Reply from {Target}: time={Format(rtt)}ms TTL={ttl.Value.ToString(CultureInfo.InvariantCulture)}"
-                    : $"Reply from {Target}: time={Format(rtt)}ms";
+                    ? $"Reply from {target}: time={Format(rtt)}ms TTL={ttl.Value.ToString(CultureInfo.InvariantCulture)}"
+                    : $"Reply from {target}: time={Format(rtt)}ms";
             } else {
                 line = "Request timed out.";
             }
@@ -71,10 +77,27 @@ public sealed class PingMonitor : IDisposable {
             line = "Request timed out.";
         }
 
+        // The user switched targets while this ping was in flight — drop it so the new host's window
+        // (already cleared by SetTarget) isn't contaminated by the old host's result.
+        if (target != Target)
+            return;
+
         Push(_lines, line, LineCount);
         Push(_results, ok, WindowSize);
         if (ok)
             Push(_rtts, rtt, WindowSize);
+    }
+
+    /// <summary>Switches to a new target and clears the rolling window + console lines, so the avg/loss
+    /// summary and reply history don't carry over from the previous host. A blank value is ignored.</summary>
+    public void SetTarget(string target) {
+        target = target?.Trim() ?? "";
+        if (target.Length == 0)
+            return;
+        Target = target;
+        _results.Clear();
+        _rtts.Clear();
+        _lines.Clear();
     }
 
     private static string Format(long rtt) =>

@@ -23,8 +23,10 @@ public sealed record ConnectionsSnapshot(IReadOnlyList<ConnectionInfo> Rows, int
 /// calls never overlap.
 /// </summary>
 public static class ConnectionsProvider {
-    /// <summary>Upper bound on rows returned, so a machine with thousands of sockets can't bloat the UI.</summary>
-    public const int MaxRows = 100;
+    /// <summary>Safety ceiling on rows returned, so a machine with a pathological number of sockets
+    /// can't bloat memory. Well above the UI's max page size (150) — the VM pages the full set
+    /// client-side, only ever binding one page at a time — so this is a backstop, not the display cap.</summary>
+    public const int MaxRows = 1000;
 
     private static readonly Dictionary<int, string> NameCache = new();
 
