@@ -17,10 +17,11 @@ namespace DashDetective.Tabs.Network;
 /// implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
 /// (toolbar Live pill) and <see cref="IDisposable"/>.
 ///
-/// Throughput mirrors the Dashboard's sampler + 1 Hz timer + 60-sample rolling-buffer pattern, but
-/// the design comp shows download and upload as TWO stacked charts, so each series keeps its OWN
-/// dynamic scale (<see cref="DownYMax"/>/<see cref="UpYMax"/>) rather than the Dashboard's single
-/// shared scale. Other panels (adapters, connections, ping, DNS) are wired in later phases.
+/// Throughput mirrors the Dashboard's sampler + 1 Hz timer + 60-sample rolling-buffer pattern. The
+/// design comp shows download and upload as TWO stacked charts, but they share ONE dynamic scale
+/// (<see cref="ThroughputYMax"/>, the peak of both windows) so their heights are directly comparable
+/// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
+/// connections, ping, DNS) are wired in later phases.
 /// </summary>
 public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
@@ -56,8 +57,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     [ObservableProperty] private string _upText = "0";
     [ObservableProperty] private string _downPoints = "";
     [ObservableProperty] private string _upPoints = "";
-    [ObservableProperty] private double _downYMax = MinScaleMbps;
-    [ObservableProperty] private double _upYMax = MinScaleMbps;
+
+    /// <summary>Shared upper bound for BOTH charts, so equal pixel height means equal Mbps.</summary>
+    [ObservableProperty] private double _throughputYMax = MinScaleMbps;
+
+    /// <summary>The shared scale as a caption (e.g. "peak 12 Mbps"), so the ceiling is visible.</summary>
+    [ObservableProperty] private string _throughputScaleText = "";
 
     /// <summary>The machine's network adapters (physical + virtual), for the Adapters panel.</summary>
     public ObservableCollection<AdapterInfo> Adapters { get; } = new();
@@ -146,28 +151,32 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>
-    /// Updates both readouts and both sparkline series. Unlike the Dashboard's single shared scale,
-    /// download and upload each auto-fit to their OWN 60-second window (the comp draws them as two
-    /// separate stacked charts), with headroom and a floor.
+    /// Updates both readouts and both sparkline series. Download and upload share ONE scale — the peak
+    /// of both 60-second windows plus headroom (the comp draws them as two stacked charts, but an honest
+    /// comparison needs a common axis) — so a larger rate always draws taller regardless of direction.
     /// </summary>
     private void UpdateThroughput(NetworkSample sample) {
         DownText = FormatMbps(sample.DownMbps);
         UpText = FormatMbps(sample.UpMbps);
 
-        DownYMax = ComputeScale(_downHistory);
-        UpYMax = ComputeScale(_upHistory);
-        DownPoints = BuildPoints(_downHistory, DownYMax);
-        UpPoints = BuildPoints(_upHistory, UpYMax);
+        ThroughputYMax = ComputeScale(Math.Max(Peak(_downHistory), Peak(_upHistory)));
+        ThroughputScaleText = $"peak {FormatMbps(ThroughputYMax)} Mbps";
+        DownPoints = BuildPoints(_downHistory, ThroughputYMax);
+        UpPoints = BuildPoints(_upHistory, ThroughputYMax);
     }
 
-    /// <summary>Upper bound for one series: its largest sample plus ~15 % headroom so the peak line
-    /// doesn't touch the top edge, clamped to <see cref="MinScaleMbps"/>.</summary>
-    private static double ComputeScale(double[] history) {
+    /// <summary>Largest sample in a rolling window.</summary>
+    private static double Peak(double[] history) {
         var max = 0.0;
         for (var i = 0; i < history.Length; i++)
             if (history[i] > max) max = history[i];
+        return max;
+    }
 
-        var scaled = max * 1.15;
+    /// <summary>Upper bound for the shared axis: the peak plus ~15 % headroom so the top line doesn't
+    /// touch the edge, clamped to <see cref="MinScaleMbps"/>.</summary>
+    private static double ComputeScale(double peak) {
+        var scaled = peak * 1.15;
         return scaled > MinScaleMbps ? scaled : MinScaleMbps;
     }
 

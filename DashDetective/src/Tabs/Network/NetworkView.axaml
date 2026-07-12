@@ -111,24 +111,31 @@
             <Border Grid.Column="2" Classes="panel">
                 <StackPanel Spacing="10">
                     <TextBlock Classes="panelTitle" Text="Throughput"/>
-                    <StackPanel Orientation="Horizontal" Spacing="18">
-                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                            <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
-                            <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                            <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                    <!-- Both charts share one Y axis (ThroughputYMax), so their heights must match too:
+                         equal Mbps must map to equal pixels for the comparison to be honest. The peak
+                         caption on the right makes the shared ceiling legible. -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="18">
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                                <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
+                                <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
+                                <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
+                                <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                            </StackPanel>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                            <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
-                            <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                            <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <controls:Sparkline Height="70" Fill="True"
+                        <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="11"
+                                   VerticalAlignment="Bottom" Foreground="{DynamicResource TextSubtle}"/>
+                    </Grid>
+                    <controls:Sparkline Height="65" Fill="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding DownPoints}"
-                                        YMin="0" YMax="{Binding DownYMax}"/>
-                    <controls:Sparkline Height="60" Fill="True"
+                                        YMin="0" YMax="{Binding ThroughputYMax}"/>
+                    <controls:Sparkline Height="65" Fill="True"
                                         Stroke="{DynamicResource ChartNetUp}" Points="{Binding UpPoints}"
-                                        YMin="0" YMax="{Binding UpYMax}"/>
+                                        YMin="0" YMax="{Binding ThroughputYMax}"/>
                 </StackPanel>
             </Border>
         </Grid>
