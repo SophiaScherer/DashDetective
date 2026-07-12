@@ -47,6 +47,35 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
+        <!-- Compact editable field (Ping/DNS targets) + its submit button. This is the app's first
+             bound text input; it mirrors the toolbar search field's surface tokens. -->
+        <Style Selector="Border.field">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Height" Value="30"/>
+        </Style>
+        <Style Selector="Border.field TextBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="9,0"/>
+        </Style>
+        <Style Selector="Button.go">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.go:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
+        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -184,11 +213,20 @@
             <StackPanel Grid.Column="1" Spacing="12">
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Classes="panelTitle" Text="Ping"/>
-                            <TextBlock Text="{Binding PingTarget}" FontSize="11" VerticalAlignment="Bottom"
-                                       Foreground="{DynamicResource TextSubtle}" Margin="0,0,0,1"/>
-                        </StackPanel>
+                        <TextBlock Classes="panelTitle" Text="Ping"/>
+                        <!-- Editable target: Enter or the button applies it (resets the rolling stats). -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <Border Grid.Column="0" Classes="field">
+                                <TextBox Text="{Binding PingTarget, Mode=TwoWay}"
+                                         PlaceholderText="Host or IP to ping">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ApplyPingTargetCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                            <Button Grid.Column="1" Classes="go" Content="Ping"
+                                    Command="{Binding ApplyPingTargetCommand}"/>
+                        </Grid>
                         <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
                             <StackPanel Spacing="3">
                                 <TextBlock Text="{Binding PingConsole}" FontFamily="{StaticResource MonoFont}"
@@ -201,11 +239,20 @@
                 </Border>
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Classes="panelTitle" Text="DNS Lookup"/>
-                            <TextBlock Text="{Binding DnsHost}" FontSize="11" VerticalAlignment="Bottom"
-                                       Foreground="{DynamicResource TextSubtle}" Margin="0,0,0,1"/>
-                        </StackPanel>
+                        <TextBlock Classes="panelTitle" Text="DNS Lookup"/>
+                        <!-- Editable host: Enter or the button re-resolves it. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                            <Border Grid.Column="0" Classes="field">
+                                <TextBox Text="{Binding DnsHost, Mode=TwoWay}"
+                                         PlaceholderText="Host name to resolve">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding LookupDnsCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                            <Button Grid.Column="1" Classes="go" Content="Look up"
+                                    Command="{Binding LookupDnsCommand}"/>
+                        </Grid>
                         <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
                             <StackPanel Spacing="3">
                                 <TextBlock Text="{Binding DnsConsole}" FontFamily="{StaticResource MonoFont}"

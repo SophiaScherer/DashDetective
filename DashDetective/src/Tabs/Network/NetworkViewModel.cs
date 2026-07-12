@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
 using DashDetective.Shared;
 
@@ -76,8 +77,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Count caption for the connections panel header (e.g. "42 active").</summary>
     [ObservableProperty] private string _connectionsSummary = "";
 
-    /// <summary>The ping target, shown as the Ping panel caption.</summary>
-    public string PingTarget => PingMonitor.Target;
+    /// <summary>The ping target, editable in the Ping panel. Applied via <see cref="ApplyPingTargetCommand"/>.</summary>
+    [ObservableProperty] private string _pingTarget = PingMonitor.DefaultTarget;
 
     /// <summary>Console-style ping output (last few reply lines).</summary>
     [ObservableProperty] private string _pingConsole = "";
@@ -85,8 +86,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Rolling average-RTT / packet-loss summary line.</summary>
     [ObservableProperty] private string _pingSummary = "";
 
-    /// <summary>The DNS lookup host, shown as the DNS panel caption.</summary>
-    public string DnsHost => DnsLookupProvider.Host;
+    /// <summary>The DNS lookup host, editable in the DNS panel. Applied via <see cref="LookupDnsCommand"/>.</summary>
+    [ObservableProperty] private string _dnsHost = DnsLookupProvider.DefaultHost;
 
     /// <summary>Console-style DNS output (name + resolved addresses).</summary>
     [ObservableProperty] private string _dnsConsole = "";
@@ -318,14 +319,30 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
     private async Task LoadDnsAsync() {
         try {
-            var result = await DnsLookupProvider.GetAsync();
+            var result = await DnsLookupProvider.GetAsync(DnsHost);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
             DnsConsole = result.Console;
             DnsFooter = result.Footer;
         } catch {
-            DnsConsole = $"Name:    {DnsLookupProvider.Host}";
-            DnsFooter = $"Could not resolve {DnsLookupProvider.Host}";
+            DnsConsole = $"Name:    {DnsHost}";
+            DnsFooter = $"Could not resolve {DnsHost}";
         }
+    }
+
+    /// <summary>Re-runs the DNS lookup for the host currently in the field (Enter / the Look up button).</summary>
+    [RelayCommand]
+    private void LookupDns() => _ = LoadDnsAsync();
+
+    /// <summary>Applies the ping target in the field: switches the monitor (resetting its rolling
+    /// window), clears the console readout, and sends one ping so the panel updates immediately.</summary>
+    [RelayCommand]
+    private void ApplyPingTarget() {
+        _pingMonitor.SetTarget(PingTarget);
+        // Reflect any normalisation (trim/blank-ignored) back into the field.
+        PingTarget = _pingMonitor.Target;
+        PingConsole = "";
+        PingSummary = "";
+        _ = RunPingAsync();
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read, ping and
