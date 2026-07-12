@@ -37,13 +37,20 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// counter, so it polls slower than the 1 Hz throughput sampler.</summary>
     private static readonly TimeSpan ConnectionsInterval = TimeSpan.FromSeconds(2.5);
 
+    /// <summary>Cadence for the ping diagnostics (one ping every couple of seconds, like a console
+    /// <c>ping -t</c>). Longer than the 1.5 s ping timeout so sends never overlap.</summary>
+    private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(2);
+
     private readonly NetworkUsageSampler _networkSampler = new();
     private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly DispatcherTimer _networkTimer;
     private readonly DispatcherTimer _adapterTimer;
     private readonly DispatcherTimer _connectionsTimer;
+    private readonly DispatcherTimer _pingTimer;
+    private readonly PingMonitor _pingMonitor = new();
     private bool _connectionsInFlight;
+    private bool _pingInFlight;
 
     [ObservableProperty] private string _downText = "0";
     [ObservableProperty] private string _upText = "0";
@@ -63,6 +70,15 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Count caption for the connections panel header (e.g. "42 active").</summary>
     [ObservableProperty] private string _connectionsSummary = "";
+
+    /// <summary>The ping target, shown as the Ping panel caption.</summary>
+    public string PingTarget => PingMonitor.Target;
+
+    /// <summary>Console-style ping output (last few reply lines).</summary>
+    [ObservableProperty] private string _pingConsole = "";
+
+    /// <summary>Rolling average-RTT / packet-loss summary line.</summary>
+    [ObservableProperty] private string _pingSummary = "";
 
     public NetworkViewModel() {
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
@@ -86,6 +102,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _connectionsTimer = new DispatcherTimer { Interval = ConnectionsInterval };
         _connectionsTimer.Tick += OnConnectionsTick;
         _connectionsTimer.Start();
+
+        // Ping the fixed target continuously; kick one off now so the panel isn't blank on arrival.
+        _ = RunPingAsync();
+
+        _pingTimer = new DispatcherTimer { Interval = PingInterval };
+        _pingTimer.Tick += OnPingTick;
+        _pingTimer.Start();
     }
 
     private void OnNetworkTick(object? sender, EventArgs e) {
@@ -250,12 +273,33 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read and connections re-read. Runs
-    /// even while paused (a manual refresh should still update once), matching the Dashboard.</summary>
+    private void OnPingTick(object? sender, EventArgs e) => _ = RunPingAsync();
+
+    /// <summary>Sends one ping off the UI thread and publishes the console + summary text. Guarded so
+    /// sends never overlap (a <see cref="PingMonitor"/> can't run two at once) and never throws.</summary>
+    private async Task RunPingAsync() {
+        if (_pingInFlight)
+            return;
+        _pingInFlight = true;
+        try {
+            await _pingMonitor.SendAsync();
+            // SendAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
+            PingConsole = _pingMonitor.ConsoleText;
+            PingSummary = _pingMonitor.SummaryText;
+        } catch {
+            // SendAsync already soft-fails; nothing further to do.
+        } finally {
+            _pingInFlight = false;
+        }
+    }
+
+    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read and ping.
+    /// Runs even while paused (a manual refresh should still update once), matching the Dashboard.</summary>
     public void Refresh() {
         OnNetworkTick(this, EventArgs.Empty);
         _ = LoadAdaptersAsync();
         _ = LoadConnectionsAsync();
+        _ = RunPingAsync();
     }
 
     /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
@@ -265,15 +309,17 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _networkTimer.Start();
             _adapterTimer.Start();
             _connectionsTimer.Start();
+            _pingTimer.Start();
         } else {
             _networkTimer.Stop();
             _adapterTimer.Stop();
             _connectionsTimer.Stop();
+            _pingTimer.Stop();
         }
     }
 
-    /// <summary>Stops the timers. Safe to call more than once. The network sampler is fully managed,
-    /// so it needs no disposal.</summary>
+    /// <summary>Stops the timers and disposes the ping monitor. Safe to call more than once. The
+    /// network sampler is fully managed, so it needs no disposal.</summary>
     public void Dispose() {
         _networkTimer.Stop();
         _networkTimer.Tick -= OnNetworkTick;
@@ -281,5 +327,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _adapterTimer.Tick -= OnAdapterTick;
         _connectionsTimer.Stop();
         _connectionsTimer.Tick -= OnConnectionsTick;
+        _pingTimer.Stop();
+        _pingTimer.Tick -= OnPingTick;
+        _pingMonitor.Dispose();
     }
 }
