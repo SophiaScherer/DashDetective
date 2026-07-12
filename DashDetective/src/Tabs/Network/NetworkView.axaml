@@ -37,6 +37,12 @@
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <!-- Uppercase muted column header for the connections table. -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -46,31 +52,37 @@
             <Border Grid.Column="0" Classes="panel">
                 <StackPanel Spacing="8">
                     <TextBlock Classes="panelTitle" Text="Adapters"/>
-                    <ItemsControl ItemsSource="{Binding Adapters}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:AdapterInfo">
-                                <Border BorderBrush="{DynamicResource RowLine}"
-                                        BorderThickness="0,0,0,1" Padding="0,9">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                        <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"
-                                                 Fill="{Binding DotBrush}"/>
-                                        <StackPanel Grid.Column="1" Margin="11,0,8,0" Spacing="1">
-                                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium"
-                                                       Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Description}" FontSize="11"
-                                                       Foreground="{DynamicResource TextSubtle}" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
-                                            <TextBlock Text="{Binding StatusText}" FontSize="11.5" TextAlignment="Right"
-                                                       Foreground="{Binding StatusBrush}"/>
-                                            <TextBlock Text="{Binding SpeedText}" FontSize="11" TextAlignment="Right"
-                                                       Foreground="{DynamicResource TextSubtle}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
+                         a machine with many adapters doesn't push the rest of the page off-screen. -->
+                    <ScrollViewer MaxHeight="188"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Adapters}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AdapterInfo">
+                                    <Border BorderBrush="{DynamicResource RowLine}"
+                                            BorderThickness="0,0,0,1" Padding="0,9">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"
+                                                     Fill="{Binding DotBrush}"/>
+                                            <StackPanel Grid.Column="1" Margin="11,0,8,0" Spacing="1">
+                                                <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium"
+                                                           Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Description}" FontSize="11"
+                                                           Foreground="{DynamicResource TextSubtle}" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding StatusText}" FontSize="11.5" TextAlignment="Right"
+                                                           Foreground="{Binding StatusBrush}"/>
+                                                <TextBlock Text="{Binding SpeedText}" FontSize="11" TextAlignment="Right"
+                                                           Foreground="{DynamicResource TextSubtle}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="panel">
@@ -120,9 +132,42 @@
         <!-- ===== Row 2: Active Connections · (Ping + DNS) ===== -->
         <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
             <Border Grid.Column="0" Classes="panel">
-                <StackPanel>
-                    <TextBlock Classes="panelTitle" Text="Active Connections"/>
-                    <TextBlock Classes="placeholder" Text="TCP / UDP connections"/>
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ConnectionsSummary}" FontSize="11"
+                                   VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
+                    </Grid>
+                    <!-- Column header -->
+                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Margin="0,0,0,2">
+                        <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
+                        <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
+                        <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
+                        <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
+                    </Grid>
+                    <!-- Whole page scrolls, so bound the table's own scroller or it never engages. -->
+                    <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Connections}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ConnectionRow">
+                                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Height="30">
+                                        <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="11.5"
+                                                   FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSubtle}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="11.5"
+                                                   VerticalAlignment="Center" Foreground="{Binding StateBrush}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="11.5"
+                                                   VerticalAlignment="Center" TextAlignment="Right"
+                                                   Foreground="{DynamicResource TextMuted}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </StackPanel>
             </Border>
             <StackPanel Grid.Column="1" Spacing="12">
