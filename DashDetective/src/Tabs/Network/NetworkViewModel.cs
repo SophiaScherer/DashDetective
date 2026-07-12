@@ -80,6 +80,15 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Rolling average-RTT / packet-loss summary line.</summary>
     [ObservableProperty] private string _pingSummary = "";
 
+    /// <summary>The DNS lookup host, shown as the DNS panel caption.</summary>
+    public string DnsHost => DnsLookupProvider.Host;
+
+    /// <summary>Console-style DNS output (name + resolved addresses).</summary>
+    [ObservableProperty] private string _dnsConsole = "";
+
+    /// <summary>DNS footer line (timing + record type, or a failure note).</summary>
+    [ObservableProperty] private string _dnsFooter = "";
+
     public NetworkViewModel() {
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
         // samples then shift in from the right, one per second.
@@ -109,6 +118,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _pingTimer = new DispatcherTimer { Interval = PingInterval };
         _pingTimer.Tick += OnPingTick;
         _pingTimer.Start();
+
+        // DNS is a one-shot lookup (not a live loop): resolve once now, and again on Refresh.
+        _ = LoadDnsAsync();
     }
 
     private void OnNetworkTick(object? sender, EventArgs e) {
@@ -293,13 +305,28 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read and ping.
-    /// Runs even while paused (a manual refresh should still update once), matching the Dashboard.</summary>
+    /// <summary>Reads the DNS lookup off the UI thread and publishes the console + footer text. The
+    /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
+    private async Task LoadDnsAsync() {
+        try {
+            var result = await DnsLookupProvider.GetAsync();
+            // Awaited on the UI thread, so the continuation resumes there — safe to bind.
+            DnsConsole = result.Console;
+            DnsFooter = result.Footer;
+        } catch {
+            DnsConsole = $"Name:    {DnsLookupProvider.Host}";
+            DnsFooter = $"Could not resolve {DnsLookupProvider.Host}";
+        }
+    }
+
+    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read, ping and
+    /// DNS re-lookup. Runs even while paused (a manual refresh should still update once), like the Dashboard.</summary>
     public void Refresh() {
         OnNetworkTick(this, EventArgs.Empty);
         _ = LoadAdaptersAsync();
         _ = LoadConnectionsAsync();
         _ = RunPingAsync();
+        _ = LoadDnsAsync();
     }
 
     /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
