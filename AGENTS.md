@@ -30,6 +30,7 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - `Dashboard`
 - `Settings`
 - `File Explorer`
+- `Network`
 
 **Implementation status within the active features:**
 
@@ -175,8 +176,46 @@ Not all of these exist yet. Only build what is listed below as "currently active
   collapses at the window's 920 px minimum. Widths are **session-only — they reset to the defaults each
   launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
   styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
+- **Network** — **live and functional** (built in phases; plan:
+  `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
+  Network page: six panels in two rows. The tab is always-on like the Dashboard (VM constructed once
+  in `MainWindowViewModel`), reuses the shared `Sparkline`, and adds **no new NuGet packages** (all
+  in-box: `System.Net.NetworkInformation`, `System.Net.NetworkInformation.Ping`, `System.Net.Dns`,
+  and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File Explorer and
+  Settings. Panels:
+  - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
+    (green connected / blue virtual / grey disconnected), status and link speed, via
+    `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
+    height-capped and scrolls so many adapters don't push the page down.
+  - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
+    from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
+  - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
+    scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
+    `NetworkUsageSampler` instance on a 1 Hz timer.
+  - **Active Connections** — netstat-style TCP+UDP table (Process · Remote · State · Protocol) with
+    owning process names, via feature-local `iphlpapi` P/Invoke (`ConnectionsInterop` →
+    `GetExtendedTcpTable`/`GetExtendedUdpTable`, IPv4 OWNER_PID tables) on a 2.5 s timer. Rows are
+    **keyed-diffed** in place (no flicker); de-duplicated by identity key in `ConnectionsProvider`
+    (two UDP sockets can share PID+local endpoint, which would otherwise break the diff), sorted,
+    **capped at 100** with an honest "N active · showing 100" caption. PID→name is cached with
+    stale-PID eviction; inaccessible/exited PIDs fall back to "PID n"; 0/4 → "System Idle"/"System".
+  - **Ping** — continuous ping to a fixed `8.8.8.8` (in-box `Ping`, 2 s timer, 1.5 s timeout,
+    in-flight-guarded), console-style last-3 replies + rolling avg-RTT / loss summary (`PingMonitor`).
+  - **DNS Lookup** — one-shot resolve of a fixed `example.com` (in-box `Dns.GetHostEntryAsync`, 3 s
+    `CancellationTokenSource`), run at startup and on Refresh (not a live loop), console-style output
+    with record type (`DnsLookupProvider`).
 
-**Everything else (Processes, Performance, Network, Storage, Hardware) is
+  Cross-cutting seams this tab added (both signed-off): the throughput sampler was **moved** from
+  `src/Tabs/Dashboard` to **`src/Services/Network`** (see *Folder Structure*) so Dashboard and Network
+  share it, and a new marker interface **`ILiveSamplingPage`** (`src/Shared`) lets the toolbar **Live**
+  pill pause/resume every sampling page — `MainWindowViewModel.ToggleLive` now routes through it over
+  `Nav.NavItems` (Dashboard + Network) instead of calling the Dashboard directly. Toolbar **Refresh**
+  routes through the existing `IRefreshablePage` (re-samples throughput, re-reads adapters/connections,
+  re-pings, re-resolves DNS). The ping/DNS console insets use a **fixed dark surface + fixed text
+  colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
+  IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
+
+**Everything else (Processes, Performance, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
@@ -260,6 +299,9 @@ currently exist.
                                the shell must NOT wrap it in a scroll region — see File Explorer)
       IRefreshablePage.cs     (marker: a page the toolbar Refresh routes to; Refresh() re-reads its
                                data — Dashboard re-samples, File Explorer reloads the current folder)
+      ILiveSamplingPage.cs    (marker: a page with live sampling the toolbar Live pill pauses/resumes;
+                               MainWindowViewModel.ToggleLive routes SetLive() over every nav page —
+                               Dashboard + Network)
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
@@ -280,6 +322,14 @@ currently exist.
         ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+      /Network
+        NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
+                                 adapter — internet-facing, has a default gateway — NOT a sum of all
+                                 adapters, see the gotcha below. Shared: Dashboard and the Network tab
+                                 each own an instance, and the Network tab's AdapterInfoProvider reuses
+                                 SelectPrimary() to identify the primary adapter — one source of truth.
+                                 Moved here from src/Tabs/Dashboard with sign-off when the Network tab
+                                 was activated.)
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
                                 (MainWindow's root is a DockPanel hosting the NavigationView at the
@@ -311,10 +361,8 @@ currently exist.
                                 GpuStaticInfo.cs        (record for the WMI result)
                                 StorageUsageSampler.cs  (live disk Active time % via PDH PhysicalDisk
                                                          counters; capacity caption uses DriveInfo, no WMI)
-                                NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface;
-                                                         samples ONE primary adapter — internet-facing,
-                                                         has a default gateway — NOT a sum of all adapters,
-                                                         see note below)
+                                (NetworkUsageSampler.cs is now under src/Services/Network — shared with
+                                 the Network tab; the Dashboard VM still owns its own instance)
                                 SystemInfoProvider.cs   (static system identity — OS/device/BIOS/board/build —
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
@@ -346,7 +394,31 @@ currently exist.
                                 FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
                                 ShellInterop.cs         (feature-local shell32 P/Invoke:
                                                          SHGetFileInfo type name + SHObjectProperties)
-      (Processes, Performance, Network, Storage, Hardware — not yet started)
+      /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
+                                                        (VM implements IRefreshablePage + ILiveSamplingPage;
+                                                         always-on like Dashboard. Owns the throughput
+                                                         sampler + adapter/connection/ping/DNS timers and
+                                                         the keyed-diff for the connections list. Tab-local
+                                                         MonoFont + fixed console-colour resources live in
+                                                         the view — promote to Shared if reused)
+                                AdapterInfoProvider.cs  (async snapshot: all adapters + primary IP config
+                                                         via managed NetworkInterface; SystemInfoProvider
+                                                         pattern, per-adapter/field soft-fail)
+                                AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
+                                IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
+                                ConnectionsInterop.cs   (feature-local iphlpapi P/Invoke:
+                                                         GetExtendedTcpTable/GetExtendedUdpTable, IPv4
+                                                         OWNER_PID tables; port byte-order swap. IPv6 deferred)
+                                ConnectionsProvider.cs  (TCP+UDP snapshot off the UI thread; PID→name cache
+                                                         with stale eviction; de-dupe by key; sort; cap 100)
+                                ConnectionInfo.cs       (record + composite identity Key)
+                                ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
+                                                         reused across polls via the keyed diff)
+                                PingMonitor.cs          (reused in-box Ping to 8.8.8.8; rolling avg/loss +
+                                                         last-3 lines; soft-fails to a timeout)
+                                DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
+                                                         3 s CTS; record type by address family)
+      (Processes, Performance, Storage, Hardware — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
@@ -407,9 +479,12 @@ Rules of thumb:
 
 Beyond Avalonia + `CommunityToolkit.Mvvm`, the project references **`System.Management`**
 (added for the live-CPU work, with user approval) — it provides WMI access (`Win32_Processor`,
-`Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. The live-Network work added
-**no** new package — it uses the in-box `System.Net.NetworkInformation`. Adding any *new* package
-still requires asking first (see Strict Working Boundaries).
+`Win32_PhysicalMemory`, etc.). Reuse it for future hardware queries. The live-Network work (Dashboard
+throughput **and** the full Network tab) added **no** new package — it uses the in-box
+`System.Net.NetworkInformation` (throughput + adapters/IP), `System.Net.NetworkInformation.Ping`,
+`System.Net.Dns`, and `iphlpapi` P/Invoke for the connections table (feature-local `ConnectionsInterop`,
+like File Explorer's `ShellInterop`). Adding any *new* package still requires asking first (see Strict
+Working Boundaries).
 
 The System Information work reads the **registry** via the `Microsoft.Win32.Registry` API (build
 revision + feature-update label). On the `net10.0` target this API is **provided in-box — no package

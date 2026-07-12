@@ -3,7 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 
-namespace DashDetective.Tabs.Dashboard;
+namespace DashDetective.Services.Network;
 
 /// <summary>
 /// A single network-throughput snapshot: download and upload rates in megabits per second (Mbps).
@@ -21,6 +21,11 @@ public readonly record struct NetworkSample(double DownMbps, double UpMbps);
 /// adapters (Hyper-V, VirtualBox, WFP, …) that mirror the physical NIC's counters, so summing them
 /// multi-counts the same traffic (observed ~8× inflation). A single primary adapter matches what
 /// Task Manager reports per connection. No native dependencies; fails soft to zero.
+///
+/// Lives under <c>src/Services/Network</c> (not a tab folder) because it is shared: the Dashboard's
+/// throughput surfaces and the Network tab both sample through it, and the Network tab's
+/// adapter/IP provider reuses <see cref="SelectPrimary"/> to identify the primary adapter — so the
+/// adapter-filtering / primary-selection logic lives in exactly one place.
 /// </summary>
 public sealed class NetworkUsageSampler {
     private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -108,8 +113,11 @@ public sealed class NetworkUsageSampler {
     /// Picks the internet-facing adapter: from the operational, non-loopback/tunnel adapters, prefer
     /// those advertising a usable default gateway (which excludes most virtual/host-only adapters),
     /// then take the busiest by cumulative bytes. Falls back to the busiest overall if none are routed.
+    ///
+    /// <c>internal</c> so the Network tab's adapter/IP provider can identify the same primary adapter
+    /// without duplicating this selection logic.
     /// </summary>
-    private static NetworkInterface? SelectPrimary() {
+    internal static NetworkInterface? SelectPrimary() {
         var active = NetworkInterface.GetAllNetworkInterfaces()
             .Where(static a =>
                 a.OperationalStatus == OperationalStatus.Up &&
@@ -137,8 +145,9 @@ public sealed class NetworkUsageSampler {
         }
     }
 
-    /// <summary>True if the adapter advertises a real default gateway (not the unspecified 0.0.0.0/::).</summary>
-    private static bool HasUsableGateway(NetworkInterface a) {
+    /// <summary>True if the adapter advertises a real default gateway (not the unspecified 0.0.0.0/::).
+    /// <c>internal</c> for reuse by the Network tab's adapter classification.</summary>
+    internal static bool HasUsableGateway(NetworkInterface a) {
         try {
             foreach (var g in a.GetIPProperties().GatewayAddresses) {
                 var addr = g.Address;

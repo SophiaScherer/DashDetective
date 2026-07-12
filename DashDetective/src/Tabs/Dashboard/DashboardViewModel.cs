@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Network;
 using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Dashboard;
@@ -14,7 +15,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// View model for the Dashboard page. Currently drives the live CPU surfaces; the other
 /// metrics remain static placeholders in the view until they are implemented.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, IDisposable {
+public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 

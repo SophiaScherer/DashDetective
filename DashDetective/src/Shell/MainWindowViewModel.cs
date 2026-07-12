@@ -9,6 +9,7 @@ using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
+using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Settings;
 
 namespace DashDetective.Shell;
@@ -20,6 +21,7 @@ public partial class MainWindowViewModel : ViewModelBase {
     private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard = new();
     private readonly FileExplorerViewModel _fileExplorer = new();
+    private readonly NetworkViewModel _network = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
@@ -62,6 +64,8 @@ public partial class MainWindowViewModel : ViewModelBase {
                         Icons.Dashboard, _dashboard, Nav.Navigate),
             new NavItem("File Explorer", "File Explorer", "Browse files and folders",
                         Icons.FileExplorer, _fileExplorer, Nav.Navigate),
+            new NavItem("Network", "Network", "Adapters, connections & diagnostics",
+                        Icons.Network, _network, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });
@@ -89,11 +93,14 @@ public partial class MainWindowViewModel : ViewModelBase {
         OnPropertyChanged(nameof(LiveDotBrush));
     }
 
-    /// <summary>Pauses/resumes all live metric sampling on the Dashboard.</summary>
+    /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
+    /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
+    /// is needed here.</summary>
     [RelayCommand]
     private void ToggleLive() {
         IsLive = !IsLive;
-        _dashboard.SetLive(IsLive);
+        foreach (var item in Nav.NavItems)
+            (item.Page as ILiveSamplingPage)?.SetLive(IsLive);
     }
 
     /// <summary>Refreshes whichever page is current: the Dashboard re-samples its metrics, the File
