@@ -12,15 +12,32 @@
          The shared 8-column layout is repeated on the header and each row (like the Network and File
          Explorer tables). Disk/GPU arrive in a later phase; Network is deferred, so those cells show "—". -->
     <UserControl.Styles>
-        <!-- Column header cells. -->
+        <!-- Column header cells. Each is a chrome-less button that sorts by its column; the active
+             column tints to the accent and shows a ↑/↓ arrow (bound to the ProcessSortColumn VMs). -->
         <Style Selector="TextBlock.colHead">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
-        <Style Selector="TextBlock.colHead.num">
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="TextAlignment" Value="Right"/>
+        <Style Selector="TextBlock.colHead.active">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="TextBlock.sortArrow">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <!-- Chrome-less button wrapper so a whole header cell is clickable (as in File Explorer). -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
@@ -119,18 +136,67 @@
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
 
-            <!-- Sticky column header -->
+            <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
+                 the label; right-aligned numeric columns put it before, so it always sits inward. -->
             <Border Grid.Row="0" Padding="16,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
                 <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
-                    <TextBlock Grid.Column="0" Classes="colHead" Text="NAME"/>
-                    <TextBlock Grid.Column="1" Classes="colHead" Text="PID"/>
-                    <TextBlock Grid.Column="2" Classes="colHead" Text="STATUS"/>
-                    <TextBlock Grid.Column="3" Classes="colHead num" Text="CPU"/>
-                    <TextBlock Grid.Column="4" Classes="colHead num" Text="MEMORY"/>
-                    <TextBlock Grid.Column="5" Classes="colHead num" Text="DISK"/>
-                    <TextBlock Grid.Column="6" Classes="colHead num" Text="NET"/>
-                    <TextBlock Grid.Column="7" Classes="colHead num" Text="GPU"/>
+                    <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding NameSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding NameSort.IsActive}" Text="NAME"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding NameSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding PidSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding PidSort.IsActive}" Text="PID"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding PidSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding StatusSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding StatusSort.IsActive}" Text="STATUS"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding StatusSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding CpuSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding CpuSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding CpuSort.IsActive}" Text="CPU"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="4" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding MemorySort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding MemorySort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding MemorySort.IsActive}" Text="MEMORY"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="5" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding DiskSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding DiskSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding DiskSort.IsActive}" Text="DISK"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="6" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding NetworkSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding NetworkSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding NetworkSort.IsActive}" Text="NET"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="7" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding GpuSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding GpuSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding GpuSort.IsActive}" Text="GPU"/>
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </Border>
 

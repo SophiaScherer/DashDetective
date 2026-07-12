@@ -37,11 +37,31 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly CpuUsageSampler _cpuSampler = new();
     private readonly MemoryUsageSampler _memorySampler = new();
 
+    // Sort state: which column + direction. Sorting applies within each group; Apps stay above
+    // Background. Defaults to Name ascending (matching the initial list order).
+    private ProcessSortKey _sortKey = ProcessSortKey.Name;
+    private bool _ascending = true;
+    private readonly ProcessSortColumn[] _sortColumns;
+
+    /// <summary>The last snapshot, kept so a header click can re-sort immediately without waiting for
+    /// the next poll.</summary>
+    private IReadOnlyList<ProcessInfo> _lastSnapshot = Array.Empty<ProcessInfo>();
+
     /// <summary>Foreground apps (own a visible window), updated in place by the keyed diff.</summary>
     public ObservableCollection<ProcessRow> Apps { get; } = new();
 
     /// <summary>Background processes (services/helpers/Windows components), updated in place.</summary>
     public ObservableCollection<ProcessRow> Background { get; } = new();
+
+    // Clickable column headers. Disk/Network/Gpu sort as no-ops until they carry values.
+    public ProcessSortColumn NameSort { get; }
+    public ProcessSortColumn PidSort { get; }
+    public ProcessSortColumn StatusSort { get; }
+    public ProcessSortColumn CpuSort { get; }
+    public ProcessSortColumn MemorySort { get; }
+    public ProcessSortColumn DiskSort { get; }
+    public ProcessSortColumn NetworkSort { get; }
+    public ProcessSortColumn GpuSort { get; }
 
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
     [ObservableProperty] private string _appsHeader = "Apps";
@@ -67,6 +87,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _threadsText = "0";
 
     public ProcessesViewModel() {
+        NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
+        PidSort = new ProcessSortColumn(ProcessSortKey.Pid, OnSort);
+        StatusSort = new ProcessSortColumn(ProcessSortKey.Status, OnSort);
+        CpuSort = new ProcessSortColumn(ProcessSortKey.Cpu, OnSort);
+        MemorySort = new ProcessSortColumn(ProcessSortKey.Memory, OnSort);
+        DiskSort = new ProcessSortColumn(ProcessSortKey.Disk, OnSort);
+        NetworkSort = new ProcessSortColumn(ProcessSortKey.Network, OnSort);
+        GpuSort = new ProcessSortColumn(ProcessSortKey.Gpu, OnSort);
+        _sortColumns = new[] {
+            NameSort, PidSort, StatusSort, CpuSort, MemorySort, DiskSort, NetworkSort, GpuSort,
+        };
+        UpdateSortIndicators();
+
         // Seed the system totals (memory is an absolute reading, so it's real at once; CPU needs an
         // interval, so it reads 0 until the first tick), then load the list and start polling.
         SampleSystemTotals();
@@ -109,8 +142,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         try {
             var processes = await ProcessSnapshotProvider.GetAsync();
             // Awaited on the UI thread, so the continuation resumes there — safe to touch collections.
+            _lastSnapshot = processes;
             ApplySnapshot(processes);
         } catch {
+            _lastSnapshot = Array.Empty<ProcessInfo>();
             Apps.Clear();
             Background.Clear();
             AppsHeader = "Apps";
@@ -137,8 +172,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             totalThreads += info.ThreadCount;
         }
 
-        apps.Sort(CompareByNameThenPid);
-        background.Sort(CompareByNameThenPid);
+        apps.Sort(Compare);
+        background.Sort(Compare);
 
         Reconcile(Apps, apps);
         Reconcile(Background, background);
@@ -154,7 +189,52 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
     }
 
-    private static int CompareByNameThenPid(ProcessInfo a, ProcessInfo b) {
+    /// <summary>Header click: flip direction if it's the same column, else switch to the new column at
+    /// its Explorer-style default direction. Re-sorts the current data immediately (so the click feels
+    /// instant) rather than waiting for the next poll.</summary>
+    private void OnSort(ProcessSortKey key) {
+        if (_sortKey == key) {
+            _ascending = !_ascending;
+        } else {
+            _sortKey = key;
+            _ascending = DefaultAscending(key);
+        }
+        UpdateSortIndicators();
+        ApplySnapshot(_lastSnapshot);
+    }
+
+    /// <summary>Explorer-style defaults: text columns ascending, magnitude columns busiest-first.</summary>
+    private static bool DefaultAscending(ProcessSortKey key) => key switch {
+        ProcessSortKey.Name => true,
+        ProcessSortKey.Pid => true,
+        ProcessSortKey.Status => true,
+        _ => false, // CPU / Memory / Disk / Network / GPU
+    };
+
+    /// <summary>Tints the active column and shows its ↑/↓ arrow; clears the rest.</summary>
+    private void UpdateSortIndicators() {
+        foreach (var column in _sortColumns) {
+            column.IsActive = column.Key == _sortKey;
+            column.Arrow = column.IsActive ? (_ascending ? "↑" : "↓") : "";
+        }
+    }
+
+    /// <summary>Orders two processes by the active sort key + direction, always breaking ties by name
+    /// then PID so the live list stays deterministic (no jitter on equal keys).</summary>
+    private int Compare(ProcessInfo a, ProcessInfo b) {
+        var cmp = _sortKey switch {
+            ProcessSortKey.Name => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            ProcessSortKey.Pid => a.Pid.CompareTo(b.Pid),
+            ProcessSortKey.Status => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
+            ProcessSortKey.Cpu => a.CpuPercent.CompareTo(b.CpuPercent),
+            ProcessSortKey.Memory => a.MemoryBytes.CompareTo(b.MemoryBytes),
+            _ => 0, // Disk / Network / GPU carry no data yet — fall through to the tie-break.
+        };
+        if (!_ascending)
+            cmp = -cmp;
+        if (cmp != 0)
+            return cmp;
+
         var byName = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         return byName != 0 ? byName : a.Pid.CompareTo(b.Pid);
     }
