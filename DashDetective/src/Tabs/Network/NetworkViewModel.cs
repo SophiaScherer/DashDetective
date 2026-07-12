@@ -31,6 +31,15 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Floor for a series' vertical scale so idle traffic isn't drawn as a huge spike.</summary>
     private const double MinScaleMbps = 1.0;
 
+    /// <summary>Rows shown per connections page before the user changes it.</summary>
+    private const int DefaultPageSize = 100;
+
+    /// <summary>Hard upper bound the user may set for the page size.</summary>
+    private const int MaxPageSize = 150;
+
+    /// <summary>Numbered pages shown either side of the current page in the pager (before ellipsis).</summary>
+    private const int PagerRadius = 2;
+
     /// <summary>Cadence for re-reading adapters + IP config. Adapters change rarely (plug/unplug,
     /// connect/disconnect), so a coarse tick is plenty — like the Dashboard's 30 s uptime timer.</summary>
     private static readonly TimeSpan AdapterInterval = TimeSpan.FromSeconds(5);
@@ -54,6 +63,15 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private bool _connectionsInFlight;
     private bool _pingInFlight;
 
+    /// <summary>The latest full (sorted) snapshot; the UI only ever binds one page-sized slice of it.</summary>
+    private readonly List<ConnectionInfo> _allConnections = new();
+    /// <summary>True active count from the last snapshot (may exceed <see cref="_allConnections"/> if capped).</summary>
+    private int _connectionsTotal;
+    /// <summary>Effective page size (clamped to 1..<see cref="MaxPageSize"/>); the field applies into this.</summary>
+    private int _pageSize = DefaultPageSize;
+    /// <summary>Current 1-based page.</summary>
+    private int _currentPage = 1;
+
     [ObservableProperty] private string _downText = "0";
     [ObservableProperty] private string _upText = "0";
     [ObservableProperty] private string _downPoints = "";
@@ -71,11 +89,20 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
     [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
 
-    /// <summary>Active TCP/UDP connections, for the Active Connections table. Updated in place.</summary>
+    /// <summary>Active TCP/UDP connections for the CURRENT page, for the table. Updated in place.</summary>
     public ObservableCollection<ConnectionRow> Connections { get; } = new();
 
-    /// <summary>Count caption for the connections panel header (e.g. "42 active").</summary>
+    /// <summary>Count caption for the connections panel header (e.g. "142 active · page 2 of 3").</summary>
     [ObservableProperty] private string _connectionsSummary = "";
+
+    /// <summary>The "entries per page" field text. Applied (parsed + clamped) via <see cref="ApplyPageSizeCommand"/>.</summary>
+    [ObservableProperty] private string _pageSizeText = DefaultPageSize.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Google-style pager items (Prev · 1 … 4 5 6 … 20 · Next). Empty when there's one page.</summary>
+    public ObservableCollection<PageLink> PageLinks { get; } = new();
+
+    /// <summary>Whether to show the pager row (only when the list spans more than one page).</summary>
+    [ObservableProperty] private bool _pagerVisible;
 
     /// <summary>The ping target, editable in the Ping panel. Applied via <see cref="ApplyPingTargetCommand"/>.</summary>
     [ObservableProperty] private string _pingTarget = PingMonitor.DefaultTarget;
@@ -233,10 +260,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private void OnConnectionsTick(object? sender, EventArgs e) => _ = LoadConnectionsAsync();
 
     /// <summary>
-    /// Reads the connections snapshot off the UI thread and reconciles it into <see cref="Connections"/>
-    /// in place: rows that vanished are removed, survivors are updated (and moved to their new sorted
-    /// position), and new rows are inserted — so the table doesn't flicker or lose scroll position.
-    /// Guarded against overlap (a slow enumeration must not pile up ticks) and never throws.
+    /// Reads the connections snapshot off the UI thread, stores the full sorted list, and rebuilds the
+    /// current page. Only one page-sized slice is ever bound (via <see cref="RebuildPage"/>), so the UI
+    /// stays light no matter how many sockets exist. Guarded against overlap (a slow enumeration must
+    /// not pile up ticks) and never throws.
     /// </summary>
     private async Task LoadConnectionsAsync() {
         if (_connectionsInFlight)
@@ -244,24 +271,104 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _connectionsInFlight = true;
         try {
             var snapshot = await ConnectionsProvider.GetAsync();
-            // Awaited on the UI thread, so the continuation resumes there — safe to touch the collection.
-            ReconcileConnections(snapshot.Rows);
-            ConnectionsSummary = BuildConnectionsSummary(snapshot.Total, snapshot.Rows.Count);
+            // Awaited on the UI thread, so the continuation resumes there — safe to touch the collections.
+            _allConnections.Clear();
+            _allConnections.AddRange(snapshot.Rows);
+            _connectionsTotal = snapshot.Total;
+            RebuildPage();
         } catch {
+            _allConnections.Clear();
+            _connectionsTotal = 0;
             Connections.Clear();
+            PageLinks.Clear();
+            PagerVisible = false;
             ConnectionsSummary = "Connections unavailable";
         } finally {
             _connectionsInFlight = false;
         }
     }
 
-    /// <summary>Header caption: the true active count, noting when the table is capped.</summary>
-    private static string BuildConnectionsSummary(int total, int shown) {
+    /// <summary>Applies the "entries per page" field: parses it, clamps to 1..<see cref="MaxPageSize"/>
+    /// (falling back to <see cref="DefaultPageSize"/> on junk), reflects the clamped value back into the
+    /// field, jumps to page 1, and re-pages immediately.</summary>
+    [RelayCommand]
+    private void ApplyPageSize() {
+        var size = DefaultPageSize;
+        if (int.TryParse(PageSizeText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            size = parsed;
+        size = Math.Clamp(size, 1, MaxPageSize);
+
+        _pageSize = size;
+        PageSizeText = size.ToString(CultureInfo.InvariantCulture);
+        _currentPage = 1;
+        RebuildPage();
+    }
+
+    /// <summary>Pager callback: navigates to a page and re-pages immediately (so it feels instant rather
+    /// than waiting for the next poll).</summary>
+    private void GoToPage(int page) {
+        _currentPage = page < 1 ? 1 : page;
+        RebuildPage();
+    }
+
+    /// <summary>Slices the full list to the current page, reconciles that slice into <see cref="Connections"/>,
+    /// and rebuilds the header caption + pager. Clamps the page if the list shrank underneath us.</summary>
+    private void RebuildPage() {
+        var available = _allConnections.Count;
+        var totalPages = Math.Max(1, (available + _pageSize - 1) / _pageSize);
+        _currentPage = Math.Clamp(_currentPage, 1, totalPages);
+
+        var start = (_currentPage - 1) * _pageSize;
+        var count = Math.Clamp(available - start, 0, _pageSize);
+        var slice = count > 0 ? _allConnections.GetRange(start, count) : (IReadOnlyList<ConnectionInfo>)Array.Empty<ConnectionInfo>();
+        ReconcileConnections(slice);
+
+        ConnectionsSummary = BuildConnectionsSummary(_connectionsTotal, totalPages);
+        RebuildPageLinks(totalPages);
+    }
+
+    /// <summary>Header caption: the true active count, plus the page position when there's more than one page.</summary>
+    private string BuildConnectionsSummary(int total, int totalPages) {
         if (total == 0)
             return "No active connections";
         var count = total.ToString(CultureInfo.InvariantCulture);
-        return total > shown ? $"{count} active · showing {shown}" : $"{count} active";
+        if (totalPages <= 1)
+            return $"{count} active";
+        return $"{count} active · page {_currentPage.ToString(CultureInfo.InvariantCulture)} " +
+               $"of {totalPages.ToString(CultureInfo.InvariantCulture)}";
     }
+
+    /// <summary>Rebuilds the Google-style pager: Prev · 1 … (window around current) … last · Next.
+    /// The first and last pages are always shown; ellipsis gaps fill the space between them and the
+    /// window. Hidden entirely when there's only one page.</summary>
+    private void RebuildPageLinks(int totalPages) {
+        PageLinks.Clear();
+        PagerVisible = totalPages > 1;
+        if (!PagerVisible)
+            return;
+
+        PageLinks.Add(new PageLink("‹", _currentPage - 1, isCurrent: false,
+            isEnabled: _currentPage > 1, GoToPage));
+
+        var lo = Math.Max(2, _currentPage - PagerRadius);
+        var hi = Math.Min(totalPages - 1, _currentPage + PagerRadius);
+
+        AddPageNumber(1);
+        if (lo > 2)
+            PageLinks.Add(PageLink.Ellipsis());
+        for (var p = lo; p <= hi; p++)
+            AddPageNumber(p);
+        if (hi < totalPages - 1)
+            PageLinks.Add(PageLink.Ellipsis());
+        AddPageNumber(totalPages);
+
+        PageLinks.Add(new PageLink("›", _currentPage + 1, isCurrent: false,
+            isEnabled: _currentPage < totalPages, GoToPage));
+    }
+
+    private void AddPageNumber(int page) =>
+        PageLinks.Add(new PageLink(page.ToString(CultureInfo.InvariantCulture),
+            page, isCurrent: page == _currentPage, isEnabled: true, GoToPage));
 
     /// <summary>Diffs <paramref name="incoming"/> (already sorted) into the observable collection by key.</summary>
     private void ReconcileConnections(IReadOnlyList<ConnectionInfo> incoming) {

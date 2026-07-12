@@ -76,6 +76,32 @@
         <Style Selector="Button.go:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
+        <!-- Google-style pager: page-number / arrow buttons, with the current page accented and
+             ellipsis / end-arrows dimmed via the disabled state. -->
+        <Style Selector="Button.pageLink">
+            <Setter Property="MinWidth" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pageLink:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Button.pageLink.selected">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.pageLink:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -174,9 +200,24 @@
             <Border Grid.Column="0" Classes="panel">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"/>
-                        <TextBlock Grid.Column="1" Text="{Binding ConnectionsSummary}" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ConnectionsSummary}" FontSize="11"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
+                            <TextBlock Text="Show" FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSubtle}"/>
+                            <!-- Entries per page (1–150). Enter or Apply commits the value. -->
+                            <Border Classes="field" Width="52">
+                                <TextBox Text="{Binding PageSizeText, Mode=TwoWay}"
+                                         TextAlignment="Center">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding ApplyPageSizeCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                            <Button Classes="go" Content="Apply" Command="{Binding ApplyPageSizeCommand}"/>
+                        </StackPanel>
                     </Grid>
                     <!-- Column header -->
                     <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Margin="0,0,0,2">
@@ -208,6 +249,22 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    <!-- Pager (Prev · 1 … 4 5 6 … 20 · Next); only visible when there's >1 page. -->
+                    <ItemsControl ItemsSource="{Binding PageLinks}" IsVisible="{Binding PagerVisible}"
+                                  HorizontalAlignment="Center" Margin="0,2,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PageLink">
+                                <Button Classes="pageLink" Classes.selected="{Binding IsCurrent}"
+                                        Content="{Binding Label}" Command="{Binding SelectCommand}"
+                                        IsEnabled="{Binding IsEnabled}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
             <StackPanel Grid.Column="1" Spacing="12">
