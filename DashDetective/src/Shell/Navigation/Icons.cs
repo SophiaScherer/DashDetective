@@ -21,6 +21,13 @@ public static class Icons {
     public static readonly Geometry FileExplorer = Geometry.Parse(
         "M2.5,6 L6.5,6 L8,7.5 L15.5,7.5 L15.5,14 L2.5,14 Z");
 
+    // A CPU/chip glyph: a rounded square die with eight pins radiating out (the Processes tab),
+    // matching the design document's processes icon.
+    public static readonly Geometry Processes = Geometry.Parse(
+        "M6.3,5 H11.7 A1.3,1.3 0 0 1 13,6.3 V11.7 A1.3,1.3 0 0 1 11.7,13 " +
+        "H6.3 A1.3,1.3 0 0 1 5,11.7 V6.3 A1.3,1.3 0 0 1 6.3,5 Z " +
+        "M7,2 V4 M11,2 V4 M7,14 V16 M11,14 V16 M2,7 H4 M2,11 H4 M14,7 H16 M14,11 H16");
+
     // A globe: an outer circle crossed by the equator and two curved meridians.
     public static readonly Geometry Network = Geometry.Parse(
         "M9,2 A7,7 0 1 1 8.99,2 Z " +

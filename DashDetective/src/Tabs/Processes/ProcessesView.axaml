@@ -1,0 +1,342 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DashDetective.Tabs.Processes"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:ProcessesViewModel"
+             x:Class="DashDetective.Tabs.Processes.ProcessesView">
+
+    <!-- Live process table, split into Apps and Background groups. Self-scrolling: the header stays
+         fixed while the grouped list scrolls. Surfaces/typography come from src/Shared/Styles.
+         The shared 8-column layout is repeated on the header and each row (like the Network and File
+         Explorer tables). Disk/GPU arrive in a later phase; Network is deferred, so those cells show "—". -->
+    <UserControl.Styles>
+        <!-- Column header cells. Each is a chrome-less button that sorts by its column; the active
+             column tints to the accent and shows a ↑/↓ arrow (bound to the ProcessSortColumn VMs). -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="TextBlock.colHead.active">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="TextBlock.sortArrow">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <!-- Chrome-less button wrapper so a whole header cell is clickable (as in File Explorer). -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- Group section header (e.g. "Apps · 6"). -->
+        <Style Selector="Border.groupHead">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="Padding" Value="16,7"/>
+        </Style>
+        <Style Selector="Border.groupHead TextBlock">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+
+        <!-- Data rows. -->
+        <Style Selector="Border.procRow">
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.procRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- Selection wins over hover (defined after :pointerover). -->
+        <Style Selector="Border.procRow.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Border.procRow.selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Border.procRow TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.cellName">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="TextBlock.cellPid">
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <!-- Numeric cells: right-aligned, themed text. -->
+        <Style Selector="TextBlock.cellNum">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <!-- CPU cell: themed by default, tinted amber/orange when elevated (classes from ProcessRow). -->
+        <Style Selector="TextBlock.cpuCell">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="TextBlock.cpuCell.med">
+            <Setter Property="Foreground" Value="#ffcf4d"/>
+        </Style>
+        <Style Selector="TextBlock.cpuCell.high">
+            <Setter Property="Foreground" Value="#ff8a5c"/>
+        </Style>
+
+        <!-- Summary-card value. -->
+        <Style Selector="TextBlock.sumValue">
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <!-- End task: a destructive-action button. Reddish when enabled (a row is selected), muted
+             when disabled. Red is a fixed semantic colour (readable in both themes). -->
+        <Style Selector="Button.endTask">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#29ff6b6b"/>
+            <Setter Property="BorderBrush" Value="#4dff6b6b"/>
+            <Setter Property="Foreground" Value="#ff8a5c"/>
+        </Style>
+        <Style Selector="Button.endTask:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#3dff6b6b"/>
+            <Setter Property="BorderBrush" Value="#66ff6b6b"/>
+        </Style>
+        <Style Selector="Button.endTask:disabled">
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+        <Style Selector="Button.endTask:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="14">
+
+        <!-- ===== Summary strip ===== -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*,Auto" ColumnSpacing="12">
+            <Border Grid.Column="0" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="PROCESSES"/>
+                    <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
+                    <TextBlock Classes="cardSub" Text="{Binding ProcessBreakdownText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="CPU"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
+                               Text="{Binding CpuUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="MEMORY"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
+                               Text="{Binding MemoryUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="THREADS"/>
+                    <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- End task / Properties act on the selected row; disabled until one is picked. -->
+            <StackPanel Grid.Column="4" VerticalAlignment="Center" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="endTask" Content="End task"
+                            Command="{Binding RequestEndTaskCommand}"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <Button Classes="action" Content="Properties"
+                            Click="OnPropertiesClick" IsEnabled="{Binding HasSelection}"/>
+                </StackPanel>
+                <TextBlock Classes="cardSub" HorizontalAlignment="Right"
+                           Foreground="#ff8a5c" Text="{Binding ActionMessage}"
+                           IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ===== Process table ===== -->
+        <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+
+            <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
+                 the label; right-aligned numeric columns put it before, so it always sits inward. -->
+            <Border Grid.Row="0" Padding="16,11" BorderBrush="{DynamicResource Hairline}"
+                    BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
+                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                    <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding NameSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding NameSort.IsActive}" Text="NAME"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding NameSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding PidSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding PidSort.IsActive}" Text="PID"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding PidSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
+                            Command="{Binding StatusSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="colHead" Classes.active="{Binding StatusSort.IsActive}" Text="STATUS"/>
+                            <TextBlock Classes="sortArrow" Text="{Binding StatusSort.Arrow}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding CpuSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding CpuSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding CpuSort.IsActive}" Text="CPU"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="4" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding MemorySort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding MemorySort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding MemorySort.IsActive}" Text="MEMORY"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="5" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding DiskSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding DiskSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding DiskSort.IsActive}" Text="DISK"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="6" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding NetworkSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding NetworkSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding NetworkSort.IsActive}" Text="NET"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="7" Classes="pick" HorizontalAlignment="Right"
+                            Command="{Binding GpuSort.SortCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Classes="sortArrow" Text="{Binding GpuSort.Arrow}"/>
+                            <TextBlock Classes="colHead" Classes.active="{Binding GpuSort.IsActive}" Text="GPU"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Scrolling grouped list -->
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <!-- Apps -->
+                    <Border Classes="groupHead">
+                        <TextBlock Text="{Binding AppsHeader}"/>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Apps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProcessRow">
+                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
+                                        Background="Transparent" Tapped="OnRowTapped">
+                                    <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
+                                          ColumnSpacing="4">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
+                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                                     Fill="{Binding StatusBrush}"/>
+                                            <TextBlock Classes="cellName" Text="{Binding Name}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
+                                                   Foreground="{Binding StatusBrush}"/>
+                                        <TextBlock Grid.Column="3" Classes="cpuCell"
+                                                   Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
+                                                   Text="{Binding CpuText}"/>
+                                        <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
+                                        <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
+                                        <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding NetworkText}"/>
+                                        <TextBlock Grid.Column="7" Classes="cellNum" Text="{Binding GpuText}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Background -->
+                    <Border Classes="groupHead">
+                        <TextBlock Text="{Binding BackgroundHeader}"/>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding Background}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProcessRow">
+                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
+                                        Background="Transparent" Tapped="OnRowTapped">
+                                    <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
+                                          ColumnSpacing="4">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
+                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                                     Fill="{Binding StatusBrush}"/>
+                                            <TextBlock Classes="cellName" Text="{Binding Name}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
+                                                   Foreground="{Binding StatusBrush}"/>
+                                        <TextBlock Grid.Column="3" Classes="cpuCell"
+                                                   Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
+                                                   Text="{Binding CpuText}"/>
+                                        <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
+                                        <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
+                                        <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding NetworkText}"/>
+                                        <TextBlock Grid.Column="7" Classes="cellNum" Text="{Binding GpuText}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+        </Border>
+
+        <!-- End-task confirmation overlay: a scrim + centred card, covering the page while open.
+             Ending a process is destructive, so it needs an explicit confirm. -->
+        <Panel Grid.Row="0" Grid.RowSpan="2" IsVisible="{Binding ConfirmVisible}">
+            <Border Background="#99000000"/>
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380"
+                    Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource Hairline}"
+                    BorderThickness="1" CornerRadius="10" Padding="22"
+                    BoxShadow="0 12 40 0 #55000000">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="End task" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextStrong}"/>
+                    <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Classes="action" Content="Cancel" Command="{Binding CancelEndTaskCommand}"/>
+                        <Button Classes="endTask" Content="End task" Command="{Binding ConfirmEndTaskCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Panel>
+    </Grid>
+</UserControl>

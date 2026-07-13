@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.Network;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Dashboard;

@@ -31,6 +31,7 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - `Settings`
 - `File Explorer`
 - `Network`
+- `Processes`
 
 **Implementation status within the active features:**
 
@@ -215,7 +216,23 @@ Not all of these exist yet. Only build what is listed below as "currently active
   colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
   IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
 
-**Everything else (Processes, Performance, Storage, Hardware) is
+- **Processes** — **newly activated; being built in phases** (plan:
+  `C:\Users\User\.claude\plans\processes-tab-plan.md`). Intended as a Task-Manager-style live process
+  view: the list **split into Apps and Background processes**, per-process **PID / status / CPU % /
+  Memory / Disk / (Network — deferred) / GPU %**, **sortable column headers**, a summary strip
+  (**process counts per group**, **total CPU %**, **total Memory %**, **total thread count**), **End
+  task**, and native **Properties** (the exe's shell property sheet). Data is **in-box, no new
+  dependencies, no admin**: `System.Diagnostics.Process` (CPU% via `TotalProcessorTime` diff, memory,
+  threads, status, Apps/Background split via `MainWindowHandle`, exe path), a feature-local
+  `GetProcessIoCounters` P/Invoke for Disk MB/s, and PDH `\GPU Engine(*)` grouped by the `pid_` token for
+  GPU %. **Per-process Network throughput is deferred** — there is no clean in-box per-process rate API
+  (Task Manager uses ETW kernel providers, which need the `TraceEvent` package + admin); the Network
+  column renders "—" until a task reactivates it. Follows the always-on tab pattern (constructed once in
+  the shell; `IRefreshablePage` + `ILiveSamplingPage` + `IDisposable` + `ISelfScrollingPage`), the Network
+  tab's keyed-diff live table, and the File Explorer sortable-header + Properties patterns. *Phase 0
+  (scaffold + activation) is in place; the live table and features land in later phases.*
+
+**Everything else (Performance, Storage, Hardware) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
@@ -322,6 +339,13 @@ currently exist.
         ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+      /SystemMetrics
+        CpuUsageSampler.cs      (live total CPU % via GetSystemTimes; shared — Dashboard + Processes)
+        MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx; shared —
+                                 Dashboard + Processes. Both moved here from src/Tabs/Dashboard with
+                                 sign-off when the Processes tab needed the same system-wide readings,
+                                 the same precedent as NetworkUsageSampler. GPU/Storage samplers stay
+                                 in the Dashboard until a second tab needs them.)
       /Network
         NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
                                  adapter — internet-facing, has a default gateway — NOT a sum of all
@@ -350,10 +374,8 @@ currently exist.
         NavPositionOption.cs        (selectable item VM for the position picker, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
-                                CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
                                 CpuInfoProvider.cs      (static CPU info via WMI, async)
                                 CpuStaticInfo.cs        (record for the WMI result)
-                                MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
                                 MemoryInfoProvider.cs   (static RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
                                 GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters)
