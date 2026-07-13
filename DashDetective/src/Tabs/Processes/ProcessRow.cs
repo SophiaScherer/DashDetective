@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -29,6 +30,8 @@ public partial class ProcessRow : ObservableObject {
         _cpuHigh = info.CpuPercent > 10;
         _cpuMed = info.CpuPercent is > 5 and <= 10;
         _memoryText = ProcessMemoryFormatter.Format(info.MemoryBytes);
+        _diskText = FormatDisk(info.DiskBytesPerSec);
+        _gpuText = FormatGpu(info.GpuPercent);
     }
 
     /// <summary>Stable identity for the keyed diff (unique among live processes).</summary>
@@ -48,15 +51,15 @@ public partial class ProcessRow : ObservableObject {
     [ObservableProperty] private bool _cpuHigh;
     [ObservableProperty] private bool _cpuMed;
     [ObservableProperty] private string _memoryText;
+    [ObservableProperty] private string _diskText;
+    [ObservableProperty] private string _gpuText;
 
     /// <summary>Whether this row is the current selection. Selection state, not process data, so the
     /// keyed-diff <see cref="Update"/> deliberately leaves it untouched across polls.</summary>
     [ObservableProperty] private bool _isSelected;
 
-    // Disk / GPU land in a later phase; Network is deferred (no in-box per-process rate API).
-    public string DiskText => "—";
+    // Per-process Network throughput is deferred (no in-box per-process rate API).
     public string NetworkText => "—";
-    public string GpuText => "—";
 
     /// <summary>Refreshes the mutable fields from a newer snapshot of the same process.</summary>
     public void Update(ProcessInfo info) {
@@ -67,12 +70,28 @@ public partial class ProcessRow : ObservableObject {
         CpuHigh = info.CpuPercent > 10;
         CpuMed = info.CpuPercent is > 5 and <= 10;
         MemoryText = ProcessMemoryFormatter.Format(info.MemoryBytes);
+        DiskText = FormatDisk(info.DiskBytesPerSec);
+        GpuText = FormatGpu(info.GpuPercent);
     }
 
     private static string FormatCpu(double percent) {
         if (percent < 0)
             percent = 0;
         return percent.ToString("F1", CultureInfo.InvariantCulture) + "%";
+    }
+
+    // Disk rate → MB/s (one decimal); a bare "0" for idle (matching the design comp) keeps the column
+    // quiet when most processes aren't touching the disk.
+    private static string FormatDisk(double bytesPerSec) {
+        var mbps = bytesPerSec / (1024d * 1024d);
+        return mbps < 0.05 ? "0" : mbps.ToString("F1", CultureInfo.InvariantCulture) + " MB/s";
+    }
+
+    // GPU → whole percent (Task Manager rounds the per-process GPU figure).
+    private static string FormatGpu(double percent) {
+        if (percent < 0)
+            percent = 0;
+        return Math.Round(percent).ToString(CultureInfo.InvariantCulture) + "%";
     }
 
     private static IBrush BrushFor(string status) =>

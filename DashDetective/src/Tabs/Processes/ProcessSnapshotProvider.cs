@@ -19,6 +19,7 @@ namespace DashDetective.Tabs.Processes;
 /// </summary>
 public static class ProcessSnapshotProvider {
     private static readonly Dictionary<int, TimeSpan> PrevCpuTime = new();
+    private static readonly Dictionary<int, ulong> PrevIoBytes = new();
     private static DateTime _prevSampledAt;
 
     /// <summary>Logical processors — the divisor that normalises CPU% to Task Manager's 0–100 scale
@@ -35,9 +36,13 @@ public static class ProcessSnapshotProvider {
         // First snapshot has no prior point, so every CPU% reads 0 this pass and real next pass.
         var wallSeconds = _prevSampledAt == default ? 0 : (now - _prevSampledAt).TotalSeconds;
 
+        // Per-process GPU% for this interval (PID → %), read once off the same PDH query.
+        var gpuByPid = ProcessGpuSampler.Sample();
+
         var processes = Process.GetProcesses();
         var result = new List<ProcessInfo>(processes.Length);
         var nextCpuTime = new Dictionary<int, TimeSpan>(processes.Length);
+        var nextIoBytes = new Dictionary<int, ulong>(processes.Length);
 
         foreach (var process in processes) {
             using (process) {
@@ -55,21 +60,40 @@ public static class ProcessSnapshotProvider {
                     var status = SafeResponding(process) ? "Running" : "Not responding";
                     var category = HasMainWindow(process) ? ProcessCategory.App : ProcessCategory.Background;
                     var name = SafeName(process);
+                    var disk = ComputeDiskRate(process, pid, nextIoBytes, wallSeconds);
+                    var gpu = gpuByPid.TryGetValue(pid, out var g) ? g : 0;
 
-                    result.Add(new ProcessInfo(pid, name, status, cpuPercent, memory, threads, category));
+                    result.Add(new ProcessInfo(pid, name, status, cpuPercent, memory, threads, category, disk, gpu));
                 } catch {
                     // A whole-process failure is rare (handle races) — skip that entry.
                 }
             }
         }
 
-        // Swap in the fresh CPU-time table so PIDs that have exited don't linger.
-        PrevCpuTime.Clear();
-        foreach (var pair in nextCpuTime)
-            PrevCpuTime[pair.Key] = pair.Value;
+        // Swap in the fresh CPU-time / IO-byte tables so PIDs that have exited don't linger.
+        Swap(PrevCpuTime, nextCpuTime);
+        Swap(PrevIoBytes, nextIoBytes);
         _prevSampledAt = now;
 
         return result;
+    }
+
+    private static void Swap<T>(Dictionary<int, T> target, Dictionary<int, T> source) {
+        target.Clear();
+        foreach (var pair in source)
+            target[pair.Key] = pair.Value;
+    }
+
+    /// <summary>Disk rate in bytes/sec: the change in cumulative read+write transfer bytes over the
+    /// interval. Records the current total in <paramref name="nextIoBytes"/> for the next diff.</summary>
+    private static double ComputeDiskRate(Process process, int pid, Dictionary<int, ulong> nextIoBytes, double wallSeconds) {
+        if (!ProcessInterop.TryGetIoBytes(process, out var bytes))
+            return 0;
+        nextIoBytes[pid] = bytes;
+
+        if (wallSeconds <= 0 || !PrevIoBytes.TryGetValue(pid, out var prev) || bytes < prev)
+            return 0;
+        return (bytes - prev) / wallSeconds;
     }
 
     private static double ComputeCpuPercent(int pid, TimeSpan cpuTime, double wallSeconds) {

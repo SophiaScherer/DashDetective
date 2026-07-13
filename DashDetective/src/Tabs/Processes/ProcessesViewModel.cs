@@ -257,7 +257,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             ProcessSortKey.Status => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
             ProcessSortKey.Cpu => a.CpuPercent.CompareTo(b.CpuPercent),
             ProcessSortKey.Memory => a.MemoryBytes.CompareTo(b.MemoryBytes),
-            _ => 0, // Disk / Network / GPU carry no data yet — fall through to the tie-break.
+            ProcessSortKey.Disk => a.DiskBytesPerSec.CompareTo(b.DiskBytesPerSec),
+            ProcessSortKey.Gpu => a.GpuPercent.CompareTo(b.GpuPercent),
+            _ => 0, // Network is deferred (no data) — fall through to the tie-break.
         };
         if (!_ascending)
             cmp = -cmp;
