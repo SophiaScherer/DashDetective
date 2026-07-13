@@ -49,6 +49,10 @@ public partial class ProcessRow : ObservableObject {
     [ObservableProperty] private bool _cpuMed;
     [ObservableProperty] private string _memoryText;
 
+    /// <summary>Whether this row is the current selection. Selection state, not process data, so the
+    /// keyed-diff <see cref="Update"/> deliberately leaves it untouched across polls.</summary>
+    [ObservableProperty] private bool _isSelected;
+
     // Disk / GPU land in a later phase; Network is deferred (no in-box per-process rate API).
     public string DiskText => "—";
     public string NetworkText => "—";

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 
@@ -85,6 +87,27 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Total thread count across all processes (e.g. "2,418").</summary>
     [ObservableProperty] private string _threadsText = "0";
+
+    // ----- Selection + actions -----
+
+    /// <summary>The currently selected row (across both groups), or null. Drives End task / Properties
+    /// enablement and the row highlight.</summary>
+    [ObservableProperty] private ProcessRow? _selectedRow;
+
+    /// <summary>Whether a row is selected — enables the End task and Properties buttons.</summary>
+    public bool HasSelection => SelectedRow is not null;
+
+    /// <summary>Whether the End-task confirmation overlay is showing.</summary>
+    [ObservableProperty] private bool _confirmVisible;
+
+    /// <summary>The confirmation prompt for the process being ended.</summary>
+    [ObservableProperty] private string _confirmText = "";
+
+    /// <summary>Transient feedback after an action (e.g. a soft-failed End task). Cleared on the next
+    /// selection or successful action.</summary>
+    [ObservableProperty] private string _actionMessage = "";
+
+    partial void OnSelectedRowChanged(ProcessRow? value) => OnPropertyChanged(nameof(HasSelection));
 
     public ProcessesViewModel() {
         NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
@@ -178,6 +201,12 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         Reconcile(Apps, apps);
         Reconcile(Background, background);
 
+        // If the selected process has exited, the diff removed its row — drop the dangling selection.
+        if (SelectedRow is not null && !Apps.Contains(SelectedRow) && !Background.Contains(SelectedRow)) {
+            SelectedRow.IsSelected = false;
+            SelectedRow = null;
+        }
+
         AppsHeader = $"Apps · {apps.Count.ToString(CultureInfo.InvariantCulture)}";
         BackgroundHeader = $"Background processes · {background.Count.ToString(CultureInfo.InvariantCulture)}";
 
@@ -267,6 +296,55 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
                 existing[info.Pid] = created;
                 target.Insert(i, created);
             }
+        }
+    }
+
+    /// <summary>Selects a row (single selection across both groups), clearing the previous one. Driven
+    /// from the view code-behind on tap, like File Explorer's row selection.</summary>
+    public void SelectRow(ProcessRow row) {
+        if (ReferenceEquals(SelectedRow, row))
+            return;
+        if (SelectedRow is not null)
+            SelectedRow.IsSelected = false;
+        row.IsSelected = true;
+        SelectedRow = row;
+        ActionMessage = "";
+    }
+
+    /// <summary>End task button: shows the confirmation overlay for the selected process (killing a
+    /// process is destructive, so it isn't done on a single click).</summary>
+    [RelayCommand]
+    private void RequestEndTask() {
+        if (SelectedRow is null)
+            return;
+        ConfirmText = $"End “{SelectedRow.Name}”? Any unsaved work in this process will be lost.";
+        ConfirmVisible = true;
+    }
+
+    /// <summary>Dismisses the confirmation overlay without ending anything.</summary>
+    [RelayCommand]
+    private void CancelEndTask() => ConfirmVisible = false;
+
+    /// <summary>Confirms the End task: terminates the process and removes its row immediately (the next
+    /// poll keeps things consistent). Soft-fails on a protected/elevated process we can't kill without
+    /// admin, surfacing a brief message rather than throwing.</summary>
+    [RelayCommand]
+    private void ConfirmEndTask() {
+        ConfirmVisible = false;
+        var row = SelectedRow;
+        if (row is null)
+            return;
+
+        try {
+            using var process = Process.GetProcessById(row.Pid);
+            process.Kill();
+            if (!Apps.Remove(row))
+                Background.Remove(row);
+            SelectedRow = null;
+            ActionMessage = "";
+        } catch {
+            // ArgumentException (already exited) or Win32Exception (access denied without elevation).
+            ActionMessage = $"Couldn't end {row.Name}";
         }
     }
 

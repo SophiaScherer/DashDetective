@@ -61,6 +61,13 @@
         <Style Selector="Border.procRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
+        <!-- Selection wins over hover (defined after :pointerover). -->
+        <Style Selector="Border.procRow.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Border.procRow.selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
         <Style Selector="Border.procRow TextBlock">
             <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -97,12 +104,37 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
+
+        <!-- End task: a destructive-action button. Reddish when enabled (a row is selected), muted
+             when disabled. Red is a fixed semantic colour (readable in both themes). -->
+        <Style Selector="Button.endTask">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16,9"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#29ff6b6b"/>
+            <Setter Property="BorderBrush" Value="#4dff6b6b"/>
+            <Setter Property="Foreground" Value="#ff8a5c"/>
+        </Style>
+        <Style Selector="Button.endTask:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#3dff6b6b"/>
+            <Setter Property="BorderBrush" Value="#66ff6b6b"/>
+        </Style>
+        <Style Selector="Button.endTask:disabled">
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+        <Style Selector="Button.endTask:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
 
         <!-- ===== Summary strip ===== -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*,Auto" ColumnSpacing="12">
             <Border Grid.Column="0" Classes="card">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="PROCESSES"/>
@@ -130,6 +162,20 @@
                     <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
                 </StackPanel>
             </Border>
+
+            <!-- End task / Properties act on the selected row; disabled until one is picked. -->
+            <StackPanel Grid.Column="4" VerticalAlignment="Center" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="endTask" Content="End task"
+                            Command="{Binding RequestEndTaskCommand}"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <Button Classes="action" Content="Properties"
+                            Click="OnPropertiesClick" IsEnabled="{Binding HasSelection}"/>
+                </StackPanel>
+                <TextBlock Classes="cardSub" HorizontalAlignment="Right"
+                           Foreground="#ff8a5c" Text="{Binding ActionMessage}"
+                           IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
         </Grid>
 
         <!-- ===== Process table ===== -->
@@ -211,7 +257,8 @@
                     <ItemsControl ItemsSource="{Binding Apps}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProcessRow">
-                                <Border Classes="procRow" Background="Transparent">
+                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
+                                        Background="Transparent" Tapped="OnRowTapped">
                                     <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
                                           ColumnSpacing="4">
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
@@ -242,7 +289,8 @@
                     <ItemsControl ItemsSource="{Binding Background}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProcessRow">
-                                <Border Classes="procRow" Background="Transparent">
+                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
+                                        Background="Transparent" Tapped="OnRowTapped">
                                     <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
                                           ColumnSpacing="4">
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
@@ -269,5 +317,26 @@
             </ScrollViewer>
         </Grid>
         </Border>
+
+        <!-- End-task confirmation overlay: a scrim + centred card, covering the page while open.
+             Ending a process is destructive, so it needs an explicit confirm. -->
+        <Panel Grid.Row="0" Grid.RowSpan="2" IsVisible="{Binding ConfirmVisible}">
+            <Border Background="#99000000"/>
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380"
+                    Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource Hairline}"
+                    BorderThickness="1" CornerRadius="10" Padding="22"
+                    BoxShadow="0 12 40 0 #55000000">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="End task" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextStrong}"/>
+                    <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Classes="action" Content="Cancel" Command="{Binding CancelEndTaskCommand}"/>
+                        <Button Classes="endTask" Content="End task" Command="{Binding ConfirmEndTaskCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Panel>
     </Grid>
 </UserControl>
