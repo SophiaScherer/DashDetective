@@ -221,12 +221,12 @@
                                     <GradientStop Offset="1" Color="#3f9c8f"/>
                                 </LinearGradientBrush>
                             </Border.Background>
-                            <TextBlock Text="AM" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
+                            <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="1" Margin="10,0" VerticalAlignment="Center">
-                            <TextBlock Text="Alex Mercer" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="Administrator" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
+                            <TextBlock Text="{Binding UserName}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding UserRole}" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                             <Ellipse Width="7" Height="7" Fill="#6ccb5f"/>
@@ -236,14 +236,14 @@
                     <!-- Compact avatar (collapsed or horizontal) -->
                     <Border Width="32" Height="32" CornerRadius="16" HorizontalAlignment="Center"
                             VerticalAlignment="Center" IsVisible="{Binding !ShowFullFooter}"
-                            ToolTip.Tip="Alex Mercer — Administrator">
+                            ToolTip.Tip="{Binding UserTooltip}">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                 <GradientStop Offset="0" Color="#6ccb5f"/>
                                 <GradientStop Offset="1" Color="#3f9c8f"/>
                             </LinearGradientBrush>
                         </Border.Background>
-                        <TextBlock Text="AM" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
+                        <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                 </Panel>

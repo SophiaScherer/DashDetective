@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Identity;
 using DashDetective.Shared;
 
 namespace DashDetective.Shell.Navigation;
@@ -50,7 +51,26 @@ public partial class NavigationViewModel : ViewModelBase {
             new("Bottom", NavOrientation.Bottom, SelectPosition),
         };
         SyncPositions();
+
+        var user = CurrentUserProvider.Load();
+        UserName = user.DisplayName;
+        UserInitials = user.Initials;
+        UserRole = user.Role;
     }
+
+    // ----- Footer identity (the interactive Windows user; read once at construction) -----
+
+    /// <summary>The logged-in user's login name shown in the footer card.</summary>
+    [ObservableProperty] private string _userName = "";
+
+    /// <summary>Up to two letters shown in the footer avatar badge.</summary>
+    [ObservableProperty] private string _userInitials = "";
+
+    /// <summary>The account's privilege level ("Administrator" / "Standard User").</summary>
+    [ObservableProperty] private string _userRole = "";
+
+    /// <summary>Name and role combined for the compact-avatar tooltip, e.g. "sophiasch — Administrator".</summary>
+    public string UserTooltip => $"{UserName} — {UserRole}";
 
     // ----- Computed layout (no converters; consumed by NavigationView bindings/styles) -----
 
