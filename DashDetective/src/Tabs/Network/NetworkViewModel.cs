@@ -75,6 +75,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The shared scale as a caption (e.g. "peak 12 Mbps"), so the ceiling is visible.</summary>
     [ObservableProperty] private string _throughputScaleText = "";
 
+    /// <summary>The download readout's unit ("kbps"/"Mbps"/"Gbps"), auto-scaled from its own value.</summary>
+    [ObservableProperty] private string _downUnit = "Mbps";
+
+    /// <summary>The upload readout's unit ("kbps"/"Mbps"/"Gbps"), auto-scaled from its own value.</summary>
+    [ObservableProperty] private string _upUnit = "Mbps";
+
     /// <summary>The machine's network adapters (physical + virtual), for the Adapters panel.</summary>
     public ObservableCollection<AdapterInfo> Adapters { get; } = new();
 
@@ -173,11 +179,19 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// comparison needs a common axis) — so a larger rate always draws taller regardless of direction.
     /// </summary>
     private void UpdateThroughput(NetworkSample sample) {
-        DownText = FormatMbps(sample.DownMbps);
-        UpText = FormatMbps(sample.UpMbps);
+        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one
+        // (e.g. "40 kbps" up next to "200 Mbps" down). Scaling from the actual value — never the
+        // floored axis scale below — is what lets the unit drop to kbps or rise to Gbps.
+        (DownText, DownUnit) = DataRateFormatter.Split(sample.DownMbps);
+        (UpText, UpUnit) = DataRateFormatter.Split(sample.UpMbps);
 
-        ThroughputYMax = ComputeScale(Math.Max(Peak(_downHistory), Peak(_upHistory)));
-        ThroughputScaleText = $"peak {FormatMbps(ThroughputYMax)} Mbps";
+        // The two sparklines still share ONE axis (the unfloored peak, floored only for rendering so an
+        // idle blip isn't a full-height spike) so equal pixel height means equal throughput; the peak
+        // caption reads in that shared unit.
+        var peak = Math.Max(Peak(_downHistory), Peak(_upHistory));
+        ThroughputYMax = ComputeScale(peak);
+        ThroughputScaleText = $"peak {DataRateFormatter.Format(peak)}";
+
         DownPoints = BuildPoints(_downHistory, ThroughputYMax);
         UpPoints = BuildPoints(_upHistory, ThroughputYMax);
     }
@@ -195,15 +209,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private static double ComputeScale(double peak) {
         var scaled = peak * 1.15;
         return scaled > MinScaleMbps ? scaled : MinScaleMbps;
-    }
-
-    /// <summary>Formats a rate for the readout: whole Mbps at ≥ 10, one decimal below (e.g. "93", "2.7").</summary>
-    private static string FormatMbps(double mbps) {
-        if (mbps < 0)
-            mbps = 0;
-        return mbps >= 10
-            ? Math.Round(mbps).ToString(CultureInfo.InvariantCulture)
-            : mbps.ToString("F1", CultureInfo.InvariantCulture);
     }
 
     /// <summary>

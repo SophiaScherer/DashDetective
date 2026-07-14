@@ -76,6 +76,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _networkDownText = "0";
     [ObservableProperty] private string _networkUpText = "0";
     [ObservableProperty] private string _networkSubText = "↑ 0 Mbps";
+
+    /// <summary>The download readout + stat card unit ("kbps"/"Mbps"/"Gbps"), auto-scaled from its value.</summary>
+    [ObservableProperty] private string _networkDownUnit = "Mbps";
+
+    /// <summary>The upload readout's unit ("kbps"/"Mbps"/"Gbps"), auto-scaled from its own value.</summary>
+    [ObservableProperty] private string _networkUpUnit = "Mbps";
     [ObservableProperty] private string _networkDownPoints = "";
     [ObservableProperty] private string _networkUpPoints = "";
     [ObservableProperty] private double _networkYMax = MinNetworkScaleMbps;
@@ -215,7 +221,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
         AppendReportRow(sb, "GPU", $"{GpuValueText}%  ({GpuModelText})");
         AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
-        AppendReportRow(sb, "Network", $"↓ {NetworkDownText} / ↑ {NetworkUpText} Mbps  ({NetworkAdapterName})");
+        AppendReportRow(sb, "Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})");
 
         return sb.ToString();
     }
@@ -623,38 +629,38 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// auto-fits to the busiest of the two 60-second windows, with headroom and a floor.
     /// </summary>
     private void UpdateNetwork(NetworkSample sample) {
-        NetworkDownText = FormatMbps(sample.DownMbps);
-        NetworkUpText = FormatMbps(sample.UpMbps);
-        NetworkSubText = $"↑ {NetworkUpText} Mbps";
+        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one.
+        // Scaling from the actual value — never the floored axis scale — is what lets the unit switch.
+        (NetworkDownText, NetworkDownUnit) = DataRateFormatter.Split(sample.DownMbps);
+        (NetworkUpText, NetworkUpUnit) = DataRateFormatter.Split(sample.UpMbps);
+        NetworkSubText = $"↑ {NetworkUpText} {NetworkUpUnit}";
 
-        var scale = ComputeNetworkScale();
-        NetworkYMax = scale;
-        NetworkDownPoints = BuildNetworkPoints(_downHistory, scale);
-        NetworkUpPoints = BuildNetworkPoints(_upHistory, scale);
+        // The two series still share ONE axis (the unfloored peak, floored only for rendering) so equal
+        // pixel height means equal throughput.
+        NetworkYMax = ComputeNetworkScale(NetworkPeak());
+        NetworkDownPoints = BuildNetworkPoints(_downHistory, NetworkYMax);
+        NetworkUpPoints = BuildNetworkPoints(_upHistory, NetworkYMax);
     }
 
-    /// <summary>
-    /// Shared upper bound for both series: the largest sample across both windows, plus ~15 % headroom
-    /// so the peak line doesn't touch the top edge, clamped to <see cref="MinNetworkScaleMbps"/>.
-    /// </summary>
-    private double ComputeNetworkScale() {
+    /// <summary>Largest sample across both rolling windows (unfloored): drives the display unit and,
+    /// once floored, the shared axis scale.</summary>
+    private double NetworkPeak() {
         var max = 0.0;
         for (var i = 0; i < WindowSeconds; i++) {
             if (_downHistory[i] > max) max = _downHistory[i];
             if (_upHistory[i] > max) max = _upHistory[i];
         }
 
-        var scaled = max * 1.15;
-        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
+        return max;
     }
 
-    /// <summary>Formats a rate for the readout: whole Mbps at ≥ 10, one decimal below (e.g. "93", "2.7").</summary>
-    private static string FormatMbps(double mbps) {
-        if (mbps < 0)
-            mbps = 0;
-        return mbps >= 10
-            ? Math.Round(mbps).ToString(CultureInfo.InvariantCulture)
-            : mbps.ToString("F1", CultureInfo.InvariantCulture);
+    /// <summary>
+    /// Shared upper bound for both series: the peak plus ~15 % headroom so the peak line doesn't touch
+    /// the top edge, clamped to <see cref="MinNetworkScaleMbps"/>.
+    /// </summary>
+    private static double ComputeNetworkScale(double peak) {
+        var scaled = peak * 1.15;
+        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
     }
 
     /// <summary>

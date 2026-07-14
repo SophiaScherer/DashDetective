@@ -150,4 +150,15 @@
     <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
     </Style>
+
+    <!-- ===== Scrollbars ===== -->
+    <!-- Fluent's default scrollbars auto-hide: a thin line that expands on hover as an overlay ON TOP
+         of content. Pin auto-hide off app-wide so a present bar stays solid and stable rather than
+         fading in and out over the content. Fluent lays content out UNDERNEATH the bar, so lists keep
+         a right gutter (row/header padding) that the bar sits in; flush lists add that padding locally
+         (see the Network Adapters/Connections rows) rather than via the ScrollViewer, which would also
+         shift a sticky header out of alignment with its rows. -->
+    <Style Selector="ScrollViewer">
+        <Setter Property="AllowAutoHide" Value="False"/>
+    </Style>
 </Styles>

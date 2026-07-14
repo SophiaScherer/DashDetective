@@ -115,8 +115,10 @@
                         <ItemsControl ItemsSource="{Binding Adapters}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:AdapterInfo">
+                                    <!-- Right padding reserves a gutter so the vertical scrollbar sits
+                                         beside the row content (link speed) rather than over it. -->
                                     <Border BorderBrush="{DynamicResource RowLine}"
-                                            BorderThickness="0,0,0,1" Padding="0,9">
+                                            BorderThickness="0,0,0,1" Padding="0,9,14,9">
                                         <Grid ColumnDefinitions="Auto,*,Auto">
                                             <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"
                                                      Fill="{Binding DotBrush}"/>
@@ -170,12 +172,12 @@
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
                                 <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
                                 <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="{Binding DownUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
                                 <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
                                 <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="{Binding UpUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                         </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="11"
@@ -201,8 +203,9 @@
                         <TextBlock Grid.Column="1" Text="{Binding ConnectionsSummary}" FontSize="11"
                                    VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
-                    <!-- Column header -->
-                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Margin="0,0,0,2">
+                    <!-- Column header. The 14px right margin matches the rows' gutter below so the columns
+                         stay aligned and the scrollbar sits in the shared gutter, not over the text. -->
+                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Margin="0,0,14,2">
                         <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
                         <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
                         <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
@@ -217,7 +220,7 @@
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Height="30">
+                                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Height="30" Margin="0,0,14,0">
                                         <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>

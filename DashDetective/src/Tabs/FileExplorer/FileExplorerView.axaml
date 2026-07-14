@@ -393,7 +393,8 @@
                 <!-- Details for the selected entry -->
                 <ScrollViewer IsVisible="{Binding HasSelection}"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Spacing="12">
+                    <!-- Right margin reserves a gutter so the scrollbar clears the detail values. -->
+                    <StackPanel Spacing="12" Margin="0,0,14,0">
                         <!-- Preview swatch: scaled file glyph on a subtle panel (approximating the
                              comp's hatch). -->
                         <Border Height="120" CornerRadius="8"
