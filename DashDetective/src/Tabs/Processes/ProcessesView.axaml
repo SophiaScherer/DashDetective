@@ -195,8 +195,13 @@
         <Grid RowDefinitions="Auto,*">
 
             <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
-                 the label; right-aligned numeric columns put it before, so it always sits inward. -->
-            <Border Grid.Row="0" Padding="16,11" BorderBrush="{DynamicResource Hairline}"
+                 the label; right-aligned numeric columns put it before, so it always sits inward.
+                 The header lives OUTSIDE the ScrollViewer, so it spans the full panel width while the
+                 rows inside are narrowed by the always-on vertical scrollbar. The extra 14px of right
+                 padding (16→30) reserves that scrollbar gutter so the header's star columns compute
+                 over the same width as the rows and stay aligned with them (the gutter pattern from
+                 the Network table). -->
+            <Border Grid.Row="0" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
                 <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
                     <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
