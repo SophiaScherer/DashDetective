@@ -32,207 +32,60 @@ Not all of these exist yet. Only build what is listed below as "currently active
 - `File Explorer`
 - `Network`
 - `Processes`
+- `Hardware`
 
-**Implementation status within the active features:**
+**Implementation status within the active features** (condensed — the full write-ups live in
+*Appendix — Completed Feature Details* at the end of this file):
 
-- **Navigation bar (shell-level).** The sidebar is a self-contained, **collapsible and dockable**
-  component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
-  (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
-  so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
-  icons-only rail**, in any orientation. Two entry points drive the **same shared**
-  `NavigationViewModel`: on-bar controls (a collapse chevron + a three-dot **kebab** menu whose
-  `Flyout` — rendered in the window overlay layer, so it is **never clipped** by the rail — offers the
-  four dock positions), and a **Navigation** group in **Settings → Appearance** (Position + Collapse,
-  both segmented controls). Orientation/collapse and every derived layout value (dock edge, rail
-  thickness, item axis, label/brand/footer visibility, accent-indicator bar↔underline, scroll axis)
-  are **computed properties on the VM — no value converters**. `MainWindowViewModel` owns page routing
-  and delegates the bar to `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. State is
-  **session-only** (resets to Left/expanded each launch, like Theming); this is shared shell work, not
-  a tab-local change.
+- **Navigation bar (shell-level).** A self-contained **collapsible + dockable** sidebar —
+  `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. Docks to any edge and
+  collapses to an icons-only rail; orientation/collapse and every derived layout value are **computed
+  properties on the VM — no value converters**. Driven from two entry points (on-bar controls +
+  **Settings → Appearance**). `MainWindowViewModel` owns page routing via `Nav.SelectionChanged` →
+  `CurrentPage`. State is **session-only**. *(full detail in Appendix)*
 
-- **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
-  the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
-  rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
-  Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
-  % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
-  **temperature** and **multi-GPU** layout are **deferred and out of scope for now** (research
-  notes under *Deferred Dashboard work* below). Storage: the Storage `StatCard` shows live disk
-  **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
-  as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
-  no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
-  in **Mbps** (dual series on one shared scale + gradient fill) with a live adapter-name caption, via
-  `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke — see the sampler note in
-  *Folder Structure*). System Information: the whole panel now reads the real machine — **OS** edition +
-  feature update (WMI `Win32_OperatingSystem.Caption` + registry `DisplayVersion`), **Device**
-  (`Environment.MachineName`), **BIOS** (`Win32_BIOS`), **Motherboard** (`Win32_BaseBoard`), **Build**
-  (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
-  timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
-  the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
-  live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
-  (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`;
-  its `TextBlock` has a fixed `Width` + centred text so the proportional-font `HH:mm:ss` reserves constant
-  space and ticking never reflows the toolbar),
-  a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
-  that now refreshes **whichever page is active** through the `IRefreshablePage` marker interface
-  (`src/Shared`) — on the Dashboard it forces an immediate re-read of every metric + static provider
-  (`DashboardViewModel.RefreshNow`), on the File Explorer it reloads the current folder, and pages that
-  don't implement it (Settings) simply ignore it (`MainWindowViewModel.Refresh` routes via
-  `CurrentPage as IRefreshablePage`) — and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
-  (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
-  needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
-  uses the in-box `Avalonia.Platform.Storage` picker — no new package.
-- **Settings** — the **Appearance** section is now live; the rest is still layout-only. The
-  **Theme** segmented control (Dark / Light / System) and the **Accent color** swatches are
-  data-bound to `SettingsViewModel` and applied at runtime through a single `ThemeService` (see
-  *Theming* below). The accent row's **first** swatch is a "Default" (multi-colour) option — a 2×2
-  four-colour square that restores the default look (each dashboard graph its own colour, highlight
-  blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
-  **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
-  `Border`s, not yet wired.
-- **File Explorer** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
-  browser matching the design comp: a folder **tree** (left, drives-as-roots + lazily-loaded
-  subfolders), a **file list** (centre) with a clickable **breadcrumb**, **filter chips**
-  (All / Documents / Images / Archives), **sortable column headers**, and a **Show hidden** checkbox,
-  and a **details/preview** pane (right) showing Type / Size /
-  Modified / Created / Attributes / Location with **Open** and **Properties** actions. Data comes from
-  `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*` with
-  `EnumerationOptions{IgnoreInaccessible, AttributesToSkip=…}` — hidden/system entries are skipped by
-  default but shown when **Show hidden** is on, see below — per-entry soft-fail off
-  the UI thread); friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES`);
-  icons are **themed vector glyphs** with fixed per-type colours (no `HICON`→bitmap); Open via
-  `Process.Start(UseShellExecute)` (also on double-click); Properties via `SHObjectProperties` invoked
-  from the view code-behind (needs the window `TopLevel` handle, like Export). **No new dependencies**
-  (Owner/ACL field intentionally omitted). Tree/list selection uses a per-item `IsSelected` +
-  callback (the NavItem pattern), with the VM enforcing single selection.
+- **Dashboard** — **fully live**: CPU, Memory, GPU, Storage and Network surfaces plus the System
+  Information panel all read the real machine (WMI + registry + PDH + managed samplers). The shell
+  **toolbar** is wired: a live clock, a **Live** pill (pause/resume sampling via `ILiveSamplingPage`),
+  a **Refresh** button (routes to the active page via `IRefreshablePage`), and an **Export** button
+  (plain-text diagnostics via the in-box `Avalonia.Platform.Storage` picker). Only the toolbar
+  **Search** box is still non-functional. GPU temperature + multi-GPU are deferred (see *Deferred
+  Dashboard work*). *(full detail in Appendix)*
 
-  Notable choices / deferred bits: this tab introduces the app's **first hierarchical control**
-  (`TreeView`) — an intentional, signed-off architecture addition. Tree roots are **drives**, not a
-  synthetic "This PC" node. Navigating via the list/breadcrumb does **not** sync the tree selection
-  (deferred by choice). Filter chips reuse the shared **segmented control** (`Border.seg`), not the
-  comp's softer chip; the details **preview** is a solid themed swatch, not the comp's literal
-  diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
-  and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
-  `TreeViewItem`'s `:pointerover` is true when the pointer is over any descendant).
+- **Settings** — **Appearance is live** (Theme segmented control + Accent swatches applied at runtime
+  through the single `ThemeService` — see *Theming*; the first accent swatch is a "Default" multi-colour
+  option). The **Monitoring** and **Export & Data** panels remain static layout. *(full detail in
+  Appendix)*
 
-  **Sorting, hidden files & contextual refresh (enhancement).** Three follow-on features, all kept
-  tab-local except the shared refresh seam:
-  - **Column sorting.** The `NAME / TYPE / MODIFIED / SIZE` headers are clickable (`Button.pick`
-    cells bound to per-column `SortColumn` VMs — same selectable-item shape as `FilterOption`); the
-    active column tints to `Accent` and shows a `↑`/`↓` arrow. Sorting lives in the **view model**, not
-    the service: `FileItem`/`FileEntry` now carry the **raw** `long Size` (-1 for folders) and
-    `DateTime Modified` keys alongside the display strings (the pre-formatted strings can't be ordered).
-    `FileExplorerViewModel.RebuildVisibleEntries` (renamed from `ApplyFilter`) filters then `Compare`-sorts;
-    `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
-    active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
-    adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
-  - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
-    `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
-    between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
-    so lazy expands honor the live setting. Toggling reloads the list **and** reconciles each loaded tree
-    branch **in place** via `FileSystemNode.SyncChildrenAsync` — surviving folders keep their instance
-    (so expansion and selection are preserved), newly-visible hidden folders are inserted and vanished
-    ones removed, and an unexpanded node's chevron is kept honest without loading its subtree. (This
-    replaced the earlier full `RootNodes.Clear()` rebuild that collapsed the whole tree on every toggle.)
-    The checkbox style recolours the Fluent template parts (`Border#NormalRectangle`, `Path#CheckGlyph`)
-    and is local to the view (the app's only checkbox — promote to `SharedStyles` if reused).
-  - **Contextual Refresh.** `FileExplorerViewModel` implements `IRefreshablePage` (`src/Shared`, the same
-    marker-interface idea as `ISelfScrollingPage`); `Refresh()` re-reads the current folder via the
-    existing `SetCurrentFolder`/`LoadEntriesAsync` path so the toolbar button picks up files added/removed
-    on disk. See the toolbar note in the Dashboard bullet for the shell-side routing.
-  - **Live auto-refresh.** Since the app is read-only, changes come from the user's own filesystem, so the
-    open folder updates itself without a manual refresh. `DirectoryWatcher` wraps a single
-    `FileSystemWatcher` (one directory, non-recursive), coalesces the OS's event bursts with a ~300 ms
-    debounce timer, and raises a UI-framework-agnostic `Changed` event; the VM holds one watcher,
-    **re-points** it at the open folder in `SetCurrentFolder`, and on `Changed` hops to the UI thread
-    (`Dispatcher.UIThread.Post`) into `ReloadCurrentFolderPreservingState`. That reload **keeps the
-    selection by path** (the `_reselectPath` captured/consumed in `LoadEntriesAsync`, cleared only if the
-    item is gone) and reconciles the matching tree node through the same `SyncChildrenAsync`, so new/removed
-    subfolders (and their chevrons) show in the left tree too. It's a same-path reload, so the scroll
-    position is kept (see below). The watcher is Windows-guarded and soft-failing (a vanished/denied path
-    stays idle); the page is a never-disposed singleton, so the one watcher lives for the app's lifetime.
-  - **Scroll-to-top on navigation.** Navigating to a *different* folder resets the file list to the top;
-    sort/filter/Refresh and auto-refresh of the *same* folder do not. The VM raises a `ScrollToTopRequested`
-    event from `SetCurrentFolder` **only when the target path differs** from the current one; the view
-    (which owns the named `FileListScroll` `ScrollViewer`) subscribes in `OnDataContextChanged` and calls
-    `ScrollToHome()`.
+- **File Explorer** — **live and functional**: a read-only three-pane browser (folder tree · file list
+  with breadcrumb/filter chips/sortable headers/Show-hidden · details+preview), all from `System.IO`,
+  with friendly type names + Properties via shell32 P/Invoke and themed vector glyphs. Live
+  auto-refresh via a debounced `FileSystemWatcher`; contextual Refresh via `IRefreshablePage`;
+  independent per-pane scrolling + resizable panes via the shell's `ISelfScrollingPage` seam +
+  `GridSplitter.paneSplitter`. Introduced the app's first `TreeView`. *(full detail in Appendix)*
 
-  **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
-  **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
-  `MainWindow.axaml` used to wrap *every* page, which left the panes unbounded in height so their own
-  scrollers never engaged (the whole tab scrolled as one). Pages that fill the viewport and manage
-  their own internal scrolling now implement the marker interface **`ISelfScrollingPage`**
-  (`src/Shared`); the shell hosts them **outside** the page-scrolling `ScrollViewer`, in a plain
-  `ContentControl` that the `*` grid row bounds to the viewport height (so the child is bounded and
-  each pane scrolls on its own). The page-host is a `Panel` with two mutually-exclusive
-  `ContentControl`s: the current page is routed to the scrolling host via
-  **`MainWindowViewModel.ScrollingPage`** or the bounded host via **`SelfScrollingPage`** (the other
-  is fed `null` so the view is only ever built once), toggled by **`CurrentPageSelfScrolls`**.
-  Dashboard/Settings scroll as a whole page (unchanged); `FileExplorerViewModel` is the only
-  self-scrolling implementer so far. (A `Disabled` `ScrollViewer` was tried first but does not
-  reliably bound its child, which clipped the bottom of long trees.) Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two
-  `GridSplitter`s (shared style **`GridSplitter.paneSplitter`** in `SharedStyles.axaml`); side panels
-  default to **240** (left) / **300** (right) with the middle list as `*`, and each side column carries
-  `MinWidth`/`MaxWidth` (plus `MinWidth="320"` on the list) so drags clamp sanely and the list never
-  collapses at the window's 920 px minimum. Widths are **session-only — they reset to the defaults each
-  launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
-  styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
-- **Network** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
-  Network page: six panels in two rows. The tab is always-on like the Dashboard (VM constructed once
-  in `MainWindowViewModel`), reuses the shared `Sparkline`, and adds **no new NuGet packages** (all
-  in-box: `System.Net.NetworkInformation`, `System.Net.NetworkInformation.Ping`, `System.Net.Dns`,
-  and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File Explorer and
-  Settings. Panels:
-  - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
-    (green connected / blue virtual / grey disconnected), status and link speed, via
-    `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
-    height-capped and scrolls so many adapters don't push the page down.
-  - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
-    from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
-  - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
-    scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
-    `NetworkUsageSampler` instance on a 1 Hz timer.
-  - **Active Connections** — netstat-style TCP+UDP table (Process · Remote · State · Protocol) with
-    owning process names, via feature-local `iphlpapi` P/Invoke (`ConnectionsInterop` →
-    `GetExtendedTcpTable`/`GetExtendedUdpTable`, IPv4 OWNER_PID tables) on a 2.5 s timer. Rows are
-    **keyed-diffed** in place (no flicker); de-duplicated by identity key in `ConnectionsProvider`
-    (two UDP sockets can share PID+local endpoint, which would otherwise break the diff), sorted,
-    **capped at 100** with an honest "N active · showing 100" caption. PID→name is cached with
-    stale-PID eviction; inaccessible/exited PIDs fall back to "PID n"; 0/4 → "System Idle"/"System".
-  - **Ping** — continuous ping to a fixed `8.8.8.8` (in-box `Ping`, 2 s timer, 1.5 s timeout,
-    in-flight-guarded), console-style last-3 replies + rolling avg-RTT / loss summary (`PingMonitor`).
-  - **DNS Lookup** — one-shot resolve of a fixed `example.com` (in-box `Dns.GetHostEntryAsync`, 3 s
-    `CancellationTokenSource`), run at startup and on Refresh (not a live loop), console-style output
-    with record type (`DnsLookupProvider`).
+- **Network** — **live and functional**: six panels (Adapters · IP Configuration · Throughput · Active
+  Connections · Ping · DNS Lookup), all in-box (`System.Net.NetworkInformation`, `Ping`, `Dns`,
+  `iphlpapi` P/Invoke). Always-on like the Dashboard; reuses the shared `Sparkline`; keyed-diff live
+  connections table. Added the shared `NetworkUsageSampler` (in `src/Services/Network`) and the
+  `ILiveSamplingPage` seam. IPv6 connections deferred. *(full detail in Appendix)*
 
-  Cross-cutting seams this tab added (both signed-off): the throughput sampler was **moved** from
-  `src/Tabs/Dashboard` to **`src/Services/Network`** (see *Folder Structure*) so Dashboard and Network
-  share it, and a new marker interface **`ILiveSamplingPage`** (`src/Shared`) lets the toolbar **Live**
-  pill pause/resume every sampling page — `MainWindowViewModel.ToggleLive` now routes through it over
-  `Nav.NavItems` (Dashboard + Network) instead of calling the Dashboard directly. Toolbar **Refresh**
-  routes through the existing `IRefreshablePage` (re-samples throughput, re-reads adapters/connections,
-  re-pings, re-resolves DNS). The ping/DNS console insets use a **fixed dark surface + fixed text
-  colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
-  IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
+- **Processes** — **being built in phases**: a Task-Manager-style live process view (Apps/Background/
+  Windows groups; per-process PID/status/CPU/Memory/Disk/GPU; sortable headers; summary strip; End
+  task; native Properties). In-box, no admin (`System.Diagnostics.Process`, `GetProcessIoCounters`
+  P/Invoke, PDH `\GPU Engine`). Per-process Network is deferred. Follows the always-on tab pattern +
+  keyed-diff table. *(full detail in Appendix)*
 
-- **Processes** — **newly activated; being built in phases** (plan:
-  `C:\Users\User\.claude\plans\processes-tab-plan.md`). Intended as a Task-Manager-style live process
-  view: the list **split into Apps and Background processes**, per-process **PID / status / CPU % /
-  Memory / Disk / (Network — deferred) / GPU %**, **sortable column headers**, a summary strip
-  (**process counts per group**, **total CPU %**, **total Memory %**, **total thread count**), **End
-  task**, and native **Properties** (the exe's shell property sheet). Data is **in-box, no new
-  dependencies, no admin**: `System.Diagnostics.Process` (CPU% via `TotalProcessorTime` diff, memory,
-  threads, status, Apps/Background split via `MainWindowHandle`, exe path), a feature-local
-  `GetProcessIoCounters` P/Invoke for Disk MB/s, and PDH `\GPU Engine(*)` grouped by the `pid_` token for
-  GPU %. **Per-process Network throughput is deferred** — there is no clean in-box per-process rate API
-  (Task Manager uses ETW kernel providers, which need the `TraceEvent` package + admin); the Network
-  column renders "—" until a task reactivates it. Follows the always-on tab pattern (constructed once in
-  the shell; `IRefreshablePage` + `ILiveSamplingPage` + `IDisposable` + `ISelfScrollingPage`), the Network
-  tab's keyed-diff live table, and the File Explorer sortable-header + Properties patterns. *Phase 0
-  (scaffold + activation) is in place; the live table and features land in later phases.*
+- **Hardware** — **newly activated; UI-only, being built in phases** (plan:
+  `C:\Users\User\.claude\plans\develop-a-plan-to-iridescent-pearl.md`). Per the design comp: a
+  2-column grid of six spec cards (Processor, Graphics, Motherboard, Memory, Storage Devices, Sensors),
+  each an icon-tile header + key/value spec rows. This phase renders a **data-driven** static layout
+  (`HardwareCard` + `HardwareSpec` records → an `ItemsControl` grid reusing the shared `InfoRow`
+  control) with **neutral placeholders** (`—`); the page scrolls as a whole like the Dashboard (not
+  self-scrolling). **Live/real data (WMI/PDH/sensors) is deferred** to a later technical phase, so
+  there is no `IRefreshablePage`/`ILiveSamplingPage` wiring yet.
 
-**Everything else (Performance, Storage, Hardware) is
+**Everything else (Performance, Storage) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
 "prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
 they are explicitly activated in a future revision of this file.
@@ -440,7 +293,16 @@ currently exist.
                                                          last-3 lines; soft-fails to a timeout)
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
                                                          3 s CTS; record type by address family)
-      (Processes, Performance, Storage, Hardware — not yet started)
+      /Hardware                 HardwareView.axaml(.cs) + HardwareViewModel.cs
+                                                        (static UI-only spec grid; whole-page scroll
+                                                         like the Dashboard — not self-scrolling. VM
+                                                         exposes a fixed list of HardwareCard models
+                                                         reused by an ItemsControl; live data deferred)
+                                HardwareCard.cs         (record: title/subtitle/icon/colours + rows)
+                                HardwareSpec.cs         (record: one key/value spec row; value → "—")
+                                HardwareIcons.cs        (feature-local card glyph geometries + fixed
+                                                         per-card icon colours)
+      (Performance, Storage — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
@@ -526,3 +388,209 @@ reference is needed** (adding the `Microsoft.Win32.Registry` package is redundan
 When a new feature becomes active, or an existing one is completed/paused, update the
 **Current Scope** section above to reflect it. This file should always describe what is
 *actually* being worked on right now — not the full long-term plan.
+
+## Appendix — Completed Feature Details
+
+> These are the full write-ups for features that are already live/complete. They were moved out of
+> **Current Scope** to keep the working section scannable; nothing here is out of date — it is the
+> detailed reference behind the condensed bullets above.
+
+- **Navigation bar (shell-level).** The sidebar is a self-contained, **collapsible and dockable**
+  component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
+  (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
+  so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
+  icons-only rail**, in any orientation. Two entry points drive the **same shared**
+  `NavigationViewModel`: on-bar controls (a collapse chevron + a three-dot **kebab** menu whose
+  `Flyout` — rendered in the window overlay layer, so it is **never clipped** by the rail — offers the
+  four dock positions), and a **Navigation** group in **Settings → Appearance** (Position + Collapse,
+  both segmented controls). Orientation/collapse and every derived layout value (dock edge, rail
+  thickness, item axis, label/brand/footer visibility, accent-indicator bar↔underline, scroll axis)
+  are **computed properties on the VM — no value converters**. `MainWindowViewModel` owns page routing
+  and delegates the bar to `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. State is
+  **session-only** (resets to Left/expanded each launch, like Theming); this is shared shell work, not
+  a tab-local change.
+
+- **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
+  the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
+  rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
+  Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
+  % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
+  **temperature** and **multi-GPU** layout are **deferred and out of scope for now** (research
+  notes under *Deferred Dashboard work* below). Storage: the Storage `StatCard` shows live disk
+  **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
+  as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
+  no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
+  in **Mbps** (dual series on one shared scale + gradient fill) with a live adapter-name caption, via
+  `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke — see the sampler note in
+  *Folder Structure*). System Information: the whole panel now reads the real machine — **OS** edition +
+  feature update (WMI `Win32_OperatingSystem.Caption` + registry `DisplayVersion`), **Device**
+  (`Environment.MachineName`), **BIOS** (`Win32_BIOS`), **Motherboard** (`Win32_BaseBoard`), **Build**
+  (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
+  timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
+  the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
+  live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
+  (top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`;
+  its `TextBlock` has a fixed `Width` + centred text so the proportional-font `HH:mm:ss` reserves constant
+  space and ticking never reflows the toolbar),
+  a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
+  that now refreshes **whichever page is active** through the `IRefreshablePage` marker interface
+  (`src/Shared`) — on the Dashboard it forces an immediate re-read of every metric + static provider
+  (`DashboardViewModel.RefreshNow`), on the File Explorer it reloads the current folder, and pages that
+  don't implement it (Settings) simply ignore it (`MainWindowViewModel.Refresh` routes via
+  `CurrentPage as IRefreshablePage`) — and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
+  (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
+  needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
+  uses the in-box `Avalonia.Platform.Storage` picker — no new package.
+
+- **Settings** — the **Appearance** section is now live; the rest is still layout-only. The
+  **Theme** segmented control (Dark / Light / System) and the **Accent color** swatches are
+  data-bound to `SettingsViewModel` and applied at runtime through a single `ThemeService` (see
+  *Theming* below). The accent row's **first** swatch is a "Default" (multi-colour) option — a 2×2
+  four-colour square that restores the default look (each dashboard graph its own colour, highlight
+  blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
+  **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
+  `Border`s, not yet wired.
+
+- **File Explorer** — **live and functional** (built in phases; plan:
+  `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
+  browser matching the design comp: a folder **tree** (left, drives-as-roots + lazily-loaded
+  subfolders), a **file list** (centre) with a clickable **breadcrumb**, **filter chips**
+  (All / Documents / Images / Archives), **sortable column headers**, and a **Show hidden** checkbox,
+  and a **details/preview** pane (right) showing Type / Size /
+  Modified / Created / Attributes / Location with **Open** and **Properties** actions. Data comes from
+  `System.IO` (`DriveInfo`/`DirectoryInfo`/`FileInfo`, lazy `Enumerate*` with
+  `EnumerationOptions{IgnoreInaccessible, AttributesToSkip=…}` — hidden/system entries are skipped by
+  default but shown when **Show hidden** is on, see below — per-entry soft-fail off
+  the UI thread); friendly type names via `SHGetFileInfo` (`SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES`);
+  icons are **themed vector glyphs** with fixed per-type colours (no `HICON`→bitmap); Open via
+  `Process.Start(UseShellExecute)` (also on double-click); Properties via `SHObjectProperties` invoked
+  from the view code-behind (needs the window `TopLevel` handle, like Export). **No new dependencies**
+  (Owner/ACL field intentionally omitted). Tree/list selection uses a per-item `IsSelected` +
+  callback (the NavItem pattern), with the VM enforcing single selection.
+
+  Notable choices / deferred bits: this tab introduces the app's **first hierarchical control**
+  (`TreeView`) — an intentional, signed-off architecture addition. Tree roots are **drives**, not a
+  synthetic "This PC" node. Navigating via the list/breadcrumb does **not** sync the tree selection
+  (deferred by choice). Filter chips reuse the shared **segmented control** (`Border.seg`), not the
+  comp's softer chip; the details **preview** is a solid themed swatch, not the comp's literal
+  diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
+  and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
+  `TreeViewItem`'s `:pointerover` is true when the pointer is over any descendant).
+
+  **Sorting, hidden files & contextual refresh (enhancement).** Three follow-on features, all kept
+  tab-local except the shared refresh seam:
+  - **Column sorting.** The `NAME / TYPE / MODIFIED / SIZE` headers are clickable (`Button.pick`
+    cells bound to per-column `SortColumn` VMs — same selectable-item shape as `FilterOption`); the
+    active column tints to `Accent` and shows a `↑`/`↓` arrow. Sorting lives in the **view model**, not
+    the service: `FileItem`/`FileEntry` now carry the **raw** `long Size` (-1 for folders) and
+    `DateTime Modified` keys alongside the display strings (the pre-formatted strings can't be ordered).
+    `FileExplorerViewModel.RebuildVisibleEntries` (renamed from `ApplyFilter`) filters then `Compare`-sorts;
+    `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
+    active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
+    adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
+  - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
+    `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
+    between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
+    so lazy expands honor the live setting. Toggling reloads the list **and** reconciles each loaded tree
+    branch **in place** via `FileSystemNode.SyncChildrenAsync` — surviving folders keep their instance
+    (so expansion and selection are preserved), newly-visible hidden folders are inserted and vanished
+    ones removed, and an unexpanded node's chevron is kept honest without loading its subtree. (This
+    replaced the earlier full `RootNodes.Clear()` rebuild that collapsed the whole tree on every toggle.)
+    The checkbox style recolours the Fluent template parts (`Border#NormalRectangle`, `Path#CheckGlyph`)
+    and is local to the view (the app's only checkbox — promote to `SharedStyles` if reused).
+  - **Contextual Refresh.** `FileExplorerViewModel` implements `IRefreshablePage` (`src/Shared`, the same
+    marker-interface idea as `ISelfScrollingPage`); `Refresh()` re-reads the current folder via the
+    existing `SetCurrentFolder`/`LoadEntriesAsync` path so the toolbar button picks up files added/removed
+    on disk. See the toolbar note in the Dashboard bullet for the shell-side routing.
+  - **Live auto-refresh.** Since the app is read-only, changes come from the user's own filesystem, so the
+    open folder updates itself without a manual refresh. `DirectoryWatcher` wraps a single
+    `FileSystemWatcher` (one directory, non-recursive), coalesces the OS's event bursts with a ~300 ms
+    debounce timer, and raises a UI-framework-agnostic `Changed` event; the VM holds one watcher,
+    **re-points** it at the open folder in `SetCurrentFolder`, and on `Changed` hops to the UI thread
+    (`Dispatcher.UIThread.Post`) into `ReloadCurrentFolderPreservingState`. That reload **keeps the
+    selection by path** (the `_reselectPath` captured/consumed in `LoadEntriesAsync`, cleared only if the
+    item is gone) and reconciles the matching tree node through the same `SyncChildrenAsync`, so new/removed
+    subfolders (and their chevrons) show in the left tree too. It's a same-path reload, so the scroll
+    position is kept (see below). The watcher is Windows-guarded and soft-failing (a vanished/denied path
+    stays idle); the page is a never-disposed singleton, so the one watcher lives for the app's lifetime.
+  - **Scroll-to-top on navigation.** Navigating to a *different* folder resets the file list to the top;
+    sort/filter/Refresh and auto-refresh of the *same* folder do not. The VM raises a `ScrollToTopRequested`
+    event from `SetCurrentFolder` **only when the target path differs** from the current one; the view
+    (which owns the named `FileListScroll` `ScrollViewer`) subscribes in `OnDataContextChanged` and calls
+    `ScrollToHome()`.
+
+  **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
+  **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
+  `MainWindow.axaml` used to wrap *every* page, which left the panes unbounded in height so their own
+  scrollers never engaged (the whole tab scrolled as one). Pages that fill the viewport and manage
+  their own internal scrolling now implement the marker interface **`ISelfScrollingPage`**
+  (`src/Shared`); the shell hosts them **outside** the page-scrolling `ScrollViewer`, in a plain
+  `ContentControl` that the `*` grid row bounds to the viewport height (so the child is bounded and
+  each pane scrolls on its own). The page-host is a `Panel` with two mutually-exclusive
+  `ContentControl`s: the current page is routed to the scrolling host via
+  **`MainWindowViewModel.ScrollingPage`** or the bounded host via **`SelfScrollingPage`** (the other
+  is fed `null` so the view is only ever built once), toggled by **`CurrentPageSelfScrolls`**.
+  Dashboard/Settings scroll as a whole page (unchanged); `FileExplorerViewModel` is the only
+  self-scrolling implementer so far. (A `Disabled` `ScrollViewer` was tried first but does not
+  reliably bound its child, which clipped the bottom of long trees.) Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two
+  `GridSplitter`s (shared style **`GridSplitter.paneSplitter`** in `SharedStyles.axaml`); side panels
+  default to **240** (left) / **300** (right) with the middle list as `*`, and each side column carries
+  `MinWidth`/`MaxWidth` (plus `MinWidth="320"` on the list) so drags clamp sanely and the list never
+  collapses at the window's 920 px minimum. Widths are **session-only — they reset to the defaults each
+  launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
+  styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
+
+- **Network** — **live and functional** (built in phases; plan:
+  `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
+  Network page: six panels in two rows. The tab is always-on like the Dashboard (VM constructed once
+  in `MainWindowViewModel`), reuses the shared `Sparkline`, and adds **no new NuGet packages** (all
+  in-box: `System.Net.NetworkInformation`, `System.Net.NetworkInformation.Ping`, `System.Net.Dns`,
+  and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File Explorer and
+  Settings. Panels:
+  - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
+    (green connected / blue virtual / grey disconnected), status and link speed, via
+    `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
+    height-capped and scrolls so many adapters don't push the page down.
+  - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
+    from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
+  - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
+    scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
+    `NetworkUsageSampler` instance on a 1 Hz timer.
+  - **Active Connections** — netstat-style TCP+UDP table (Process · Remote · State · Protocol) with
+    owning process names, via feature-local `iphlpapi` P/Invoke (`ConnectionsInterop` →
+    `GetExtendedTcpTable`/`GetExtendedUdpTable`, IPv4 OWNER_PID tables) on a 2.5 s timer. Rows are
+    **keyed-diffed** in place (no flicker); de-duplicated by identity key in `ConnectionsProvider`
+    (two UDP sockets can share PID+local endpoint, which would otherwise break the diff), sorted,
+    **capped at 100** with an honest "N active · showing 100" caption. PID→name is cached with
+    stale-PID eviction; inaccessible/exited PIDs fall back to "PID n"; 0/4 → "System Idle"/"System".
+  - **Ping** — continuous ping to a fixed `8.8.8.8` (in-box `Ping`, 2 s timer, 1.5 s timeout,
+    in-flight-guarded), console-style last-3 replies + rolling avg-RTT / loss summary (`PingMonitor`).
+  - **DNS Lookup** — one-shot resolve of a fixed `example.com` (in-box `Dns.GetHostEntryAsync`, 3 s
+    `CancellationTokenSource`), run at startup and on Refresh (not a live loop), console-style output
+    with record type (`DnsLookupProvider`).
+
+  Cross-cutting seams this tab added (both signed-off): the throughput sampler was **moved** from
+  `src/Tabs/Dashboard` to **`src/Services/Network`** (see *Folder Structure*) so Dashboard and Network
+  share it, and a new marker interface **`ILiveSamplingPage`** (`src/Shared`) lets the toolbar **Live**
+  pill pause/resume every sampling page — `MainWindowViewModel.ToggleLive` now routes through it over
+  `Nav.NavItems` (Dashboard + Network) instead of calling the Dashboard directly. Toolbar **Refresh**
+  routes through the existing `IRefreshablePage` (re-samples throughput, re-reads adapters/connections,
+  re-pings, re-resolves DNS). The ping/DNS console insets use a **fixed dark surface + fixed text
+  colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
+  IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
+
+- **Processes** — **newly activated; being built in phases** (plan:
+  `C:\Users\User\.claude\plans\processes-tab-plan.md`). Intended as a Task-Manager-style live process
+  view: the list **split into Apps and Background processes**, per-process **PID / status / CPU % /
+  Memory / Disk / (Network — deferred) / GPU %**, **sortable column headers**, a summary strip
+  (**process counts per group**, **total CPU %**, **total Memory %**, **total thread count**), **End
+  task**, and native **Properties** (the exe's shell property sheet). Data is **in-box, no new
+  dependencies, no admin**: `System.Diagnostics.Process` (CPU% via `TotalProcessorTime` diff, memory,
+  threads, status, Apps/Background split via `MainWindowHandle`, exe path), a feature-local
+  `GetProcessIoCounters` P/Invoke for Disk MB/s, and PDH `\GPU Engine(*)` grouped by the `pid_` token for
+  GPU %. **Per-process Network throughput is deferred** — there is no clean in-box per-process rate API
+  (Task Manager uses ETW kernel providers, which need the `TraceEvent` package + admin); the Network
+  column renders "—" until a task reactivates it. Follows the always-on tab pattern (constructed once in
+  the shell; `IRefreshablePage` + `ILiveSamplingPage` + `IDisposable` + `ISelfScrollingPage`), the Network
+  tab's keyed-diff live table, and the File Explorer sortable-header + Properties patterns. *Phase 0
+  (scaffold + activation) is in place; the live table and features land in later phases.*
