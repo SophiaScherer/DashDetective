@@ -39,6 +39,10 @@ public static class ProcessSnapshotProvider {
         // Per-process GPU% for this interval (PID → %), read once off the same PDH query.
         var gpuByPid = ProcessGpuSampler.Sample();
 
+        // Parent PIDs + App/Background/Windows categories for this instant (window ownership + session),
+        // captured once so each process below is just a lookup. See ProcessClassifier.
+        var classification = ProcessClassifier.Capture();
+
         var processes = Process.GetProcesses();
         var result = new List<ProcessInfo>(processes.Length);
         var nextCpuTime = new Dictionary<int, TimeSpan>(processes.Length);
@@ -58,12 +62,13 @@ public static class ProcessSnapshotProvider {
                     var memory = SafeWorkingSet(process);
                     var threads = SafeThreadCount(process);
                     var status = SafeResponding(process) ? "Running" : "Not responding";
-                    var category = HasMainWindow(process) ? ProcessCategory.App : ProcessCategory.Background;
+                    var category = classification.CategoryOf(pid);
+                    var parentPid = classification.ParentOf(pid);
                     var name = SafeName(process);
                     var disk = ComputeDiskRate(process, pid, nextIoBytes, wallSeconds);
                     var gpu = gpuByPid.TryGetValue(pid, out var g) ? g : 0;
 
-                    result.Add(new ProcessInfo(pid, name, status, cpuPercent, memory, threads, category, disk, gpu));
+                    result.Add(new ProcessInfo(pid, parentPid, name, status, cpuPercent, memory, threads, category, disk, gpu));
                 } catch {
                     // A whole-process failure is rare (handle races) — skip that entry.
                 }
@@ -106,11 +111,6 @@ public static class ProcessSnapshotProvider {
 
         var percent = delta / (wallSeconds * LogicalProcessors) * 100;
         return percent < 0 ? 0 : percent > 100 ? 100 : percent;
-    }
-
-    private static bool HasMainWindow(Process process) {
-        try { return process.MainWindowHandle != IntPtr.Zero; }
-        catch { return false; }
     }
 
     private static long SafeWorkingSet(Process process) {

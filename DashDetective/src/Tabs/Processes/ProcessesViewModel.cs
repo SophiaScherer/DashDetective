@@ -49,11 +49,21 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// the next poll.</summary>
     private IReadOnlyList<ProcessInfo> _lastSnapshot = Array.Empty<ProcessInfo>();
 
-    /// <summary>Foreground apps (own a visible window), updated in place by the keyed diff.</summary>
+    /// <summary>The last built process tree (top-level entries with their collapsed children). Kept so
+    /// the expand/collapse chevrons can reveal children without rebuilding.</summary>
+    private IReadOnlyList<ProcessNode> _lastRoots = Array.Empty<ProcessNode>();
+
+    /// <summary>Foreground apps (own a visible top-level window), updated in place by the keyed diff.
+    /// Holds one row per top-level group (a multi-process app collapses to a single entry).</summary>
     public ObservableCollection<ProcessRow> Apps { get; } = new();
 
-    /// <summary>Background processes (services/helpers/Windows components), updated in place.</summary>
+    /// <summary>Background processes (user-session helpers/trays/updaters with no window), updated in
+    /// place.</summary>
     public ObservableCollection<ProcessRow> Background { get; } = new();
+
+    /// <summary>Windows processes (system/service processes outside the interactive session), updated in
+    /// place — Task Manager's third group.</summary>
+    public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
     // Clickable column headers. Disk/Network/Gpu sort as no-ops until they carry values.
     public ProcessSortColumn NameSort { get; }
@@ -68,8 +78,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
     [ObservableProperty] private string _appsHeader = "Apps";
 
-    /// <summary>Group header caption for the Background section (e.g. "Background processes · 214").</summary>
+    /// <summary>Group header caption for the Background section (e.g. "Background processes · 127").</summary>
     [ObservableProperty] private string _backgroundHeader = "Background processes";
+
+    /// <summary>Group header caption for the Windows-processes section (e.g. "Windows processes · 150").</summary>
+    [ObservableProperty] private string _windowsHeader = "Windows processes";
 
     // ----- Summary strip -----
 
@@ -169,10 +182,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             ApplySnapshot(processes);
         } catch {
             _lastSnapshot = Array.Empty<ProcessInfo>();
+            _lastRoots = Array.Empty<ProcessNode>();
             Apps.Clear();
             Background.Clear();
+            WindowsProcesses.Clear();
             AppsHeader = "Apps";
             BackgroundHeader = "Background processes";
+            WindowsHeader = "Windows processes";
             TotalProcessesText = "0";
             ProcessBreakdownText = "";
             ThreadsText = "0";
@@ -181,40 +197,58 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         }
     }
 
-    /// <summary>Splits the snapshot into the two groups, orders each (by name for now — real column
-    /// sorting is a later phase), reconciles them into place and updates the group captions.</summary>
+    /// <summary>Builds the process tree (collapsing multi-process apps into one entry, Task-Manager
+    /// style), splits the top-level entries into the three groups, orders each by the active sort key,
+    /// reconciles them into place and updates the captions. Each row shows its group's aggregate
+    /// metrics (own + descendants). Kept for the next poll / a header re-sort.</summary>
     private void ApplySnapshot(IReadOnlyList<ProcessInfo> processes) {
+        var roots = ProcessTreeBuilder.Build(processes);
+        _lastRoots = roots;
+
         var apps = new List<ProcessInfo>();
         var background = new List<ProcessInfo>();
-        var totalThreads = 0;
-        foreach (var info in processes) {
-            if (info.Category == ProcessCategory.App)
-                apps.Add(info);
-            else
-                background.Add(info);
-            totalThreads += info.ThreadCount;
+        var windows = new List<ProcessInfo>();
+        foreach (var node in roots) {
+            var entry = node.Aggregate;
+            switch (entry.Category) {
+                case ProcessCategory.App: apps.Add(entry); break;
+                case ProcessCategory.Windows: windows.Add(entry); break;
+                default: background.Add(entry); break;
+            }
         }
+
+        // Total threads span every process, not just the top-level entries.
+        var totalThreads = 0;
+        foreach (var info in processes)
+            totalThreads += info.ThreadCount;
 
         apps.Sort(Compare);
         background.Sort(Compare);
+        windows.Sort(Compare);
 
         Reconcile(Apps, apps);
         Reconcile(Background, background);
+        Reconcile(WindowsProcesses, windows);
 
         // If the selected process has exited, the diff removed its row — drop the dangling selection.
-        if (SelectedRow is not null && !Apps.Contains(SelectedRow) && !Background.Contains(SelectedRow)) {
+        if (SelectedRow is not null && !Apps.Contains(SelectedRow) &&
+            !Background.Contains(SelectedRow) && !WindowsProcesses.Contains(SelectedRow)) {
             SelectedRow.IsSelected = false;
             SelectedRow = null;
         }
 
         AppsHeader = $"Apps · {apps.Count.ToString(CultureInfo.InvariantCulture)}";
         BackgroundHeader = $"Background processes · {background.Count.ToString(CultureInfo.InvariantCulture)}";
+        WindowsHeader = $"Windows processes · {windows.Count.ToString(CultureInfo.InvariantCulture)}";
 
-        // Summary strip: total count + per-group breakdown + total threads (CPU%/Memory% come from
-        // the system samplers in SampleSystemTotals).
-        TotalProcessesText = (apps.Count + background.Count).ToString(CultureInfo.InvariantCulture);
+        // Summary strip: the total is the number of top-level entries (so it matches the sum of the
+        // three group headers), with the per-group breakdown under it. CPU%/Memory% come from the
+        // system samplers in SampleSystemTotals.
+        var entries = apps.Count + background.Count + windows.Count;
+        TotalProcessesText = entries.ToString(CultureInfo.InvariantCulture);
         ProcessBreakdownText = $"{apps.Count.ToString(CultureInfo.InvariantCulture)} apps · " +
-                               $"{background.Count.ToString(CultureInfo.InvariantCulture)} background";
+                               $"{background.Count.ToString(CultureInfo.InvariantCulture)} background · " +
+                               $"{windows.Count.ToString(CultureInfo.InvariantCulture)} Windows";
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
     }
 
@@ -340,8 +374,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         try {
             using var process = Process.GetProcessById(row.Pid);
             process.Kill();
-            if (!Apps.Remove(row))
-                Background.Remove(row);
+            if (!Apps.Remove(row) && !Background.Remove(row))
+                WindowsProcesses.Remove(row);
             SelectedRow = null;
             ActionMessage = "";
         } catch {

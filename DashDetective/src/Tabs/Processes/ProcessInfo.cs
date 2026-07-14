@@ -5,12 +5,15 @@ namespace DashDetective.Tabs.Processes;
 /// (<see cref="CpuPercent"/>, <see cref="MemoryBytes"/>, <see cref="DiskBytesPerSec"/>,
 /// <see cref="GpuPercent"/>) the view model sorts on — the pre-formatted display strings live on
 /// <see cref="ProcessRow"/> and can't be ordered. <see cref="Pid"/> is the identity used by the keyed
-/// diff (unique among live processes).
+/// diff (unique among live processes). <see cref="ParentPid"/> ties each process to its creator so
+/// <see cref="ProcessTreeBuilder"/> can collapse a multi-process app (e.g. all of Edge's helpers)
+/// under one entry, the way Task Manager does.
 ///
 /// Per-process Network throughput is deferred (no clean in-box API), so the Net column stays "—".
 /// </summary>
 public sealed record ProcessInfo(
     int Pid,
+    int ParentPid,
     string Name,
     string Status,
     double CpuPercent,
