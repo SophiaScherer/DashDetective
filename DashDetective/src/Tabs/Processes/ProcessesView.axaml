@@ -11,6 +11,42 @@
          fixed while the grouped list scrolls. Surfaces/typography come from src/Shared/Styles.
          The shared 8-column layout is repeated on the header and each row (like the Network and File
          Explorer tables). Disk/GPU arrive in a later phase; Network is deferred, so those cells show "—". -->
+    <UserControl.Resources>
+        <!-- Shared row template for all three groups (Apps / Background / Windows) so the 8-column
+             layout is defined once instead of copy-pasted per group; it must stay in sync with the
+             sticky header's column definition above. Bindings are compiled (x:DataType); the row tap
+             is handled in code-behind (OnRowTapped). -->
+        <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
+            <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
+                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                    <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
+                         inside column 0 so revealing children never shifts the other columns. The slot
+                         is reserved even without a chevron so parent and child names line up. -->
+                    <Grid Grid.Column="0" Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
+                        <Button Grid.Column="0" Classes="chev" Click="OnChevronClick"
+                                IsVisible="{Binding HasChildren}">
+                            <TextBlock Text="{Binding ChevronGlyph}"/>
+                        </Button>
+                        <Ellipse Grid.Column="1" Width="7" Height="7" Margin="0,0,9,0"
+                                 VerticalAlignment="Center" Fill="{Binding StatusBrush}"/>
+                        <TextBlock Grid.Column="2" Classes="cellName" VerticalAlignment="Center"
+                                   Text="{Binding Name}"/>
+                    </Grid>
+                    <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
+                               Foreground="{Binding StatusBrush}"/>
+                    <TextBlock Grid.Column="3" Classes="cpuCell"
+                               Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
+                               Text="{Binding CpuText}"/>
+                    <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
+                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
+                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding NetworkText}"/>
+                    <TextBlock Grid.Column="7" Classes="cellNum" Text="{Binding GpuText}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <!-- Column header cells. Each is a chrome-less button that sorts by its column; the active
              column tints to the accent and shows a ↑/↓ arrow (bound to the ProcessSortColumn VMs). -->
@@ -40,6 +76,30 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
+        <!-- Expand/collapse chevron: a chrome-less button in the name cell. Its 16px slot is reserved on
+             every row (empty when the entry has no children) so names stay aligned parent-to-child. -->
+        <Style Selector="Button.chev">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chev /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.chev TextBlock">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="Button.chev:pointerover TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
         <!-- Group section header (e.g. "Apps · 6"). -->
         <Style Selector="Border.groupHead">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
@@ -51,9 +111,14 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
 
-        <!-- Data rows. -->
+        <!-- Data rows. Background is Transparent here (a base style), NOT set locally on the row
+             Border: a locally-set Background outranks the :pointerover / .selected style triggers
+             (LocalValue beats StyleTrigger in Avalonia), so hover and selection would never paint.
+             Setting it in the style keeps the whole row hit-testable for Tapped while letting the
+             triggers below override it. -->
         <Style Selector="Border.procRow">
             <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -61,9 +126,16 @@
         <Style Selector="Border.procRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <!-- Selection wins over hover (defined after :pointerover). -->
+        <!-- Selection wins over hover (defined after :pointerover). A solid accent bar down the left
+             edge makes the selected row unmistakable in both themes; the soft accent fill tints the
+             rest. The 3px left border is offset by trimming the left padding 16→13 so the row content
+             doesn't shift when selected. Accent brushes are DynamicResource so they track the runtime
+             accent (ThemeService.SetAccent). -->
         <Style Selector="Border.procRow.selected">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderThickness" Value="3,0,0,1"/>
+            <Setter Property="Padding" Value="13,8"/>
         </Style>
         <Style Selector="Border.procRow.selected:pointerover">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
@@ -139,7 +211,9 @@
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="PROCESSES"/>
                     <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
-                    <TextBlock Classes="cardSub" Text="{Binding ProcessBreakdownText}"/>
+                    <!-- Three category counts don't fit on one line, so let the breakdown wrap. -->
+                    <TextBlock Classes="cardSub" TextWrapping="Wrap"
+                               Text="{Binding ProcessBreakdownText}"/>
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Classes="card">
@@ -183,8 +257,13 @@
         <Grid RowDefinitions="Auto,*">
 
             <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
-                 the label; right-aligned numeric columns put it before, so it always sits inward. -->
-            <Border Grid.Row="0" Padding="16,11" BorderBrush="{DynamicResource Hairline}"
+                 the label; right-aligned numeric columns put it before, so it always sits inward.
+                 The header lives OUTSIDE the ScrollViewer, so it spans the full panel width while the
+                 rows inside are narrowed by the always-on vertical scrollbar. The extra 14px of right
+                 padding (16→30) reserves that scrollbar gutter so the header's star columns compute
+                 over the same width as the rows and stay aligned with them (the gutter pattern from
+                 the Network table). -->
+            <Border Grid.Row="0" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
                 <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
                     <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
@@ -254,65 +333,22 @@
                     <Border Classes="groupHead">
                         <TextBlock Text="{Binding AppsHeader}"/>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Apps}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProcessRow">
-                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
-                                        Background="Transparent" Tapped="OnRowTapped">
-                                    <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
-                                          ColumnSpacing="4">
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
-                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                                     Fill="{Binding StatusBrush}"/>
-                                            <TextBlock Classes="cellName" Text="{Binding Name}"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                                                   Foreground="{Binding StatusBrush}"/>
-                                        <TextBlock Grid.Column="3" Classes="cpuCell"
-                                                   Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
-                                                   Text="{Binding CpuText}"/>
-                                        <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                                        <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
-                                        <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding NetworkText}"/>
-                                        <TextBlock Grid.Column="7" Classes="cellNum" Text="{Binding GpuText}"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Apps}"
+                                  ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Background -->
                     <Border Classes="groupHead">
                         <TextBlock Text="{Binding BackgroundHeader}"/>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Background}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProcessRow">
-                                <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
-                                        Background="Transparent" Tapped="OnRowTapped">
-                                    <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
-                                          ColumnSpacing="4">
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
-                                            <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                                     Fill="{Binding StatusBrush}"/>
-                                            <TextBlock Classes="cellName" Text="{Binding Name}"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                                                   Foreground="{Binding StatusBrush}"/>
-                                        <TextBlock Grid.Column="3" Classes="cpuCell"
-                                                   Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
-                                                   Text="{Binding CpuText}"/>
-                                        <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                                        <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
-                                        <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding NetworkText}"/>
-                                        <TextBlock Grid.Column="7" Classes="cellNum" Text="{Binding GpuText}"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Background}"
+                                  ItemTemplate="{StaticResource ProcRowTemplate}"/>
+
+                    <!-- Windows processes -->
+                    <Border Classes="groupHead">
+                        <TextBlock Text="{Binding WindowsHeader}"/>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding WindowsProcesses}"
+                                  ItemTemplate="{StaticResource ProcRowTemplate}"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

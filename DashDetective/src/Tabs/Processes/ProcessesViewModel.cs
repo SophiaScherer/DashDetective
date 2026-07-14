@@ -49,11 +49,25 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// the next poll.</summary>
     private IReadOnlyList<ProcessInfo> _lastSnapshot = Array.Empty<ProcessInfo>();
 
-    /// <summary>Foreground apps (own a visible window), updated in place by the keyed diff.</summary>
+    /// <summary>The last built process tree (top-level entries with their collapsed children). Kept so
+    /// the expand/collapse chevrons can re-flatten the visible rows without rebuilding the tree.</summary>
+    private IReadOnlyList<ProcessNode> _lastRoots = Array.Empty<ProcessNode>();
+
+    /// <summary>PIDs whose children are currently revealed. The authoritative expand state (rows are
+    /// transient — the keyed diff recreates them), so it survives polls and re-sorts.</summary>
+    private readonly HashSet<int> _expandedPids = new();
+
+    /// <summary>Foreground apps (own a visible top-level window), updated in place by the keyed diff.
+    /// Holds one row per top-level group (a multi-process app collapses to a single entry).</summary>
     public ObservableCollection<ProcessRow> Apps { get; } = new();
 
-    /// <summary>Background processes (services/helpers/Windows components), updated in place.</summary>
+    /// <summary>Background processes (user-session helpers/trays/updaters with no window), updated in
+    /// place.</summary>
     public ObservableCollection<ProcessRow> Background { get; } = new();
+
+    /// <summary>Windows processes (system/service processes outside the interactive session), updated in
+    /// place — Task Manager's third group.</summary>
+    public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
     // Clickable column headers. Disk/Network/Gpu sort as no-ops until they carry values.
     public ProcessSortColumn NameSort { get; }
@@ -68,8 +82,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
     [ObservableProperty] private string _appsHeader = "Apps";
 
-    /// <summary>Group header caption for the Background section (e.g. "Background processes · 214").</summary>
+    /// <summary>Group header caption for the Background section (e.g. "Background processes · 127").</summary>
     [ObservableProperty] private string _backgroundHeader = "Background processes";
+
+    /// <summary>Group header caption for the Windows-processes section (e.g. "Windows processes · 150").</summary>
+    [ObservableProperty] private string _windowsHeader = "Windows processes";
 
     // ----- Summary strip -----
 
@@ -169,10 +186,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             ApplySnapshot(processes);
         } catch {
             _lastSnapshot = Array.Empty<ProcessInfo>();
+            _lastRoots = Array.Empty<ProcessNode>();
             Apps.Clear();
             Background.Clear();
+            WindowsProcesses.Clear();
             AppsHeader = "Apps";
             BackgroundHeader = "Background processes";
+            WindowsHeader = "Windows processes";
             TotalProcessesText = "0";
             ProcessBreakdownText = "";
             ThreadsText = "0";
@@ -181,41 +201,121 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         }
     }
 
-    /// <summary>Splits the snapshot into the two groups, orders each (by name for now — real column
-    /// sorting is a later phase), reconciles them into place and updates the group captions.</summary>
+    /// <summary>A single visible row in a group: a tree node projected for display — its aggregate
+    /// metrics plus where it sits in the tree (depth, whether it has children, whether it's expanded).</summary>
+    private readonly record struct RowModel(ProcessInfo Info, int Depth, bool HasChildren, bool IsExpanded);
+
+    /// <summary>Builds the process tree (collapsing multi-process apps into one entry, Task-Manager
+    /// style) and flattens it into the visible rows. Kept for the next poll / a header re-sort.</summary>
     private void ApplySnapshot(IReadOnlyList<ProcessInfo> processes) {
-        var apps = new List<ProcessInfo>();
-        var background = new List<ProcessInfo>();
-        var totalThreads = 0;
-        foreach (var info in processes) {
-            if (info.Category == ProcessCategory.App)
-                apps.Add(info);
-            else
-                background.Add(info);
-            totalThreads += info.ThreadCount;
+        _lastRoots = ProcessTreeBuilder.Build(processes);
+        PruneExpanded(_lastRoots);
+        RebuildVisibleRows();
+    }
+
+    /// <summary>Drops expand state for PIDs that no longer name a live parent (exited or lost their
+    /// children), so the set doesn't accumulate stale entries across polls.</summary>
+    private void PruneExpanded(IReadOnlyList<ProcessNode> roots) {
+        if (_expandedPids.Count == 0)
+            return;
+        var expandable = new HashSet<int>();
+        CollectExpandable(roots, expandable);
+        _expandedPids.IntersectWith(expandable);
+    }
+
+    private static void CollectExpandable(IReadOnlyList<ProcessNode> nodes, HashSet<int> into) {
+        foreach (var node in nodes) {
+            if (node.HasChildren) {
+                into.Add(node.Info.Pid);
+                CollectExpandable(node.Children, into);
+            }
+        }
+    }
+
+    /// <summary>Splits the tree's top-level entries into the three groups, orders each by the active
+    /// sort key, flattens expanded subtrees into visible rows, reconciles them into place and updates
+    /// the captions. Each row shows its node's aggregate metrics (own + descendants). Called on every
+    /// poll, header re-sort and expand/collapse.</summary>
+    private void RebuildVisibleRows() {
+        var appRoots = new List<ProcessNode>();
+        var backgroundRoots = new List<ProcessNode>();
+        var windowsRoots = new List<ProcessNode>();
+        foreach (var node in _lastRoots) {
+            switch (node.Aggregate.Category) {
+                case ProcessCategory.App: appRoots.Add(node); break;
+                case ProcessCategory.Windows: windowsRoots.Add(node); break;
+                default: backgroundRoots.Add(node); break;
+            }
         }
 
-        apps.Sort(Compare);
-        background.Sort(Compare);
+        var appRows = Flatten(appRoots);
+        var backgroundRows = Flatten(backgroundRoots);
+        var windowsRows = Flatten(windowsRoots);
 
-        Reconcile(Apps, apps);
-        Reconcile(Background, background);
+        Reconcile(Apps, appRows);
+        Reconcile(Background, backgroundRows);
+        Reconcile(WindowsProcesses, windowsRows);
 
         // If the selected process has exited, the diff removed its row — drop the dangling selection.
-        if (SelectedRow is not null && !Apps.Contains(SelectedRow) && !Background.Contains(SelectedRow)) {
+        if (SelectedRow is not null && !Apps.Contains(SelectedRow) &&
+            !Background.Contains(SelectedRow) && !WindowsProcesses.Contains(SelectedRow)) {
             SelectedRow.IsSelected = false;
             SelectedRow = null;
         }
 
-        AppsHeader = $"Apps · {apps.Count.ToString(CultureInfo.InvariantCulture)}";
-        BackgroundHeader = $"Background processes · {background.Count.ToString(CultureInfo.InvariantCulture)}";
+        // Group headers and the summary count top-level entries (roots), not the expanded rows, so the
+        // numbers stay put when a group is expanded.
+        AppsHeader = $"Apps · {appRoots.Count.ToString(CultureInfo.InvariantCulture)}";
+        BackgroundHeader = $"Background processes · {backgroundRoots.Count.ToString(CultureInfo.InvariantCulture)}";
+        WindowsHeader = $"Windows processes · {windowsRoots.Count.ToString(CultureInfo.InvariantCulture)}";
 
-        // Summary strip: total count + per-group breakdown + total threads (CPU%/Memory% come from
-        // the system samplers in SampleSystemTotals).
-        TotalProcessesText = (apps.Count + background.Count).ToString(CultureInfo.InvariantCulture);
-        ProcessBreakdownText = $"{apps.Count.ToString(CultureInfo.InvariantCulture)} apps · " +
-                               $"{background.Count.ToString(CultureInfo.InvariantCulture)} background";
+        // Total threads span every process, not just the top-level entries.
+        var totalThreads = 0;
+        foreach (var info in _lastSnapshot)
+            totalThreads += info.ThreadCount;
+
+        var entries = appRoots.Count + backgroundRoots.Count + windowsRoots.Count;
+        TotalProcessesText = entries.ToString(CultureInfo.InvariantCulture);
+        ProcessBreakdownText = $"{appRoots.Count.ToString(CultureInfo.InvariantCulture)} apps · " +
+                               $"{backgroundRoots.Count.ToString(CultureInfo.InvariantCulture)} background · " +
+                               $"{windowsRoots.Count.ToString(CultureInfo.InvariantCulture)} Windows";
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Orders the roots and flattens each expanded subtree depth-first into the visible-row
+    /// list: a parent is immediately followed by its children (when expanded), each ordered by the same
+    /// active sort key.</summary>
+    private List<RowModel> Flatten(List<ProcessNode> roots) {
+        roots.Sort(CompareNodes);
+        var rows = new List<RowModel>(roots.Count);
+        foreach (var root in roots)
+            FlattenInto(root, 0, rows);
+        return rows;
+    }
+
+    private void FlattenInto(ProcessNode node, int depth, List<RowModel> rows) {
+        var expanded = node.HasChildren && _expandedPids.Contains(node.Info.Pid);
+        rows.Add(new RowModel(node.Aggregate, depth, node.HasChildren, expanded));
+        if (!expanded)
+            return;
+
+        var children = new List<ProcessNode>(node.Children);
+        children.Sort(CompareNodes);
+        foreach (var child in children)
+            FlattenInto(child, depth + 1, rows);
+    }
+
+    private int CompareNodes(ProcessNode a, ProcessNode b) => Compare(a.Aggregate, b.Aggregate);
+
+    /// <summary>Toggles a parent entry's expanded state and re-flattens the visible rows (from the tree
+    /// already built this poll — no re-enumeration). Driven from the view code-behind on a chevron tap,
+    /// like row selection.</summary>
+    public void ToggleExpand(ProcessRow row) {
+        if (!row.HasChildren)
+            return;
+        if (!_expandedPids.Remove(row.Pid))
+            _expandedPids.Add(row.Pid);
+        RebuildVisibleRows();
     }
 
     /// <summary>Header click: flip direction if it's the same column, else switch to the new column at
@@ -229,7 +329,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             _ascending = DefaultAscending(key);
         }
         UpdateSortIndicators();
-        ApplySnapshot(_lastSnapshot);
+        RebuildVisibleRows();
     }
 
     /// <summary>Explorer-style defaults: text columns ascending, magnitude columns busiest-first.</summary>
@@ -273,10 +373,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Diffs an already-ordered snapshot into <paramref name="target"/> by PID: drops rows no
     /// longer present, updates survivors in place, inserts new ones, and moves survivors to their new
     /// position. Mirrors <c>NetworkViewModel.ReconcileConnections</c>.</summary>
-    private static void Reconcile(ObservableCollection<ProcessRow> target, IReadOnlyList<ProcessInfo> incoming) {
+    private static void Reconcile(ObservableCollection<ProcessRow> target, IReadOnlyList<RowModel> incoming) {
         var incomingPids = new HashSet<int>(incoming.Count);
-        foreach (var info in incoming)
-            incomingPids.Add(info.Pid);
+        foreach (var model in incoming)
+            incomingPids.Add(model.Info.Pid);
 
         for (var i = target.Count - 1; i >= 0; i--)
             if (!incomingPids.Contains(target[i].Pid))
@@ -287,15 +387,15 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             existing[row.Pid] = row;
 
         for (var i = 0; i < incoming.Count; i++) {
-            var info = incoming[i];
-            if (existing.TryGetValue(info.Pid, out var row)) {
-                row.Update(info);
+            var model = incoming[i];
+            if (existing.TryGetValue(model.Info.Pid, out var row)) {
+                row.Update(model.Info, model.Depth, model.HasChildren, model.IsExpanded);
                 var current = target.IndexOf(row);
                 if (current != i)
                     target.Move(current, i);
             } else {
-                var created = new ProcessRow(info);
-                existing[info.Pid] = created;
+                var created = new ProcessRow(model.Info, model.Depth, model.HasChildren, model.IsExpanded);
+                existing[model.Info.Pid] = created;
                 target.Insert(i, created);
             }
         }
@@ -340,8 +440,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         try {
             using var process = Process.GetProcessById(row.Pid);
             process.Kill();
-            if (!Apps.Remove(row))
-                Background.Remove(row);
+            if (!Apps.Remove(row) && !Background.Remove(row))
+                WindowsProcesses.Remove(row);
             SelectedRow = null;
             ActionMessage = "";
         } catch {

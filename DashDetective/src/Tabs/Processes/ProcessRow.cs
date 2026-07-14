@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -19,10 +20,13 @@ public partial class ProcessRow : ObservableObject {
     private static readonly IBrush RunningBrush = new SolidColorBrush(Color.Parse("#6ccb5f"));
     private static readonly IBrush WarnBrush = new SolidColorBrush(Color.Parse("#ffcf4d"));
 
-    public ProcessRow(ProcessInfo info) {
+    public ProcessRow(ProcessInfo info, int depth, bool hasChildren, bool isExpanded) {
         Pid = info.Pid;
         PidText = info.Pid.ToString(CultureInfo.InvariantCulture);
         Category = info.Category;
+        _depth = depth;
+        _hasChildren = hasChildren;
+        _isExpanded = isExpanded;
         _name = info.Name;
         _status = info.Status;
         _statusBrush = BrushFor(info.Status);
@@ -58,11 +62,36 @@ public partial class ProcessRow : ObservableObject {
     /// keyed-diff <see cref="Update"/> deliberately leaves it untouched across polls.</summary>
     [ObservableProperty] private bool _isSelected;
 
+    /// <summary>Depth in the process tree: 0 for a top-level entry, deeper for a collapsed app's
+    /// children. Drives the left indent so a child's name sits under its parent's.</summary>
+    [ObservableProperty] private int _depth;
+
+    /// <summary>Whether this entry has collapsed children (a multi-process app) — shows the chevron.</summary>
+    [ObservableProperty] private bool _hasChildren;
+
+    /// <summary>Whether this entry's children are currently revealed. Drives the chevron glyph; the view
+    /// model owns the authoritative expanded set, so this is kept in sync on each rebuild.</summary>
+    [ObservableProperty] private bool _isExpanded;
+
+    /// <summary>Left indent for the name cell, derived from <see cref="Depth"/>. The chevron and dot live
+    /// inside the name column, so indenting here never shifts the PID/CPU/… columns out of alignment.</summary>
+    public Thickness IndentMargin => new(Depth * 14, 0, 0, 0);
+
+    /// <summary>Chevron glyph: ▾ when expanded, ▸ when collapsed.</summary>
+    public string ChevronGlyph => IsExpanded ? "▾" : "▸";
+
+    partial void OnDepthChanged(int value) => OnPropertyChanged(nameof(IndentMargin));
+    partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ChevronGlyph));
+
     // Per-process Network throughput is deferred (no in-box per-process rate API).
     public string NetworkText => "—";
 
-    /// <summary>Refreshes the mutable fields from a newer snapshot of the same process.</summary>
-    public void Update(ProcessInfo info) {
+    /// <summary>Refreshes the mutable fields from a newer snapshot of the same process (and its current
+    /// place in the tree — depth, whether it has children, and whether it's expanded).</summary>
+    public void Update(ProcessInfo info, int depth, bool hasChildren, bool isExpanded) {
+        Depth = depth;
+        HasChildren = hasChildren;
+        IsExpanded = isExpanded;
         Name = info.Name;
         Status = info.Status;
         StatusBrush = BrushFor(info.Status);
