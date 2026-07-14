@@ -28,6 +28,14 @@ public static class Icons {
         "H6.3 A1.3,1.3 0 0 1 5,11.7 V6.3 A1.3,1.3 0 0 1 6.3,5 Z " +
         "M7,2 V4 M11,2 V4 M7,14 V16 M11,14 V16 M2,7 H4 M2,11 H4 M14,7 H16 M14,11 H16");
 
+    // A hardware/chip glyph: a rounded die with two pins on each edge, matching the design
+    // document's hardware icon. Distinct from the Processes die (whose pins sit at different
+    // offsets) so the two chip-like tabs stay visually separable.
+    public static readonly Geometry Hardware = Geometry.Parse(
+        "M6,5 H12 A1,1 0 0 1 13,6 V12 A1,1 0 0 1 12,13 H6 A1,1 0 0 1 5,12 V6 A1,1 0 0 1 6,5 Z " +
+        "M7.5,5 V2.5 M10.5,5 V2.5 M7.5,15.5 V13 M10.5,15.5 V13 " +
+        "M2.5,7.5 H5 M2.5,10.5 H5 M13,7.5 H15.5 M13,10.5 H15.5");
+
     // A globe: an outer circle crossed by the equator and two curved meridians.
     public static readonly Geometry Network = Geometry.Parse(
         "M9,2 A7,7 0 1 1 8.99,2 Z " +

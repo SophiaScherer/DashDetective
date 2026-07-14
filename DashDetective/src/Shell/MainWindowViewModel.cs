@@ -9,6 +9,7 @@ using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
+using DashDetective.Tabs.Hardware;
 using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
@@ -24,6 +25,7 @@ public partial class MainWindowViewModel : ViewModelBase {
     private readonly FileExplorerViewModel _fileExplorer = new();
     private readonly ProcessesViewModel _processes = new();
     private readonly NetworkViewModel _network = new();
+    private readonly HardwareViewModel _hardware = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
@@ -70,6 +72,8 @@ public partial class MainWindowViewModel : ViewModelBase {
                         Icons.Processes, _processes, Nav.Navigate),
             new NavItem("Network", "Network", "Adapters, connections & diagnostics",
                         Icons.Network, _network, Nav.Navigate),
+            new NavItem("Hardware", "Hardware", "Installed components & specs",
+                        Icons.Hardware, _hardware, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });
