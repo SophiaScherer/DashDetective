@@ -18,6 +18,15 @@ public partial class ProcessesView : UserControl {
             vm.SelectRow(row);
     }
 
+    // The chevron expands/collapses a multi-process app's children. Handled here (like the row tap) as
+    // it has no XAML command binding. Marked handled so it doesn't also select the row via the Border's
+    // Tapped, keeping expand and select independent.
+    private void OnChevronClick(object? sender, RoutedEventArgs e) {
+        if (sender is Control { DataContext: ProcessRow row } && DataContext is ProcessesViewModel vm)
+            vm.ToggleExpand(row);
+        e.Handled = true;
+    }
+
     // The native Properties dialog needs the owning window handle, so it's invoked here rather than
     // from the view model (the same reason the Export and File Explorer Properties dialogs live in
     // code-behind).

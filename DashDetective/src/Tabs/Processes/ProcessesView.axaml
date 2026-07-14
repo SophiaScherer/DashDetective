@@ -19,10 +19,19 @@
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
             <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
                 <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
-                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{Binding StatusBrush}"/>
-                        <TextBlock Classes="cellName" Text="{Binding Name}"/>
-                    </StackPanel>
+                    <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
+                         inside column 0 so revealing children never shifts the other columns. The slot
+                         is reserved even without a chevron so parent and child names line up. -->
+                    <Grid Grid.Column="0" Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
+                        <Button Grid.Column="0" Classes="chev" Click="OnChevronClick"
+                                IsVisible="{Binding HasChildren}">
+                            <TextBlock Text="{Binding ChevronGlyph}"/>
+                        </Button>
+                        <Ellipse Grid.Column="1" Width="7" Height="7" Margin="0,0,9,0"
+                                 VerticalAlignment="Center" Fill="{Binding StatusBrush}"/>
+                        <TextBlock Grid.Column="2" Classes="cellName" VerticalAlignment="Center"
+                                   Text="{Binding Name}"/>
+                    </Grid>
                     <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
                                Foreground="{Binding StatusBrush}"/>
@@ -65,6 +74,30 @@
         </Style>
         <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- Expand/collapse chevron: a chrome-less button in the name cell. Its 16px slot is reserved on
+             every row (empty when the entry has no children) so names stay aligned parent-to-child. -->
+        <Style Selector="Button.chev">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chev /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.chev TextBlock">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="Button.chev:pointerover TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
