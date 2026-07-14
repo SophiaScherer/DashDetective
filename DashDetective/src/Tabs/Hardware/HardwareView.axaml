@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DashDetective.Tabs.Hardware"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:HardwareViewModel"
+             x:Class="DashDetective.Tabs.Hardware.HardwareView">
+
+    <!-- Scaffold placeholder. The 2-column spec-card grid (Processor · Graphics · Motherboard ·
+         Memory · Storage Devices · Sensors) lands in the next phase. Surfaces/typography come from
+         src/Shared/Styles; the page scrolls as a whole like the Dashboard. -->
+    <StackPanel Spacing="16">
+        <TextBlock Classes="panelTitle" Text="Hardware"/>
+    </StackPanel>
+</UserControl>
