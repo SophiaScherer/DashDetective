@@ -51,9 +51,14 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
 
-        <!-- Data rows. -->
+        <!-- Data rows. Background is Transparent here (a base style), NOT set locally on the row
+             Border: a locally-set Background outranks the :pointerover / .selected style triggers
+             (LocalValue beats StyleTrigger in Avalonia), so hover and selection would never paint.
+             Setting it in the style keeps the whole row hit-testable for Tapped while letting the
+             triggers below override it. -->
         <Style Selector="Border.procRow">
             <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -61,9 +66,16 @@
         <Style Selector="Border.procRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <!-- Selection wins over hover (defined after :pointerover). -->
+        <!-- Selection wins over hover (defined after :pointerover). A solid accent bar down the left
+             edge makes the selected row unmistakable in both themes; the soft accent fill tints the
+             rest. The 3px left border is offset by trimming the left padding 16→13 so the row content
+             doesn't shift when selected. Accent brushes are DynamicResource so they track the runtime
+             accent (ThemeService.SetAccent). -->
         <Style Selector="Border.procRow.selected">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderThickness" Value="3,0,0,1"/>
+            <Setter Property="Padding" Value="13,8"/>
         </Style>
         <Style Selector="Border.procRow.selected:pointerover">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
@@ -258,7 +270,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProcessRow">
                                 <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
-                                        Background="Transparent" Tapped="OnRowTapped">
+                                        Tapped="OnRowTapped">
                                     <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
                                           ColumnSpacing="4">
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
@@ -290,7 +302,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProcessRow">
                                 <Border Classes="procRow" Classes.selected="{Binding IsSelected}"
-                                        Background="Transparent" Tapped="OnRowTapped">
+                                        Tapped="OnRowTapped">
                                     <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*,0.85*"
                                           ColumnSpacing="4">
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9">
