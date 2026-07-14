@@ -170,12 +170,12 @@
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
                                 <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
                                 <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="{Binding DownUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
                                 <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
                                 <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="Mbps" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="{Binding UpUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                         </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="11"

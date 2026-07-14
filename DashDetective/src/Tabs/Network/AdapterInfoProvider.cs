@@ -6,6 +6,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using DashDetective.Services.Network;
+using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Network;
 
@@ -87,8 +88,10 @@ public static class AdapterInfoProvider {
         return VirtualMarkers.Any(m => haystack.Contains(m, StringComparison.Ordinal));
     }
 
-    /// <summary>Formats link speed as Gbps/Mbps. <see cref="NetworkInterface.Speed"/> returns −1 (or 0)
-    /// when unknown — and a down adapter has no meaningful speed — so both render as "—".</summary>
+    /// <summary>Formats link speed via the shared rate scaler (kbps/Mbps/Gbps).
+    /// <see cref="NetworkInterface.Speed"/> returns −1 (or 0) when unknown — and a down adapter has no
+    /// meaningful speed — so both render as "—". Link speeds are round figures, so this trims to one
+    /// decimal ("1 Gbps", "2.5 Gbps") rather than the throughput readout's compact rule.</summary>
     private static string FormatSpeed(NetworkInterface nic, bool isUp) {
         long bps;
         try {
@@ -100,12 +103,10 @@ public static class AdapterInfoProvider {
         if (!isUp || bps <= 0)
             return "—";
 
-        if (bps >= 1_000_000_000L) {
-            var gbps = bps / 1_000_000_000.0;
-            return $"{gbps.ToString("0.#", CultureInfo.InvariantCulture)} Gbps";
-        }
         var mbps = bps / 1_000_000.0;
-        return $"{mbps.ToString("0.#", CultureInfo.InvariantCulture)} Mbps";
+        var unit = DataRateFormatter.UnitFor(mbps);
+        var value = DataRateFormatter.Convert(mbps, unit);
+        return $"{value.ToString("0.#", CultureInfo.InvariantCulture)} {DataRateFormatter.Label(unit)}";
     }
 
     private static IpConfigInfo ReadIpConfig(NetworkInterface nic) {

@@ -26,7 +26,7 @@
             <controls:StatCard Grid.Column="3" Label="STORAGE" Value="{Binding StorageValueText}" Unit="%"
                                Sub="{Binding StorageSubText}" Accent="{DynamicResource ChartStorage}"
                                YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
-            <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="Mbps"
+            <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="{Binding NetworkDownUnit}"
                                Sub="{Binding NetworkSubText}" Accent="{DynamicResource ChartNetDown}"
                                YMin="0" YMax="{Binding NetworkYMax}" Points="{Binding NetworkDownPoints}"/>
         </Grid>
@@ -91,14 +91,14 @@
                             <TextBlock Text="↓ Download" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetDown}"/>
-                                <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkDownUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="1">
                             <TextBlock Text="↑ Upload" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <TextBlock Text="{Binding NetworkUpText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetUp}"/>
-                                <TextBlock Text="Mbps" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkUpUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
