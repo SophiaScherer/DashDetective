@@ -2,15 +2,54 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:vm="using:DashDetective.Tabs.Hardware"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:HardwareViewModel"
              x:Class="DashDetective.Tabs.Hardware.HardwareView">
 
-    <!-- Scaffold placeholder. The 2-column spec-card grid (Processor · Graphics · Motherboard ·
-         Memory · Storage Devices · Sensors) lands in the next phase. Surfaces/typography come from
-         src/Shared/Styles; the page scrolls as a whole like the Dashboard. -->
-    <StackPanel Spacing="16">
-        <TextBlock Classes="panelTitle" Text="Hardware"/>
-    </StackPanel>
+    <!-- The design comp's Hardware page: a 2-column grid of component spec cards. Data-driven —
+         each card is a HardwareCard model (icon-tile header + a list of key/value spec rows) reusing
+         the shared InfoRow control. Values are neutral placeholders ("—") until live data is wired.
+         The page scrolls as a whole like the Dashboard (not self-scrolling). The 8px card margin
+         yields a 16px gutter between cards (matching the comp) with a symmetric outer inset. -->
+    <ItemsControl ItemsSource="{Binding Cards}" Margin="-8">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <UniformGrid Columns="2"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:HardwareCard">
+                <Border Classes="panel" Margin="8" VerticalAlignment="Top">
+                    <StackPanel Spacing="12">
+                        <!-- Header: tinted icon tile + title / subtitle -->
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Border Width="30" Height="30" CornerRadius="7"
+                                    Background="{Binding IconBackground}">
+                                <Path Data="{Binding Icon}" Stroke="{Binding IconColor}"
+                                      StrokeThickness="1.4" StrokeLineCap="Round"
+                                      StrokeJoin="Round" Stretch="None"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                           Foreground="{DynamicResource TextSubtle}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <!-- Spec rows: reuse the shared key/value InfoRow -->
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:HardwareSpec">
+                                    <controls:InfoRow Key="{Binding Key}" Value="{Binding Value}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
 </UserControl>
