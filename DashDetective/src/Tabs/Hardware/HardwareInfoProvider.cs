@@ -236,13 +236,69 @@ public static class HardwareInfoProvider {
         }
     }
 
-    /// <summary>Board facts from <c>Win32_BaseBoard</c> + <c>Win32_BIOS</c> + <c>Win32_SystemSlot</c>. (Phase 5)</summary>
+    /// <summary>
+    /// Board facts: vendor + product from <c>Win32_BaseBoard</c>, BIOS version + release year from
+    /// <c>Win32_BIOS</c>, and a best-effort PCIe slot count from <c>Win32_SystemSlot</c> (slots whose
+    /// designation names PCI/PCIe). Chipset, form factor and M.2 count have no WMI source → "—".
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static MotherboardInfo ReadMotherboard() {
         try {
-            return MotherboardInfo.Unknown;
+            var board = ReadBoard();
+            var bios = ReadBios();
+            var pcie = ReadPcieSlotCount();
+
+            return new MotherboardInfo(
+                Board: string.IsNullOrEmpty(board) ? "—" : board,
+                Chipset: "—",
+                Bios: string.IsNullOrEmpty(bios) ? "—" : bios,
+                FormFactor: "—",
+                PcieSlots: pcie > 0 ? pcie.ToString() : "—",
+                M2Slots: "—");
         } catch {
             return MotherboardInfo.Unknown;
+        }
+    }
+
+    /// <summary>Motherboard vendor + product, e.g. "ASUSTeK COMPUTER INC. ROG STRIX B650E-F".</summary>
+    [SupportedOSPlatform("windows")]
+    private static string ReadBoard() {
+        var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
+        var product = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
+        return Join(manufacturer, product);
+    }
+
+    /// <summary>BIOS version plus release year, e.g. "1203 (2024)".</summary>
+    [SupportedOSPlatform("windows")]
+    private static string ReadBios() {
+        var version = FirstString("SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS", "SMBIOSBIOSVersion");
+        var releaseDate = FirstString("SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS", "ReleaseDate");
+        var year = DmtfYear(releaseDate);
+        if (string.IsNullOrEmpty(version))
+            return "";
+        return year > 0 ? $"{version} ({year})" : version;
+    }
+
+    /// <summary>Best-effort count of PCIe slots — <c>Win32_SystemSlot</c> rows whose designation names
+    /// PCI/PCIe. Lane width isn't in WMI, so only the count is reported.</summary>
+    [SupportedOSPlatform("windows")]
+    private static int ReadPcieSlotCount() {
+        try {
+            var count = 0;
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT SlotDesignation FROM Win32_SystemSlot");
+            using var results = searcher.Get();
+            foreach (var obj in results) {
+                using (obj) {
+                    var designation = obj["SlotDesignation"] as string ?? "";
+                    if (designation.IndexOf("PCI", StringComparison.OrdinalIgnoreCase) >= 0)
+                        count++;
+                }
+            }
+
+            return count;
+        } catch {
+            return 0;
         }
     }
 
@@ -323,6 +379,33 @@ public static class HardwareInfoProvider {
         35 => "LPDDR5",
         _ => "RAM",
     };
+
+    /// <summary>Returns the first non-empty string value of <paramref name="property"/> from a WMI query
+    /// (the <c>SystemInfoProvider.QueryString</c> idiom).</summary>
+    [SupportedOSPlatform("windows")]
+    private static string FirstString(string query, string property) {
+        using var searcher = new ManagementObjectSearcher(query);
+        using var results = searcher.Get();
+        foreach (var obj in results) {
+            using (obj) {
+                if (obj[property] is string s && !string.IsNullOrWhiteSpace(s))
+                    return s.Trim();
+            }
+        }
+
+        return "";
+    }
+
+    /// <summary>Joins two parts with a space, skipping blanks (e.g. vendor + product).</summary>
+    private static string Join(string first, string second) {
+        if (string.IsNullOrWhiteSpace(first)) return second.Trim();
+        if (string.IsNullOrWhiteSpace(second)) return first.Trim();
+        return $"{first.Trim()} {second.Trim()}";
+    }
+
+    /// <summary>Extracts the year from a WMI/DMTF datetime (leading "yyyy…"); 0 if unparseable.</summary>
+    private static int DmtfYear(string dmtf) =>
+        dmtf.Length >= 4 && int.TryParse(dmtf[..4], out var year) ? year : 0;
 
     private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
 
