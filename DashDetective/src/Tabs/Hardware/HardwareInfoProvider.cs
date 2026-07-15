@@ -5,6 +5,7 @@ using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
+using DashDetective.Tabs.Hardware.Catalog;
 
 namespace DashDetective.Tabs.Hardware;
 
@@ -75,13 +76,15 @@ public static class HardwareInfoProvider {
             if (threads == 0)
                 threads = Environment.ProcessorCount;
 
+            // Boost clock and TDP aren't in WMI — fill them from the spec catalog by model name.
+            var spec = HardwareCatalog.LookupCpu(name);
+
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 CoresThreads: cores > 0 ? $"{cores} / {threads}" : $"— / {threads}",
-                // WMI's MaxClockSpeed is the rated/base speed; there is no turbo/boost value.
-                BaseBoost: maxClockMhz > 0 ? $"{FormatGhz(maxClockMhz)} / —" : "—",
+                BaseBoost: FormatBaseBoost(maxClockMhz, spec?.Boost),
                 CacheL3: l3CacheKb > 0 ? $"{l3CacheKb / 1024} MB" : "—",
-                Tdp: "—",
+                Tdp: spec?.Tdp ?? "—",
                 Socket: string.IsNullOrEmpty(socket) ? "—" : socket);
         } catch {
             return ProcessorInfo.Unknown;
@@ -346,6 +349,18 @@ public static class HardwareInfoProvider {
     /// <summary>Formats a clock speed in MHz as GHz to one decimal (e.g. 3200 → "3.2 GHz").</summary>
     private static string FormatGhz(double mhz) =>
         (mhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " GHz";
+
+    /// <summary>Composes the "Base / Boost" value from the WMI base clock and the catalog boost string.
+    /// When both are known the unit is shared ("4.7 / 5.3 GHz", matching the comp); otherwise the known
+    /// side carries its own unit and the missing side is "—".</summary>
+    private static string FormatBaseBoost(double baseMhz, string? boost) {
+        var hasBase = baseMhz > 0;
+        var hasBoost = !string.IsNullOrEmpty(boost);
+        if (!hasBase && !hasBoost) return "—";
+        if (hasBase && hasBoost)
+            return $"{(baseMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} / {boost}";
+        return hasBase ? $"{FormatGhz(baseMhz)} / —" : $"— / {boost}";
+    }
 
     /// <summary>Formats a GB figure without a trailing ".0" for whole values (16.0 → "16", 1.5 → "1.5").</summary>
     private static string FormatGb(double gb) =>
