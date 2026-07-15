@@ -76,14 +76,17 @@ Not all of these exist yet. Only build what is listed below as "currently active
   P/Invoke, PDH `\GPU Engine`). Per-process Network is deferred. Follows the always-on tab pattern +
   keyed-diff table. *(full detail in Appendix)*
 
-- **Hardware** — **newly activated; UI-only, being built in phases** (plan:
-  `C:\Users\User\.claude\plans\develop-a-plan-to-iridescent-pearl.md`). Per the design comp: a
+- **Hardware** — **live data being added in phases** (UI shipped; technical-stats plan:
+  `C:\Users\User\.claude\plans\develop-a-plan-to-refactored-yao.md`). Per the design comp: a
   2-column grid of six spec cards (Processor, Graphics, Motherboard, Memory, Storage Devices, Sensors),
-  each an icon-tile header + key/value spec rows. This phase renders a **data-driven** static layout
-  (`HardwareCard` + `HardwareSpec` records → an `ItemsControl` grid reusing the shared `InfoRow`
-  control) with **neutral placeholders** (`—`); the page scrolls as a whole like the Dashboard (not
-  self-scrolling). **Live/real data (WMI/PDH/sensors) is deferred** to a later technical phase, so
-  there is no `IRefreshablePage`/`ILiveSamplingPage` wiring yet.
+  each an icon-tile header + key/value spec rows, in a **data-driven** whole-page-scroll layout
+  (`HardwareCard` + `HardwareSpec` → an `ItemsControl` grid reusing the shared `InfoRow`). The cards
+  are now populated from **real WMI** by the tab-local async `HardwareInfoProvider` (same idiom as the
+  Dashboard's `SystemInfoProvider`), mapped onto observable card/row models; the VM implements
+  `IRefreshablePage` (toolbar Refresh re-reads). Data lands **one card per phase**. Fields WMI cannot
+  supply stay the neutral placeholder `—` (CPU boost/TDP, GPU CUDA/mem-type/bus/true-VRAM, board
+  chipset/form-factor/M.2, RAM timings). The **Sensors** card (temps/fans/voltages) is **deferred** —
+  no usable WMI source — so it keeps its `—` placeholders and there is no `ILiveSamplingPage` wiring.
 
 **Everything else (Performance, Storage) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
@@ -294,12 +297,18 @@ currently exist.
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
                                                          3 s CTS; record type by address family)
       /Hardware                 HardwareView.axaml(.cs) + HardwareViewModel.cs
-                                                        (static UI-only spec grid; whole-page scroll
-                                                         like the Dashboard — not self-scrolling. VM
-                                                         exposes a fixed list of HardwareCard models
-                                                         reused by an ItemsControl; live data deferred)
-                                HardwareCard.cs         (record: title/subtitle/icon/colours + rows)
-                                HardwareSpec.cs         (record: one key/value spec row; value → "—")
+                                                        (spec grid; whole-page scroll like the Dashboard
+                                                         — not self-scrolling. VM builds the six fixed
+                                                         HardwareCard models, populates them from
+                                                         HardwareInfoProvider in the ctor, and implements
+                                                         IRefreshablePage; Sensors card left as "—")
+                                HardwareInfoProvider.cs (async WMI reader, SystemInfoProvider idiom: one
+                                                         soft-failing section per card → HardwareInfo)
+                                HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
+                                                         each with .Unknown; fields default to "—")
+                                HardwareCard.cs         (observable: fixed title/icon/colours, observable
+                                                         Subtitle + ObservableCollection<HardwareSpec> Rows)
+                                HardwareSpec.cs         (observable: fixed Key, observable Value → "—")
                                 HardwareIcons.cs        (feature-local card glyph geometries + fixed
                                                          per-card icon colours)
       (Performance, Storage — not yet started)
