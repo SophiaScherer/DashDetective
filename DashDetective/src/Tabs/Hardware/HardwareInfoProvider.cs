@@ -5,6 +5,7 @@ using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
+using DashDetective.Tabs.Hardware.Catalog;
 
 namespace DashDetective.Tabs.Hardware;
 
@@ -75,13 +76,15 @@ public static class HardwareInfoProvider {
             if (threads == 0)
                 threads = Environment.ProcessorCount;
 
+            // Boost clock and TDP aren't in WMI — fill them from the spec catalog by model name.
+            var spec = HardwareCatalog.LookupCpu(name);
+
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 CoresThreads: cores > 0 ? $"{cores} / {threads}" : $"— / {threads}",
-                // WMI's MaxClockSpeed is the rated/base speed; there is no turbo/boost value.
-                BaseBoost: maxClockMhz > 0 ? $"{FormatGhz(maxClockMhz)} / —" : "—",
+                BaseBoost: FormatBaseBoost(maxClockMhz, spec?.Boost),
                 CacheL3: l3CacheKb > 0 ? $"{l3CacheKb / 1024} MB" : "—",
-                Tdp: "—",
+                Tdp: spec?.Tdp ?? "—",
                 Socket: string.IsNullOrEmpty(socket) ? "—" : socket);
         } catch {
             return ProcessorInfo.Unknown;
@@ -99,10 +102,11 @@ public static class HardwareInfoProvider {
             var moduleGbs = new List<double>();
             ulong totalBytes = 0;
             int speed = 0, memoryType = 0, voltageMv = 0;
+            var partNumber = "";
 
             using (var searcher = new ManagementObjectSearcher(
-                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType, ConfiguredVoltage " +
-                "FROM Win32_PhysicalMemory"))
+                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType, ConfiguredVoltage, " +
+                "PartNumber FROM Win32_PhysicalMemory"))
             using (var results = searcher.Get()) {
                 foreach (var obj in results) {
                     using (obj) {
@@ -116,6 +120,8 @@ public static class HardwareInfoProvider {
                             memoryType = ToInt(obj["SMBIOSMemoryType"]);
                         if (voltageMv == 0)
                             voltageMv = ToInt(obj["ConfiguredVoltage"]);
+                        if (string.IsNullOrEmpty(partNumber) && obj["PartNumber"] is string pn && !string.IsNullOrWhiteSpace(pn))
+                            partNumber = pn.Trim();
                     }
                 }
             }
@@ -128,13 +134,16 @@ public static class HardwareInfoProvider {
             var populated = moduleGbs.Count;
             var totalSlots = ReadMemorySlotCount();
 
+            // Timings aren't in WMI — fill from the spec catalog by module part number (rated profile).
+            var timings = HardwareCatalog.LookupMemory(partNumber)?.Timings ?? "—";
+
             return new MemoryInfo(
                 Summary: speed > 0
                     ? $"{FormatGb(totalGb)} GB {type}-{speed}"
                     : $"{FormatGb(totalGb)} GB {type}",
                 Installed: FormatModules(moduleGbs),
                 Speed: speed > 0 ? $"{speed} MT/s" : "—",
-                Timings: "—",
+                Timings: timings,
                 SlotsUsed: totalSlots > 0 ? $"{populated} / {totalSlots}" : populated.ToString(),
                 Voltage: voltageMv > 0
                     ? (voltageMv / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " V"
@@ -244,28 +253,54 @@ public static class HardwareInfoProvider {
     [SupportedOSPlatform("windows")]
     private static MotherboardInfo ReadMotherboard() {
         try {
-            var board = ReadBoard();
+            var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
+            var product = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
+            var board = Join(manufacturer, product);
             var bios = ReadBios();
             var pcie = ReadPcieSlotCount();
 
+            // Chipset/form-factor/M.2 aren't in WMI. Form factor + M.2 come from the board catalog;
+            // chipset prefers the catalog but falls back to a name-token derivation so most boards
+            // resolve it without per-board data.
+            var spec = HardwareCatalog.LookupBoard(product);
+            var chipset = spec?.Chipset ?? DeriveChipset(product);
+
             return new MotherboardInfo(
                 Board: string.IsNullOrEmpty(board) ? "—" : board,
-                Chipset: "—",
+                Chipset: string.IsNullOrEmpty(chipset) ? "—" : chipset,
                 Bios: string.IsNullOrEmpty(bios) ? "—" : bios,
-                FormFactor: "—",
+                FormFactor: spec?.FormFactor ?? "—",
                 PcieSlots: pcie > 0 ? pcie.ToString() : "—",
-                M2Slots: "—");
+                M2Slots: spec?.M2Slots ?? "—");
         } catch {
             return MotherboardInfo.Unknown;
         }
     }
 
-    /// <summary>Motherboard vendor + product, e.g. "ASUSTeK COMPUTER INC. ROG STRIX B650E-F".</summary>
-    [SupportedOSPlatform("windows")]
-    private static string ReadBoard() {
-        var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
-        var product = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
-        return Join(manufacturer, product);
+    /// <summary>Chipset (vendor + model) tokens looked up in the board product string, more-specific
+    /// variants first (e.g. B650E before B650) so the derived label is the exact chipset.</summary>
+    private static readonly (string Token, string Label)[] Chipsets = {
+        // AMD (AM5 / AM4)
+        ("X670E", "AMD X670E"), ("X670", "AMD X670"), ("B650E", "AMD B650E"), ("B650", "AMD B650"),
+        ("A620", "AMD A620"), ("X570", "AMD X570"), ("B550", "AMD B550"), ("A520", "AMD A520"),
+        ("X470", "AMD X470"), ("B450", "AMD B450"),
+        // Intel (LGA 1700)
+        ("Z790", "Intel Z790"), ("Z690", "Intel Z690"), ("B760", "Intel B760"), ("B660", "Intel B660"),
+        ("H770", "Intel H770"), ("H670", "Intel H670"), ("Q670", "Intel Q670"), ("H610", "Intel H610"),
+    };
+
+    /// <summary>Best-effort chipset from the board product name (e.g. "MPG B650I EDGE" → "AMD B650");
+    /// "" when no known token is present.</summary>
+    private static string DeriveChipset(string product) {
+        if (string.IsNullOrWhiteSpace(product))
+            return "";
+        var upper = product.ToUpperInvariant();
+        foreach (var (token, label) in Chipsets) {
+            if (upper.Contains(token, StringComparison.Ordinal))
+                return label;
+        }
+
+        return "";
     }
 
     /// <summary>BIOS version plus release year, e.g. "1203 (2024)".</summary>
@@ -302,10 +337,43 @@ public static class HardwareInfoProvider {
         }
     }
 
-    /// <summary>Graphics facts from <c>Win32_VideoController</c>. (Phase 6)</summary>
+    /// <summary>
+    /// Graphics facts from <c>Win32_VideoController</c> — the first physical adapter's name (subtitle)
+    /// and Windows driver version. Filtered to PCI-bus adapters (skipping virtual/software ones) the
+    /// same way as <c>GpuInfoProvider</c>. VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
+    /// memory type, CUDA-core count, boost clock and bus width have no reliable WMI source → "—".
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static GraphicsInfo ReadGraphics() {
         try {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Name, PNPDeviceID, DriverVersion FROM Win32_VideoController");
+            using var results = searcher.Get();
+
+            foreach (var obj in results) {
+                using (obj) {
+                    // Physical GPUs sit on the PCI bus; virtual/software adapters are ROOT\/SWD\.
+                    var pnp = obj["PNPDeviceID"] as string;
+                    if (pnp is null || !pnp.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var name = obj["Name"] as string;
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+
+                    var driver = obj["DriverVersion"] as string;
+                    // Memory/CUDA/boost/bus aren't in WMI — fill them from the spec catalog by model.
+                    var spec = HardwareCatalog.LookupGpu(name);
+                    return new GraphicsInfo(
+                        Name: name.Trim(),
+                        Memory: spec?.Memory ?? "—",
+                        CudaCores: spec?.CudaCores ?? "—",
+                        BoostClock: spec?.BoostClock ?? "—",
+                        Driver: string.IsNullOrWhiteSpace(driver) ? "—" : driver.Trim(),
+                        Bus: spec?.Bus ?? "—");
+                }
+            }
+
             return GraphicsInfo.Unknown;
         } catch {
             return GraphicsInfo.Unknown;
@@ -315,6 +383,18 @@ public static class HardwareInfoProvider {
     /// <summary>Formats a clock speed in MHz as GHz to one decimal (e.g. 3200 → "3.2 GHz").</summary>
     private static string FormatGhz(double mhz) =>
         (mhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " GHz";
+
+    /// <summary>Composes the "Base / Boost" value from the WMI base clock and the catalog boost string.
+    /// When both are known the unit is shared ("4.7 / 5.3 GHz", matching the comp); otherwise the known
+    /// side carries its own unit and the missing side is "—".</summary>
+    private static string FormatBaseBoost(double baseMhz, string? boost) {
+        var hasBase = baseMhz > 0;
+        var hasBoost = !string.IsNullOrEmpty(boost);
+        if (!hasBase && !hasBoost) return "—";
+        if (hasBase && hasBoost)
+            return $"{(baseMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} / {boost}";
+        return hasBase ? $"{FormatGhz(baseMhz)} / —" : $"— / {boost}";
+    }
 
     /// <summary>Formats a GB figure without a trailing ".0" for whole values (16.0 → "16", 1.5 → "1.5").</summary>
     private static string FormatGb(double gb) =>
