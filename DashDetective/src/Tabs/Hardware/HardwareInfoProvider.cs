@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
@@ -86,14 +88,81 @@ public static class HardwareInfoProvider {
         }
     }
 
-    /// <summary>Memory facts from <c>Win32_PhysicalMemory</c> + <c>Win32_PhysicalMemoryArray</c>. (Phase 3)</summary>
+    /// <summary>
+    /// Memory facts from <c>Win32_PhysicalMemory</c> (per-module capacity/speed/type/voltage) plus
+    /// <c>Win32_PhysicalMemoryArray.MemoryDevices</c> for the total slot count. Timings have no WMI
+    /// source (SPD/SMBus only), so that row stays "—".
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static MemoryInfo ReadMemory() {
         try {
-            return MemoryInfo.Unknown;
+            var moduleGbs = new List<double>();
+            ulong totalBytes = 0;
+            int speed = 0, memoryType = 0, voltageMv = 0;
+
+            using (var searcher = new ManagementObjectSearcher(
+                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType, ConfiguredVoltage " +
+                "FROM Win32_PhysicalMemory"))
+            using (var results = searcher.Get()) {
+                foreach (var obj in results) {
+                    using (obj) {
+                        var bytes = ToUInt64(obj["Capacity"]);
+                        totalBytes += bytes;
+                        moduleGbs.Add(bytes / (double)(1L << 30));
+                        // ConfiguredClockSpeed is the actual running speed (what Task Manager shows);
+                        // fall back to the rated Speed. Take the highest across modules.
+                        speed = Math.Max(speed, Math.Max(ToInt(obj["ConfiguredClockSpeed"]), ToInt(obj["Speed"])));
+                        if (memoryType == 0)
+                            memoryType = ToInt(obj["SMBIOSMemoryType"]);
+                        if (voltageMv == 0)
+                            voltageMv = ToInt(obj["ConfiguredVoltage"]);
+                    }
+                }
+            }
+
+            if (moduleGbs.Count == 0)
+                return MemoryInfo.Unknown;
+
+            var totalGb = totalBytes / (double)(1L << 30);
+            var type = MemoryTypeLabel(memoryType);
+            var populated = moduleGbs.Count;
+            var totalSlots = ReadMemorySlotCount();
+
+            return new MemoryInfo(
+                Summary: speed > 0
+                    ? $"{FormatGb(totalGb)} GB {type}-{speed}"
+                    : $"{FormatGb(totalGb)} GB {type}",
+                Installed: FormatModules(moduleGbs),
+                Speed: speed > 0 ? $"{speed} MT/s" : "—",
+                Timings: "—",
+                SlotsUsed: totalSlots > 0 ? $"{populated} / {totalSlots}" : populated.ToString(),
+                Voltage: voltageMv > 0
+                    ? (voltageMv / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " V"
+                    : "—");
         } catch {
             return MemoryInfo.Unknown;
         }
+    }
+
+    /// <summary>Total DIMM slots on the board from <c>Win32_PhysicalMemoryArray</c> (0 if unavailable).</summary>
+    [SupportedOSPlatform("windows")]
+    private static int ReadMemorySlotCount() {
+        try {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT MemoryDevices FROM Win32_PhysicalMemoryArray");
+            using var results = searcher.Get();
+            foreach (var obj in results) {
+                using (obj) {
+                    var slots = ToInt(obj["MemoryDevices"]);
+                    if (slots > 0)
+                        return slots;
+                }
+            }
+        } catch {
+            // Fall through to 0 — the slot count is best-effort.
+        }
+
+        return 0;
     }
 
     /// <summary>Drive facts from <c>Win32_DiskDrive</c> + <c>MSFT_PhysicalDisk</c>. (Phase 4)</summary>
@@ -130,5 +199,35 @@ public static class HardwareInfoProvider {
     private static string FormatGhz(double mhz) =>
         (mhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " GHz";
 
+    /// <summary>Formats a GB figure without a trailing ".0" for whole values (16.0 → "16", 1.5 → "1.5").</summary>
+    private static string FormatGb(double gb) =>
+        gb.ToString(gb % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture);
+
+    /// <summary>Renders the module layout: "2 × 16 GB" when uniform, else "16 GB + 8 GB".</summary>
+    private static string FormatModules(IReadOnlyList<double> moduleGbs) {
+        if (moduleGbs.Count == 0)
+            return "—";
+        if (moduleGbs.Distinct().Count() == 1)
+            return $"{moduleGbs.Count} × {FormatGb(moduleGbs[0])} GB";
+        return string.Join(" + ", moduleGbs.Select(g => $"{FormatGb(g)} GB"));
+    }
+
+    /// <summary>Maps an SMBIOS memory-type code to a human label, falling back to "RAM".</summary>
+    private static string MemoryTypeLabel(int smbiosType) => smbiosType switch {
+        20 => "DDR",
+        21 => "DDR2",
+        24 => "DDR3",
+        26 => "DDR4",
+        34 => "DDR5",
+        27 => "LPDDR",
+        28 => "LPDDR2",
+        29 => "LPDDR3",
+        30 => "LPDDR4",
+        35 => "LPDDR5",
+        _ => "RAM",
+    };
+
     private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
+
+    private static ulong ToUInt64(object? value) => value is null ? 0 : Convert.ToUInt64(value);
 }
