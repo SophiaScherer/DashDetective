@@ -247,28 +247,54 @@ public static class HardwareInfoProvider {
     [SupportedOSPlatform("windows")]
     private static MotherboardInfo ReadMotherboard() {
         try {
-            var board = ReadBoard();
+            var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
+            var product = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
+            var board = Join(manufacturer, product);
             var bios = ReadBios();
             var pcie = ReadPcieSlotCount();
 
+            // Chipset/form-factor/M.2 aren't in WMI. Form factor + M.2 come from the board catalog;
+            // chipset prefers the catalog but falls back to a name-token derivation so most boards
+            // resolve it without per-board data.
+            var spec = HardwareCatalog.LookupBoard(product);
+            var chipset = spec?.Chipset ?? DeriveChipset(product);
+
             return new MotherboardInfo(
                 Board: string.IsNullOrEmpty(board) ? "—" : board,
-                Chipset: "—",
+                Chipset: string.IsNullOrEmpty(chipset) ? "—" : chipset,
                 Bios: string.IsNullOrEmpty(bios) ? "—" : bios,
-                FormFactor: "—",
+                FormFactor: spec?.FormFactor ?? "—",
                 PcieSlots: pcie > 0 ? pcie.ToString() : "—",
-                M2Slots: "—");
+                M2Slots: spec?.M2Slots ?? "—");
         } catch {
             return MotherboardInfo.Unknown;
         }
     }
 
-    /// <summary>Motherboard vendor + product, e.g. "ASUSTeK COMPUTER INC. ROG STRIX B650E-F".</summary>
-    [SupportedOSPlatform("windows")]
-    private static string ReadBoard() {
-        var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
-        var product = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
-        return Join(manufacturer, product);
+    /// <summary>Chipset (vendor + model) tokens looked up in the board product string, more-specific
+    /// variants first (e.g. B650E before B650) so the derived label is the exact chipset.</summary>
+    private static readonly (string Token, string Label)[] Chipsets = {
+        // AMD (AM5 / AM4)
+        ("X670E", "AMD X670E"), ("X670", "AMD X670"), ("B650E", "AMD B650E"), ("B650", "AMD B650"),
+        ("A620", "AMD A620"), ("X570", "AMD X570"), ("B550", "AMD B550"), ("A520", "AMD A520"),
+        ("X470", "AMD X470"), ("B450", "AMD B450"),
+        // Intel (LGA 1700)
+        ("Z790", "Intel Z790"), ("Z690", "Intel Z690"), ("B760", "Intel B760"), ("B660", "Intel B660"),
+        ("H770", "Intel H770"), ("H670", "Intel H670"), ("Q670", "Intel Q670"), ("H610", "Intel H610"),
+    };
+
+    /// <summary>Best-effort chipset from the board product name (e.g. "MPG B650I EDGE" → "AMD B650");
+    /// "" when no known token is present.</summary>
+    private static string DeriveChipset(string product) {
+        if (string.IsNullOrWhiteSpace(product))
+            return "";
+        var upper = product.ToUpperInvariant();
+        foreach (var (token, label) in Chipsets) {
+            if (upper.Contains(token, StringComparison.Ordinal))
+                return label;
+        }
+
+        return "";
     }
 
     /// <summary>BIOS version plus release year, e.g. "1203 (2024)".</summary>

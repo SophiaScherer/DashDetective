@@ -15,6 +15,9 @@ public sealed record BoardSpec(string Chipset, string FormFactor, string M2Slots
 internal static class BoardCatalog {
     public static readonly IReadOnlyDictionary<string, BoardSpec> Data =
         new Dictionary<string, BoardSpec>(StringComparer.Ordinal) {
-            // Populated in Phase 10.
+            // Form factor + M.2 count can't be derived, so only fully-confirmed boards are listed;
+            // everything else falls back to the chipset name-token derivation (form/M.2 stay "—").
+            ["MPG B650I EDGE WIFI"] = new("AMD B650", "Mini-ITX", "2"),
+            ["ROG STRIX Z790 E"] = new("Intel Z790", "ATX", "5"),
         };
 }
