@@ -165,11 +165,72 @@ public static class HardwareInfoProvider {
         return 0;
     }
 
-    /// <summary>Drive facts from <c>Win32_DiskDrive</c> + <c>MSFT_PhysicalDisk</c>. (Phase 4)</summary>
+    /// <summary>
+    /// Drive facts, one row per physical disk. Primary source is <c>MSFT_PhysicalDisk</c>
+    /// (<c>root\Microsoft\Windows\Storage</c>), which gives the friendly model, size, media/bus type
+    /// (SSD/HDD/NVMe) and health in one place. If that namespace is unavailable it falls back to
+    /// <c>Win32_DiskDrive</c> for model + size only (type/health then read "—").
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static StorageInfo ReadStorage() {
         try {
-            return StorageInfo.Unknown;
+            var devices = new List<StorageDeviceInfo>();
+            var healthCodes = new List<int>();
+            ulong totalBytes = 0;
+            var haveHealth = false;
+
+            // Primary: the Storage-management namespace (model + size + type + health).
+            try {
+                var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
+                var query = new ObjectQuery(
+                    "SELECT FriendlyName, Size, MediaType, BusType, HealthStatus FROM MSFT_PhysicalDisk");
+                using var searcher = new ManagementObjectSearcher(scope, query);
+                using var results = searcher.Get();
+                foreach (var obj in results) {
+                    using (obj) {
+                        var model = (obj["FriendlyName"] as string)?.Trim();
+                        var bytes = ToUInt64(obj["Size"]);
+                        var type = DriveTypeLabel(ToInt(obj["MediaType"]), ToInt(obj["BusType"]));
+                        totalBytes += bytes;
+                        devices.Add(new StorageDeviceInfo(
+                            string.IsNullOrWhiteSpace(model) ? "Drive" : model,
+                            FormatDriveDetail(bytes, type)));
+                        healthCodes.Add(ToInt(obj["HealthStatus"]));
+                        haveHealth = true;
+                    }
+                }
+            } catch {
+                // Storage namespace unavailable — reset and fall back below.
+                devices.Clear();
+                healthCodes.Clear();
+                totalBytes = 0;
+                haveHealth = false;
+            }
+
+            // Fallback: classic Win32_DiskDrive (no media type or health).
+            if (devices.Count == 0) {
+                using var searcher = new ManagementObjectSearcher("SELECT Model, Size FROM Win32_DiskDrive");
+                using var results = searcher.Get();
+                foreach (var obj in results) {
+                    using (obj) {
+                        var model = (obj["Model"] as string)?.Trim();
+                        var bytes = ToUInt64(obj["Size"]);
+                        totalBytes += bytes;
+                        devices.Add(new StorageDeviceInfo(
+                            string.IsNullOrWhiteSpace(model) ? "Drive" : model,
+                            FormatDriveDetail(bytes, "")));
+                    }
+                }
+            }
+
+            if (devices.Count == 0)
+                return StorageInfo.Unknown;
+
+            var noun = devices.Count == 1 ? "drive" : "drives";
+            return new StorageInfo(
+                Summary: $"{devices.Count} {noun} · {FormatDriveSize(totalBytes)} total",
+                Drives: devices,
+                TotalHealth: haveHealth ? AggregateHealth(healthCodes) : "—");
         } catch {
             return StorageInfo.Unknown;
         }
@@ -210,6 +271,42 @@ public static class HardwareInfoProvider {
         if (moduleGbs.Distinct().Count() == 1)
             return $"{moduleGbs.Count} × {FormatGb(moduleGbs[0])} GB";
         return string.Join(" + ", moduleGbs.Select(g => $"{FormatGb(g)} GB"));
+    }
+
+    /// <summary>Media/bus type label for a physical disk: NVMe wins over the SSD/HDD media flag; "" if
+    /// neither is known (the row then shows size only).</summary>
+    private static string DriveTypeLabel(int mediaType, int busType) {
+        if (busType == 17) return "NVMe";   // BusType 17 = NVMe
+        if (mediaType == 4) return "SSD";    // MediaType 4 = SSD
+        if (mediaType == 3) return "HDD";    // MediaType 3 = HDD
+        return "";
+    }
+
+    /// <summary>A drive row's value: capacity plus optional type, e.g. "2 TB NVMe" or "500 GB".</summary>
+    private static string FormatDriveDetail(ulong bytes, string type) {
+        if (bytes == 0)
+            return string.IsNullOrEmpty(type) ? "—" : type;
+        var size = FormatDriveSize(bytes);
+        return string.IsNullOrEmpty(type) ? size : $"{size} {type}";
+    }
+
+    /// <summary>Formats drive capacity in decimal (marketing) units — TB at/above 1 TB, else GB —
+    /// dropping a trailing ".0" (2000398934016 → "2 TB").</summary>
+    private static string FormatDriveSize(ulong bytes) {
+        const double tb = 1_000_000_000_000d, gb = 1_000_000_000d;
+        return bytes >= tb
+            ? (bytes / tb).ToString("0.#", CultureInfo.InvariantCulture) + " TB"
+            : (bytes / gb).ToString("0.#", CultureInfo.InvariantCulture) + " GB";
+    }
+
+    /// <summary>Worst-status-wins summary of the drives' HealthStatus codes (0 Healthy, 1 Warning,
+    /// 2 Unhealthy; anything else Unknown).</summary>
+    private static string AggregateHealth(IReadOnlyList<int> codes) {
+        if (codes.Count == 0) return "—";
+        if (codes.Contains(2)) return "Unhealthy";
+        if (codes.Contains(1)) return "Warning";
+        if (codes.All(c => c == 0)) return "Good";
+        return "—";
     }
 
     /// <summary>Maps an SMBIOS memory-type code to a human label, falling back to "RAM".</summary>
