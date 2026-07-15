@@ -23,7 +23,8 @@ public static class HardwareCatalog {
 
     /// <summary>Resolves a spec by normalizing the raw model string and matching it against the table
     /// keys — exact first, then a substring match either way (a short key like "7600X" inside the full
-    /// WMI name, or vice-versa). Returns <c>null</c> when nothing matches.</summary>
+    /// WMI name, or vice-versa). When several keys match, the <b>longest</b> wins, so a variant like
+    /// "RTX 4070 TI" isn't shadowed by its base "RTX 4070". Returns <c>null</c> when nothing matches.</summary>
     private static TSpec? Match<TSpec>(IReadOnlyDictionary<string, TSpec> data, string raw)
         where TSpec : class {
         if (string.IsNullOrWhiteSpace(raw) || data.Count == 0)
@@ -33,13 +34,17 @@ public static class HardwareCatalog {
         if (data.TryGetValue(key, out var exact))
             return exact;
 
+        TSpec? best = null;
+        var bestLen = 0;
         foreach (var pair in data) {
-            if (key.Contains(pair.Key, StringComparison.Ordinal) ||
-                pair.Key.Contains(key, StringComparison.Ordinal))
-                return pair.Value;
+            if ((key.Contains(pair.Key, StringComparison.Ordinal) ||
+                 pair.Key.Contains(key, StringComparison.Ordinal)) && pair.Key.Length > bestLen) {
+                best = pair.Value;
+                bestLen = pair.Key.Length;
+            }
         }
 
-        return null;
+        return best;
     }
 
     private static readonly Regex ClockSuffix = new(@"@\s*[\d.]+\s*GHZ", RegexOptions.Compiled);

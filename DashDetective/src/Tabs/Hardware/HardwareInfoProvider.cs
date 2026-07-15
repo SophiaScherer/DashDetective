@@ -330,13 +330,15 @@ public static class HardwareInfoProvider {
                         continue;
 
                     var driver = obj["DriverVersion"] as string;
+                    // Memory/CUDA/boost/bus aren't in WMI — fill them from the spec catalog by model.
+                    var spec = HardwareCatalog.LookupGpu(name);
                     return new GraphicsInfo(
                         Name: name.Trim(),
-                        Memory: "—",
-                        CudaCores: "—",
-                        BoostClock: "—",
+                        Memory: spec?.Memory ?? "—",
+                        CudaCores: spec?.CudaCores ?? "—",
+                        BoostClock: spec?.BoostClock ?? "—",
                         Driver: string.IsNullOrWhiteSpace(driver) ? "—" : driver.Trim(),
-                        Bus: "—");
+                        Bus: spec?.Bus ?? "—");
                 }
             }
 
