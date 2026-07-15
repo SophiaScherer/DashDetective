@@ -76,17 +76,21 @@ Not all of these exist yet. Only build what is listed below as "currently active
   P/Invoke, PDH `\GPU Engine`). Per-process Network is deferred. Follows the always-on tab pattern +
   keyed-diff table. *(full detail in Appendix)*
 
-- **Hardware** — **live data being added in phases** (UI shipped; technical-stats plan:
+- **Hardware** — **live** (technical-stats plan:
   `C:\Users\User\.claude\plans\develop-a-plan-to-refactored-yao.md`). Per the design comp: a
   2-column grid of six spec cards (Processor, Graphics, Motherboard, Memory, Storage Devices, Sensors),
   each an icon-tile header + key/value spec rows, in a **data-driven** whole-page-scroll layout
-  (`HardwareCard` + `HardwareSpec` → an `ItemsControl` grid reusing the shared `InfoRow`). The cards
-  are now populated from **real WMI** by the tab-local async `HardwareInfoProvider` (same idiom as the
-  Dashboard's `SystemInfoProvider`), mapped onto observable card/row models; the VM implements
-  `IRefreshablePage` (toolbar Refresh re-reads). Data lands **one card per phase**. Fields WMI cannot
+  (`HardwareCard` + `HardwareSpec` → an `ItemsControl` grid reusing the shared `InfoRow`). Five cards
+  are populated from **real WMI** by the tab-local async `HardwareInfoProvider` (same idiom as the
+  Dashboard's `SystemInfoProvider`, one soft-failing section per card), mapped onto observable
+  card/row models; the VM implements `IRefreshablePage` (toolbar Refresh re-reads). Fields WMI cannot
   supply stay the neutral placeholder `—` (CPU boost/TDP, GPU CUDA/mem-type/bus/true-VRAM, board
-  chipset/form-factor/M.2, RAM timings). The **Sensors** card (temps/fans/voltages) is **deferred** —
-  no usable WMI source — so it keeps its `—` placeholders and there is no `ILiveSamplingPage` wiring.
+  chipset/form-factor/M.2, RAM timings). **Deferred:** the **Sensors** card (temps/fans/voltages — no
+  usable WMI source; would need LibreHardwareMonitor + admin) stays `—` with no `ILiveSamplingPage`
+  wiring; multi-GPU (Graphics shows the first physical adapter) and true VRAM via DXGI are likewise
+  out of scope (see the plan's appendix). Storage is the one **variable-row** card (one row per
+  physical disk, rebuilt at runtime); PCIe-slot count is best-effort from `Win32_SystemSlot`
+  designations (may include M.2/internal connectors).
 
 **Everything else (Performance, Storage) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
