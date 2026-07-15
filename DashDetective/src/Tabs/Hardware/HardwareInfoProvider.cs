@@ -102,10 +102,11 @@ public static class HardwareInfoProvider {
             var moduleGbs = new List<double>();
             ulong totalBytes = 0;
             int speed = 0, memoryType = 0, voltageMv = 0;
+            var partNumber = "";
 
             using (var searcher = new ManagementObjectSearcher(
-                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType, ConfiguredVoltage " +
-                "FROM Win32_PhysicalMemory"))
+                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType, ConfiguredVoltage, " +
+                "PartNumber FROM Win32_PhysicalMemory"))
             using (var results = searcher.Get()) {
                 foreach (var obj in results) {
                     using (obj) {
@@ -119,6 +120,8 @@ public static class HardwareInfoProvider {
                             memoryType = ToInt(obj["SMBIOSMemoryType"]);
                         if (voltageMv == 0)
                             voltageMv = ToInt(obj["ConfiguredVoltage"]);
+                        if (string.IsNullOrEmpty(partNumber) && obj["PartNumber"] is string pn && !string.IsNullOrWhiteSpace(pn))
+                            partNumber = pn.Trim();
                     }
                 }
             }
@@ -131,13 +134,16 @@ public static class HardwareInfoProvider {
             var populated = moduleGbs.Count;
             var totalSlots = ReadMemorySlotCount();
 
+            // Timings aren't in WMI — fill from the spec catalog by module part number (rated profile).
+            var timings = HardwareCatalog.LookupMemory(partNumber)?.Timings ?? "—";
+
             return new MemoryInfo(
                 Summary: speed > 0
                     ? $"{FormatGb(totalGb)} GB {type}-{speed}"
                     : $"{FormatGb(totalGb)} GB {type}",
                 Installed: FormatModules(moduleGbs),
                 Speed: speed > 0 ? $"{speed} MT/s" : "—",
-                Timings: "—",
+                Timings: timings,
                 SlotsUsed: totalSlots > 0 ? $"{populated} / {totalSlots}" : populated.ToString(),
                 Voltage: voltageMv > 0
                     ? (voltageMv / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " V"

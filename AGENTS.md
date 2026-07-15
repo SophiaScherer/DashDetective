@@ -84,13 +84,19 @@ Not all of these exist yet. Only build what is listed below as "currently active
   are populated from **real WMI** by the tab-local async `HardwareInfoProvider` (same idiom as the
   Dashboard's `SystemInfoProvider`, one soft-failing section per card), mapped onto observable
   card/row models; the VM implements `IRefreshablePage` (toolbar Refresh re-reads). Fields WMI cannot
-  supply stay the neutral placeholder `—` (CPU boost/TDP, GPU CUDA/mem-type/bus/true-VRAM, board
-  chipset/form-factor/M.2, RAM timings). **Deferred:** the **Sensors** card (temps/fans/voltages — no
-  usable WMI source; would need LibreHardwareMonitor + admin) stays `—` with no `ILiveSamplingPage`
-  wiring; multi-GPU (Graphics shows the first physical adapter) and true VRAM via DXGI are likewise
-  out of scope (see the plan's appendix). Storage is the one **variable-row** card (one row per
+  report (rated specs — CPU boost/TDP, GPU CUDA-cores/mem-type/bus, board chipset/form-factor/M.2, RAM
+  timings) are filled by a **bundled offline spec catalog** (`Catalog/` — a facade + name normalizer
+  over per-domain static tables keyed by the WMI model strings; longest-key match; unknown parts fall
+  back to `—`, never a guess). Chipset also has a name-token fallback (B650/Z790/… derived from the
+  board product) so it resolves without per-board data. The catalog is a pure enrichment layer applied
+  inside `HardwareInfoProvider` after the WMI read — no new dependency, no admin, no network. **Deferred:**
+  the **Sensors** card (temps/fans/voltages — no usable WMI source; would need LibreHardwareMonitor +
+  admin + elevation) stays `—` with no `ILiveSamplingPage` wiring (a build-plan is in the plan file);
+  multi-GPU (Graphics shows the first physical adapter), true VRAM via DXGI, and live SPD timings are
+  likewise out of scope (see the plan's appendix). Storage is the one **variable-row** card (one row per
   physical disk, rebuilt at runtime); PCIe-slot count is best-effort from `Win32_SystemSlot`
-  designations (may include M.2/internal connectors).
+  designations (may include M.2/internal connectors); catalogued RAM timings are the kit's *rated*
+  profile (can differ from the applied one if EXPO/XMP is off).
 
 **Everything else (Performance, Storage) is
 out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
@@ -315,6 +321,11 @@ currently exist.
                                 HardwareSpec.cs         (observable: fixed Key, observable Value → "—")
                                 HardwareIcons.cs        (feature-local card glyph geometries + fixed
                                                          per-card icon colours)
+                                /Catalog                HardwareCatalog.cs (facade + name normalizer +
+                                                         longest-key match) over per-domain static spec
+                                                         tables: CpuCatalog / GpuCatalog / BoardCatalog /
+                                                         MemoryCatalog (each a spec record + Data dict).
+                                                         Fills rated specs WMI can't report; unknown → "—")
       (Performance, Storage — not yet started)
 ```
 

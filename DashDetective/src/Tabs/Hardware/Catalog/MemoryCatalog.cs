@@ -15,6 +15,8 @@ public sealed record MemorySpec(string Timings);
 internal static class MemoryCatalog {
     public static readonly IReadOnlyDictionary<string, MemorySpec> Data =
         new Dictionary<string, MemorySpec>(StringComparer.Ordinal) {
-            // Populated in Phase 11.
+            // Keyed by the normalized part number (hyphens → spaces). Timings are CL-tRCD-tRP-tRAS at
+            // the kit's rated (XMP/EXPO) profile — may differ from the applied profile if EXPO is off.
+            ["F5 6000J3636F16G"] = new("36-36-36-96"),   // G.Skill DDR5-6000 CL36
         };
 }
