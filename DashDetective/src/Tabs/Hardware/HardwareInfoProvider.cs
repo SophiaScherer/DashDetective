@@ -302,10 +302,41 @@ public static class HardwareInfoProvider {
         }
     }
 
-    /// <summary>Graphics facts from <c>Win32_VideoController</c>. (Phase 6)</summary>
+    /// <summary>
+    /// Graphics facts from <c>Win32_VideoController</c> — the first physical adapter's name (subtitle)
+    /// and Windows driver version. Filtered to PCI-bus adapters (skipping virtual/software ones) the
+    /// same way as <c>GpuInfoProvider</c>. VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
+    /// memory type, CUDA-core count, boost clock and bus width have no reliable WMI source → "—".
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static GraphicsInfo ReadGraphics() {
         try {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT Name, PNPDeviceID, DriverVersion FROM Win32_VideoController");
+            using var results = searcher.Get();
+
+            foreach (var obj in results) {
+                using (obj) {
+                    // Physical GPUs sit on the PCI bus; virtual/software adapters are ROOT\/SWD\.
+                    var pnp = obj["PNPDeviceID"] as string;
+                    if (pnp is null || !pnp.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var name = obj["Name"] as string;
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+
+                    var driver = obj["DriverVersion"] as string;
+                    return new GraphicsInfo(
+                        Name: name.Trim(),
+                        Memory: "—",
+                        CudaCores: "—",
+                        BoostClock: "—",
+                        Driver: string.IsNullOrWhiteSpace(driver) ? "—" : driver.Trim(),
+                        Bus: "—");
+                }
+            }
+
             return GraphicsInfo.Unknown;
         } catch {
             return GraphicsInfo.Unknown;
