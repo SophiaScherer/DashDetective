@@ -24,6 +24,11 @@ public partial class PerformanceViewModel : ViewModelBase, ISelfScrollingPage {
     // comp's palette — parsed like MainWindowViewModel's live dots.
     private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
 
+    // The four label/value readouts for a resource's detail stat strip (design comp's statMap).
+    private static StatTile[] Stats(string l1, string v1, string l2, string v2,
+                                    string l3, string v3, string l4, string v4) =>
+        new[] { new StatTile(l1, v1), new StatTile(l2, v2), new StatTile(l3, v3), new StatTile(l4, v4) };
+
     /// <summary>The resource rows shown in the left rail, in display order.</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
 
@@ -31,18 +36,28 @@ public partial class PerformanceViewModel : ViewModelBase, ISelfScrollingPage {
     [ObservableProperty] private ResourceRow _selectedResource = null!;
 
     public PerformanceViewModel() {
-        // Static mock data from the design comp (perfDefs). Real values/history are a later technical
-        // pass. Each chart series is a deterministic mock wave around the resource's level.
+        // Static mock data from the design comp (perfDefs + statMap). Real values/history are a later
+        // technical pass. Each chart series is a deterministic mock wave around the resource's level.
         Resources.Add(new ResourceRow("CPU", "24 cores · 3.2 GHz", "Intel Core i9-14900K",
-                                      "23", "%", Brush("#4cc2ff"), MockPoints(23, 16, 0), Select));
+                                      "23", "%", Brush("#4cc2ff"), MockPoints(23, 16, 0),
+                                      Stats("Utilization", "23 %", "Speed", "3.24 GHz",
+                                            "Processes", "263", "Up time", "2:05:20:14"), Select));
         Resources.Add(new ResourceRow("Memory", "19.5 / 32 GB", "DDR5-6000 · 2 slots",
-                                      "61", "%", Brush("#c58fff"), MockPoints(61, 6, 11), Select));
+                                      "61", "%", Brush("#c58fff"), MockPoints(61, 6, 11),
+                                      Stats("In use", "19.5 GB", "Available", "12.5 GB",
+                                            "Cached", "5.8 GB", "Committed", "24 / 38 GB"), Select));
         Resources.Add(new ResourceRow("Disk 0 (C:)", "NVMe SSD", "Samsung 990 Pro 2TB",
-                                      "4", "%", Brush("#ffcf4d"), MockPoints(9, 18, 5), Select));
+                                      "4", "%", Brush("#ffcf4d"), MockPoints(9, 18, 5),
+                                      Stats("Active", "4 %", "Read", "48 MB/s",
+                                            "Write", "12 MB/s", "Response", "0.4 ms"), Select));
         Resources.Add(new ResourceRow("GPU", "RTX 4080", "16 GB GDDR6X · 52°C",
-                                      "12", "%", Brush("#6ccb5f"), MockPoints(14, 12, 23), Select));
+                                      "12", "%", Brush("#6ccb5f"), MockPoints(14, 12, 23),
+                                      Stats("3D", "12 %", "VRAM", "4.2 / 16 GB",
+                                            "Temp", "52 °C", "Power", "142 W"), Select));
         Resources.Add(new ResourceRow("Ethernet", "2.5 GbE", "Intel I225-V",
-                                      "48", "Mbps", Brush("#4cc2ff"), MockPoints(40, 26, 7), Select));
+                                      "48", "Mbps", Brush("#4cc2ff"), MockPoints(40, 26, 7),
+                                      Stats("Receive", "48 Mbps", "Send", "3.8 Mbps",
+                                            "Link", "2.5 Gbps", "Errors", "0"), Select));
 
         SelectedResource = Resources[0];
         SelectedResource.IsSelected = true;

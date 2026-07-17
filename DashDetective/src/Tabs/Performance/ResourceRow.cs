@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -20,7 +21,8 @@ namespace DashDetective.Tabs.Performance;
 /// </summary>
 public partial class ResourceRow : ObservableObject {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
-                       IBrush valueBrush, string points, Action<ResourceRow> onSelected) {
+                       IBrush valueBrush, string points, IReadOnlyList<StatTile> stats,
+                       Action<ResourceRow> onSelected) {
         Name = name;
         Sub = sub;
         Spec = spec;
@@ -28,6 +30,7 @@ public partial class ResourceRow : ObservableObject {
         Unit = unit;
         ValueBrush = valueBrush;
         Points = points;
+        Stats = stats;
         SelectCommand = new RelayCommand(() => onSelected(this));
     }
 
@@ -54,6 +57,10 @@ public partial class ResourceRow : ObservableObject {
     /// (y already flipped to axis-max − value so higher utilization sits at the top). Static mock data;
     /// live history is a later technical pass.</summary>
     public string Points { get; }
+
+    /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
+    /// statMap). Static mock data; live values are a later technical pass.</summary>
+    public IReadOnlyList<StatTile> Stats { get; }
 
     public ICommand SelectCommand { get; }
 

@@ -64,6 +64,17 @@
             <Setter Property="VerticalAlignment" Value="Bottom"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
         </Style>
+
+        <!-- Detail stat tiles: a small label over a larger value. -->
+        <Style Selector="Border.statTile TextBlock.statLabel">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="Border.statTile TextBlock.statValue">
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -129,6 +140,26 @@
                                         Points="{Binding SelectedResource.Points}"/>
                 </StackPanel>
             </Border>
+
+            <!-- Stat tiles: four resource-specific readouts in a 4-column grid (design comp's statMap).
+                 The -12 right margin absorbs each tile's 12px gutter so the row stays flush right. -->
+            <ItemsControl ItemsSource="{Binding SelectedResource.Stats}" Margin="0,0,-12,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="4"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:StatTile">
+                        <Border Classes="card statTile" Margin="0,0,12,0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="statLabel" Text="{Binding Label}"/>
+                                <TextBlock Classes="statValue" Text="{Binding Value}"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
     </Grid>
 </UserControl>
