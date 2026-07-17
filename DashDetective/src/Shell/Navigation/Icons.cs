@@ -36,6 +36,12 @@ public static class Icons {
         "M7.5,5 V2.5 M10.5,5 V2.5 M7.5,15.5 V13 M10.5,15.5 V13 " +
         "M2.5,7.5 H5 M2.5,10.5 H5 M13,7.5 H15.5 M13,10.5 H15.5");
 
+    // A rising line-graph: an L-shaped axis (left + bottom) with a climbing polyline over it,
+    // matching the design document's Performance icon.
+    public static readonly Geometry Performance = Geometry.Parse(
+        "M2.5,3 V15.5 H15.5 " +
+        "M4.5,12.5 L7.5,9 L10,11 L15,5.5");
+
     // A globe: an outer circle crossed by the equator and two curved meridians.
     public static readonly Geometry Network = Geometry.Parse(
         "M9,2 A7,7 0 1 1 8.99,2 Z " +

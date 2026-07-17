@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Performance"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
+             x:DataType="vm:PerformanceViewModel"
+             x:Class="DashDetective.Tabs.Performance.PerformanceView">
+
+    <!-- Task-Manager-style master-detail: a resource-selector rail (left) swaps a detail pane (right).
+         Phase 2 is the layout shell with placeholders; the resource list (Phase 3), chart (Phase 4),
+         and stat tiles (Phase 5) fill these columns. Surfaces/styles come from src/Shared/Styles. -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
+            <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
+            <ColumnDefinition Width="*"   MinWidth="360"/>                 <!-- detail pane -->
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== Resource selector (left) ===== -->
+        <Border Grid.Column="0" Classes="panel" Padding="10">
+            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="Resources"/>
+        </Border>
+
+        <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
+
+        <!-- ===== Detail pane (right) ===== -->
+        <Border Grid.Column="2" Classes="panel">
+            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Text="Select a resource"/>
+        </Border>
+    </Grid>
+</UserControl>

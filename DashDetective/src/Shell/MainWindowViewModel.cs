@@ -11,6 +11,7 @@ using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
 using DashDetective.Tabs.Hardware;
 using DashDetective.Tabs.Network;
+using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
 
@@ -24,6 +25,7 @@ public partial class MainWindowViewModel : ViewModelBase {
     private readonly DashboardViewModel _dashboard = new();
     private readonly FileExplorerViewModel _fileExplorer = new();
     private readonly ProcessesViewModel _processes = new();
+    private readonly PerformanceViewModel _performance = new();
     private readonly NetworkViewModel _network = new();
     private readonly HardwareViewModel _hardware = new();
     private readonly SettingsViewModel _settings;
@@ -70,6 +72,8 @@ public partial class MainWindowViewModel : ViewModelBase {
                         Icons.FileExplorer, _fileExplorer, Nav.Navigate),
             new NavItem("Processes", "Processes", "Live processes & resource usage",
                         Icons.Processes, _processes, Nav.Navigate),
+            new NavItem("Performance", "Performance", "Live resource utilization",
+                        Icons.Performance, _performance, Nav.Navigate),
             new NavItem("Network", "Network", "Adapters, connections & diagnostics",
                         Icons.Network, _network, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
