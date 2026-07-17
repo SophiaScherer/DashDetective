@@ -8,9 +8,64 @@
              x:DataType="vm:PerformanceViewModel"
              x:Class="DashDetective.Tabs.Performance.PerformanceView">
 
-    <!-- Task-Manager-style master-detail: a resource-selector rail (left) swaps a detail pane (right).
-         Phase 2 is the layout shell with placeholders; the resource list (Phase 3), chart (Phase 4),
-         and stat tiles (Phase 5) fill these columns. Surfaces/styles come from src/Shared/Styles. -->
+    <!-- Task-Manager-style master-detail: the resource-selector rail (left) swaps the detail pane
+         (right). Phase 3 wires the selectable resource list + selection; the chart (Phase 4) and stat
+         tiles (Phase 5) fill the detail pane. Surfaces/styles come from src/Shared/Styles. -->
+    <UserControl.Styles>
+        <!-- Chrome-less button wrapper so the whole card is clickable (as File Explorer's Button.pick,
+             which is local to that view). -->
+        <Style Selector="Button.resButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.resButton /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- Resource selector cards: a name + sub-label on the left, a tinted value on the right.
+             Selected uses AccentSoft fill + Accent border (the design comp's cyan highlight). -->
+        <Style Selector="Border.resCard">
+            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.resCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.resCard.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Border.resCard TextBlock.resName">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.resCard TextBlock.resSub">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Border.resCard TextBlock.resVal">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.resCard TextBlock.resUnit">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
@@ -19,17 +74,52 @@
         </Grid.ColumnDefinitions>
 
         <!-- ===== Resource selector (left) ===== -->
-        <Border Grid.Column="0" Classes="panel" Padding="10">
-            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Text="Resources"/>
-        </Border>
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Resources}" Margin="0,0,2,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="8"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ResourceRow">
+                        <Button Classes="resButton" Command="{Binding SelectCommand}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Border Classes="resCard" Classes.selected="{Binding IsSelected}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Classes="resName" Text="{Binding Name}"/>
+                                        <TextBlock Classes="resSub" Text="{Binding Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Classes="resVal" Text="{Binding ValueText}"
+                                                   Foreground="{Binding ValueBrush}"/>
+                                        <TextBlock Classes="resUnit" Text="{Binding Unit}"
+                                                   Foreground="{Binding ValueBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
 
         <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
 
         <!-- ===== Detail pane (right) ===== -->
         <Border Grid.Column="2" Classes="panel">
-            <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Text="Select a resource"/>
+            <!-- Minimal header for now; the chart (Phase 4) and stat tiles (Phase 5) fill this pane. -->
+            <StackPanel Spacing="4" VerticalAlignment="Top">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="panelTitle"
+                               Text="{Binding SelectedResource.Name}"/>
+                    <TextBlock Grid.Column="1" Classes="cardSub" VerticalAlignment="Center"
+                               Text="{Binding SelectedResource.Spec}"/>
+                </Grid>
+                <TextBlock Classes="cardSub" Text="% Utilization over 60 seconds"/>
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>
