@@ -20,13 +20,14 @@ namespace DashDetective.Tabs.Performance;
 /// </summary>
 public partial class ResourceRow : ObservableObject {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
-                       IBrush valueBrush, Action<ResourceRow> onSelected) {
+                       IBrush valueBrush, string points, Action<ResourceRow> onSelected) {
         Name = name;
         Sub = sub;
         Spec = spec;
         ValueText = valueText;
         Unit = unit;
         ValueBrush = valueBrush;
+        Points = points;
         SelectCommand = new RelayCommand(() => onSelected(this));
     }
 
@@ -45,9 +46,14 @@ public partial class ResourceRow : ObservableObject {
     /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps").</summary>
     public string Unit { get; }
 
-    /// <summary>Semantic per-metric tint for the value (and the detail chart in a later phase). A fixed
+    /// <summary>Semantic per-metric tint for the value and the detail utilization chart. A fixed
     /// legend colour, so it is theme/accent-independent by design.</summary>
     public IBrush ValueBrush { get; }
+
+    /// <summary>The 60-point utilization history for the detail chart, as a Sparkline "x,y x,y …" string
+    /// (y already flipped to axis-max − value so higher utilization sits at the top). Static mock data;
+    /// live history is a later technical pass.</summary>
+    public string Points { get; }
 
     public ICommand SelectCommand { get; }
 

@@ -109,17 +109,26 @@
         <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
 
         <!-- ===== Detail pane (right) ===== -->
-        <Border Grid.Column="2" Classes="panel">
-            <!-- Minimal header for now; the chart (Phase 4) and stat tiles (Phase 5) fill this pane. -->
-            <StackPanel Spacing="4" VerticalAlignment="Top">
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" Classes="panelTitle"
-                               Text="{Binding SelectedResource.Name}"/>
-                    <TextBlock Grid.Column="1" Classes="cardSub" VerticalAlignment="Center"
-                               Text="{Binding SelectedResource.Spec}"/>
-                </Grid>
-                <TextBlock Classes="cardSub" Text="% Utilization over 60 seconds"/>
-            </StackPanel>
-        </Border>
+        <!-- Stacks the utilization chart (Phase 4); the stat tiles (Phase 5) go below it. -->
+        <StackPanel Grid.Column="2" Spacing="12">
+
+            <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
+                 in the resource's colour. Reuses the shared Sparkline (no grid, like the Dashboard). -->
+            <Border Classes="panel">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="panelTitle"
+                                   Text="{Binding SelectedResource.Name}"/>
+                        <TextBlock Grid.Column="1" Classes="cardSub" VerticalAlignment="Center"
+                                   Text="{Binding SelectedResource.Spec}"/>
+                    </Grid>
+                    <TextBlock Classes="cardSub" Text="% Utilization over 60 seconds"/>
+                    <controls:Sparkline Height="240" Fill="True" StrokeThickness="1.8"
+                                        YMin="0" YMax="100"
+                                        Stroke="{Binding SelectedResource.ValueBrush}"
+                                        Points="{Binding SelectedResource.Points}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
     </Grid>
 </UserControl>
