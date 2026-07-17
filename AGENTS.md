@@ -25,83 +25,33 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 ## Current Scope — READ THIS FIRST
 
-**Currently active features (the only ones you may touch):**
+**The feature currently being built (the only one you may modify):**
 
-- `Dashboard`
-- `Settings`
-- `File Explorer`
-- `Network`
-- `Processes`
-- `Hardware`
+- `Performance` — initial UI implementation, **static mock data** (status below).
 
-**Implementation status within the active features** (condensed — the full write-ups live in
-*Appendix — Completed Feature Details* at the end of this file):
+**Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
+patterns), but do NOT modify while building Performance** (full write-ups in *Appendix — Completed
+Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (Appearance live;
+Monitoring/Export static), **File Explorer**, **Network**, **Processes**, **Hardware**. Editing any of
+these needs an explicit scope expansion.
 
-- **Navigation bar (shell-level).** A self-contained **collapsible + dockable** sidebar —
-  `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. Docks to any edge and
-  collapses to an icons-only rail; orientation/collapse and every derived layout value are **computed
-  properties on the VM — no value converters**. Driven from two entry points (on-bar controls +
-  **Settings → Appearance**). `MainWindowViewModel` owns page routing via `Nav.SelectionChanged` →
-  `CurrentPage`. State is **session-only**. *(full detail in Appendix)*
+**Performance — implementation status** (the already-live features' write-ups live in *Appendix —
+Completed Feature Details* at the end of this file):
 
-- **Dashboard** — **fully live**: CPU, Memory, GPU, Storage and Network surfaces plus the System
-  Information panel all read the real machine (WMI + registry + PDH + managed samplers). The shell
-  **toolbar** is wired: a live clock, a **Live** pill (pause/resume sampling via `ILiveSamplingPage`),
-  a **Refresh** button (routes to the active page via `IRefreshablePage`), and an **Export** button
-  (plain-text diagnostics via the in-box `Avalonia.Platform.Storage` picker). Only the toolbar
-  **Search** box is still non-functional. GPU temperature + multi-GPU are deferred (see *Deferred
-  Dashboard work*). *(full detail in Appendix)*
+- **Performance** — **initial UI in progress**, built in phases (plan:
+  `C:\Users\User\.claude\plans\develop-a-plan-to-elegant-thimble.md`). A Task-Manager-style live
+  resource drill-down per the design comp: a left **resource selector** rail (CPU · Memory · Disk 0 (C:)
+  · GPU · Ethernet) that swaps a right **detail pane** — one large utilization chart (reuses the shared
+  `Sparkline`, fixed 0–100 axis + gradient fill, **no grid**) plus a 4-tile stat strip. Self-contained
+  tab under `src/Tabs/Performance/` (`PerformanceView` + `PerformanceViewModel`, `ISelfScrollingPage`
+  master-detail like File Explorer), reusing the selectable-item pattern (`NavItem` / `FilterOption`),
+  shared styles, and the `Chart*` palette keys. **This UI pass is static mock data only** — live
+  samplers/providers, real metrics, `IRefreshablePage` / `ILiveSamplingPage`, and accent-reactive
+  brushes are a **later technical pass**, not built yet. No new packages, no new shared controls.
 
-- **Settings** — **Appearance is live** (Theme segmented control + Accent swatches applied at runtime
-  through the single `ThemeService` — see *Theming*; the first accent swatch is a "Default" multi-colour
-  option). The **Monitoring** and **Export & Data** panels remain static layout. *(full detail in
-  Appendix)*
-
-- **File Explorer** — **live and functional**: a read-only three-pane browser (folder tree · file list
-  with breadcrumb/filter chips/sortable headers/Show-hidden · details+preview), all from `System.IO`,
-  with friendly type names + Properties via shell32 P/Invoke and themed vector glyphs. Live
-  auto-refresh via a debounced `FileSystemWatcher`; contextual Refresh via `IRefreshablePage`;
-  independent per-pane scrolling + resizable panes via the shell's `ISelfScrollingPage` seam +
-  `GridSplitter.paneSplitter`. Introduced the app's first `TreeView`. *(full detail in Appendix)*
-
-- **Network** — **live and functional**: six panels (Adapters · IP Configuration · Throughput · Active
-  Connections · Ping · DNS Lookup), all in-box (`System.Net.NetworkInformation`, `Ping`, `Dns`,
-  `iphlpapi` P/Invoke). Always-on like the Dashboard; reuses the shared `Sparkline`; keyed-diff live
-  connections table. Added the shared `NetworkUsageSampler` (in `src/Services/Network`) and the
-  `ILiveSamplingPage` seam. IPv6 connections deferred. *(full detail in Appendix)*
-
-- **Processes** — **being built in phases**: a Task-Manager-style live process view (Apps/Background/
-  Windows groups; per-process PID/status/CPU/Memory/Disk/GPU; sortable headers; summary strip; End
-  task; native Properties). In-box, no admin (`System.Diagnostics.Process`, `GetProcessIoCounters`
-  P/Invoke, PDH `\GPU Engine`). Per-process Network is deferred. Follows the always-on tab pattern +
-  keyed-diff table. *(full detail in Appendix)*
-
-- **Hardware** — **live** (technical-stats plan:
-  `C:\Users\User\.claude\plans\develop-a-plan-to-refactored-yao.md`). Per the design comp: a
-  2-column grid of six spec cards (Processor, Graphics, Motherboard, Memory, Storage Devices, Sensors),
-  each an icon-tile header + key/value spec rows, in a **data-driven** whole-page-scroll layout
-  (`HardwareCard` + `HardwareSpec` → an `ItemsControl` grid reusing the shared `InfoRow`). Five cards
-  are populated from **real WMI** by the tab-local async `HardwareInfoProvider` (same idiom as the
-  Dashboard's `SystemInfoProvider`, one soft-failing section per card), mapped onto observable
-  card/row models; the VM implements `IRefreshablePage` (toolbar Refresh re-reads). Fields WMI cannot
-  report (rated specs — CPU boost/TDP, GPU CUDA-cores/mem-type/bus, board chipset/form-factor/M.2, RAM
-  timings) are filled by a **bundled offline spec catalog** (`Catalog/` — a facade + name normalizer
-  over per-domain static tables keyed by the WMI model strings; longest-key match; unknown parts fall
-  back to `—`, never a guess). Chipset also has a name-token fallback (B650/Z790/… derived from the
-  board product) so it resolves without per-board data. The catalog is a pure enrichment layer applied
-  inside `HardwareInfoProvider` after the WMI read — no new dependency, no admin, no network. **Deferred:**
-  the **Sensors** card (temps/fans/voltages — no usable WMI source; would need LibreHardwareMonitor +
-  admin + elevation) stays `—` with no `ILiveSamplingPage` wiring (a build-plan is in the plan file);
-  multi-GPU (Graphics shows the first physical adapter), true VRAM via DXGI, and live SPD timings are
-  likewise out of scope (see the plan's appendix). Storage is the one **variable-row** card (one row per
-  physical disk, rebuilt at runtime); PCIe-slot count is best-effort from `Win32_SystemSlot`
-  designations (may include M.2/internal connectors); catalogued RAM timings are the kit's *rated*
-  profile (can differ from the applied one if EXPO/XMP is off).
-
-**Everything else (Performance, Storage) is
-out of scope until this document says otherwise.** Do not scaffold, stub, reference, or
-"prepare" folders for inactive features, even if it seems convenient or efficient. Wait until
-they are explicitly activated in a future revision of this file.
+**Everything else (Storage) is out of scope until this document says otherwise.** Do not scaffold, stub,
+reference, or "prepare" folders for inactive features, even if it seems convenient or efficient. Wait
+until they are explicitly activated in a future revision of this file.
 
 ### Deferred Dashboard work — DO NOT build without an explicit task
 
@@ -326,7 +276,16 @@ currently exist.
                                                          tables: CpuCatalog / GpuCatalog / BoardCatalog /
                                                          MemoryCatalog (each a spec record + Data dict).
                                                          Fills rated specs WMI can't report; unknown → "—")
-      (Performance, Storage — not yet started)
+      /Performance              PerformanceView.axaml(.cs) + PerformanceViewModel.cs
+                                (ACTIVE BUILD — initial UI, static mock data. Task-Manager-style
+                                 master-detail: a 220px resource-selector rail (ResourceRow item VMs)
+                                 swaps a right detail pane — one large Sparkline utilization chart +
+                                 a 4-tile stat strip (StatTile item VMs). Fills the viewport via
+                                 ISelfScrollingPage, like File Explorer. Built in phases — item VMs
+                                 (ResourceRow/StatTile) land in later UI phases; live samplers/
+                                 providers + IRefreshablePage/ILiveSamplingPage are a later
+                                 technical pass. See Current Scope + the plan file.)
+      (Storage — not yet started)
 ```
 
 Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
