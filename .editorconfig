@@ -1,0 +1,103 @@
+# EditorConfig for DashDetective — https://editorconfig.org
+#
+# This file encodes the code style already used throughout the repo (hand-written, consistent):
+# 4-space indent, file-scoped namespaces, K&R / same-line braces, and broad `var` usage. It is the
+# source of truth for both the in-build code-style rules (EnforceCodeStyleInBuild in the csproj) and
+# the `dotnet format` check in CI. Opinionated style preferences are kept at `suggestion` so they
+# guide without failing the build; only genuine formatting/whitespace is enforced.
+#
+# Note: `end_of_line` is deliberately left unset — the repo's line endings are mixed, so pinning one
+# here would make `dotnet format` rewrite unrelated files. Git's .gitattributes handles normalization.
+
+root = true
+
+# ---- All files ----
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# YAML (GitHub Actions workflows) conventionally indents two spaces.
+[*.{yml,yaml}]
+indent_size = 2
+
+# Markdown uses trailing whitespace for hard line breaks — don't strip it.
+[*.md]
+trim_trailing_whitespace = false
+
+# XAML / project / config XML.
+[*.{axaml,xaml,xml,csproj,props,targets,manifest}]
+indent_size = 4
+
+[*.json]
+indent_size = 2
+
+# ---- C# ----
+[*.cs]
+
+# Namespaces: file-scoped, matching every file in the repo.
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# Braces on the same line (K&R): the opening brace never starts a new line, and else/catch/finally
+# hug the preceding brace ("} else {", "} catch {"). Single-statement blocks in the repo often omit
+# braces, so braces are only preferred where a block spans multiple lines.
+csharp_new_line_before_open_brace = none
+csharp_new_line_before_else = false
+csharp_new_line_before_catch = false
+csharp_new_line_before_finally = false
+csharp_prefer_braces = when_multiline:suggestion
+
+# The repo groups several related initializer members on one line (e.g. "Width = 16, Height = 16,");
+# don't force each onto its own line.
+csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_anonymous_types = false
+
+# `var` is used broadly, including where the type isn't apparent from the right-hand side.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Expression-bodied members appear for concise methods/properties but aren't universal — don't force
+# either way.
+csharp_style_expression_bodied_methods = true:silent
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_expression_bodied_accessors = true:silent
+csharp_style_expression_bodied_lambdas = true:silent
+
+# Modern language features the repo already leans on.
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_prefer_index_operator = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+
+# Naming: private instance fields are `_camelCase`.
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_case
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# Indentation / spacing (standard C#, matches the repo).
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+
+# Using directives sit outside the namespace and aren't consistently System-first — leave sorting
+# unenforced so `dotnet format` doesn't reshuffle them.
+dotnet_sort_system_directives_first = false
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# `this.` is never used to qualify members in this repo.
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion

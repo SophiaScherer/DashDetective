@@ -29,6 +29,18 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 - `Performance` — initial UI implementation, **static mock data** (status below).
 
+**Repo-hygiene / portfolio pass — COMPLETED (2026-07-18), under explicit sign-off.** A one-off,
+cross-cutting pass outside the usual per-feature boundaries was authorised and is done: a portfolio
+`README.md`, a reader-facing `docs/ARCHITECTURE.md` (distilled from the appendix below), project
+metadata in the csproj (`Version 0.1.0`, title/authors/copyright, retarget to `net10.0-windows`),
+analyzer + warning gates (`AnalysisLevel latest`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`)
+with a root `.editorconfig` encoding the existing style, a `dotnet format --verify-no-changes` step in
+CI, and the Settings footer wired to a real assembly version via `AppInfo` (`src/Shared`) instead of the
+old fictional string. This did **not** change any feature behaviour (the footer text is the sole
+exception). It does not widen the working boundaries: scope control still proceeds **phase-by-phase per
+the roadmap**, and any further cross-cutting or out-of-feature change still needs its own explicit
+sign-off.
+
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
 patterns), but do NOT modify while building Performance** (full write-ups in *Appendix — Completed
 Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (Appearance live;
