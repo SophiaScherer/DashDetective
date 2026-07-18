@@ -1,14 +1,14 @@
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Network;
+using DashDetective.Services.SystemMetrics;
+using DashDetective.Shared;
 using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Avalonia.Threading;
-using CommunityToolkit.Mvvm.ComponentModel;
-using DashDetective.Services.Network;
-using DashDetective.Services.SystemMetrics;
-using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Dashboard;
 
