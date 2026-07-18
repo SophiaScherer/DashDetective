@@ -1,9 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 namespace DashDetective.Shared.Controls;
 
