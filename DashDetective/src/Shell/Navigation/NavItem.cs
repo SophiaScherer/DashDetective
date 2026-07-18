@@ -1,9 +1,9 @@
-using System;
-using System.Windows.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
+using System;
+using System.Windows.Input;
 
 namespace DashDetective.Shell.Navigation;
 

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -10,6 +7,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Identity;
 using DashDetective.Shared;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace DashDetective.Shell.Navigation;
 

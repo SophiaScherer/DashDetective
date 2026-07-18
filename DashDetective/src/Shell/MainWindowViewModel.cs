@@ -1,5 +1,3 @@
-using System;
-using System.Globalization;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,6 +12,8 @@ using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
+using System;
+using System.Globalization;
 
 namespace DashDetective.Shell;
 

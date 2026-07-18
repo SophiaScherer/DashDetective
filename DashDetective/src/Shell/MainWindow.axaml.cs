@@ -1,8 +1,8 @@
-using System;
-using System.IO;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using System;
+using System.IO;
 
 namespace DashDetective.Shell;
 
