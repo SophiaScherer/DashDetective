@@ -55,6 +55,8 @@
             <SolidColorBrush x:Key="Hairline" Color="#FFFFFF" Opacity="0.06"/>
             <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.05"/>
             <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.16"/>
+            <!-- Faint lattice drawn behind the larger utilization charts (matches the design's rgba(255,255,255,0.055)). -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#FFFFFF" Opacity="0.055"/>
 
             <!-- Hover overlays (for icon buttons / faint fills) -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.07"/>
@@ -83,6 +85,8 @@
             <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.10"/>
             <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.08"/>
             <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.20"/>
+            <!-- Faint lattice drawn behind the larger utilization charts (dark's white 5.5% mirrored to a matching faint black). -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.08"/>
 
             <!-- Hover overlays -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
