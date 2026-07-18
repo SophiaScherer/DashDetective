@@ -24,8 +24,8 @@ namespace DashDetective.Tabs.Performance;
 /// <see cref="SparklinePoints"/>, and results are pushed into the selected resource's <see cref="ResourceRow"/>.
 /// The tab keeps its own sampler instances (like the Processes tab) rather than sharing the Dashboard's.
 ///
-/// Wired live so far: <b>CPU</b>. Memory / Disk / GPU / Ethernet still show static mock data until their
-/// own phases. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
+/// Wired live so far: <b>CPU</b>, <b>Memory</b>. Disk / GPU / Ethernet still show static mock data until
+/// their own phases. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
 /// (toolbar Live/Pause) and <see cref="IDisposable"/>; <see cref="ISelfScrollingPage"/> keeps the shell
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
@@ -58,6 +58,15 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _cpuProcessesTile;
     private readonly StatTile _cpuUptimeTile;
 
+    // ---- Memory (live) ----
+    private readonly MemoryUsageSampler _memorySampler = new();
+    private readonly double[] _memoryHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _memoryTimer;
+    private readonly ResourceRow _memoryRow;
+    private readonly StatTile _memInUseTile;
+    private readonly StatTile _memAvailableTile;
+    private readonly StatTile _memCommittedTile;
+
     public PerformanceViewModel() {
         // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
         // "—" (no reliable current-clock source, and the base clock already appears in the sub-label).
@@ -72,12 +81,21 @@ public partial class PerformanceViewModel : ViewModelBase,
                                   }, Select);
         Resources.Add(_cpuRow);
 
-        // Memory / Disk / GPU / Ethernet — static mock data from the design comp (perfDefs + statMap),
-        // wired to real samplers in later phases. Each mock series is a deterministic wave.
-        Resources.Add(new ResourceRow("Memory", "19.5 / 32 GB", "DDR5-6000 · 2 slots",
-                                      "61", "%", Brush("#c58fff"), MockPoints(61, 6, 11),
-                                      Stats("In use", "19.5 GB", "Available", "12.5 GB",
-                                            "Cached", "5.8 GB", "Committed", "24 / 38 GB"), Select));
+        // Memory — live. Tiles: In use / Available / Committed update every tick; Cached is blanked to
+        // "—" (no reliable source without adding a PDH counter to the pure-Win32 memory sampler).
+        _memInUseTile = new StatTile("In use", "0 GB");
+        _memAvailableTile = new StatTile("Available", "0 GB");
+        _memCommittedTile = new StatTile("Committed", "0 / 0 GB");
+        _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
+                                     SparklinePoints.Build(_memoryHistory, 100),
+                                     new[] {
+                                         _memInUseTile, _memAvailableTile,
+                                         new StatTile("Cached", "—"), _memCommittedTile,
+                                     }, Select);
+        Resources.Add(_memoryRow);
+
+        // Disk / GPU / Ethernet — static mock data from the design comp (perfDefs + statMap), wired to
+        // real samplers in later phases. Each mock series is a deterministic wave.
         Resources.Add(new ResourceRow("Disk 0 (C:)", "NVMe SSD", "Samsung 990 Pro 2TB",
                                       "4", "%", Brush("#ffcf4d"), MockPoints(9, 18, 5),
                                       Stats("Active", "4 %", "Read", "48 MB/s",
@@ -103,23 +121,37 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuTimer.Tick += OnCpuTick;
         _cpuTimer.Start();
 
-        // Load static CPU hardware info off the UI thread; the sub/spec labels fill in when ready.
+        // Memory runs on its own timer so it stays independent of the CPU sampler: either can fail and
+        // stop without taking the other down.
+        UpdateMemory(_memorySampler.Sample());
+
+        _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _memoryTimer.Tick += OnMemoryTick;
+        _memoryTimer.Start();
+
+        // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
         _ = LoadCpuInfoAsync();
+        _ = LoadMemoryInfoAsync();
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
     public void Refresh() {
         OnCpuTick(this, EventArgs.Empty);
+        OnMemoryTick(this, EventArgs.Empty);
         _ = LoadCpuInfoAsync();
+        _ = LoadMemoryInfoAsync();
     }
 
     /// <summary>Pauses or resumes all live sampling by stopping/starting the metric timers. Drives the
     /// shell's Live toggle; <see cref="Refresh"/> still works while paused.</summary>
     public void SetLive(bool live) {
-        if (live)
+        if (live) {
             _cpuTimer.Start();
-        else
+            _memoryTimer.Start();
+        } else {
             _cpuTimer.Stop();
+            _memoryTimer.Stop();
+        }
     }
 
     private void OnCpuTick(object? sender, EventArgs e) {
@@ -211,6 +243,72 @@ public partial class PerformanceViewModel : ViewModelBase,
         return Regex.Replace(name, @"\s+", " ").Trim();
     }
 
+    private void OnMemoryTick(object? sender, EventArgs e) {
+        MemorySample sample;
+        try {
+            sample = _memorySampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host). Show neutral placeholders and stop
+            // polling rather than throwing on the UI thread every second.
+            _memoryRow.ValueText = "—";
+            _memInUseTile.Value = "—";
+            _memAvailableTile.Value = "—";
+            _memCommittedTile.Value = "—";
+            _memoryTimer.Stop();
+            return;
+        }
+
+        // Shift the window left by one and append the newest load percentage at the end.
+        Array.Copy(_memoryHistory, 1, _memoryHistory, 0, _memoryHistory.Length - 1);
+        _memoryHistory[^1] = sample.LoadPercent;
+
+        UpdateMemory(sample);
+    }
+
+    private void UpdateMemory(MemorySample sample) {
+        const double gb = 1L << 30;
+        var usedGb = sample.UsedBytes / gb;
+        var totalGb = sample.TotalBytes / gb;
+        var committedGb = sample.CommittedBytes / gb;
+        var limitGb = sample.CommitLimitBytes / gb;
+        var rounded = Math.Round(sample.LoadPercent);
+
+        _memoryRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+        // Rail sub-caption mirrors the design comp's live "used / total" figure (e.g. "19.5 / 32 GB").
+        _memoryRow.Sub = totalGb > 0
+            ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
+            : "";
+        _memoryRow.Points = SparklinePoints.Build(_memoryHistory, 100);
+
+        _memInUseTile.Value = $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} GB";
+        _memAvailableTile.Value = $"{Math.Max(0, totalGb - usedGb).ToString("F1", CultureInfo.InvariantCulture)} GB";
+        _memCommittedTile.Value = limitGb > 0
+            ? $"{committedGb.ToString("F0", CultureInfo.InvariantCulture)} / {limitGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
+            : "—";
+    }
+
+    private async Task LoadMemoryInfoAsync() {
+        // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole path
+        // so a surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await MemoryInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            _memoryRow.Spec = FormatMemorySpec(info);
+        } catch {
+            _memoryRow.Spec = "Unknown RAM";
+        }
+    }
+
+    /// <summary>Type, speed and slot count for the detail spec header, e.g. "DDR5-6000 · 2 slots".</summary>
+    private static string FormatMemorySpec(MemoryStaticInfo info) {
+        var label = info.SpeedMhz > 0
+            ? $"{info.TypeLabel}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
+            : info.TypeLabel;
+        return info.ModuleCount > 0
+            ? $"{label} · {info.ModuleCount.ToString(CultureInfo.InvariantCulture)} slots"
+            : label;
+    }
+
     /// <summary>
     /// Builds a 60-point mock utilization series as a Sparkline "x,y x,y …" string for a fixed 0–100
     /// axis. Values oscillate deterministically around <paramref name="level"/> (± ~<paramref
@@ -244,10 +342,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         row.IsSelected = true;
     }
 
-    /// <summary>Stops the sampling timers. Safe to call more than once. The CPU sampler is fully
-    /// managed (no unmanaged handle), so it needs no disposal.</summary>
+    /// <summary>Stops the sampling timers. Safe to call more than once. The CPU and Memory samplers are
+    /// fully managed (no unmanaged handle), so they need no disposal.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
         _cpuTimer.Tick -= OnCpuTick;
+        _memoryTimer.Stop();
+        _memoryTimer.Tick -= OnMemoryTick;
     }
 }
