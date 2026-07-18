@@ -124,7 +124,7 @@
         <StackPanel Grid.Column="2" Spacing="12">
 
             <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
-                 in the resource's colour. Reuses the shared Sparkline (no grid, like the Dashboard). -->
+                 in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
             <Border Classes="panel">
                 <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="*,Auto">
@@ -134,7 +134,7 @@
                                    Text="{Binding SelectedResource.Spec}"/>
                     </Grid>
                     <TextBlock Classes="cardSub" Text="% Utilization over 60 seconds"/>
-                    <controls:Sparkline Height="240" Fill="True" StrokeThickness="1.8"
+                    <controls:Sparkline Height="240" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         Stroke="{Binding SelectedResource.ValueBrush}"
                                         Points="{Binding SelectedResource.Points}"/>
