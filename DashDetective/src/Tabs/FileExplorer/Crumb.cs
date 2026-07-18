@@ -1,6 +1,6 @@
+using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Windows.Input;
-using CommunityToolkit.Mvvm.Input;
 
 namespace DashDetective.Tabs.FileExplorer;
 
