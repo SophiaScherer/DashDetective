@@ -51,8 +51,9 @@ public partial class ResourceRow : ObservableObject {
     /// Live-updated each sampling tick.</summary>
     [ObservableProperty] private string _valueText;
 
-    /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps").</summary>
-    public string Unit { get; }
+    /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps"). Fixed for percentage
+    /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate.</summary>
+    [ObservableProperty] private string _unit;
 
     /// <summary>Semantic per-metric tint for the value and the detail utilization chart. A fixed
     /// legend colour, so it is theme/accent-independent by design.</summary>

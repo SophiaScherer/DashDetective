@@ -2,12 +2,13 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text;
+using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
@@ -24,8 +25,8 @@ namespace DashDetective.Tabs.Performance;
 /// <see cref="SparklinePoints"/>, and results are pushed into the selected resource's <see cref="ResourceRow"/>.
 /// The tab keeps its own sampler instances (like the Processes tab) rather than sharing the Dashboard's.
 ///
-/// Wired live so far: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>, <b>GPU</b>. Ethernet still shows static mock
-/// data until its phase. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
+/// All five resources are wired live: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>, <b>GPU</b>, <b>Ethernet</b>.
+/// Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
 /// (toolbar Live/Pause) and <see cref="IDisposable"/>; <see cref="ISelfScrollingPage"/> keeps the shell
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
@@ -34,14 +35,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
+    /// <summary>Floor for the network chart's auto-scaled axis, in Mbps: keeps an idle graph pinned flat
+    /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
+    /// Dashboard's network scale floor.</summary>
+    private const double MinNetworkScaleMbps = 1.0;
+
     // Fixed semantic per-metric legend colours (theme/accent-independent by design), matching the design
     // comp's palette — parsed like MainWindowViewModel's live dots.
     private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
-
-    // The four label/value readouts for a still-mock resource's detail stat strip (design comp's statMap).
-    private static StatTile[] Stats(string l1, string v1, string l2, string v2,
-                                    string l3, string v3, string l4, string v4) =>
-        new[] { new StatTile(l1, v1), new StatTile(l2, v2), new StatTile(l3, v3), new StatTile(l4, v4) };
 
     /// <summary>The resource rows shown in the left rail, in display order.</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
@@ -83,6 +84,16 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly DispatcherTimer _gpuTimer;
     private readonly ResourceRow _gpuRow;
     private readonly StatTile _gpu3dTile;
+
+    // ---- Ethernet / network (live) ----
+    private readonly NetworkUsageSampler _networkSampler = new();
+    private readonly double[] _downHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _networkTimer;
+    private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
+    private readonly ResourceRow _networkRow;
+    private readonly StatTile _netReceiveTile;
+    private readonly StatTile _netSendTile;
+    private readonly StatTile _netErrorsTile;
 
     public PerformanceViewModel() {
         // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
@@ -136,12 +147,21 @@ public partial class PerformanceViewModel : ViewModelBase,
                                   }, Select);
         Resources.Add(_gpuRow);
 
-        // Ethernet — static mock data from the design comp (perfDefs + statMap), wired to a real sampler
-        // in the next phase. The mock series is a deterministic wave.
-        Resources.Add(new ResourceRow("Ethernet", "2.5 GbE", "Intel I225-V",
-                                      "48", "Mbps", Brush("#4cc2ff"), MockPoints(40, 26, 7),
-                                      Stats("Receive", "48 Mbps", "Send", "3.8 Mbps",
-                                            "Link", "2.5 Gbps", "Errors", "0"), Select));
+        // Ethernet / network — live. Rail value + chart show the primary adapter's receive throughput;
+        // tiles show Receive / Send / Link / Errors. The row is named after the real primary adapter
+        // (e.g. "Ethernet", "Wi-Fi"), and Link speed is read once at construction (it rarely changes).
+        _netReceiveTile = new StatTile("Receive", "0 Mbps");
+        _netSendTile = new StatTile("Send", "0 Mbps");
+        _netErrorsTile = new StatTile("Errors", "0");
+        var adapterName = string.IsNullOrWhiteSpace(_networkSampler.AdapterName) ? "Ethernet" : _networkSampler.AdapterName;
+        var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
+        _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
+                                      SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
+                                      new[] {
+                                          _netReceiveTile, _netSendTile,
+                                          new StatTile("Link", linkSpeed), _netErrorsTile,
+                                      }, Select);
+        Resources.Add(_networkRow);
 
         SelectedResource = Resources[0];
         SelectedResource.IsSelected = true;
@@ -177,11 +197,19 @@ public partial class PerformanceViewModel : ViewModelBase,
         _gpuTimer.Tick += OnGpuTick;
         _gpuTimer.Start();
 
+        // Network runs on its own timer for the same reason: independent of the other samplers.
+        UpdateNetwork(new NetworkSample(0, 0));
+
+        _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _networkTimer.Tick += OnNetworkTick;
+        _networkTimer.Start();
+
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadDiskInfoAsync();
         _ = LoadGpuInfoAsync();
+        _ = LoadNetworkInfoAsync();
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
@@ -190,10 +218,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         OnMemoryTick(this, EventArgs.Empty);
         OnStorageTick(this, EventArgs.Empty);
         OnGpuTick(this, EventArgs.Empty);
+        OnNetworkTick(this, EventArgs.Empty);
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadDiskInfoAsync();
         _ = LoadGpuInfoAsync();
+        _ = LoadNetworkInfoAsync();
     }
 
     /// <summary>Pauses or resumes all live sampling by stopping/starting the metric timers. Drives the
@@ -204,11 +234,13 @@ public partial class PerformanceViewModel : ViewModelBase,
             _memoryTimer.Start();
             _storageTimer.Start();
             _gpuTimer.Start();
+            _networkTimer.Start();
         } else {
             _cpuTimer.Stop();
             _memoryTimer.Stop();
             _storageTimer.Stop();
             _gpuTimer.Stop();
+            _networkTimer.Stop();
         }
     }
 
@@ -496,26 +528,103 @@ public partial class PerformanceViewModel : ViewModelBase,
         return Regex.Replace(name, @"\s+", " ").Trim();
     }
 
-    /// <summary>
-    /// Builds a 60-point mock utilization series as a Sparkline "x,y x,y …" string for a fixed 0–100
-    /// axis. Values oscillate deterministically around <paramref name="level"/> (± ~<paramref
-    /// name="amp"/>); each y is flipped to <c>100 − value</c> so higher utilization draws at the top.
-    /// Placeholder for the resources not yet wired to live samplers.
-    /// </summary>
-    private static string MockPoints(double level, double amp, double seed) {
-        var sb = new StringBuilder();
-        for (var i = 0; i < 60; i++) {
-            var value = level
-                        + amp * Math.Sin((i + seed) * 0.40)
-                        + amp * 0.5 * Math.Sin((i + seed) * 0.13);
-            value = Math.Clamp(value, 0, 100);
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((100 - value).ToString("0.##", CultureInfo.InvariantCulture));
+    private void OnNetworkTick(object? sender, EventArgs e) {
+        NetworkSample sample;
+        try {
+            sample = _networkSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. no readable adapters). Show neutral placeholders and stop
+            // polling rather than throwing on the UI thread every second.
+            _networkRow.ValueText = "—";
+            _netReceiveTile.Value = "—";
+            _netSendTile.Value = "—";
+            _networkTimer.Stop();
+            return;
         }
-        return sb.ToString();
+
+        // Shift the window left by one and append the newest receive rate at the end.
+        Array.Copy(_downHistory, 1, _downHistory, 0, _downHistory.Length - 1);
+        _downHistory[^1] = sample.DownMbps;
+
+        UpdateNetwork(sample);
+    }
+
+    private void UpdateNetwork(NetworkSample sample) {
+        // Each readout auto-scales to its own value so a small flow shows kbps beside a large one — the
+        // rail value + unit and the Receive/Send tiles all read through the shared DataRateFormatter.
+        var (downValue, downUnit) = DataRateFormatter.Split(sample.DownMbps);
+        _networkRow.ValueText = downValue;
+        _networkRow.Unit = downUnit;
+        _netReceiveTile.Value = $"{downValue} {downUnit}";
+        _netSendTile.Value = DataRateFormatter.Format(sample.UpMbps);
+
+        // The chart has no natural 0–100 axis, so normalise against the rolling receive peak (with
+        // headroom and a floor, like the Dashboard) so the filled area still spans the fixed axis.
+        _networkRow.Points = SparklinePoints.Build(_downHistory, ComputeNetworkScale(NetworkPeak()));
+
+        _netErrorsTile.Value = ReadNetworkErrors();
+    }
+
+    /// <summary>Largest receive sample in the rolling window, before headroom — drives the chart scale.</summary>
+    private double NetworkPeak() {
+        var max = 0.0;
+        for (var i = 0; i < WindowSeconds; i++)
+            if (_downHistory[i] > max)
+                max = _downHistory[i];
+        return max;
+    }
+
+    /// <summary>The receive peak plus ~15% headroom so the peak doesn't touch the top edge, floored at
+    /// <see cref="MinNetworkScaleMbps"/>.</summary>
+    private static double ComputeNetworkScale(double peak) {
+        var scaled = peak * 1.15;
+        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
+    }
+
+    /// <summary>Cumulative incoming + outgoing packet errors on the primary adapter, or "—" if the
+    /// adapter can't be read. Read from the cached interface each tick (a cheap syscall).</summary>
+    private string ReadNetworkErrors() {
+        try {
+            if (_networkInterface is null)
+                return "0";
+            var stats = _networkInterface.GetIPStatistics();
+            var errors = stats.IncomingPacketsWithErrors + stats.OutgoingPacketsWithErrors;
+            return errors.ToString(CultureInfo.InvariantCulture);
+        } catch {
+            return "—";
+        }
+    }
+
+    private async Task LoadNetworkInfoAsync() {
+        // Resolve the adapter's link speed + description off the UI thread (enumeration can be slow),
+        // then bind on the UI thread. SelectPrimary never throws in practice, but guard defensively.
+        try {
+            var (sub, spec) = await Task.Run(ReadNetworkInfo);
+            _networkRow.Sub = sub;
+            _networkRow.Spec = spec;
+        } catch {
+            _networkRow.Sub = "";
+            _networkRow.Spec = "";
+        }
+    }
+
+    /// <summary>Link speed (sub) and adapter description (spec) for the primary adapter.</summary>
+    private static (string Sub, string Spec) ReadNetworkInfo() {
+        var adapter = NetworkUsageSampler.SelectPrimary();
+        if (adapter is null)
+            return ("", "");
+        return (FormatLinkSpeed(adapter.Speed), adapter.Description ?? "");
+    }
+
+    /// <summary>Formats an adapter link speed (bits/second) as "2.5 Gbps" / "866 Mbps", or "—" when
+    /// unknown. Uses the decimal (1000) base that matches adapter link-speed conventions.</summary>
+    private static string FormatLinkSpeed(long bitsPerSecond) {
+        if (bitsPerSecond <= 0)
+            return "—";
+        var mbps = bitsPerSecond / 1_000_000.0;
+        return mbps >= 1000
+            ? $"{(mbps / 1000.0).ToString("0.#", CultureInfo.InvariantCulture)} Gbps"
+            : $"{Math.Round(mbps).ToString(CultureInfo.InvariantCulture)} Mbps";
     }
 
     /// <summary>Selects a resource (single-select) so the detail pane swaps to it. No-ops when the
@@ -530,8 +639,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>Stops the sampling timers and disposes samplers that own unmanaged handles. Safe to call
-    /// more than once. The CPU and Memory samplers are fully managed, so they need no disposal; the
-    /// Storage and GPU samplers own PDH query handles and are disposed here.</summary>
+    /// more than once. The CPU, Memory and Network samplers are fully managed, so they need no disposal;
+    /// the Storage and GPU samplers own PDH query handles and are disposed here.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
         _cpuTimer.Tick -= OnCpuTick;
@@ -541,6 +650,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         _storageTimer.Tick -= OnStorageTick;
         _gpuTimer.Stop();
         _gpuTimer.Tick -= OnGpuTick;
+        _networkTimer.Stop();
+        _networkTimer.Tick -= OnNetworkTick;
         _storageSampler.Dispose();
         _gpuSampler.Dispose();
     }
