@@ -46,8 +46,7 @@ public sealed class NetworkUsageSampler {
                 Rebaseline(primary);
             else
                 _prevElapsedSeconds = _clock.Elapsed.TotalSeconds;
-        }
-        catch {
+        } catch {
             // Leave baselines at zero; subsequent samples self-correct.
         }
     }
@@ -93,8 +92,7 @@ public sealed class NetworkUsageSampler {
             var up = upBytes > 0 ? upBytes * 8.0 / 1_000_000.0 / seconds : 0;
 
             return new NetworkSample(down, up);
-        }
-        catch {
+        } catch {
             return new NetworkSample(0, 0);
         }
     }
@@ -139,8 +137,7 @@ public sealed class NetworkUsageSampler {
         try {
             return NetworkInterface.GetAllNetworkInterfaces()
                 .FirstOrDefault(a => a.Id == id && a.OperationalStatus == OperationalStatus.Up);
-        }
-        catch {
+        } catch {
             return null;
         }
     }
@@ -154,8 +151,7 @@ public sealed class NetworkUsageSampler {
                 if (addr is not null && !addr.Equals(IPAddress.Any) && !addr.Equals(IPAddress.IPv6Any))
                     return true;
             }
-        }
-        catch {
+        } catch {
             // Some adapters refuse GetIPProperties(); treat as unrouted.
         }
         return false;
@@ -165,8 +161,7 @@ public sealed class NetworkUsageSampler {
         try {
             var s = a.GetIPStatistics();
             return s.BytesReceived + s.BytesSent;
-        }
-        catch {
+        } catch {
             return 0;
         }
     }

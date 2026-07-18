@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using Avalonia.Media;
+using System.Collections.Generic;
 
 namespace DashDetective.Services.Theming;
 
