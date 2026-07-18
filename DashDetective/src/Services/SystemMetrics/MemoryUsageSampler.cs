@@ -3,9 +3,13 @@ using System.Runtime.InteropServices;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// A single physical-memory snapshot: load as a percentage (0–100), plus used and total bytes.
+/// A single physical-memory snapshot: load as a percentage (0–100), used and total physical bytes,
+/// plus the system commit charge and limit (<c>CommittedBytes</c> of <c>CommitLimitBytes</c>) — Task
+/// Manager's "Committed" figure, which counts pagefile-backed virtual memory beyond physical RAM.
 /// </summary>
-public readonly record struct MemorySample(double LoadPercent, ulong UsedBytes, ulong TotalBytes);
+public readonly record struct MemorySample(
+    double LoadPercent, ulong UsedBytes, ulong TotalBytes,
+    ulong CommittedBytes, ulong CommitLimitBytes);
 
 /// <summary>
 /// Samples system physical-memory usage via the Win32 <c>GlobalMemoryStatusEx</c> API. Each
@@ -43,15 +47,21 @@ public sealed class MemoryUsageSampler {
         // Length must be set before the call so the OS knows the struct version/size.
         var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
         if (!GlobalMemoryStatusEx(ref status))
-            return new MemorySample(0, 0, 0);
+            return new MemorySample(0, 0, 0, 0, 0);
 
         var used = status.TotalPhys >= status.AvailPhys
             ? status.TotalPhys - status.AvailPhys
             : 0;
 
+        // Committed = commit limit − amount the system can still commit. TotalPageFile is the current
+        // commit limit (RAM + pagefile); AvailPageFile is what remains commitable.
+        var committed = status.TotalPageFile >= status.AvailPageFile
+            ? status.TotalPageFile - status.AvailPageFile
+            : 0;
+
         // Clamp defensively against rounding edge cases.
         var load = status.MemoryLoad > 100 ? 100 : status.MemoryLoad;
 
-        return new MemorySample(load, used, status.TotalPhys);
+        return new MemorySample(load, used, status.TotalPhys, committed, status.TotalPageFile);
     }
 }

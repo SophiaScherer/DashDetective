@@ -10,7 +10,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// (or a non-Windows host) yields <see cref="GpuStaticInfo.Unknown"/> rather than throwing.
 ///
 /// Only the adapter <c>Name</c> is read here: <c>Win32_VideoController</c> has no live-utilisation
-/// counter (that comes from PDH in <see cref="GpuUsageSampler"/>) and its <c>AdapterRAM</c> is
+/// counter (that comes from PDH in <see cref="DashDetective.Services.SystemMetrics.GpuUsageSampler"/>) and its <c>AdapterRAM</c> is
 /// capped at 4 GB, so VRAM is deliberately not sourced from it.
 /// </summary>
 public static class GpuInfoProvider {

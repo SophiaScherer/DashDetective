@@ -2,13 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace DashDetective.Tabs.Dashboard;
+namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>
 /// performance counter — the same source Task Manager uses. Each <see cref="Sample"/> call returns
 /// the current GPU load as a percentage (0–100). No extra dependencies beyond the OS
 /// <c>pdh.dll</c>; comparable per-sample cost to the CPU/Memory samplers.
+///
+/// Shared: the Dashboard and the Performance tab each own an instance. Moved here from
+/// src/Tabs/Dashboard with sign-off when the Performance tab was activated — the same precedent as
+/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>.
 /// </summary>
 public sealed class GpuUsageSampler : IDisposable {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).
