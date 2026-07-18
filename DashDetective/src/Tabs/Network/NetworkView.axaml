@@ -183,10 +183,10 @@
                         <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="11"
                                    VerticalAlignment="Bottom" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
-                    <controls:Sparkline Height="65" Fill="True"
+                    <controls:Sparkline Height="65" Fill="True" ShowGrid="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding DownPoints}"
                                         YMin="0" YMax="{Binding ThroughputYMax}"/>
-                    <controls:Sparkline Height="65" Fill="True"
+                    <controls:Sparkline Height="65" Fill="True" ShowGrid="True"
                                         Stroke="{DynamicResource ChartNetUp}" Points="{Binding UpPoints}"
                                         YMin="0" YMax="{Binding ThroughputYMax}"/>
                 </StackPanel>

@@ -17,8 +17,9 @@ namespace DashDetective.Shared.Controls;
 /// In fixed-range mode an optional second series (<see cref="Points2"/>/<see cref="Stroke2"/>)
 /// may be supplied; both series share the same <see cref="YMin"/>/<see cref="YMax"/> axis so
 /// their values are directly comparable. Set <see cref="Fill"/> to draw a translucent gradient
-/// area beneath each line. These extras apply only to fixed-range mode; auto-fit mode is
-/// unchanged single-series behaviour.
+/// area beneath each line. Set <see cref="ShowGrid"/> to draw a faint lattice behind the data
+/// (<see cref="GridRows"/> × <see cref="GridColumns"/>, coloured by <see cref="GridBrush"/>).
+/// These extras apply only to fixed-range mode; auto-fit mode is unchanged single-series behaviour.
 /// </summary>
 public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> StrokeProperty =
@@ -44,6 +45,18 @@ public partial class Sparkline : UserControl {
 
     public static readonly StyledProperty<bool> FillProperty =
         AvaloniaProperty.Register<Sparkline, bool>(nameof(Fill));
+
+    public static readonly StyledProperty<bool> ShowGridProperty =
+        AvaloniaProperty.Register<Sparkline, bool>(nameof(ShowGrid));
+
+    public static readonly StyledProperty<int> GridRowsProperty =
+        AvaloniaProperty.Register<Sparkline, int>(nameof(GridRows), 4);
+
+    public static readonly StyledProperty<int> GridColumnsProperty =
+        AvaloniaProperty.Register<Sparkline, int>(nameof(GridColumns), 10);
+
+    public static readonly StyledProperty<IBrush?> GridBrushProperty =
+        AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(GridBrush));
 
     private List<Point> _data = new();
     private List<Point> _data2 = new();
@@ -102,6 +115,30 @@ public partial class Sparkline : UserControl {
         set => SetValue(FillProperty, value);
     }
 
+    /// <summary>When true (fixed-range mode), draw a faint lattice behind the data.</summary>
+    public bool ShowGrid {
+        get => GetValue(ShowGridProperty);
+        set => SetValue(ShowGridProperty, value);
+    }
+
+    /// <summary>Number of horizontal bands in the grid (draws this many + 1 lines). Design default: 4.</summary>
+    public int GridRows {
+        get => GetValue(GridRowsProperty);
+        set => SetValue(GridRowsProperty, value);
+    }
+
+    /// <summary>Number of vertical columns in the grid (draws this many + 1 lines). Design default: 10.</summary>
+    public int GridColumns {
+        get => GetValue(GridColumnsProperty);
+        set => SetValue(GridColumnsProperty, value);
+    }
+
+    /// <summary>Grid line colour. Falls back to the themed <c>ChartGrid</c> resource when unset.</summary>
+    public IBrush? GridBrush {
+        get => GetValue(GridBrushProperty);
+        set => SetValue(GridBrushProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
         base.OnPropertyChanged(change);
         if (change.Property == PointsProperty
@@ -111,7 +148,9 @@ public partial class Sparkline : UserControl {
             Rebuild();
         else if (_fixedRange
             && (change.Property == StrokeProperty || change.Property == StrokeThicknessProperty
-                || change.Property == Stroke2Property || change.Property == FillProperty))
+                || change.Property == Stroke2Property || change.Property == FillProperty
+                || change.Property == ShowGridProperty || change.Property == GridRowsProperty
+                || change.Property == GridColumnsProperty || change.Property == GridBrushProperty))
             InvalidateVisual();
     }
 
@@ -123,6 +162,10 @@ public partial class Sparkline : UserControl {
         double w = Bounds.Width, h = Bounds.Height;
         if (w <= 0 || h <= 0)
             return;
+
+        // The grid sits behind the data and shows even before any samples arrive.
+        if (ShowGrid)
+            DrawGrid(context, w, h);
 
         var hasSeries1 = _data.Count >= 2 && Stroke is not null;
         var hasSeries2 = _data2.Count >= 2 && Stroke2 is not null;
@@ -153,6 +196,32 @@ public partial class Sparkline : UserControl {
         if (hasSeries2)
             DrawLine(context, _data2, Stroke2!, w, h, maxX, span);
     }
+
+    /// <summary>Draws a faint lattice (<see cref="GridRows"/>+1 horizontal, <see cref="GridColumns"/>+1 vertical
+    /// lines) behind the data. Coordinates are snapped to +0.5 device pixels for crisp 1px lines.</summary>
+    private void DrawGrid(DrawingContext context, double w, double h) {
+        var brush = GridBrush ?? ResolveGridBrush();
+        if (brush is null)
+            return;
+
+        var pen = new Pen(brush, 1);
+
+        var rows = Math.Max(1, GridRows);
+        for (var i = 0; i <= rows; i++) {
+            var y = Math.Round(h / rows * i) + 0.5;
+            context.DrawLine(pen, new Point(0, y), new Point(w, y));
+        }
+
+        var cols = Math.Max(1, GridColumns);
+        for (var i = 0; i <= cols; i++) {
+            var x = Math.Round(w / cols * i) + 0.5;
+            context.DrawLine(pen, new Point(x, 0), new Point(x, h));
+        }
+    }
+
+    /// <summary>Themed fallback grid colour (the <c>ChartGrid</c> resource), resolved for the current theme variant.</summary>
+    private IBrush? ResolveGridBrush() =>
+        this.TryFindResource("ChartGrid", ActualThemeVariant, out var value) ? value as IBrush : null;
 
     /// <summary>Maps a data point to control pixels. Keeps "smaller y = top" so the axis floor is at the top.</summary>
     private Point ToPixel(Point p, double w, double h, double maxX, double span) {

@@ -39,7 +39,7 @@
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
                         <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
                     </Grid>
-                    <controls:Sparkline Height="130" Stroke="{DynamicResource ChartCpu}"
+                    <controls:Sparkline Height="130" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
                 </StackPanel>
             </Border>
@@ -49,7 +49,7 @@
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
                         <TextBlock Grid.Column="1" Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
                     </Grid>
-                    <controls:Sparkline Height="130" Stroke="{DynamicResource ChartMemory}"
+                    <controls:Sparkline Height="130" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
                                         YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
                 </StackPanel>
             </Border>
