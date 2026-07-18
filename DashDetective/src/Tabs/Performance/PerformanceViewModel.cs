@@ -24,8 +24,8 @@ namespace DashDetective.Tabs.Performance;
 /// <see cref="SparklinePoints"/>, and results are pushed into the selected resource's <see cref="ResourceRow"/>.
 /// The tab keeps its own sampler instances (like the Processes tab) rather than sharing the Dashboard's.
 ///
-/// Wired live so far: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>. GPU / Ethernet still show static mock data
-/// until their own phases. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
+/// Wired live so far: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>, <b>GPU</b>. Ethernet still shows static mock
+/// data until its phase. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
 /// (toolbar Live/Pause) and <see cref="IDisposable"/>; <see cref="ISelfScrollingPage"/> keeps the shell
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
@@ -77,6 +77,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _diskWriteTile;
     private readonly StatTile _diskResponseTile;
 
+    // ---- GPU (live) ----
+    private readonly GpuUsageSampler _gpuSampler = new();
+    private readonly double[] _gpuHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _gpuTimer;
+    private readonly ResourceRow _gpuRow;
+    private readonly StatTile _gpu3dTile;
+
     public PerformanceViewModel() {
         // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
         // "—" (no reliable current-clock source, and the base clock already appears in the sub-label).
@@ -117,12 +124,20 @@ public partial class PerformanceViewModel : ViewModelBase,
                                    }, Select);
         Resources.Add(_diskRow);
 
-        // GPU / Ethernet — static mock data from the design comp (perfDefs + statMap), wired to real
-        // samplers in later phases. Each mock series is a deterministic wave.
-        Resources.Add(new ResourceRow("GPU", "RTX 4080", "16 GB GDDR6X · 52°C",
-                                      "12", "%", Brush("#6ccb5f"), MockPoints(14, 12, 23),
-                                      Stats("3D", "12 %", "VRAM", "4.2 / 16 GB",
-                                            "Temp", "52 °C", "Power", "142 W"), Select));
+        // GPU — live. Rail value + chart show the busiest GPU engine's utilization; 3D tile mirrors it.
+        // VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU temperature
+        // is already deferred out of scope in the project).
+        _gpu3dTile = new StatTile("3D", "0 %");
+        _gpuRow = new ResourceRow("GPU", "", "", "0", "%", Brush("#6ccb5f"),
+                                  SparklinePoints.Build(_gpuHistory, 100),
+                                  new[] {
+                                      _gpu3dTile, new StatTile("VRAM", "—"),
+                                      new StatTile("Temp", "—"), new StatTile("Power", "—"),
+                                  }, Select);
+        Resources.Add(_gpuRow);
+
+        // Ethernet — static mock data from the design comp (perfDefs + statMap), wired to a real sampler
+        // in the next phase. The mock series is a deterministic wave.
         Resources.Add(new ResourceRow("Ethernet", "2.5 GbE", "Intel I225-V",
                                       "48", "Mbps", Brush("#4cc2ff"), MockPoints(40, 26, 7),
                                       Stats("Receive", "48 Mbps", "Send", "3.8 Mbps",
@@ -155,10 +170,18 @@ public partial class PerformanceViewModel : ViewModelBase,
         _storageTimer.Tick += OnStorageTick;
         _storageTimer.Start();
 
+        // GPU runs on its own timer for the same reason: independent of the other samplers.
+        UpdateGpu(0);
+
+        _gpuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _gpuTimer.Tick += OnGpuTick;
+        _gpuTimer.Start();
+
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadDiskInfoAsync();
+        _ = LoadGpuInfoAsync();
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
@@ -166,9 +189,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         OnCpuTick(this, EventArgs.Empty);
         OnMemoryTick(this, EventArgs.Empty);
         OnStorageTick(this, EventArgs.Empty);
+        OnGpuTick(this, EventArgs.Empty);
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadDiskInfoAsync();
+        _ = LoadGpuInfoAsync();
     }
 
     /// <summary>Pauses or resumes all live sampling by stopping/starting the metric timers. Drives the
@@ -178,10 +203,12 @@ public partial class PerformanceViewModel : ViewModelBase,
             _cpuTimer.Start();
             _memoryTimer.Start();
             _storageTimer.Start();
+            _gpuTimer.Start();
         } else {
             _cpuTimer.Stop();
             _memoryTimer.Stop();
             _storageTimer.Stop();
+            _gpuTimer.Stop();
         }
     }
 
@@ -410,6 +437,65 @@ public partial class PerformanceViewModel : ViewModelBase,
         return $"{info.Model} {size}";
     }
 
+    private void OnGpuTick(object? sender, EventArgs e) {
+        double value;
+        try {
+            value = _gpuSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host or missing GPU Engine counters). Show a
+            // neutral placeholder and stop polling rather than throwing on the UI thread every second.
+            _gpuRow.ValueText = "—";
+            _gpu3dTile.Value = "—";
+            _gpuTimer.Stop();
+            return;
+        }
+
+        // Shift the window left by one and append the newest sample at the end.
+        Array.Copy(_gpuHistory, 1, _gpuHistory, 0, _gpuHistory.Length - 1);
+        _gpuHistory[^1] = value;
+
+        UpdateGpu(value);
+    }
+
+    private void UpdateGpu(double value) {
+        var rounded = Math.Round(value);
+        _gpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+        _gpu3dTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+        _gpuRow.Points = SparklinePoints.Build(_gpuHistory, 100);
+    }
+
+    private async Task LoadGpuInfoAsync() {
+        // GetAsync never throws (it falls back to GpuStaticInfo.Unknown), but guard the whole path so a
+        // surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await GpuInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            _gpuRow.Sub = ShortenGpuName(info.Name);
+            _gpuRow.Spec = info.Name;
+        } catch {
+            _gpuRow.Sub = "";
+            _gpuRow.Spec = "Unknown GPU";
+        }
+    }
+
+    /// <summary>
+    /// Trims vendor decoration ("NVIDIA", "AMD", "(R)", "(TM)") from an adapter name for the compact
+    /// rail sub-label, e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060".
+    /// </summary>
+    private static string ShortenGpuName(string raw) {
+        if (string.IsNullOrWhiteSpace(raw))
+            return "Unknown GPU";
+
+        var name = raw.Replace("(R)", "").Replace("(r)", "")
+                      .Replace("(TM)", "").Replace("(tm)", "");
+
+        foreach (var vendor in new[] { "NVIDIA ", "AMD ", "Intel " })
+            if (name.StartsWith(vendor, StringComparison.OrdinalIgnoreCase))
+                name = name[vendor.Length..];
+
+        return Regex.Replace(name, @"\s+", " ").Trim();
+    }
+
     /// <summary>
     /// Builds a 60-point mock utilization series as a Sparkline "x,y x,y …" string for a fixed 0–100
     /// axis. Values oscillate deterministically around <paramref name="level"/> (± ~<paramref
@@ -445,7 +531,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Stops the sampling timers and disposes samplers that own unmanaged handles. Safe to call
     /// more than once. The CPU and Memory samplers are fully managed, so they need no disposal; the
-    /// Storage sampler owns a PDH query handle and is disposed here.</summary>
+    /// Storage and GPU samplers own PDH query handles and are disposed here.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
         _cpuTimer.Tick -= OnCpuTick;
@@ -453,6 +539,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryTimer.Tick -= OnMemoryTick;
         _storageTimer.Stop();
         _storageTimer.Tick -= OnStorageTick;
+        _gpuTimer.Stop();
+        _gpuTimer.Tick -= OnGpuTick;
         _storageSampler.Dispose();
+        _gpuSampler.Dispose();
     }
 }
