@@ -298,20 +298,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// is milliseconds since boot and, unlike the 32-bit <c>TickCount</c>, does not wrap.
     /// </summary>
     private void UpdateUptime() =>
-        UptimeText = FormatUptime(TimeSpan.FromMilliseconds(Environment.TickCount64));
-
-    /// <summary>
-    /// Formats a duration as "Nd Nh Nm", dropping any leading zero units
-    /// (e.g. "3d 14h 22m", "5h 2m", "12m").
-    /// </summary>
-    private static string FormatUptime(TimeSpan uptime) {
-        var days = (int)uptime.TotalDays;
-        if (days > 0)
-            return $"{days}d {uptime.Hours}h {uptime.Minutes}m";
-        if (uptime.Hours > 0)
-            return $"{uptime.Hours}h {uptime.Minutes}m";
-        return $"{uptime.Minutes}m";
-    }
+        UptimeText = UptimeFormatter.Format(TimeSpan.FromMilliseconds(Environment.TickCount64));
 
     /// <summary>
     /// Trims vendor decoration ("NVIDIA", "AMD", "(R)", "(TM)") from an adapter name so it fits the

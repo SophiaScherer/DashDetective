@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace DashDetective.Tabs.Dashboard;
+namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// Samples total physical-disk activity via the Windows PDH <c>\PhysicalDisk(_Total)\% Idle Time</c>
@@ -10,6 +10,10 @@ namespace DashDetective.Tabs.Dashboard;
 /// so idle time is the reliable source). Each <see cref="Sample"/> call returns the current disk
 /// activity as a percentage (0–100). No extra dependencies beyond the OS <c>pdh.dll</c>; comparable
 /// per-sample cost to the CPU/GPU samplers.
+///
+/// Shared: the Dashboard and the Performance tab each own an instance. Moved here from
+/// src/Tabs/Dashboard with sign-off when the Performance tab was activated — the same precedent as
+/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>.
 /// </summary>
 public sealed class StorageUsageSampler : IDisposable {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).

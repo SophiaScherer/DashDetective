@@ -15,9 +15,11 @@ namespace DashDetective.Tabs.Performance;
 ///
 /// Carries the resource's display identity (<see cref="Name"/> / <see cref="Sub"/> / <see cref="Spec"/>),
 /// its headline value (<see cref="ValueText"/> + <see cref="Unit"/>), and the semantic per-metric
-/// <see cref="ValueBrush"/> (a fixed legend colour, like <c>MainWindowViewModel</c>'s live dots). The
-/// utilization-chart points and stat tiles are added in later UI phases; live values are a later
-/// technical pass — everything here is static mock data for now.
+/// <see cref="ValueBrush"/> (a fixed legend colour, like <c>MainWindowViewModel</c>'s live dots).
+///
+/// The owning <see cref="PerformanceViewModel"/> updates the live members (<see cref="ValueText"/>,
+/// <see cref="Sub"/>, <see cref="Spec"/>, <see cref="Points"/>, and each tile's value) in place each
+/// sampling tick; <see cref="Name"/> / <see cref="Unit"/> / <see cref="ValueBrush"/> are fixed identity.
 /// </summary>
 public partial class ResourceRow : ObservableObject {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
@@ -37,14 +39,17 @@ public partial class ResourceRow : ObservableObject {
     /// <summary>Resource name shown on the card and as the detail header (e.g. "CPU", "Disk 0 (C:)").</summary>
     public string Name { get; }
 
-    /// <summary>Secondary caption under the name (e.g. "24 cores · 3.2 GHz", "NVMe SSD").</summary>
-    public string Sub { get; }
+    /// <summary>Secondary caption under the name (e.g. "24 cores · 3.2 GHz", "NVMe SSD"). Loaded from
+    /// the resource's static-info provider once available.</summary>
+    [ObservableProperty] private string _sub;
 
-    /// <summary>Device/spec string shown at the right of the detail header (e.g. "Intel Core i9-14900K").</summary>
-    public string Spec { get; }
+    /// <summary>Device/spec string shown at the right of the detail header (e.g. "Intel Core i9-14900K").
+    /// Loaded from the resource's static-info provider once available.</summary>
+    [ObservableProperty] private string _spec;
 
-    /// <summary>Headline value shown at the right of the card (paired with <see cref="Unit"/>).</summary>
-    public string ValueText { get; }
+    /// <summary>Headline value shown at the right of the card (paired with <see cref="Unit"/>).
+    /// Live-updated each sampling tick.</summary>
+    [ObservableProperty] private string _valueText;
 
     /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps").</summary>
     public string Unit { get; }
@@ -54,12 +59,12 @@ public partial class ResourceRow : ObservableObject {
     public IBrush ValueBrush { get; }
 
     /// <summary>The 60-point utilization history for the detail chart, as a Sparkline "x,y x,y …" string
-    /// (y already flipped to axis-max − value so higher utilization sits at the top). Static mock data;
-    /// live history is a later technical pass.</summary>
-    public string Points { get; }
+    /// (y already flipped to axis-max − value so higher utilization sits at the top). Live-updated each
+    /// sampling tick.</summary>
+    [ObservableProperty] private string _points;
 
     /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
-    /// statMap). Static mock data; live values are a later technical pass.</summary>
+    /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>
     public IReadOnlyList<StatTile> Stats { get; }
 
     public ICommand SelectCommand { get; }
