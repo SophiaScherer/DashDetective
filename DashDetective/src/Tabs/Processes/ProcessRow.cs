@@ -1,8 +1,8 @@
-using System;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System;
+using System.Globalization;
 
 namespace DashDetective.Tabs.Processes;
 

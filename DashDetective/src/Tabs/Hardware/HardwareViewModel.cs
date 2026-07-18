@@ -1,6 +1,6 @@
+using DashDetective.Shared;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Hardware;
 

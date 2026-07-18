@@ -1,3 +1,4 @@
+using DashDetective.Tabs.Hardware.Catalog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -5,7 +6,6 @@ using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
-using DashDetective.Tabs.Hardware.Catalog;
 
 namespace DashDetective.Tabs.Hardware;
 
