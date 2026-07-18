@@ -1,8 +1,8 @@
-using System;
-using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Theming;
+using System;
+using System.Windows.Input;
 
 namespace DashDetective.Tabs.Settings;
 

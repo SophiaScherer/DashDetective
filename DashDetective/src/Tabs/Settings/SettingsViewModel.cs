@@ -1,7 +1,7 @@
-using System.Collections.ObjectModel;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
+using System.Collections.ObjectModel;
 
 namespace DashDetective.Tabs.Settings;
 
@@ -20,6 +20,10 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>The shell's navigation bar view-model — the single shared instance, so the Settings
     /// Navigation controls and the on-bar controls stay in sync.</summary>
     public NavigationViewModel Nav { get; }
+
+    /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
+    /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
+    public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
 
     public SettingsViewModel(ThemeService theme, NavigationViewModel nav) {
         _theme = theme;
