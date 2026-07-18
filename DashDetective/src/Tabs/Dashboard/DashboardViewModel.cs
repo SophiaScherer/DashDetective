@@ -458,7 +458,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnStorageTick(object? sender, EventArgs e) {
         double value;
         try {
-            value = _storageSampler.Sample();
+            value = _storageSampler.Sample().ActivePercent;
         } catch {
             // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters).
             // Show a neutral placeholder and stop polling rather than throwing every second.

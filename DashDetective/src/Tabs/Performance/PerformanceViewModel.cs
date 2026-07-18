@@ -24,8 +24,8 @@ namespace DashDetective.Tabs.Performance;
 /// <see cref="SparklinePoints"/>, and results are pushed into the selected resource's <see cref="ResourceRow"/>.
 /// The tab keeps its own sampler instances (like the Processes tab) rather than sharing the Dashboard's.
 ///
-/// Wired live so far: <b>CPU</b>, <b>Memory</b>. Disk / GPU / Ethernet still show static mock data until
-/// their own phases. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
+/// Wired live so far: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>. GPU / Ethernet still show static mock data
+/// until their own phases. Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
 /// (toolbar Live/Pause) and <see cref="IDisposable"/>; <see cref="ISelfScrollingPage"/> keeps the shell
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
@@ -67,6 +67,16 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _memAvailableTile;
     private readonly StatTile _memCommittedTile;
 
+    // ---- Disk (live) ----
+    private readonly StorageUsageSampler _storageSampler = new();
+    private readonly double[] _storageHistory = new double[WindowSeconds];
+    private readonly DispatcherTimer _storageTimer;
+    private readonly ResourceRow _diskRow;
+    private readonly StatTile _diskActiveTile;
+    private readonly StatTile _diskReadTile;
+    private readonly StatTile _diskWriteTile;
+    private readonly StatTile _diskResponseTile;
+
     public PerformanceViewModel() {
         // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
         // "—" (no reliable current-clock source, and the base clock already appears in the sub-label).
@@ -94,12 +104,21 @@ public partial class PerformanceViewModel : ViewModelBase,
                                      }, Select);
         Resources.Add(_memoryRow);
 
-        // Disk / GPU / Ethernet — static mock data from the design comp (perfDefs + statMap), wired to
-        // real samplers in later phases. Each mock series is a deterministic wave.
-        Resources.Add(new ResourceRow("Disk 0 (C:)", "NVMe SSD", "Samsung 990 Pro 2TB",
-                                      "4", "%", Brush("#ffcf4d"), MockPoints(9, 18, 5),
-                                      Stats("Active", "4 %", "Read", "48 MB/s",
-                                            "Write", "12 MB/s", "Response", "0.4 ms"), Select));
+        // Disk — live. Rail value + chart show Task Manager's disk "Active time"; tiles show Active /
+        // Read / Write / Response, all sampled from the aggregate _Total PhysicalDisk counters.
+        _diskActiveTile = new StatTile("Active", "0 %");
+        _diskReadTile = new StatTile("Read", "0 MB/s");
+        _diskWriteTile = new StatTile("Write", "0 MB/s");
+        _diskResponseTile = new StatTile("Response", "0 ms");
+        _diskRow = new ResourceRow("Disk 0 (C:)", "", "", "0", "%", Brush("#ffcf4d"),
+                                   SparklinePoints.Build(_storageHistory, 100),
+                                   new[] {
+                                       _diskActiveTile, _diskReadTile, _diskWriteTile, _diskResponseTile,
+                                   }, Select);
+        Resources.Add(_diskRow);
+
+        // GPU / Ethernet — static mock data from the design comp (perfDefs + statMap), wired to real
+        // samplers in later phases. Each mock series is a deterministic wave.
         Resources.Add(new ResourceRow("GPU", "RTX 4080", "16 GB GDDR6X · 52°C",
                                       "12", "%", Brush("#6ccb5f"), MockPoints(14, 12, 23),
                                       Stats("3D", "12 %", "VRAM", "4.2 / 16 GB",
@@ -129,17 +148,27 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryTimer.Tick += OnMemoryTick;
         _memoryTimer.Start();
 
+        // Disk runs on its own timer for the same reason: independent of the other samplers.
+        UpdateStorage(_storageSampler.Sample());
+
+        _storageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _storageTimer.Tick += OnStorageTick;
+        _storageTimer.Start();
+
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
+        _ = LoadDiskInfoAsync();
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
     public void Refresh() {
         OnCpuTick(this, EventArgs.Empty);
         OnMemoryTick(this, EventArgs.Empty);
+        OnStorageTick(this, EventArgs.Empty);
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
+        _ = LoadDiskInfoAsync();
     }
 
     /// <summary>Pauses or resumes all live sampling by stopping/starting the metric timers. Drives the
@@ -148,9 +177,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         if (live) {
             _cpuTimer.Start();
             _memoryTimer.Start();
+            _storageTimer.Start();
         } else {
             _cpuTimer.Stop();
             _memoryTimer.Stop();
+            _storageTimer.Stop();
         }
     }
 
@@ -309,6 +340,76 @@ public partial class PerformanceViewModel : ViewModelBase,
             : label;
     }
 
+    private void OnStorageTick(object? sender, EventArgs e) {
+        StorageSample sample;
+        try {
+            sample = _storageSampler.Sample();
+        } catch {
+            // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters). Show
+            // neutral placeholders and stop polling rather than throwing on the UI thread every second.
+            _diskRow.ValueText = "—";
+            _diskActiveTile.Value = "—";
+            _diskReadTile.Value = "—";
+            _diskWriteTile.Value = "—";
+            _diskResponseTile.Value = "—";
+            _storageTimer.Stop();
+            return;
+        }
+
+        // Shift the window left by one and append the newest activity sample at the end.
+        Array.Copy(_storageHistory, 1, _storageHistory, 0, _storageHistory.Length - 1);
+        _storageHistory[^1] = sample.ActivePercent;
+
+        UpdateStorage(sample);
+    }
+
+    private void UpdateStorage(StorageSample sample) {
+        var rounded = Math.Round(sample.ActivePercent);
+        _diskRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+        _diskRow.Points = SparklinePoints.Build(_storageHistory, 100);
+
+        _diskActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+        _diskReadTile.Value = FormatRate(sample.ReadBytesPerSec);
+        _diskWriteTile.Value = FormatRate(sample.WriteBytesPerSec);
+        // Avg. Disk sec/Transfer is in seconds; show it in milliseconds like Task Manager's "Response".
+        _diskResponseTile.Value = $"{(sample.ResponseSeconds * 1000).ToString("0.0", CultureInfo.InvariantCulture)} ms";
+    }
+
+    /// <summary>Formats a byte/second throughput as "N MB/s" (binary MiB), whole at ≥ 10 and one
+    /// decimal below so small transfers stay legible.</summary>
+    private static string FormatRate(double bytesPerSec) {
+        var mib = bytesPerSec / (1L << 20);
+        var value = mib >= 10
+            ? Math.Round(mib).ToString(CultureInfo.InvariantCulture)
+            : mib.ToString("F1", CultureInfo.InvariantCulture);
+        return $"{value} MB/s";
+    }
+
+    private async Task LoadDiskInfoAsync() {
+        // GetAsync never throws (it falls back to DiskStaticInfo.Unknown), but guard the whole path so a
+        // surprise can't take down the app via an unobserved task exception.
+        try {
+            var info = await DiskInfoProvider.GetAsync();
+            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+            _diskRow.Sub = string.IsNullOrEmpty(info.TypeLabel) ? "Drive" : info.TypeLabel;
+            _diskRow.Spec = FormatDiskSpec(info);
+        } catch {
+            _diskRow.Sub = "";
+            _diskRow.Spec = "Unknown drive";
+        }
+    }
+
+    /// <summary>Model plus capacity for the detail spec header, e.g. "Samsung SSD 990 Pro 1.8 TB".
+    /// Uses the app's binary TB/GB convention (1 TB = 1024 GB), matching the Dashboard storage card.</summary>
+    private static string FormatDiskSpec(DiskStaticInfo info) {
+        if (info.SizeGb <= 0)
+            return info.Model;
+        var size = info.SizeGb >= 1024
+            ? $"{(info.SizeGb / 1024.0).ToString("0.#", CultureInfo.InvariantCulture)} TB"
+            : $"{info.SizeGb.ToString("0", CultureInfo.InvariantCulture)} GB";
+        return $"{info.Model} {size}";
+    }
+
     /// <summary>
     /// Builds a 60-point mock utilization series as a Sparkline "x,y x,y …" string for a fixed 0–100
     /// axis. Values oscillate deterministically around <paramref name="level"/> (± ~<paramref
@@ -342,12 +443,16 @@ public partial class PerformanceViewModel : ViewModelBase,
         row.IsSelected = true;
     }
 
-    /// <summary>Stops the sampling timers. Safe to call more than once. The CPU and Memory samplers are
-    /// fully managed (no unmanaged handle), so they need no disposal.</summary>
+    /// <summary>Stops the sampling timers and disposes samplers that own unmanaged handles. Safe to call
+    /// more than once. The CPU and Memory samplers are fully managed, so they need no disposal; the
+    /// Storage sampler owns a PDH query handle and is disposed here.</summary>
     public void Dispose() {
         _cpuTimer.Stop();
         _cpuTimer.Tick -= OnCpuTick;
         _memoryTimer.Stop();
         _memoryTimer.Tick -= OnMemoryTick;
+        _storageTimer.Stop();
+        _storageTimer.Tick -= OnStorageTick;
+        _storageSampler.Dispose();
     }
 }

@@ -4,12 +4,19 @@ using System.Runtime.InteropServices;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// Samples total physical-disk activity via the Windows PDH <c>\PhysicalDisk(_Total)\% Idle Time</c>
-/// performance counter and reports the inverse — <c>active = 100 − idle</c>, clamped 0–100 — which is
-/// Task Manager's disk "Active time" (the <c>% Disk Time</c> counter can read above 100% under load,
-/// so idle time is the reliable source). Each <see cref="Sample"/> call returns the current disk
-/// activity as a percentage (0–100). No extra dependencies beyond the OS <c>pdh.dll</c>; comparable
-/// per-sample cost to the CPU/GPU samplers.
+/// A single physical-disk snapshot on the aggregate <c>_Total</c> instance: activity as a percentage
+/// (0–100), read/write throughput in bytes per second, and average transfer response time in seconds.
+/// </summary>
+public readonly record struct StorageSample(
+    double ActivePercent, double ReadBytesPerSec, double WriteBytesPerSec, double ResponseSeconds);
+
+/// <summary>
+/// Samples total physical-disk metrics via Windows PDH <c>\PhysicalDisk(_Total)\*</c> performance
+/// counters. Activity is reported as <c>active = 100 − % Idle Time</c>, clamped 0–100 — Task Manager's
+/// disk "Active time" (the <c>% Disk Time</c> counter can read above 100% under load, so idle time is
+/// the reliable source) — alongside read/write throughput and average response time. Each
+/// <see cref="Sample"/> call returns the current snapshot. No extra dependencies beyond the OS
+/// <c>pdh.dll</c>; comparable per-sample cost to the CPU/GPU samplers.
 ///
 /// Shared: the Dashboard and the Performance tab each own an instance. Moved here from
 /// src/Tabs/Dashboard with sign-off when the Performance tab was activated — the same precedent as
@@ -49,46 +56,65 @@ public sealed class StorageUsageSampler : IDisposable {
     [DllImport("pdh.dll")]
     private static extern uint PdhCloseQuery(IntPtr query);
 
-    private const string CounterPath = @"\PhysicalDisk(_Total)\% Idle Time";
+    private const string IdlePath = @"\PhysicalDisk(_Total)\% Idle Time";
+    private const string ReadPath = @"\PhysicalDisk(_Total)\Disk Read Bytes/sec";
+    private const string WritePath = @"\PhysicalDisk(_Total)\Disk Write Bytes/sec";
+    private const string ResponsePath = @"\PhysicalDisk(_Total)\Avg. Disk sec/Transfer";
 
     private readonly IntPtr _query;
-    private readonly IntPtr _counter;
+    private readonly IntPtr _idleCounter;
+    private readonly IntPtr _readCounter;
+    private readonly IntPtr _writeCounter;
+    private readonly IntPtr _responseCounter;
     private readonly bool _ready;
 
     public StorageUsageSampler() {
-        // A failure to stand up the query leaves _ready false; Sample() then returns 0 forever and
-        // the caller stops its timer — the same soft-fail contract as the CPU/Memory/GPU samplers.
+        // A failure to stand up the query leaves _ready false; Sample() then returns a zero snapshot
+        // forever and the caller stops its timer — the same soft-fail contract as the other samplers.
         if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
             return;
 
-        if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
+        if (!AddCounter(IdlePath, out _idleCounter)
+            || !AddCounter(ReadPath, out _readCounter)
+            || !AddCounter(WritePath, out _writeCounter)
+            || !AddCounter(ResponsePath, out _responseCounter)) {
             PdhCloseQuery(_query);
             _query = IntPtr.Zero;
             return;
         }
 
-        // Seed one collect so the first Sample() reflects a real interval. % Idle Time is a rate
-        // that needs two data points, so priming here mirrors GpuUsageSampler seeding its query.
+        // Seed one collect so the first Sample() reflects a real interval. These are all rate/average
+        // counters that need two data points, so priming here mirrors GpuUsageSampler seeding its query.
         PdhCollectQueryData(_query);
         _ready = true;
     }
 
+    private bool AddCounter(string path, out IntPtr counter) =>
+        PdhAddEnglishCounter(_query, path, IntPtr.Zero, out counter) == ErrorSuccess;
+
     /// <summary>
-    /// Returns total physical-disk activity (0–100) at the moment of the call, as <c>100 − idle</c>
-    /// on the aggregate <c>_Total</c> instance. Any failure yields 0.
+    /// Returns the total physical-disk snapshot at the moment of the call, on the aggregate
+    /// <c>_Total</c> instance. Any failure yields a zero snapshot.
     /// </summary>
-    public double Sample() {
+    public StorageSample Sample() {
         if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
-            return 0;
+            return default;
 
-        if (PdhGetFormattedCounterValue(_counter, PdhFmtDouble, out _, out var value) != ErrorSuccess)
-            return 0;
+        var idle = ReadCounter(_idleCounter);
+        var active = 100 - idle;
+        active = active < 0 ? 0 : active > 100 ? 100 : active;
 
+        return new StorageSample(
+            active, ReadCounter(_readCounter), ReadCounter(_writeCounter), ReadCounter(_responseCounter));
+    }
+
+    /// <summary>Reads one formatted counter as a non-negative double, or 0 on any failure/invalid status.</summary>
+    private static double ReadCounter(IntPtr counter) {
+        if (PdhGetFormattedCounterValue(counter, PdhFmtDouble, out _, out var value) != ErrorSuccess)
+            return 0;
         if (value.CStatus != PdhCstatusValidData && value.CStatus != PdhCstatusNewData)
             return 0;
-
-        var active = 100 - value.Value;
-        return active < 0 ? 0 : active > 100 ? 100 : active;
+        return value.Value < 0 ? 0 : value.Value;
     }
 
     /// <summary>Closes the PDH query handle. Safe to call more than once.</summary>
