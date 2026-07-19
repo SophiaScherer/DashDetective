@@ -185,10 +185,10 @@
                     </Grid>
                     <controls:Sparkline Height="65" Fill="True" ShowGrid="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding DownPoints}"
-                                        YMin="0" YMax="{Binding ThroughputYMax}"/>
+                                        YMin="0" YMax="100"/>
                     <controls:Sparkline Height="65" Fill="True" ShowGrid="True"
                                         Stroke="{DynamicResource ChartNetUp}" Points="{Binding UpPoints}"
-                                        YMin="0" YMax="{Binding ThroughputYMax}"/>
+                                        YMin="0" YMax="100"/>
                 </StackPanel>
             </Border>
         </Grid>

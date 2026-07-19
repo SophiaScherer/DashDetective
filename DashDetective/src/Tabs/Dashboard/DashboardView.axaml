@@ -28,7 +28,7 @@
                                YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
             <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="{Binding NetworkDownUnit}"
                                Sub="{Binding NetworkSubText}" Accent="{DynamicResource ChartNetDown}"
-                               YMin="0" YMax="{Binding NetworkYMax}" Points="{Binding NetworkDownPoints}"/>
+                               YMin="0" YMax="100" Points="{Binding NetworkDownPoints}"/>
         </Grid>
 
         <!-- ===== Utilization charts ===== -->
@@ -105,7 +105,7 @@
                     <controls:Sparkline Height="96" Fill="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                         Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
-                                        YMin="0" YMax="{Binding NetworkYMax}"/>
+                                        YMin="0" YMax="100"/>
                 </StackPanel>
             </Border>
         </Grid>

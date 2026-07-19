@@ -10,7 +10,6 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.NetworkInformation;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Performance;
@@ -19,10 +18,9 @@ namespace DashDetective.Tabs.Performance;
 /// The Performance tab: a Task-Manager-style live resource drill-down. A left resource-selector rail
 /// swaps a right detail pane (one large utilization chart + a stat-tile strip).
 ///
-/// Live sampling uses one <see cref="MetricChannel"/> per metric (sampler + 1 Hz timer + <c>double[60]</c>
-/// rolling history) that renders to the shared <c>Sparkline</c> via <see cref="SparklinePoints"/>, and
-/// pushes results into the selected resource's <see cref="ResourceRow"/>. The tab keeps its own sampler
-/// instances (like the Processes tab) rather than sharing the Dashboard's.
+/// Live sampling subscribes to the shared <see cref="SystemMetricsService"/>; each metric keeps its own
+/// <c>double[60]</c> rolling history, rebuilds the shared <c>Sparkline</c> via <see cref="SparklinePoints"/>,
+/// and pushes results into the selected resource's <see cref="ResourceRow"/>.
 ///
 /// All five resources are wired live: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>, <b>GPU</b>, <b>Ethernet</b>.
 /// Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
@@ -49,25 +47,25 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>The currently selected resource, whose detail the right pane shows.</summary>
     [ObservableProperty] private ResourceRow _selectedResource = null!;
 
+    private readonly SystemMetricsService _service;
+    private readonly IDisposable[] _subscriptions;
+
     // ---- CPU (live) ----
-    private readonly CpuUsageSampler _cpuSampler = new();
-    private readonly MetricChannel _cpuChannel;
+    private readonly double[] _cpuHistory = new double[WindowSeconds];
     private readonly ResourceRow _cpuRow;
     private readonly StatTile _cpuUtilTile;
     private readonly StatTile _cpuProcessesTile;
     private readonly StatTile _cpuUptimeTile;
 
     // ---- Memory (live) ----
-    private readonly MemoryUsageSampler _memorySampler = new();
-    private readonly MetricChannel<MemorySample> _memoryChannel;
+    private readonly double[] _memoryHistory = new double[WindowSeconds];
     private readonly ResourceRow _memoryRow;
     private readonly StatTile _memInUseTile;
     private readonly StatTile _memAvailableTile;
     private readonly StatTile _memCommittedTile;
 
     // ---- Disk (live) ----
-    private readonly StorageUsageSampler _storageSampler = new();
-    private readonly MetricChannel<StorageSample> _storageChannel;
+    private readonly double[] _storageHistory = new double[WindowSeconds];
     private readonly ResourceRow _diskRow;
     private readonly StatTile _diskActiveTile;
     private readonly StatTile _diskReadTile;
@@ -75,24 +73,23 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _diskResponseTile;
 
     // ---- GPU (live) ----
-    private readonly GpuUsageSampler _gpuSampler = new();
-    private readonly MetricChannel _gpuChannel;
+    private readonly double[] _gpuHistory = new double[WindowSeconds];
     private readonly ResourceRow _gpuRow;
     private readonly StatTile _gpu3dTile;
 
     // ---- Ethernet / network (live) ----
-    private readonly NetworkUsageSampler _networkSampler = new();
-    private readonly MetricChannel<NetworkSample> _networkChannel;
+    private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel() {
-        // Build the stat tiles first, then the metric channels (each owns its sampler + timer + rolling
-        // history), then the resource rows — the rows seed their initial charts from the channels'
-        // (all-zero) histories. Channels do not auto-start; we seed then Start() below.
+    public PerformanceViewModel(SystemMetricsService service) {
+        _service = service;
+
+        // Build the stat tiles first, then the resource rows (their initial charts come from the all-zero
+        // histories), then subscribe to the shared metrics.
 
         // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
         // "—" (no reliable current-clock source, and the base clock already appears in the sub-label).
@@ -122,19 +119,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         _netSendTile = new StatTile("Send", "0 Mbps");
         _netErrorsTile = new StatTile("Errors", "0");
 
-        _cpuChannel = new MetricChannel(TimeSpan.FromSeconds(1), WindowSeconds,
-            () => _cpuSampler.Sample(), OnCpuSample, OnCpuFailed);
-        _memoryChannel = new MetricChannel<MemorySample>(TimeSpan.FromSeconds(1), WindowSeconds,
-            () => _memorySampler.Sample(), static s => s.LoadPercent, UpdateMemory, OnMemoryFailed);
-        _storageChannel = new MetricChannel<StorageSample>(TimeSpan.FromSeconds(1), WindowSeconds,
-            () => _storageSampler.Sample(), static s => s.ActivePercent, UpdateStorage, OnStorageFailed);
-        _gpuChannel = new MetricChannel(TimeSpan.FromSeconds(1), WindowSeconds,
-            () => _gpuSampler.Sample(), UpdateGpu, OnGpuFailed);
-        _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
-            () => _networkSampler.Sample(), static s => s.DownMbps, UpdateNetwork, OnNetworkFailed);
-
         _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
-                                  SparklinePoints.Build(_cpuChannel.History, 100),
+                                  SparklinePoints.Build(_cpuHistory, 100),
                                   new[] {
                                       _cpuUtilTile, new StatTile("Speed", "—"),
                                       _cpuProcessesTile, _cpuUptimeTile,
@@ -142,7 +128,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         Resources.Add(_cpuRow);
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
-                                     SparklinePoints.Build(_memoryChannel.History, 100),
+                                     SparklinePoints.Build(_memoryHistory, 100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
                                          new StatTile("Cached", "—"), _memCommittedTile,
@@ -150,7 +136,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         Resources.Add(_memoryRow);
 
         _diskRow = new ResourceRow("Disk 0 (C:)", "", "", "0", "%", Brush("#ffcf4d"),
-                                   SparklinePoints.Build(_storageChannel.History, 100),
+                                   SparklinePoints.Build(_storageHistory, 100),
                                    new[] {
                                        _diskActiveTile, _diskReadTile, _diskWriteTile, _diskResponseTile,
                                    }, Select);
@@ -159,7 +145,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // GPU — VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU
         // temperature is already deferred out of scope in the project).
         _gpuRow = new ResourceRow("GPU", "", "", "0", "%", Brush("#6ccb5f"),
-                                  SparklinePoints.Build(_gpuChannel.History, 100),
+                                  SparklinePoints.Build(_gpuHistory, 100),
                                   new[] {
                                       _gpu3dTile, new StatTile("VRAM", "—"),
                                       new StatTile("Temp", "—"), new StatTile("Power", "—"),
@@ -168,10 +154,10 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
         // read once at construction (it rarely changes).
-        var adapterName = string.IsNullOrWhiteSpace(_networkSampler.AdapterName) ? "Ethernet" : _networkSampler.AdapterName;
+        var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
         _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
-                                      SparklinePoints.Build(_networkChannel.History, MinNetworkScaleMbps),
+                                      SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
@@ -181,23 +167,15 @@ public partial class PerformanceViewModel : ViewModelBase,
         SelectedResource = Resources[0];
         SelectedResource.IsSelected = true;
 
-        // Seed each metric's surfaces once so they're correct on the first frame, then start sampling.
-        UpdateCpu(0);
-        UpdateCpuProcesses();
-        UpdateCpuUptime();
-        _cpuChannel.Start();
-
-        UpdateMemory(_memorySampler.Sample());
-        _memoryChannel.Start();
-
-        UpdateStorage(_storageSampler.Sample());
-        _storageChannel.Start();
-
-        UpdateGpu(0);
-        _gpuChannel.Start();
-
-        UpdateNetwork(new NetworkSample(0, 0));
-        _networkChannel.Start();
+        // Subscribe to the shared metrics; each subscription immediately replays the latest cached sample,
+        // seeding the surfaces with real data on the first frame.
+        _subscriptions = new[] {
+            service.SubscribeCpu(OnCpu, OnCpuFailed),
+            service.SubscribeMemory(OnMemory, OnMemoryFailed),
+            service.SubscribeStorage(OnStorage, OnStorageFailed),
+            service.SubscribeGpu(OnGpu, OnGpuFailed),
+            service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
+        };
 
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
         _ = LoadCpuInfoAsync();
@@ -209,11 +187,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
     public void Refresh() {
-        _cpuChannel.SampleNow();
-        _memoryChannel.SampleNow();
-        _storageChannel.SampleNow();
-        _gpuChannel.SampleNow();
-        _networkChannel.SampleNow();
+        _service.RefreshAll();
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadDiskInfoAsync();
@@ -221,27 +195,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         _ = LoadNetworkInfoAsync();
     }
 
-    /// <summary>Pauses or resumes all live sampling by stopping/starting the metric channels. Drives the
-    /// shell's Live toggle; <see cref="Refresh"/> still works while paused.</summary>
-    public void SetLive(bool live) {
-        if (live) {
-            _cpuChannel.Start();
-            _memoryChannel.Start();
-            _storageChannel.Start();
-            _gpuChannel.Start();
-            _networkChannel.Start();
-        } else {
-            _cpuChannel.Stop();
-            _memoryChannel.Stop();
-            _storageChannel.Stop();
-            _gpuChannel.Stop();
-            _networkChannel.Stop();
-        }
-    }
+    /// <summary>No local timers to pause — all sampling is the shared service's, which the shell pauses
+    /// via <see cref="SystemMetricsService.Pause"/>. Present for the <see cref="ILiveSamplingPage"/> seam.</summary>
+    public void SetLive(bool live) { }
 
-    /// <summary>CPU channel callback: refresh the utilization surfaces plus the live process count and
-    /// uptime tiles (all keyed off the CPU tick, like the old handler).</summary>
-    private void OnCpuSample(double value) {
+    /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
+    /// plus the live process count and uptime tiles (all keyed off the CPU tick).</summary>
+    private void OnCpu(double value) {
+        MetricChannel.PushHistory(_cpuHistory, value);
         UpdateCpu(value);
         UpdateCpuProcesses();
         UpdateCpuUptime();
@@ -257,7 +218,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         var rounded = Math.Round(value);
         _cpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
         _cpuUtilTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-        _cpuRow.Points = SparklinePoints.Build(_cpuChannel.History, 100);
+        _cpuRow.Points = SparklinePoints.Build(_cpuHistory, 100);
     }
 
     /// <summary>Updates the live process count. <see cref="Process.GetProcesses"/> returns disposable
@@ -285,7 +246,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var info = await CpuInfoProvider.GetAsync();
             // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             _cpuRow.Sub = FormatCpuSub(info);
-            _cpuRow.Spec = ShortenCpuName(info.Name);
+            _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
         } catch {
             _cpuRow.Sub = "";
             _cpuRow.Spec = "Unknown CPU";
@@ -300,27 +261,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         return cores > 0 ? $"{cores} cores" : "";
     }
 
-    /// <summary>
-    /// Trims WMI decoration ("(R)", "(TM)", "N-Core Processor", "CPU @ …GHz") from a processor name for
-    /// the compact spec header, e.g. "AMD Ryzen 5 7600X 6-Core Processor" → "AMD Ryzen 5 7600X".
-    /// </summary>
-    private static string ShortenCpuName(string raw) {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown CPU";
-
-        var name = raw.Replace("(R)", "").Replace("(r)", "")
-                      .Replace("(TM)", "").Replace("(tm)", "");
-
-        var atIndex = name.IndexOf(" @", StringComparison.Ordinal);
-        if (atIndex >= 0)
-            name = name[..atIndex];
-
-        name = Regex.Replace(name, @"\s+\d+-Core Processor", "");
-        name = name.Replace(" Processor", "").Replace(" CPU", "");
-        return Regex.Replace(name, @"\s+", " ").Trim();
+    /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
+    private void OnMemory(MemorySample sample) {
+        MetricChannel.PushHistory(_memoryHistory, sample.LoadPercent);
+        UpdateMemory(sample);
     }
 
-    /// <summary>Sampler-failure handler for the Memory channel: shows neutral placeholders.</summary>
+    /// <summary>Sampler-failure handler for the Memory metric: shows neutral placeholders.</summary>
     private void OnMemoryFailed() {
         _memoryRow.ValueText = "—";
         _memInUseTile.Value = "—";
@@ -341,7 +288,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryRow.Sub = totalGb > 0
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
-        _memoryRow.Points = SparklinePoints.Build(_memoryChannel.History, 100);
+        _memoryRow.Points = SparklinePoints.Build(_memoryHistory, 100);
 
         _memInUseTile.Value = $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} GB";
         _memAvailableTile.Value = $"{Math.Max(0, totalGb - usedGb).ToString("F1", CultureInfo.InvariantCulture)} GB";
@@ -372,7 +319,13 @@ public partial class PerformanceViewModel : ViewModelBase,
             : label;
     }
 
-    /// <summary>Sampler-failure handler for the Disk channel: shows neutral placeholders.</summary>
+    /// <summary>Disk subscription callback: append active-time to the history, then refresh the surface.</summary>
+    private void OnStorage(StorageSample sample) {
+        MetricChannel.PushHistory(_storageHistory, sample.ActivePercent);
+        UpdateStorage(sample);
+    }
+
+    /// <summary>Sampler-failure handler for the Disk metric: shows neutral placeholders.</summary>
     private void OnStorageFailed() {
         _diskRow.ValueText = "—";
         _diskActiveTile.Value = "—";
@@ -384,7 +337,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private void UpdateStorage(StorageSample sample) {
         var rounded = Math.Round(sample.ActivePercent);
         _diskRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
-        _diskRow.Points = SparklinePoints.Build(_storageChannel.History, 100);
+        _diskRow.Points = SparklinePoints.Build(_storageHistory, 100);
 
         _diskActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
         _diskReadTile.Value = FormatRate(sample.ReadBytesPerSec);
@@ -428,7 +381,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         return $"{info.Model} {size}";
     }
 
-    /// <summary>Sampler-failure handler for the GPU channel: shows neutral placeholders.</summary>
+    /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
+    private void OnGpu(double value) {
+        MetricChannel.PushHistory(_gpuHistory, value);
+        UpdateGpu(value);
+    }
+
+    /// <summary>Sampler-failure handler for the GPU metric: shows neutral placeholders.</summary>
     private void OnGpuFailed() {
         _gpuRow.ValueText = "—";
         _gpu3dTile.Value = "—";
@@ -438,7 +397,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         var rounded = Math.Round(value);
         _gpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
         _gpu3dTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-        _gpuRow.Points = SparklinePoints.Build(_gpuChannel.History, 100);
+        _gpuRow.Points = SparklinePoints.Build(_gpuHistory, 100);
     }
 
     private async Task LoadGpuInfoAsync() {
@@ -447,7 +406,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         try {
             var info = await GpuInfoProvider.GetAsync();
             // Constructed on the UI thread, so the continuation resumes there — safe to bind.
-            _gpuRow.Sub = ShortenGpuName(info.Name);
+            _gpuRow.Sub = HardwareNameFormatter.ShortenGpu(info.Name);
             _gpuRow.Spec = info.Name;
         } catch {
             _gpuRow.Sub = "";
@@ -455,25 +414,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         }
     }
 
-    /// <summary>
-    /// Trims vendor decoration ("NVIDIA", "AMD", "(R)", "(TM)") from an adapter name for the compact
-    /// rail sub-label, e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060".
-    /// </summary>
-    private static string ShortenGpuName(string raw) {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown GPU";
-
-        var name = raw.Replace("(R)", "").Replace("(r)", "")
-                      .Replace("(TM)", "").Replace("(tm)", "");
-
-        foreach (var vendor in new[] { "NVIDIA ", "AMD ", "Intel " })
-            if (name.StartsWith(vendor, StringComparison.OrdinalIgnoreCase))
-                name = name[vendor.Length..];
-
-        return Regex.Replace(name, @"\s+", " ").Trim();
+    /// <summary>Network subscription callback: append the download rate to the history, then refresh.</summary>
+    private void OnNetwork(NetworkSample sample) {
+        MetricChannel.PushHistory(_downHistory, sample.DownMbps);
+        UpdateNetwork(sample);
     }
 
-    /// <summary>Sampler-failure handler for the Network channel: shows neutral placeholders.</summary>
+    /// <summary>Sampler-failure handler for the Network metric: shows neutral placeholders.</summary>
     private void OnNetworkFailed() {
         _networkRow.ValueText = "—";
         _netReceiveTile.Value = "—";
@@ -491,26 +438,10 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         // The chart has no natural 0–100 axis, so normalise against the rolling receive peak (with
         // headroom and a floor, like the Dashboard) so the filled area still spans the fixed axis.
-        _networkRow.Points = SparklinePoints.Build(_networkChannel.History, ComputeNetworkScale(NetworkPeak()));
+        _networkRow.Points = SparklinePoints.Build(
+            _downHistory, ChartScale.FitAxis(_downHistory, floor: MinNetworkScaleMbps));
 
         _netErrorsTile.Value = ReadNetworkErrors();
-    }
-
-    /// <summary>Largest receive sample in the rolling window, before headroom — drives the chart scale.</summary>
-    private double NetworkPeak() {
-        var down = _networkChannel.History;
-        var max = 0.0;
-        for (var i = 0; i < WindowSeconds; i++)
-            if (down[i] > max)
-                max = down[i];
-        return max;
-    }
-
-    /// <summary>The receive peak plus ~15% headroom so the peak doesn't touch the top edge, floored at
-    /// <see cref="MinNetworkScaleMbps"/>.</summary>
-    private static double ComputeNetworkScale(double peak) {
-        var scaled = peak * 1.15;
-        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
     }
 
     /// <summary>Cumulative incoming + outgoing packet errors on the primary adapter, or "—" if the
@@ -570,16 +501,10 @@ public partial class PerformanceViewModel : ViewModelBase,
         row.IsSelected = true;
     }
 
-    /// <summary>Stops the sampling channels and disposes samplers that own unmanaged handles. Safe to
-    /// call more than once. The CPU, Memory and Network samplers are fully managed, so they need no
-    /// disposal; the Storage and GPU samplers own PDH query handles and are disposed here.</summary>
+    /// <summary>Unsubscribes from the shared metrics. The samplers are owned (and disposed) by the shared
+    /// service. Safe to call more than once.</summary>
     public void Dispose() {
-        _cpuChannel.Dispose();
-        _memoryChannel.Dispose();
-        _storageChannel.Dispose();
-        _gpuChannel.Dispose();
-        _networkChannel.Dispose();
-        _storageSampler.Dispose();
-        _gpuSampler.Dispose();
+        foreach (var subscription in _subscriptions)
+            subscription.Dispose();
     }
 }

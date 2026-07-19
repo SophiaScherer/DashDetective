@@ -58,6 +58,12 @@ public class MetricChannel<TSample> : IDisposable {
         _timer.Tick += OnTick;
     }
 
+    /// <summary>No-history variant: timer + sampling + fan-out only, for consumers that keep no rolling
+    /// buffer (the shared <see cref="SystemMetricsService"/>, which fans each sample out to subscribers
+    /// that own their own histories).</summary>
+    public MetricChannel(TimeSpan interval, Func<TSample> sample, Action<TSample> onSample, Action onFailed)
+        : this(interval, 0, sample, static _ => 0.0, onSample, onFailed) { }
+
     /// <summary>The rolling history, oldest-first. A read-only view over the live buffer; valid only for
     /// synchronous reads on the UI thread (the next tick mutates it in place).</summary>
     public ReadOnlySpan<double> History => _history;
@@ -88,8 +94,9 @@ public class MetricChannel<TSample> : IDisposable {
             return;
         }
 
-        // Shift the window left by one and append the newest sample at the end.
-        PushHistory(_history, _historyValue(value));
+        // Shift the window left by one and append the newest sample at the end (skipped for no-history channels).
+        if (_history.Length > 0)
+            PushHistory(_history, _historyValue(value));
         _onSample(value);
     }
 
@@ -97,6 +104,8 @@ public class MetricChannel<TSample> : IDisposable {
     /// and append <paramref name="value"/> at the end. Public so the two-history network case reuses the
     /// exact same shift for its second buffer instead of re-inlining <c>Array.Copy</c>.</summary>
     public static void PushHistory(double[] buffer, double value) {
+        if (buffer.Length == 0)
+            return;
         Array.Copy(buffer, 1, buffer, 0, buffer.Length - 1);
         buffer[^1] = value;
     }
