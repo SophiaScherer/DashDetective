@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Management;
 using System.Threading.Tasks;
@@ -82,7 +83,8 @@ public static class DiskInfoProvider {
             }
 
             return DiskStaticInfo.Unknown;
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("DiskInfoProvider read failed", e);
             return DiskStaticInfo.Unknown;
         }
     }

@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using DashDetective.Services.Diagnostics;
 using System;
 
 namespace DashDetective.Services.SystemMetrics;
@@ -86,9 +87,10 @@ public class MetricChannel<TSample> : IDisposable {
         TSample value;
         try {
             value = _sample();
-        } catch {
+        } catch (Exception e) {
             // Sampling is unavailable (e.g. a non-Windows host or a missing counter). Show the view's
             // neutral placeholder and stop polling rather than throwing on the UI thread every interval.
+            Log.Warn("MetricChannel sampler failed; stopping channel", e);
             _onFailed();
             _timer.Stop();
             return;

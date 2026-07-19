@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Management;
 using System.Threading.Tasks;
@@ -46,7 +47,8 @@ public static class CpuInfoProvider {
                 logical = Environment.ProcessorCount;
 
             return new CpuStaticInfo(name, physical, logical, maxClock);
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("CpuInfoProvider read failed", e);
             return CpuStaticInfo.Unknown;
         }
     }
