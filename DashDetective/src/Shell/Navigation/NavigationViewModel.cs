@@ -24,10 +24,18 @@ public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty] private NavItem _selectedNav = null!;
 
     /// <summary>Whether the bar is collapsed to an icons-only rail. Session-only, like Theming.</summary>
-    [ObservableProperty] private bool _isCollapsed;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+        nameof(ShowBrandText), nameof(ShowFullFooter), nameof(CollapseIcon))]
+    private bool _isCollapsed;
 
     /// <summary>Which window edge the bar docks to. Session-only, like Theming.</summary>
-    [ObservableProperty] private NavOrientation _orientation = NavOrientation.Left;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
+        nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
+        nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
+        nameof(ShowFullFooter), nameof(CollapseIcon))]
+    private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
     public ObservableCollection<NavItem> NavItems { get; } = new();
@@ -61,13 +69,17 @@ public partial class NavigationViewModel : ViewModelBase {
     // ----- Footer identity (the interactive Windows user; read once at construction) -----
 
     /// <summary>The logged-in user's login name shown in the footer card.</summary>
-    [ObservableProperty] private string _userName = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UserTooltip))]
+    private string _userName = "";
 
     /// <summary>Up to two letters shown in the footer avatar badge.</summary>
     [ObservableProperty] private string _userInitials = "";
 
     /// <summary>The account's privilege level ("Administrator" / "Standard User").</summary>
-    [ObservableProperty] private string _userRole = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UserTooltip))]
+    private string _userRole = "";
 
     /// <summary>Name and role combined for the compact-avatar tooltip, e.g. "sophiasch — Administrator".</summary>
     public string UserTooltip => $"{UserName} — {UserRole}";
@@ -166,32 +178,9 @@ public partial class NavigationViewModel : ViewModelBase {
             position.IsSelected = position.Value == Orientation;
     }
 
-    partial void OnIsCollapsedChanged(bool value) {
-        OnPropertyChanged(nameof(RailWidth));
-        OnPropertyChanged(nameof(RailHeight));
-        OnPropertyChanged(nameof(ShowLabels));
-        OnPropertyChanged(nameof(ShowBrandText));
-        OnPropertyChanged(nameof(ShowFullFooter));
-        OnPropertyChanged(nameof(CollapseIcon));
-    }
-
-    partial void OnOrientationChanged(NavOrientation value) {
-        OnPropertyChanged(nameof(IsHorizontal));
-        OnPropertyChanged(nameof(Dock));
-        OnPropertyChanged(nameof(BrandDock));
-        OnPropertyChanged(nameof(FooterDock));
-        OnPropertyChanged(nameof(ItemsOrientation));
-        OnPropertyChanged(nameof(ItemsVAlign));
-        OnPropertyChanged(nameof(RailWidth));
-        OnPropertyChanged(nameof(RailHeight));
-        OnPropertyChanged(nameof(HairlineThickness));
-        OnPropertyChanged(nameof(ScrollV));
-        OnPropertyChanged(nameof(ScrollH));
-        OnPropertyChanged(nameof(ShowBrandText));
-        OnPropertyChanged(nameof(ShowFullFooter));
-        OnPropertyChanged(nameof(CollapseIcon));
-        SyncPositions();
-    }
+    // The computed layout properties are fanned out via [NotifyPropertyChangedFor] on the source fields;
+    // this hook only carries the non-property side effect (keeping the position picker's selection in sync).
+    partial void OnOrientationChanged(NavOrientation value) => SyncPositions();
 
     /// <summary>Populates the bar and selects the first item. Items must be created with
     /// <see cref="Navigate"/> as their select callback so clicks route back here.</summary>

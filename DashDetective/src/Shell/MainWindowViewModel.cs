@@ -33,13 +33,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
-    [ObservableProperty] private ViewModelBase _currentPage;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage))]
+    private ViewModelBase _currentPage;
 
     /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
     [ObservableProperty] private string _clock = "";
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
-    [ObservableProperty] private bool _isLive = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LiveLabel), nameof(LiveDotBrush))]
+    private bool _isLive = true;
 
     /// <summary>The navigation bar: owns the nav items and selection; the shell hosts the page it
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
@@ -102,17 +106,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     private void UpdateClock() =>
         Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-
-    partial void OnCurrentPageChanged(ViewModelBase value) {
-        OnPropertyChanged(nameof(CurrentPageSelfScrolls));
-        OnPropertyChanged(nameof(ScrollingPage));
-        OnPropertyChanged(nameof(SelfScrollingPage));
-    }
-
-    partial void OnIsLiveChanged(bool value) {
-        OnPropertyChanged(nameof(LiveLabel));
-        OnPropertyChanged(nameof(LiveDotBrush));
-    }
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring

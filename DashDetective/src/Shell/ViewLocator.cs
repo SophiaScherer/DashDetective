@@ -1,33 +1,32 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using DashDetective.Shared;
-using System;
-using System.Diagnostics.CodeAnalysis;
+using DashDetective.Tabs.Dashboard;
+using DashDetective.Tabs.FileExplorer;
+using DashDetective.Tabs.Hardware;
+using DashDetective.Tabs.Network;
+using DashDetective.Tabs.Performance;
+using DashDetective.Tabs.Processes;
+using DashDetective.Tabs.Settings;
 
 namespace DashDetective.Shell;
 
 /// <summary>
-/// Given a view model, returns the corresponding view if possible.
+/// Maps a page view model to its view via an explicit switch — compile-time and trimming-safe (no
+/// reflection). Keeps the "Not Found" fallback for any unmapped view model.
 /// </summary>
-[RequiresUnreferencedCode(
-    "Default implementation of ViewLocator involves reflection which may be trimmed away.",
-    Url = "https://docs.avaloniaui.net/docs/concepts/view-locator")]
 public class ViewLocator : IDataTemplate {
-    public Control? Build(object? param) {
-        if (param is null)
-            return null;
+    public Control? Build(object? param) => param switch {
+        DashboardViewModel => new DashboardView(),
+        FileExplorerViewModel => new FileExplorerView(),
+        ProcessesViewModel => new ProcessesView(),
+        PerformanceViewModel => new PerformanceView(),
+        NetworkViewModel => new NetworkView(),
+        HardwareViewModel => new HardwareView(),
+        SettingsViewModel => new SettingsView(),
+        null => null,
+        _ => new TextBlock { Text = "Not Found: " + param.GetType().FullName },
+    };
 
-        var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
-        var type = Type.GetType(name);
-
-        if (type != null) {
-            return (Control)Activator.CreateInstance(type)!;
-        }
-
-        return new TextBlock { Text = "Not Found: " + name };
-    }
-
-    public bool Match(object? data) {
-        return data is ViewModelBase;
-    }
+    public bool Match(object? data) => data is ViewModelBase;
 }
