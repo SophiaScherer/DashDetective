@@ -55,9 +55,9 @@ share a namespace.
 
 ## Page lifecycle: always-on pages and marker interfaces
 
-Data-bearing tabs (Dashboard, Network, Processes) are **always-on singletons**: their view-models are
-constructed once by the shell and live for the app's lifetime, so their timers and rolling buffers keep
-running as you switch tabs. Rather than a common base class dictating behaviour, pages opt into shell
+Data-bearing tabs (Dashboard, Network, Processes, Performance) are **always-on singletons**: their
+view-models are constructed once by the shell and live for the app's lifetime, so their timers and
+rolling buffers keep running as you switch tabs. Rather than a common base class dictating behaviour, pages opt into shell
 behaviours by implementing small **marker interfaces** in `src/Shared`:
 
 - **`ISelfScrollingPage`** — the page fills the viewport and manages its own internal scrolling, so the

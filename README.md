@@ -10,26 +10,22 @@ performance counters, and Win32 P/Invoke) with no elevation required, and is wri
 one-feature-at-a-time discipline: every tab is a self-contained module, and cross-cutting concerns
 (theming, sampling, page lifecycle) live behind small shared seams.
 
-> **Status:** actively built tab-by-tab. Dashboard, File Explorer, Network, Hardware and Settings →
-> Appearance are live; Performance and Processes are in progress. See [Feature tour](#feature-tour)
-> for the honest per-tab state and [Roadmap](#roadmap) for what's next.
+> **Status:** actively built tab-by-tab. Dashboard, File Explorer, Processes, Performance, Network and
+> Hardware are live; in Settings, Appearance and Navigation are live while Monitoring and Export are
+> still static layout. See [Feature tour](#feature-tour) for the honest per-tab state and
+> [Roadmap](#roadmap) for what's next.
 
 ## Screenshots
 
 <!--
-  SCREENSHOTS TO CAPTURE (save as PNG under docs/images/, names below):
-    Per tab, in DARK theme with the default multi-colour accent:
-      dashboard-dark.png, file-explorer-dark.png, processes-dark.png,
-      performance-dark.png, network-dark.png, hardware-dark.png, settings-dark.png
-    The same tabs in LIGHT theme:
-      dashboard-light.png, file-explorer-light.png, processes-light.png,
-      performance-light.png, network-light.png, hardware-light.png, settings-light.png
-    One accent variant (pick a single accent swatch in Settings → Appearance, e.g. purple):
-      dashboard-accent-purple.png
-    The drag-to-dock navigation gesture (grab the nav bar and drag toward an edge so the
-    docking hint chip + drop target are visible):
-      nav-drag-to-dock.png
-  Then replace the placeholder links below with the captured images.
+  Screenshots live in docs/images/ (captured from the running app, maximised at 1936x1080).
+  The full set is available there; the grid below shows a representative selection:
+    Every tab in both themes: <tab>-dark.png and <tab>-light.png for
+      dashboard, file-explorer, processes, performance, network, hardware, settings
+    Accent variant:  dashboard-accent-purple.png  (dark theme, purple accent)
+    Nav gesture:     nav-drag-to-dock.png          (bar lifted, "Dock top" hint chip visible)
+  To refresh them, re-run the capture (see docs/images) after a Release build; keep the file names
+  stable so these links keep resolving.
 -->
 
 | Dashboard (dark) | File Explorer (dark) | Network (dark) |
@@ -76,19 +72,19 @@ A read-only three-pane file browser:
 Built on `System.IO` with per-entry soft-fail off the UI thread; friendly type names and shell actions
 via `shell32` P/Invoke.
 
-### Processes — *in progress*
+### Processes — *live*
 A Task-Manager-style live process view: the list split into **Apps** and **Background processes**, with
-per-process PID / status / CPU % / Memory / Disk / GPU %, sortable headers, a summary strip, **End
-task**, and native **Properties**. Data is entirely in-box and needs no admin
-(`System.Diagnostics.Process`, `GetProcessIoCounters` P/Invoke, PDH GPU counters). *The scaffold and
-activation are in place; the live table lands in subsequent phases. Per-process network throughput is
-deferred (no clean in-box per-process rate API).*
+per-process PID / status / CPU % / Memory / Disk / GPU %, sortable headers, a summary strip (process
+counts, total CPU/memory, thread count), **End task**, and native **Properties**. Data is entirely
+in-box and needs no admin (`System.Diagnostics.Process`, `GetProcessIoCounters` P/Invoke, PDH GPU
+counters), with the live table keyed-diffed in place. *Per-process network throughput is deferred (the
+**Net** column shows `—`) — there is no clean in-box per-process rate API.*
 
-### Performance — *UI in progress (static mock data)*
-A Task-Manager-style resource drill-down: a left **resource-selector rail**
-(CPU · Memory · Disk · GPU · Ethernet) swaps a right **detail pane** — one large utilization chart
-(fixed 0–100 axis, gradient fill) plus a four-tile stat strip. *This is a UI pass on static mock data;
-live samplers and accent-reactive metrics are a later technical pass.*
+### Performance — *live*
+A Task-Manager-style resource drill-down: a left **resource-selector rail** (CPU · Memory · Disk · GPU ·
+network adapter) with a live value per resource swaps a right **detail pane** — one large utilization
+chart (fixed 0–100 axis, gradient fill) plus a four-tile stat strip. Each metric runs on its own 1 Hz
+sampler, mirroring the Dashboard, and honours the toolbar Live/Refresh controls.
 
 ### Network — *live*
 A six-panel network inspector:
@@ -205,5 +201,5 @@ Honest near-term work, roughly in priority order:
   started.
 - **Hardware sensors** — wire the **Sensors** card to a real temperature/fan source (needs vendor SDKs
   or a sensor library), and revisit deferred GPU temperature / multi-GPU layouts.
-- **Finish Performance & Processes** — swap Performance's mock data for live samplers, and land the
-  Processes live table.
+- **Deferred metrics** — per-process **network throughput** in Processes and **IPv6** active
+  connections in Network both await a suitable in-box data source.
