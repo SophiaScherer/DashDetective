@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using Microsoft.Win32;
 using System;
 using System.Management;
@@ -28,7 +29,8 @@ public static class SystemInfoProvider {
         try {
             return new SystemStaticInfo(
                 ReadOs(), Environment.MachineName, ReadBios(), ReadBuild(), ReadMotherboard());
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("SystemInfoProvider read failed", e);
             return SystemStaticInfo.Unknown;
         }
     }

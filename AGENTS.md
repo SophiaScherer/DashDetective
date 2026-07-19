@@ -41,6 +41,18 @@ exception). It does not widen the working boundaries: scope control still procee
 the roadmap**, and any further cross-cutting or out-of-feature change still needs its own explicit
 sign-off.
 
+**De-duplication / composition refactor — COMPLETED (2026-07-19), under explicit sign-off.** A
+cross-cutting pass over `src/Shared`, `src/Services`, `src/Shell` and the Dashboard / Performance /
+Network / Processes tabs, with **zero user-visible behaviour change**. It replaced the ~10× copy-pasted
+per-metric `DispatcherTimer` + rolling-buffer pattern with `MetricChannel` + a shared
+`SystemMetricsService` (one sampler set, ref-counted subscriptions, removing the duplicate PDH GPU/disk
+queries); consolidated the chart/format/diff duplication into `SparklinePoints`, `ChartScale`,
+`HardwareNameFormatter` and `CollectionReconciler`; added real shutdown disposal via a manual composition
+root in `App`; switched `NavigationView`/`MainWindow` fan-out to `[NotifyPropertyChangedFor]`; replaced
+the reflection `ViewLocator` with a compile-time switch; and added the soft-failing `Log` seam. As with
+the portfolio pass, this did not widen the working boundaries — further cross-cutting work still needs
+its own sign-off.
+
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
 patterns), but do NOT modify while building Performance** (full write-ups in *Appendix — Completed
 Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (Appearance live;
@@ -147,6 +159,18 @@ currently exist.
       ILiveSamplingPage.cs    (marker: a page with live sampling the toolbar Live pill pauses/resumes;
                                MainWindowViewModel.ToggleLive routes SetLive() over every nav page —
                                Dashboard + Network)
+      HardwareNameFormatter.cs (static: trims vendor/marketing decoration from CPU/GPU names for the
+                                compact captions; shared by Dashboard + Performance. Distinct from
+                                HardwareCatalog.Normalize — display trim, not a lookup key)
+      CollectionReconciler.cs  (generic keyed diff of an ordered snapshot into an ObservableCollection —
+                                drop/update/move/insert in place, no flicker; shared by the Network
+                                connections table + the Processes list)
+      /Charts
+        SparklinePoints.cs      (renders a rolling metric history to a Sparkline "x,y" points string on a
+                                 fixed 0–100 axis; percentage metrics pass valueMax 100, unbounded ones a
+                                 rolling peak. Used by every live chart)
+        ChartScale.cs           (peak/headroom/floor auto-scaling for the network throughput axis —
+                                 Peak / FitPeak / FitAxis; shared by Dashboard + Performance + Network)
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
@@ -163,17 +187,34 @@ currently exist.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal)
     /Services                   (cross-cutting app services)
+      /Diagnostics
+        Log.cs                  (minimal soft-failing logger → Debug output + a per-day rolling file in
+                                 %LocalAppData%/DashDetective/logs; never throws. The sampler / provider /
+                                 MetricChannel catch blocks route through Log.Warn, and Program.cs hooks
+                                 AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException →
+                                 Log.Error. No logging packages)
       /Theming
         ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
       /SystemMetrics
-        CpuUsageSampler.cs      (live total CPU % via GetSystemTimes; shared — Dashboard + Processes)
-        MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx; shared —
-                                 Dashboard + Processes. Both moved here from src/Tabs/Dashboard with
-                                 sign-off when the Processes tab needed the same system-wide readings,
-                                 the same precedent as NetworkUsageSampler. GPU/Storage samplers stay
-                                 in the Dashboard until a second tab needs them.)
+        CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
+        MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
+        GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters; owns a PDH query handle)
+        StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
+                                 counters; owns a PDH query handle)
+        DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
+        MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
+                                 unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
+                                 paused Refresh. Non-generic MetricChannel for plain-double metrics,
+                                 generic MetricChannel<TSample> for snapshot samples + a no-history variant)
+        SystemMetricsService.cs (SINGLE owner of the five samplers; per-metric 1 Hz channel fans each
+                                 sample out to subscribers (ref-counted — a channel runs only while it has
+                                 one), Pause/Resume for the Live pill, RefreshAll for Refresh, per-metric
+                                 fault isolation. Dashboard / Performance / Processes SUBSCRIBE instead of
+                                 owning samplers — this removes the duplicate PDH GPU/disk queries. The
+                                 Network tab keeps its own NetworkUsageSampler. Built in the App composition
+                                 root and disposed on shutdown.)
       /Network
         NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
                                  adapter — internet-facing, has a default gateway — NOT a sum of all
@@ -206,13 +247,11 @@ currently exist.
                                 CpuStaticInfo.cs        (record for the WMI result)
                                 MemoryInfoProvider.cs   (static RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
-                                GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters)
                                 GpuInfoProvider.cs      (static GPU name via WMI, async)
                                 GpuStaticInfo.cs        (record for the WMI result)
-                                StorageUsageSampler.cs  (live disk Active time % via PDH PhysicalDisk
-                                                         counters; capacity caption uses DriveInfo, no WMI)
-                                (NetworkUsageSampler.cs is now under src/Services/Network — shared with
-                                 the Network tab; the Dashboard VM still owns its own instance)
+                                (the CPU/Memory/GPU/Storage/Network *samplers* now live under
+                                 src/Services/SystemMetrics + /Network and are owned by
+                                 SystemMetricsService — the Dashboard VM subscribes, it no longer owns them)
                                 SystemInfoProvider.cs   (static system identity — OS/device/BIOS/board/build —
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
@@ -300,12 +339,14 @@ currently exist.
       (Storage — not yet started)
 ```
 
-Feature-specific helpers (samplers, providers) live in the tab folder, not `src/Shared`, until
-a second feature needs them (per the "keep each tab self-contained" rule). The live-CPU and
-live-Memory code above is the reference example: each metric has its own 1 Hz `DispatcherTimer`
-and a 60-sample rolling buffer in `DashboardViewModel`, plus a feature-local sampler (Win32
-P/Invoke) and WMI provider. The Network metric follows the same pattern but keeps **two** 60-sample
-buffers (download + upload) and computes a shared dynamic `YMax` so both series plot on one scale.
+Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
+until a second feature needs them (per the "keep each tab self-contained" rule). Live **sampling**,
+however, is now shared: `SystemMetricsService` owns one sampler per metric and drives it through a
+`MetricChannel` at 1 Hz, fanning each sample out to the pages that subscribe (Dashboard, Performance,
+Processes). A subscriber keeps its own 60-sample rolling buffer (two for network — download + upload)
+and rebuilds its `Sparkline` via `SparklinePoints.Build`, using `ChartScale.FitAxis` for the unbounded
+network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer` + `Array.Copy`
+buffer or a bespoke points/peak helper.
 
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
@@ -353,6 +394,10 @@ Rules of thumb:
 - Keep each tab self-contained: its view, view model, and feature-specific helpers live in
   its own folder under `src/Tabs`, not scattered project-wide.
 - The shell (sidebar/toolbar/navigation) is shared — edit carefully.
+- **Reuse the shared abstractions instead of re-inlining the old patterns:** `MetricChannel` +
+  `SystemMetricsService` (live sampling), `SparklinePoints` + `ChartScale` (charts),
+  `CollectionReconciler` (keyed-diff live lists), `HardwareNameFormatter` (CPU/GPU name trim),
+  `UptimeFormatter` / `DataRateFormatter` (formatting), and `Log` (diagnostics behind soft-fail catches).
 
 ## Dependencies
 

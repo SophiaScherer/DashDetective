@@ -34,10 +34,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly DispatcherTimer _timer;
     private bool _inFlight;
 
-    // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from
-    // the shared samplers (promoted to src/Services/SystemMetrics when this tab was activated).
-    private readonly CpuUsageSampler _cpuSampler = new();
-    private readonly MemoryUsageSampler _memorySampler = new();
+    // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from the
+    // shared SystemMetricsService (so there's one sampler across all tabs).
+    private readonly SystemMetricsService _service;
+    private readonly IDisposable[] _subscriptions;
 
     // Sort state: which column + direction. Sorting applies within each group; Apps stay above
     // Background. Defaults to Name ascending (matching the initial list order).
@@ -126,7 +126,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     partial void OnSelectedRowChanged(ProcessRow? value) => OnPropertyChanged(nameof(HasSelection));
 
-    public ProcessesViewModel() {
+    public ProcessesViewModel(SystemMetricsService service) {
+        _service = service;
         NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
         PidSort = new ProcessSortColumn(ProcessSortKey.Pid, OnSort);
         StatusSort = new ProcessSortColumn(ProcessSortKey.Status, OnSort);
@@ -140,9 +141,12 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         };
         UpdateSortIndicators();
 
-        // Seed the system totals (memory is an absolute reading, so it's real at once; CPU needs an
-        // interval, so it reads 0 until the first tick), then load the list and start polling.
-        SampleSystemTotals();
+        // The summary CPU%/Memory% come from the shared service (subscribe replays the latest value at
+        // once). The process list loads and polls on its own timer below.
+        _subscriptions = new[] {
+            _service.SubscribeCpu(OnCpuTotal, OnCpuTotalFailed),
+            _service.SubscribeMemory(OnMemoryTotal, OnMemoryTotalFailed),
+        };
         _ = LoadAsync();
 
         _timer = new DispatcherTimer { Interval = SampleInterval };
@@ -150,22 +154,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _timer.Start();
     }
 
-    private void OnTick(object? sender, EventArgs e) {
-        SampleSystemTotals();
-        _ = LoadAsync();
-    }
+    private void OnTick(object? sender, EventArgs e) => _ = LoadAsync();
 
-    /// <summary>Reads the system-wide CPU% and Memory% samplers (synchronous, negligible cost) and
-    /// updates the summary cards. Never throws.</summary>
-    private void SampleSystemTotals() {
-        double cpu;
-        try { cpu = _cpuSampler.Sample(); } catch { cpu = 0; }
-        CpuUsageText = FormatPercent(cpu);
+    /// <summary>Summary CPU% callback.</summary>
+    private void OnCpuTotal(double cpu) => CpuUsageText = FormatPercent(cpu);
 
-        MemorySample memory;
-        try { memory = _memorySampler.Sample(); } catch { memory = default; }
-        MemoryUsageText = FormatPercent(memory.LoadPercent);
-    }
+    /// <summary>Summary Memory% callback.</summary>
+    private void OnMemoryTotal(MemorySample memory) => MemoryUsageText = FormatPercent(memory.LoadPercent);
+
+    /// <summary>On a CPU sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
+    private void OnCpuTotalFailed() => CpuUsageText = FormatPercent(0);
+
+    /// <summary>On a memory sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
+    private void OnMemoryTotalFailed() => MemoryUsageText = FormatPercent(0);
 
     private static string FormatPercent(double percent) {
         if (percent < 0)
@@ -370,36 +371,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         return byName != 0 ? byName : a.Pid.CompareTo(b.Pid);
     }
 
-    /// <summary>Diffs an already-ordered snapshot into <paramref name="target"/> by PID: drops rows no
-    /// longer present, updates survivors in place, inserts new ones, and moves survivors to their new
-    /// position. Mirrors <c>NetworkViewModel.ReconcileConnections</c>.</summary>
-    private static void Reconcile(ObservableCollection<ProcessRow> target, IReadOnlyList<RowModel> incoming) {
-        var incomingPids = new HashSet<int>(incoming.Count);
-        foreach (var model in incoming)
-            incomingPids.Add(model.Info.Pid);
-
-        for (var i = target.Count - 1; i >= 0; i--)
-            if (!incomingPids.Contains(target[i].Pid))
-                target.RemoveAt(i);
-
-        var existing = new Dictionary<int, ProcessRow>(target.Count);
-        foreach (var row in target)
-            existing[row.Pid] = row;
-
-        for (var i = 0; i < incoming.Count; i++) {
-            var model = incoming[i];
-            if (existing.TryGetValue(model.Info.Pid, out var row)) {
-                row.Update(model.Info, model.Depth, model.HasChildren, model.IsExpanded);
-                var current = target.IndexOf(row);
-                if (current != i)
-                    target.Move(current, i);
-            } else {
-                var created = new ProcessRow(model.Info, model.Depth, model.HasChildren, model.IsExpanded);
-                existing[model.Info.Pid] = created;
-                target.Insert(i, created);
-            }
-        }
-    }
+    /// <summary>Diffs an already-ordered snapshot into <paramref name="target"/> by PID, via the shared
+    /// <see cref="CollectionReconciler"/> (drop/update/move/insert in place, no flicker).</summary>
+    private static void Reconcile(ObservableCollection<ProcessRow> target, IReadOnlyList<RowModel> incoming) =>
+        CollectionReconciler.Reconcile(target, incoming,
+            static row => row.Pid, static model => model.Info.Pid,
+            static (row, model) => row.Update(model.Info, model.Depth, model.HasChildren, model.IsExpanded),
+            static model => new ProcessRow(model.Info, model.Depth, model.HasChildren, model.IsExpanded));
 
     /// <summary>Selects a row (single selection across both groups), clearing the previous one. Driven
     /// from the view code-behind on tap, like File Explorer's row selection.</summary>
@@ -450,11 +428,14 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         }
     }
 
-    /// <summary>Toolbar Refresh: re-sample once immediately. Runs even while paused, like the other tabs.</summary>
-    public void Refresh() => OnTick(this, EventArgs.Empty);
+    /// <summary>Toolbar Refresh: re-sample the summary totals and reload the list once, even while paused.</summary>
+    public void Refresh() {
+        _service.RefreshAll();
+        _ = LoadAsync();
+    }
 
-    /// <summary>Pauses/resumes the polling timer, driven by the toolbar Live pill. Refresh still works
-    /// while paused.</summary>
+    /// <summary>Pauses/resumes the list-polling timer, driven by the toolbar Live pill. The shared summary
+    /// sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.</summary>
     public void SetLive(bool live) {
         if (live)
             _timer.Start();
@@ -462,9 +443,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             _timer.Stop();
     }
 
-    /// <summary>Stops the timer. Safe to call more than once.</summary>
+    /// <summary>Stops the timer and unsubscribes from the shared metrics. Safe to call more than once.</summary>
     public void Dispose() {
         _timer.Stop();
         _timer.Tick -= OnTick;
+        foreach (var subscription in _subscriptions)
+            subscription.Dispose();
     }
 }

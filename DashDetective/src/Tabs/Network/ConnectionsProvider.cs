@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -69,7 +70,8 @@ public static class ConnectionsProvider {
             if (list.Count > MaxRows)
                 list = list.GetRange(0, MaxRows);
             return new ConnectionsSnapshot(list, total);
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("ConnectionsProvider read failed", e);
             return new ConnectionsSnapshot(Array.Empty<ConnectionInfo>(), 0);
         }
     }

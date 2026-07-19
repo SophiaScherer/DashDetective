@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Management;
 using System.Threading.Tasks;
@@ -44,7 +45,8 @@ public static class GpuInfoProvider {
             }
 
             return GpuStaticInfo.Unknown;
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("GpuInfoProvider read failed", e);
             return GpuStaticInfo.Unknown;
         }
     }

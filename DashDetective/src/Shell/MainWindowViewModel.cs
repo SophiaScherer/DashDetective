@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
@@ -17,27 +18,32 @@ using System.Globalization;
 
 namespace DashDetective.Shell;
 
-public partial class MainWindowViewModel : ViewModelBase {
+public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private static readonly IBrush LiveDot = new SolidColorBrush(Color.Parse("#6ccb5f"));
     private static readonly IBrush PausedDot = new SolidColorBrush(Color.Parse("#9aa0a6"));
 
+    private readonly SystemMetricsService _metrics;
     private readonly ThemeService _theme = new();
-    private readonly DashboardViewModel _dashboard = new();
+    private readonly DashboardViewModel _dashboard;
     private readonly FileExplorerViewModel _fileExplorer = new();
-    private readonly ProcessesViewModel _processes = new();
-    private readonly PerformanceViewModel _performance = new();
+    private readonly ProcessesViewModel _processes;
+    private readonly PerformanceViewModel _performance;
     private readonly NetworkViewModel _network = new();
     private readonly HardwareViewModel _hardware = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
-    [ObservableProperty] private ViewModelBase _currentPage;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage))]
+    private ViewModelBase _currentPage;
 
     /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
     [ObservableProperty] private string _clock = "";
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
-    [ObservableProperty] private bool _isLive = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LiveLabel), nameof(LiveDotBrush))]
+    private bool _isLive = true;
 
     /// <summary>The navigation bar: owns the nav items and selection; the shell hosts the page it
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
@@ -58,7 +64,14 @@ public partial class MainWindowViewModel : ViewModelBase {
     /// <summary>The current page routed to the bounded, self-scrolling host (null otherwise).</summary>
     public ViewModelBase? SelfScrollingPage => CurrentPage is ISelfScrollingPage ? CurrentPage : null;
 
-    public MainWindowViewModel() {
+    public MainWindowViewModel(SystemMetricsService metrics) {
+        // The shared metrics service is injected by the composition root and passed to the pages that
+        // sample (Dashboard, Performance, Processes); the rest are self-contained.
+        _metrics = metrics;
+        _dashboard = new DashboardViewModel(metrics);
+        _processes = new ProcessesViewModel(metrics);
+        _performance = new PerformanceViewModel(metrics);
+
         // Apply the default appearance (Dark + Blue) through the single theming seam,
         // then hand the same service to the Settings page so its controls drive it.
         _theme.ApplyDefaults();
@@ -94,23 +107,16 @@ public partial class MainWindowViewModel : ViewModelBase {
     private void UpdateClock() =>
         Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
-    partial void OnCurrentPageChanged(ViewModelBase value) {
-        OnPropertyChanged(nameof(CurrentPageSelfScrolls));
-        OnPropertyChanged(nameof(ScrollingPage));
-        OnPropertyChanged(nameof(SelfScrollingPage));
-    }
-
-    partial void OnIsLiveChanged(bool value) {
-        OnPropertyChanged(nameof(LiveLabel));
-        OnPropertyChanged(nameof(LiveDotBrush));
-    }
-
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
     /// is needed here.</summary>
     [RelayCommand]
     private void ToggleLive() {
         IsLive = !IsLive;
+        if (IsLive)
+            _metrics.Resume();
+        else
+            _metrics.Pause();
         foreach (var item in Nav.NavItems)
             (item.Page as ILiveSamplingPage)?.SetLive(IsLive);
     }
@@ -129,4 +135,13 @@ public partial class MainWindowViewModel : ViewModelBase {
 
     /// <summary>Hosts the page for whichever nav item the bar selected.</summary>
     private void OnNavSelected(NavItem item) => CurrentPage = item.Page;
+
+    /// <summary>Disposes the page view models and the shared metrics service on shutdown, so their timers,
+    /// subscriptions and PDH handles are released. Driven by the composition root.</summary>
+    public void Dispose() {
+        _clockTimer.Stop();
+        foreach (var item in Nav.NavItems)
+            (item.Page as IDisposable)?.Dispose();
+        _metrics.Dispose();
+    }
 }

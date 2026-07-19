@@ -3,18 +3,19 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Charts;
 using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Dashboard;
 
 /// <summary>
-/// View model for the Dashboard page. Currently drives the live CPU surfaces; the other
-/// metrics remain static placeholders in the view until they are implemented.
+/// View model for the Dashboard page. Drives the live CPU / Memory / GPU / Storage / Network surfaces
+/// by subscribing to the shared <see cref="SystemMetricsService"/> — the samplers are shared across
+/// pages; each surface keeps its own rolling history and rebuilds its chart in the subscription callback.
 /// </summary>
 public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
@@ -26,26 +27,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     private const double MinNetworkScaleMbps = 1.0;
 
-    private readonly CpuUsageSampler _cpuSampler = new();
+    private readonly SystemMetricsService _service;
+    private readonly IDisposable[] _subscriptions;
+
+    // Per-view rolling histories (the samplers are shared; the histories are not).
     private readonly double[] _cpuHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _cpuTimer;
-
-    private readonly MemoryUsageSampler _memorySampler = new();
     private readonly double[] _memoryHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _memoryTimer;
-
-    private readonly GpuUsageSampler _gpuSampler = new();
     private readonly double[] _gpuHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _gpuTimer;
-
-    private readonly StorageUsageSampler _storageSampler = new();
     private readonly double[] _storageHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _storageTimer;
-
-    private readonly NetworkUsageSampler _networkSampler = new();
     private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly double[] _upHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _networkTimer;
 
     private readonly DispatcherTimer _uptimeTimer;
 
@@ -94,49 +85,24 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _motherboardText = "";
     [ObservableProperty] private string _uptimeText = "";
 
-    public DashboardViewModel() {
-        // The history array starts all-zero, so the chart is full-width (flat at 0%) from
-        // the first frame; real samples then shift in from the right, one per second.
-        UpdateCpu(0);
+    public DashboardViewModel(SystemMetricsService service) {
+        _service = service;
 
-        _cpuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _cpuTimer.Tick += OnCpuTick;
-        _cpuTimer.Start();
+        // The adapter label is chosen once from the busiest active adapter.
+        if (!string.IsNullOrWhiteSpace(service.NetworkAdapterName))
+            NetworkAdapterName = service.NetworkAdapterName;
 
-        // Memory runs on its own timer so it stays independent of the CPU sampler: either can
-        // fail and stop without taking the other down.
-        UpdateMemory(_memorySampler.Sample());
+        // Subscribe to the shared metrics. Each subscription immediately replays the latest cached
+        // sample, seeding the surface with real data on the first frame; ticks then shift in from the right.
+        _subscriptions = new[] {
+            service.SubscribeCpu(OnCpu, OnCpuFailed),
+            service.SubscribeMemory(OnMemory, OnMemoryFailed),
+            service.SubscribeGpu(OnGpu, OnGpuFailed),
+            service.SubscribeStorage(OnStorage, OnStorageFailed),
+            service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
+        };
 
-        _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _memoryTimer.Tick += OnMemoryTick;
-        _memoryTimer.Start();
-
-        // GPU runs on its own timer for the same reason: independent of the CPU/Memory samplers.
-        UpdateGpu(0);
-
-        _gpuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _gpuTimer.Tick += OnGpuTick;
-        _gpuTimer.Start();
-
-        // Storage runs on its own timer for the same reason: independent of the other samplers.
-        UpdateStorage(0);
-
-        _storageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _storageTimer.Tick += OnStorageTick;
-        _storageTimer.Start();
-
-        // Network runs on its own timer for the same reason: independent of the other samplers.
-        // The adapter label is chosen once, at construction, from the busiest active adapter.
-        if (!string.IsNullOrWhiteSpace(_networkSampler.AdapterName))
-            NetworkAdapterName = _networkSampler.AdapterName;
-        UpdateNetwork(new NetworkSample(0, 0));
-
-        _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _networkTimer.Tick += OnNetworkTick;
-        _networkTimer.Start();
-
-        // Uptime updates on a coarse 30 s cadence — the smallest displayed unit is minutes, so a
-        // faster tick would be wasted work. Seed once so it's correct on the first frame.
+        // Uptime has no sampler/history, so it stays a plain 30 s timer. Seed once for the first frame.
         UpdateUptime();
 
         _uptimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
@@ -156,11 +122,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// still update once. Drives the shell's Refresh action.
     /// </summary>
     public void RefreshNow() {
-        OnCpuTick(this, EventArgs.Empty);
-        OnMemoryTick(this, EventArgs.Empty);
-        OnGpuTick(this, EventArgs.Empty);
-        OnStorageTick(this, EventArgs.Empty);
-        OnNetworkTick(this, EventArgs.Empty);
+        _service.RefreshAll();
         UpdateUptime();
 
         _ = LoadCpuInfoAsync();
@@ -173,27 +135,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     public void Refresh() => RefreshNow();
 
     /// <summary>
-    /// Pauses or resumes all live sampling by stopping/starting the five metric timers plus the
-    /// uptime timer. Drives the shell's Live toggle; <see cref="RefreshNow"/> still works while
-    /// paused. A timer previously auto-stopped after a sampler failure will simply fail and
-    /// re-stop on resume — harmless.
+    /// Pauses/resumes the Dashboard's own uptime timer for the shell's Live toggle. The shared metric
+    /// sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.
     /// </summary>
     public void SetLive(bool live) {
-        if (live) {
-            _cpuTimer.Start();
-            _memoryTimer.Start();
-            _gpuTimer.Start();
-            _storageTimer.Start();
-            _networkTimer.Start();
+        if (live)
             _uptimeTimer.Start();
-        } else {
-            _cpuTimer.Stop();
-            _memoryTimer.Stop();
-            _gpuTimer.Stop();
-            _storageTimer.Stop();
-            _networkTimer.Stop();
+        else
             _uptimeTimer.Stop();
-        }
     }
 
     /// <summary>
@@ -235,8 +184,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await CpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
-            CpuModelShort = ShortenCpuName(info.Name);
+            CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
         } catch {
@@ -250,7 +198,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await MemoryInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             MemoryModelText = FormatMemoryModel(info);
         } catch {
             MemoryModelText = "Unknown RAM";
@@ -262,8 +209,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await GpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
-            GpuModelShort = ShortenGpuName(info.Name);
+            GpuModelShort = HardwareNameFormatter.ShortenGpu(info.Name);
             GpuModelText = info.Name;
         } catch {
             GpuModelShort = "Unknown GPU";
@@ -276,7 +222,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await SystemInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             OsText = info.Os;
             DeviceText = info.Device;
             BiosText = info.Bios;
@@ -300,25 +245,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void UpdateUptime() =>
         UptimeText = UptimeFormatter.Format(TimeSpan.FromMilliseconds(Environment.TickCount64));
 
-    /// <summary>
-    /// Trims vendor decoration ("NVIDIA", "AMD", "(R)", "(TM)") from an adapter name so it fits the
-    /// compact StatCard caption, e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060",
-    /// "AMD Radeon(TM) Graphics" → "Radeon Graphics".
-    /// </summary>
-    private static string ShortenGpuName(string raw) {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown GPU";
-
-        var name = raw.Replace("(R)", "").Replace("(r)", "")
-                      .Replace("(TM)", "").Replace("(tm)", "");
-
-        foreach (var vendor in new[] { "NVIDIA ", "AMD ", "Intel " })
-            if (name.StartsWith(vendor, StringComparison.OrdinalIgnoreCase))
-                name = name[vendor.Length..];
-
-        return Regex.Replace(name, @"\s+", " ").Trim();
-    }
-
     /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>
     private static string FormatMemoryModel(MemoryStaticInfo info) {
         if (info.TotalGb <= 0)
@@ -332,7 +258,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
     private static string FormatCpuModel(CpuStaticInfo info) {
-        var name = ShortenCpuName(info.Name);
+        var name = HardwareNameFormatter.ShortenCpu(info.Name);
         return info.MaxClockMhz > 0
             ? $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz"
             : name;
@@ -344,24 +270,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             ? $"{info.PhysicalCores} cores · {info.LogicalCores} threads"
             : $"{info.LogicalCores} threads";
 
-    private void OnCpuTick(object? sender, EventArgs e) {
-        double value;
-        try {
-            value = _cpuSampler.Sample();
-        } catch {
-            // Sampling is unavailable (e.g. a non-Windows host). Show a neutral placeholder
-            // and stop polling rather than throwing on the UI thread every second.
-            CpuValueText = "—";
-            CpuPercentText = "—";
-            _cpuTimer.Stop();
-            return;
-        }
-
-        // Shift the window left by one and append the newest sample at the end.
-        Array.Copy(_cpuHistory, 1, _cpuHistory, 0, _cpuHistory.Length - 1);
-        _cpuHistory[^1] = value;
-
+    /// <summary>CPU subscription callback: append to the history, then refresh the surface.</summary>
+    private void OnCpu(double value) {
+        MetricChannel.PushHistory(_cpuHistory, value);
         UpdateCpu(value);
+    }
+
+    /// <summary>Sampler-failure handler for the CPU metric: shows a neutral placeholder.</summary>
+    private void OnCpuFailed() {
+        CpuValueText = "—";
+        CpuPercentText = "—";
     }
 
     private void UpdateCpu(double value) {
@@ -369,110 +287,35 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuPercent = value;
         CpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
         CpuPercentText = $"{rounded}%";
-        CpuPoints = BuildCpuPoints();
+        CpuPoints = SparklinePoints.Build(_cpuHistory, 100);
     }
 
-    /// <summary>
-    /// Trims WMI decoration ("(R)", "(TM)", "N-Core Processor", "CPU @ …GHz") from a
-    /// processor name so it fits the compact StatCard caption, e.g.
-    /// "AMD Ryzen 5 7600X 6-Core Processor" → "AMD Ryzen 5 7600X".
-    /// </summary>
-    private static string ShortenCpuName(string raw) {
-        if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown CPU";
-
-        var name = raw.Replace("(R)", "").Replace("(r)", "")
-                      .Replace("(TM)", "").Replace("(tm)", "");
-
-        var atIndex = name.IndexOf(" @", StringComparison.Ordinal);
-        if (atIndex >= 0)
-            name = name[..atIndex];
-
-        name = Regex.Replace(name, @"\s+\d+-Core Processor", "");
-        name = name.Replace(" Processor", "").Replace(" CPU", "");
-        return Regex.Replace(name, @"\s+", " ").Trim();
-    }
-
-    /// <summary>
-    /// Renders the history as a Sparkline "x,y" string. x is the sample index; y is
-    /// <c>100 − value</c> so higher utilisation sits at the top (smaller y = top), paired
-    /// with a fixed 0–100 axis on the Sparkline.
-    /// </summary>
-    private string BuildCpuPoints() {
-        var sb = new StringBuilder(_cpuHistory.Length * 8);
-        for (var i = 0; i < _cpuHistory.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((100 - _cpuHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
-    }
-
-    private void OnGpuTick(object? sender, EventArgs e) {
-        double value;
-        try {
-            value = _gpuSampler.Sample();
-        } catch {
-            // Sampling is unavailable (e.g. a non-Windows host or missing GPU Engine counters).
-            // Show a neutral placeholder and stop polling rather than throwing every second.
-            GpuValueText = "—";
-            _gpuTimer.Stop();
-            return;
-        }
-
-        // Shift the window left by one and append the newest sample at the end.
-        Array.Copy(_gpuHistory, 1, _gpuHistory, 0, _gpuHistory.Length - 1);
-        _gpuHistory[^1] = value;
-
+    /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
+    private void OnGpu(double value) {
+        MetricChannel.PushHistory(_gpuHistory, value);
         UpdateGpu(value);
     }
+
+    /// <summary>Sampler-failure handler for the GPU metric: shows a neutral placeholder.</summary>
+    private void OnGpuFailed() => GpuValueText = "—";
 
     private void UpdateGpu(double value) {
         var rounded = Math.Round(value);
         GpuPercent = value;
         GpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
-        GpuPoints = BuildGpuPoints();
+        GpuPoints = SparklinePoints.Build(_gpuHistory, 100);
     }
 
-    /// <summary>
-    /// Renders the GPU history as a Sparkline "x,y" string, matching <see cref="BuildCpuPoints"/>:
-    /// x is the sample index; y is <c>100 − value</c> so higher usage sits at the top, paired with a
-    /// fixed 0–100 axis on the Sparkline.
-    /// </summary>
-    private string BuildGpuPoints() {
-        var sb = new StringBuilder(_gpuHistory.Length * 8);
-        for (var i = 0; i < _gpuHistory.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((100 - _gpuHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
+    /// <summary>Storage subscription callback: append active-time to the history, then refresh.</summary>
+    private void OnStorage(StorageSample sample) {
+        MetricChannel.PushHistory(_storageHistory, sample.ActivePercent);
+        UpdateStorage(sample.ActivePercent);
     }
 
-    private void OnStorageTick(object? sender, EventArgs e) {
-        double value;
-        try {
-            value = _storageSampler.Sample().ActivePercent;
-        } catch {
-            // Sampling is unavailable (e.g. a non-Windows host or missing PhysicalDisk counters).
-            // Show a neutral placeholder and stop polling rather than throwing every second.
-            StorageValueText = "—";
-            StorageSubText = "";
-            _storageTimer.Stop();
-            return;
-        }
-
-        // Shift the window left by one and append the newest activity sample at the end.
-        Array.Copy(_storageHistory, 1, _storageHistory, 0, _storageHistory.Length - 1);
-        _storageHistory[^1] = value;
-
-        UpdateStorage(value);
+    /// <summary>Sampler-failure handler for the Storage metric: shows a neutral placeholder.</summary>
+    private void OnStorageFailed() {
+        StorageValueText = "—";
+        StorageSubText = "";
     }
 
     /// <summary>
@@ -482,7 +325,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     private void UpdateStorage(double value) {
         StorageValueText = Math.Round(value).ToString(CultureInfo.InvariantCulture);
-        StoragePoints = BuildStoragePoints();
+        StoragePoints = SparklinePoints.Build(_storageHistory, 100);
         UpdateStorageCapacity();
     }
 
@@ -517,42 +360,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             : $"{Math.Round(usedBytes / gb).ToString(CultureInfo.InvariantCulture)} / {Math.Round(totalBytes / gb).ToString(CultureInfo.InvariantCulture)} GB";
     }
 
-    /// <summary>
-    /// Renders the storage-activity history as a Sparkline "x,y" string, matching
-    /// <see cref="BuildCpuPoints"/>: x is the sample index; y is <c>100 − value</c> so higher
-    /// activity sits at the top, paired with a fixed 0–100 axis on the Sparkline.
-    /// </summary>
-    private string BuildStoragePoints() {
-        var sb = new StringBuilder(_storageHistory.Length * 8);
-        for (var i = 0; i < _storageHistory.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((100 - _storageHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
+    /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
+    private void OnMemory(MemorySample sample) {
+        MetricChannel.PushHistory(_memoryHistory, sample.LoadPercent);
+        UpdateMemory(sample);
     }
 
-    private void OnMemoryTick(object? sender, EventArgs e) {
-        MemorySample sample;
-        try {
-            sample = _memorySampler.Sample();
-        } catch {
-            // Sampling is unavailable (e.g. a non-Windows host). Show a neutral placeholder and
-            // stop polling rather than throwing on the UI thread every second.
-            MemoryValueText = "—";
-            MemorySubText = "";
-            _memoryTimer.Stop();
-            return;
-        }
-
-        // Shift the window left by one and append the newest load percentage at the end.
-        Array.Copy(_memoryHistory, 1, _memoryHistory, 0, _memoryHistory.Length - 1);
-        _memoryHistory[^1] = sample.LoadPercent;
-
-        UpdateMemory(sample);
+    /// <summary>Sampler-failure handler for the Memory metric: shows a neutral placeholder.</summary>
+    private void OnMemoryFailed() {
+        MemoryValueText = "—";
+        MemorySubText = "";
     }
 
     private void UpdateMemory(MemorySample sample) {
@@ -567,124 +384,42 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         MemoryUtilizationText = totalGb > 0
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
-        MemoryPoints = BuildMemoryPoints();
+        MemoryPoints = SparklinePoints.Build(_memoryHistory, 100);
     }
 
-    /// <summary>
-    /// Renders the memory history as a Sparkline "x,y" string, matching <see cref="BuildCpuPoints"/>:
-    /// x is the sample index; y is <c>100 − load</c> so higher usage sits at the top, paired with a
-    /// fixed 0–100 axis on the Sparkline.
-    /// </summary>
-    private string BuildMemoryPoints() {
-        var sb = new StringBuilder(_memoryHistory.Length * 8);
-        for (var i = 0; i < _memoryHistory.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((100 - _memoryHistory[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
+    /// <summary>Sampler-failure handler for the Network metric: shows a neutral placeholder.</summary>
+    private void OnNetworkFailed() {
+        NetworkDownText = "—";
+        NetworkUpText = "—";
     }
 
-    private void OnNetworkTick(object? sender, EventArgs e) {
-        NetworkSample sample;
-        try {
-            sample = _networkSampler.Sample();
-        } catch {
-            // Sampling is unavailable (e.g. no readable adapters). Show a neutral placeholder and
-            // stop polling rather than throwing on the UI thread every second.
-            NetworkDownText = "—";
-            NetworkUpText = "—";
-            _networkTimer.Stop();
-            return;
-        }
-
-        // Shift both windows left by one and append the newest down/up rates at the end.
-        Array.Copy(_downHistory, 1, _downHistory, 0, _downHistory.Length - 1);
-        _downHistory[^1] = sample.DownMbps;
-        Array.Copy(_upHistory, 1, _upHistory, 0, _upHistory.Length - 1);
-        _upHistory[^1] = sample.UpMbps;
-
+    /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
+    /// refresh the readouts.</summary>
+    private void OnNetwork(NetworkSample sample) {
+        MetricChannel.PushHistory(_downHistory, sample.DownMbps);
+        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
         UpdateNetwork(sample);
     }
 
-    /// <summary>
-    /// Updates the throughput readouts and both sparkline series. Download and upload share one
-    /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable; the scale
-    /// auto-fits to the busiest of the two 60-second windows, with headroom and a floor.
-    /// </summary>
+    /// <summary>Updates the throughput readouts and both sparkline series, which share one auto-fitted
+    /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable.</summary>
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one.
-        // Scaling from the actual value — never the floored axis scale — is what lets the unit switch.
+        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
         (NetworkDownText, NetworkDownUnit) = DataRateFormatter.Split(sample.DownMbps);
         (NetworkUpText, NetworkUpUnit) = DataRateFormatter.Split(sample.UpMbps);
         NetworkSubText = $"↑ {NetworkUpText} {NetworkUpUnit}";
 
-        // The two series still share ONE axis (the unfloored peak, floored only for rendering) so equal
-        // pixel height means equal throughput.
-        NetworkYMax = ComputeNetworkScale(NetworkPeak());
-        NetworkDownPoints = BuildNetworkPoints(_downHistory, NetworkYMax);
-        NetworkUpPoints = BuildNetworkPoints(_upHistory, NetworkYMax);
+        NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
+        NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);
+        NetworkUpPoints = SparklinePoints.Build(_upHistory, NetworkYMax);
     }
 
-    /// <summary>Largest sample across both rolling windows (unfloored): drives the display unit and,
-    /// once floored, the shared axis scale.</summary>
-    private double NetworkPeak() {
-        var max = 0.0;
-        for (var i = 0; i < WindowSeconds; i++) {
-            if (_downHistory[i] > max) max = _downHistory[i];
-            if (_upHistory[i] > max) max = _upHistory[i];
-        }
-
-        return max;
-    }
-
-    /// <summary>
-    /// Shared upper bound for both series: the peak plus ~15 % headroom so the peak line doesn't touch
-    /// the top edge, clamped to <see cref="MinNetworkScaleMbps"/>.
-    /// </summary>
-    private static double ComputeNetworkScale(double peak) {
-        var scaled = peak * 1.15;
-        return scaled > MinNetworkScaleMbps ? scaled : MinNetworkScaleMbps;
-    }
-
-    /// <summary>
-    /// Renders a throughput history as a Sparkline "x,y" string against the shared <paramref name="yMax"/>:
-    /// x is the sample index; y is <c>yMax − value</c> so higher throughput sits at the top (smaller y =
-    /// top), paired with a fixed 0–<paramref name="yMax"/> axis on the Sparkline.
-    /// </summary>
-    private static string BuildNetworkPoints(double[] history, double yMax) {
-        var sb = new StringBuilder(history.Length * 8);
-        for (var i = 0; i < history.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((yMax - history[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
-    }
-
-    /// <summary>Stops the sampling timers. Safe to call more than once.</summary>
+    /// <summary>Unsubscribes from the shared metrics and stops the uptime timer. The samplers are owned
+    /// (and disposed) by the shared service. Safe to call more than once.</summary>
     public void Dispose() {
-        _cpuTimer.Stop();
-        _cpuTimer.Tick -= OnCpuTick;
-        _memoryTimer.Stop();
-        _memoryTimer.Tick -= OnMemoryTick;
-        _gpuTimer.Stop();
-        _gpuTimer.Tick -= OnGpuTick;
-        _storageTimer.Stop();
-        _storageTimer.Tick -= OnStorageTick;
-        _networkTimer.Stop();
-        _networkTimer.Tick -= OnNetworkTick;
+        foreach (var subscription in _subscriptions)
+            subscription.Dispose();
         _uptimeTimer.Stop();
         _uptimeTimer.Tick -= OnUptimeTick;
-        // Unlike the CPU/Memory samplers, the GPU and Storage samplers own PDH query handles.
-        // The network sampler is fully managed, so it needs no disposal.
-        _gpuSampler.Dispose();
-        _storageSampler.Dispose();
     }
 }

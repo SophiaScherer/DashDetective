@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Network;
 using DashDetective.Shared;
 using System;
@@ -66,7 +67,8 @@ public static class AdapterInfoProvider {
 
             var config = primary is not null ? ReadIpConfig(primary) : IpConfigInfo.Unknown;
             return new AdapterSnapshot(ordered, config);
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("AdapterInfoProvider read failed", e);
             return new AdapterSnapshot(Array.Empty<AdapterInfo>(), IpConfigInfo.Unknown);
         }
     }

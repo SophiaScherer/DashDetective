@@ -2,12 +2,13 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -47,9 +48,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(2);
 
     private readonly NetworkUsageSampler _networkSampler = new();
-    private readonly double[] _downHistory = new double[WindowSeconds];
+    // The channel owns the download history; upload is a second rolling buffer pushed alongside it.
     private readonly double[] _upHistory = new double[WindowSeconds];
-    private readonly DispatcherTimer _networkTimer;
+    private readonly MetricChannel<NetworkSample> _networkChannel;
     private readonly DispatcherTimer _adapterTimer;
     private readonly DispatcherTimer _connectionsTimer;
     private readonly DispatcherTimer _pingTimer;
@@ -120,11 +121,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     public NetworkViewModel() {
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
         // samples then shift in from the right, one per second.
+        _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
+            () => _networkSampler.Sample(), static s => s.DownMbps, OnNetworkSample, OnNetworkFailed);
         UpdateThroughput(new NetworkSample(0, 0));
-
-        _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _networkTimer.Tick += OnNetworkTick;
-        _networkTimer.Start();
+        _networkChannel.Start();
 
         // Adapters + IP config load once off the UI thread, then refresh on a coarse timer.
         _ = LoadAdaptersAsync();
@@ -151,82 +151,32 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _ = LoadDnsAsync();
     }
 
-    private void OnNetworkTick(object? sender, EventArgs e) {
-        NetworkSample sample;
-        try {
-            sample = _networkSampler.Sample();
-        } catch {
-            // Sampling is unavailable (e.g. no readable adapters). Show a neutral placeholder and
-            // stop polling rather than throwing on the UI thread every second.
-            DownText = "—";
-            UpText = "—";
-            _networkTimer.Stop();
-            return;
-        }
+    /// <summary>Sampler-failure handler for the throughput channel: shows neutral placeholders.</summary>
+    private void OnNetworkFailed() {
+        DownText = "—";
+        UpText = "—";
+    }
 
-        // Shift both windows left by one and append the newest down/up rates at the end.
-        Array.Copy(_downHistory, 1, _downHistory, 0, _downHistory.Length - 1);
-        _downHistory[^1] = sample.DownMbps;
-        Array.Copy(_upHistory, 1, _upHistory, 0, _upHistory.Length - 1);
-        _upHistory[^1] = sample.UpMbps;
-
+    /// <summary>Throughput channel callback: the channel already pushed the download rate into its
+    /// history, so append the upload rate to the second buffer, then refresh the readouts.</summary>
+    private void OnNetworkSample(NetworkSample sample) {
+        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
         UpdateThroughput(sample);
     }
 
-    /// <summary>
-    /// Updates both readouts and both sparkline series. Download and upload share ONE scale — the peak
-    /// of both 60-second windows plus headroom (the comp draws them as two stacked charts, but an honest
-    /// comparison needs a common axis) — so a larger rate always draws taller regardless of direction.
-    /// </summary>
+    /// <summary>Updates both readouts and sparkline series. Download and upload share one scale (the peak
+    /// of both windows) so equal pixel height means equal throughput.</summary>
     private void UpdateThroughput(NetworkSample sample) {
-        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one
-        // (e.g. "40 kbps" up next to "200 Mbps" down). Scaling from the actual value — never the
-        // floored axis scale below — is what lets the unit drop to kbps or rise to Gbps.
+        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
         (DownText, DownUnit) = DataRateFormatter.Split(sample.DownMbps);
         (UpText, UpUnit) = DataRateFormatter.Split(sample.UpMbps);
 
-        // The two sparklines still share ONE axis (the unfloored peak, floored only for rendering so an
-        // idle blip isn't a full-height spike) so equal pixel height means equal throughput; the peak
-        // caption reads in that shared unit.
-        var peak = Math.Max(Peak(_downHistory), Peak(_upHistory));
-        ThroughputYMax = ComputeScale(peak);
+        var peak = ChartScale.Peak(_networkChannel.History, _upHistory);
+        ThroughputYMax = ChartScale.FitPeak(peak, MinScaleMbps);
         ThroughputScaleText = $"peak {DataRateFormatter.Format(peak)}";
 
-        DownPoints = BuildPoints(_downHistory, ThroughputYMax);
-        UpPoints = BuildPoints(_upHistory, ThroughputYMax);
-    }
-
-    /// <summary>Largest sample in a rolling window.</summary>
-    private static double Peak(double[] history) {
-        var max = 0.0;
-        for (var i = 0; i < history.Length; i++)
-            if (history[i] > max) max = history[i];
-        return max;
-    }
-
-    /// <summary>Upper bound for the shared axis: the peak plus ~15 % headroom so the top line doesn't
-    /// touch the edge, clamped to <see cref="MinScaleMbps"/>.</summary>
-    private static double ComputeScale(double peak) {
-        var scaled = peak * 1.15;
-        return scaled > MinScaleMbps ? scaled : MinScaleMbps;
-    }
-
-    /// <summary>
-    /// Renders a throughput history as a Sparkline "x,y" string against <paramref name="yMax"/>: x is
-    /// the sample index; y is <c>yMax − value</c> so higher throughput sits at the top (smaller y =
-    /// top), paired with a fixed 0–<paramref name="yMax"/> axis on the Sparkline.
-    /// </summary>
-    private static string BuildPoints(double[] history, double yMax) {
-        var sb = new StringBuilder(history.Length * 8);
-        for (var i = 0; i < history.Length; i++) {
-            if (i > 0)
-                sb.Append(' ');
-            sb.Append(i.ToString(CultureInfo.InvariantCulture));
-            sb.Append(',');
-            sb.Append((yMax - history[i]).ToString("0.##", CultureInfo.InvariantCulture));
-        }
-
-        return sb.ToString();
+        DownPoints = SparklinePoints.Build(_networkChannel.History, ThroughputYMax);
+        UpPoints = SparklinePoints.Build(_upHistory, ThroughputYMax);
     }
 
     private void OnAdapterTick(object? sender, EventArgs e) => _ = LoadAdaptersAsync();
@@ -304,7 +254,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         var start = (_currentPage - 1) * PageSize;
         var count = Math.Clamp(available - start, 0, PageSize);
         var slice = count > 0 ? _allConnections.GetRange(start, count) : (IReadOnlyList<ConnectionInfo>)Array.Empty<ConnectionInfo>();
-        ReconcileConnections(slice);
+        CollectionReconciler.Reconcile(Connections, slice,
+            static row => row.Key, static info => info.Key,
+            static (row, info) => row.Update(info), static info => new ConnectionRow(info));
 
         ConnectionsSummary = BuildConnectionsSummary(_connectionsTotal, totalPages);
         RebuildPageLinks(totalPages);
@@ -332,38 +284,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         for (var p = 1; p <= totalPages; p++)
             PageLinks.Add(new PageLink(p, isCurrent: p == _currentPage, GoToPage));
-    }
-
-    /// <summary>Diffs <paramref name="incoming"/> (already sorted) into the observable collection by key.</summary>
-    private void ReconcileConnections(IReadOnlyList<ConnectionInfo> incoming) {
-        var incomingKeys = new HashSet<string>(incoming.Count);
-        foreach (var info in incoming)
-            incomingKeys.Add(info.Key);
-
-        // Drop rows that are no longer present.
-        for (var i = Connections.Count - 1; i >= 0; i--)
-            if (!incomingKeys.Contains(Connections[i].Key))
-                Connections.RemoveAt(i);
-
-        // Index the survivors for O(1) lookup.
-        var existing = new Dictionary<string, ConnectionRow>(Connections.Count);
-        foreach (var row in Connections)
-            existing[row.Key] = row;
-
-        // Walk the incoming order, placing each row at its target index.
-        for (var i = 0; i < incoming.Count; i++) {
-            var info = incoming[i];
-            if (existing.TryGetValue(info.Key, out var row)) {
-                row.Update(info);
-                var current = Connections.IndexOf(row);
-                if (current != i)
-                    Connections.Move(current, i);
-            } else {
-                var created = new ConnectionRow(info);
-                existing[info.Key] = created;
-                Connections.Insert(i, created);
-            }
-        }
     }
 
     private void OnPingTick(object? sender, EventArgs e) => _ = RunPingAsync();
@@ -419,7 +339,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read, ping and
     /// DNS re-lookup. Runs even while paused (a manual refresh should still update once), like the Dashboard.</summary>
     public void Refresh() {
-        OnNetworkTick(this, EventArgs.Empty);
+        _networkChannel.SampleNow();
         _ = LoadAdaptersAsync();
         _ = LoadConnectionsAsync();
         _ = RunPingAsync();
@@ -430,12 +350,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <see cref="Refresh"/> still works while paused.</summary>
     public void SetLive(bool live) {
         if (live) {
-            _networkTimer.Start();
+            _networkChannel.Start();
             _adapterTimer.Start();
             _connectionsTimer.Start();
             _pingTimer.Start();
         } else {
-            _networkTimer.Stop();
+            _networkChannel.Stop();
             _adapterTimer.Stop();
             _connectionsTimer.Stop();
             _pingTimer.Stop();
@@ -445,8 +365,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Stops the timers and disposes the ping monitor. Safe to call more than once. The
     /// network sampler is fully managed, so it needs no disposal.</summary>
     public void Dispose() {
-        _networkTimer.Stop();
-        _networkTimer.Tick -= OnNetworkTick;
+        _networkChannel.Dispose();
         _adapterTimer.Stop();
         _adapterTimer.Tick -= OnAdapterTick;
         _connectionsTimer.Stop();

@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Management;
 using System.Threading.Tasks;
@@ -44,7 +45,8 @@ public static class MemoryInfoProvider {
 
             var totalGb = totalBytes / (double)(1L << 30);
             return new MemoryStaticInfo(totalGb, MemoryTypeLabel(memoryType), speed, modules);
-        } catch {
+        } catch (Exception e) {
+            Log.Warn("MemoryInfoProvider read failed", e);
             return MemoryStaticInfo.Unknown;
         }
     }

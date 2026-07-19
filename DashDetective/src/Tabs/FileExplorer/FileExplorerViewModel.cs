@@ -15,7 +15,7 @@ namespace DashDetective.Tabs.FileExplorer;
 /// this currently drives the folder tree, file list, breadcrumb and filters; the details pane
 /// and actions are layered on in later phases.
 /// </summary>
-public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, IRefreshablePage {
+public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, IRefreshablePage, IDisposable {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
@@ -344,4 +344,8 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     }
 
     private void OnCrumbSelected(Crumb crumb) => SetCurrentFolder(crumb.FullPath);
+
+    /// <summary>Disposes the directory watcher (its <see cref="FileSystemWatcher"/> and debounce timer)
+    /// on shutdown. Safe to call more than once.</summary>
+    public void Dispose() => _watcher.Dispose();
 }

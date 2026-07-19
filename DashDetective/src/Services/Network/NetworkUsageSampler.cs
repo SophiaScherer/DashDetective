@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -46,8 +47,9 @@ public sealed class NetworkUsageSampler {
                 Rebaseline(primary);
             else
                 _prevElapsedSeconds = _clock.Elapsed.TotalSeconds;
-        } catch {
+        } catch (System.Exception e) {
             // Leave baselines at zero; subsequent samples self-correct.
+            Log.Warn("NetworkUsageSampler baseline failed", e);
         }
     }
 
@@ -92,7 +94,8 @@ public sealed class NetworkUsageSampler {
             var up = upBytes > 0 ? upBytes * 8.0 / 1_000_000.0 / seconds : 0;
 
             return new NetworkSample(down, up);
-        } catch {
+        } catch (System.Exception e) {
+            Log.Warn("NetworkUsageSampler sample failed", e);
             return new NetworkSample(0, 0);
         }
     }
