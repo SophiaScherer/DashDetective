@@ -1,3 +1,5 @@
+using DashDetective.Services.Network;
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -5,8 +7,6 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using DashDetective.Services.Network;
-using DashDetective.Shared;
 
 namespace DashDetective.Tabs.Network;
 

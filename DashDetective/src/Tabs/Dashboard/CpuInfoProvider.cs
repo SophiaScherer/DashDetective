@@ -46,8 +46,7 @@ public static class CpuInfoProvider {
                 logical = Environment.ProcessorCount;
 
             return new CpuStaticInfo(name, physical, logical, maxClock);
-        }
-        catch {
+        } catch {
             return CpuStaticInfo.Unknown;
         }
     }

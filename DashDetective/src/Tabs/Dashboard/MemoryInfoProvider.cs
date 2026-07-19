@@ -44,8 +44,7 @@ public static class MemoryInfoProvider {
 
             var totalGb = totalBytes / (double)(1L << 30);
             return new MemoryStaticInfo(totalGb, MemoryTypeLabel(memoryType), speed, modules);
-        }
-        catch {
+        } catch {
             return MemoryStaticInfo.Unknown;
         }
     }

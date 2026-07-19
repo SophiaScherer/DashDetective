@@ -1,8 +1,8 @@
+using Microsoft.Win32;
 using System;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
-using Microsoft.Win32;
 
 namespace DashDetective.Tabs.Dashboard;
 

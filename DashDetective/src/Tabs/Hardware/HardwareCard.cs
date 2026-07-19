@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace DashDetective.Tabs.Hardware;
 

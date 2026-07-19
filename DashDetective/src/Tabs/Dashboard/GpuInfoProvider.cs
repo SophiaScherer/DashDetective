@@ -44,8 +44,7 @@ public static class GpuInfoProvider {
             }
 
             return GpuStaticInfo.Unknown;
-        }
-        catch {
+        } catch {
             return GpuStaticInfo.Unknown;
         }
     }

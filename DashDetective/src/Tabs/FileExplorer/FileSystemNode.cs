@@ -1,9 +1,9 @@
+using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using Avalonia.Media;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace DashDetective.Tabs.FileExplorer;
 

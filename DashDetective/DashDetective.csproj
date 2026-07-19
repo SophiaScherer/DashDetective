@@ -1,10 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <!-- The whole app is Windows-only (WMI, PDH performance counters, Win32 P/Invoke), so the
+             target framework is pinned to -windows. This makes the assembly implicitly windows to the
+             platform-compatibility analyzers, which is what AnalysisLevel=latest below engages. -->
+        <TargetFramework>net10.0-windows</TargetFramework>
         <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+        <!-- Assembly / package metadata. Version flows into AssemblyVersion, FileVersion and the
+             informational version that AppInfo reads back for the Settings footer. -->
+        <Version>0.1.0</Version>
+        <AssemblyTitle>DashDetective</AssemblyTitle>
+        <Authors>Sophia Scherer</Authors>
+        <Copyright>© 2026 Sophia Scherer</Copyright>
+
+        <!-- Quality gates. AnalysisLevel=latest turns on the current platform-compatibility (CA14xx)
+             analyzers; EnforceCodeStyleInBuild promotes the .editorconfig code-style rules into the
+             build, and TreatWarningsAsErrors makes any of them (or a stray compiler warning) fail the
+             build rather than slip through. -->
+        <AnalysisLevel>latest</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>

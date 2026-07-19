@@ -55,6 +55,12 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
 
+    # Verify the code is formatted to the repo's .editorconfig (whitespace + import ordering).
+    # This fails the run on any unformatted code, so style stays consistent without relying on
+    # a reviewer to spot it. Runs after restore and skips its own restore to reuse the one above.
+    - name: Verify formatting
+      run: dotnet format $env:Solution_Name --verify-no-changes --no-restore
+
     # Build the solution
     - name: Build
       run: dotnet build $env:Solution_Name --configuration ${{ matrix.configuration }} --no-restore

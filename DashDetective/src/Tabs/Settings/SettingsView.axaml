@@ -255,6 +255,6 @@
         </Border>
 
         <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextFaint}"
-                   Text="System Information Console v3.2.1 · Build 24019 · © 2026"/>
+                   Text="{Binding VersionText}"/>
     </StackPanel>
 </UserControl>
