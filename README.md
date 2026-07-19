@@ -15,30 +15,47 @@ one-feature-at-a-time discipline: every tab is a self-contained module, and cros
 > still static layout. See [Feature tour](#feature-tour) for the honest per-tab state and
 > [Roadmap](#roadmap) for what's next.
 
-## Screenshots
+[//]: # (## Screenshots)
 
-<!--
-  Screenshots live in docs/images/ (captured from the running app, maximised at 1936x1080).
-  The full set is available there; the grid below shows a representative selection:
-    Every tab in both themes: <tab>-dark.png and <tab>-light.png for
-      dashboard, file-explorer, processes, performance, network, hardware, settings
-    Accent variant:  dashboard-accent-purple.png  (dark theme, purple accent)
-    Nav gesture:     nav-drag-to-dock.png          (bar lifted, "Dock top" hint chip visible)
-  To refresh them, re-run the capture (see docs/images) after a Release build; keep the file names
-  stable so these links keep resolving.
--->
+[//]: # ()
+[//]: # (<!--)
 
-| Dashboard (dark) | File Explorer (dark) | Network (dark) |
-| --- | --- | --- |
-| ![Dashboard](docs/images/dashboard-dark.png) | ![File Explorer](docs/images/file-explorer-dark.png) | ![Network](docs/images/network-dark.png) |
+[//]: # (  Screenshots live in docs/images/ &#40;captured from the running app, maximised at 1936x1080&#41;.)
 
-| Hardware (light) | Performance (dark) | Settings — accent (purple) |
-| --- | --- | --- |
-| ![Hardware](docs/images/hardware-light.png) | ![Performance](docs/images/performance-dark.png) | ![Settings accent](docs/images/dashboard-accent-purple.png) |
+[//]: # (  The full set is available there; the grid below shows a representative selection:)
 
-Drag-to-dock navigation gesture:
+[//]: # (    Every tab in both themes: <tab>-dark.png and <tab>-light.png for)
 
-![Drag to dock](docs/images/nav-drag-to-dock.png)
+[//]: # (      dashboard, file-explorer, processes, performance, network, hardware, settings)
+
+[//]: # (    Accent variant:  dashboard-accent-purple.png  &#40;dark theme, purple accent&#41;)
+
+[//]: # (    Nav gesture:     nav-drag-to-dock.png          &#40;bar lifted, "Dock top" hint chip visible&#41;)
+
+[//]: # (  To refresh them, re-run the capture &#40;see docs/images&#41; after a Release build; keep the file names)
+
+[//]: # (  stable so these links keep resolving.)
+
+[//]: # (-->)
+
+[//]: # ()
+[//]: # (| Dashboard &#40;dark&#41; | File Explorer &#40;dark&#41; | Network &#40;dark&#41; |)
+
+[//]: # (| --- | --- | --- |)
+
+[//]: # (| ![Dashboard]&#40;docs/images/dashboard-dark.png&#41; | ![File Explorer]&#40;docs/images/file-explorer-dark.png&#41; | ![Network]&#40;docs/images/network-dark.png&#41; |)
+
+[//]: # ()
+[//]: # (| Hardware &#40;light&#41; | Performance &#40;dark&#41; | Settings — accent &#40;purple&#41; |)
+
+[//]: # (| --- | --- | --- |)
+
+[//]: # (| ![Hardware]&#40;docs/images/hardware-light.png&#41; | ![Performance]&#40;docs/images/performance-dark.png&#41; | ![Settings accent]&#40;docs/images/dashboard-accent-purple.png&#41; |)
+
+[//]: # (Drag-to-dock navigation gesture:)
+
+[//]: # ()
+[//]: # (![Drag to dock]&#40;docs/images/nav-drag-to-dock.png&#41;)
 
 ## Feature tour
 
