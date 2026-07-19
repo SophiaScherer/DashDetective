@@ -5,15 +5,11 @@ using System.Collections.Generic;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// Single owner of the live system samplers (CPU, Memory, GPU, Storage, Network). Each metric is sampled
-/// once per 1 Hz tick and the value fanned out to every subscriber, so pages share one sampler instead of
-/// each owning their own — this removes the duplicate PDH GPU/disk queries the Dashboard and Performance
-/// tabs used to run in parallel.
-///
-/// Subscription-based and ref-counted: a metric's channel runs only while it has at least one subscriber.
-/// <see cref="Pause"/>/<see cref="Resume"/> back the shell's Live pill, and <see cref="RefreshAll"/> backs
-/// the toolbar Refresh (a one-shot sample even while paused). Per-metric fault isolation is preserved: one
-/// sampler failing stops only that metric's channel and notifies its subscribers, never the others.
+/// Single owner of the live samplers (CPU, Memory, GPU, Storage, Network). Each metric is sampled once
+/// per 1 Hz tick and fanned out to every subscriber, so pages share one sampler — removing the duplicate
+/// PDH GPU/disk queries the Dashboard and Performance tabs used to run in parallel. Subscriptions are
+/// ref-counted (a channel runs only while it has subscribers); <see cref="Pause"/>/<see cref="Resume"/>
+/// back the Live pill, <see cref="RefreshAll"/> backs Refresh, and per-metric fault isolation is kept.
 /// </summary>
 public sealed class SystemMetricsService : IDisposable {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
@@ -93,12 +89,9 @@ public sealed class SystemMetricsService : IDisposable {
         public abstract void Dispose();
     }
 
-    /// <summary>
-    /// One metric: a no-history <see cref="MetricChannel{TSample}"/> plus its subscriber list. Caches the
-    /// latest sample and replays it to a new subscriber on subscribe, so a page seeds with real data on its
-    /// first frame (as the old per-page constructors did). Ref-counted: the channel runs only while at
-    /// least one subscriber is attached and sampling isn't paused.
-    /// </summary>
+    /// <summary>One metric: a no-history <see cref="MetricChannel{TSample}"/> plus its subscriber list.
+    /// Caches the latest sample and replays it on subscribe (so a page seeds with real data at once), and
+    /// runs the channel only while it has subscribers and isn't paused.</summary>
     private sealed class MetricFeed<TSample> : MetricFeed {
         private readonly MetricChannel<TSample> _channel;
         private readonly List<Action<TSample>> _onSample = new();
@@ -110,8 +103,7 @@ public sealed class SystemMetricsService : IDisposable {
         public MetricFeed(TimeSpan interval, Func<TSample> sample) {
             _channel = new MetricChannel<TSample>(interval, sample, OnSample, OnFailed);
 
-            // Prime the cache once so the first subscriber seeds with a real value (the samplers already
-            // seeded their own baselines in their constructors). Never throws in practice.
+            // Prime the cache once so the first subscriber seeds with a real value.
             try {
                 _latest = sample();
                 _hasLatest = true;

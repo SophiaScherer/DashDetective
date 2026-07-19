@@ -164,21 +164,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         UpdateThroughput(sample);
     }
 
-    /// <summary>
-    /// Updates both readouts and both sparkline series. Download and upload share ONE scale — the peak
-    /// of both 60-second windows plus headroom (the comp draws them as two stacked charts, but an honest
-    /// comparison needs a common axis) — so a larger rate always draws taller regardless of direction.
-    /// </summary>
+    /// <summary>Updates both readouts and sparkline series. Download and upload share one scale (the peak
+    /// of both windows) so equal pixel height means equal throughput.</summary>
     private void UpdateThroughput(NetworkSample sample) {
-        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one
-        // (e.g. "40 kbps" up next to "200 Mbps" down). Scaling from the actual value — never the
-        // floored axis scale below — is what lets the unit drop to kbps or rise to Gbps.
+        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
         (DownText, DownUnit) = DataRateFormatter.Split(sample.DownMbps);
         (UpText, UpUnit) = DataRateFormatter.Split(sample.UpMbps);
 
-        // The two sparklines still share ONE axis (the unfloored peak, floored only for rendering so an
-        // idle blip isn't a full-height spike) so equal pixel height means equal throughput; the peak
-        // caption reads in that shared unit.
         var peak = ChartScale.Peak(_networkChannel.History, _upHistory);
         ThroughputYMax = ChartScale.FitPeak(peak, MinScaleMbps);
         ThroughputScaleText = $"peak {DataRateFormatter.Format(peak)}";

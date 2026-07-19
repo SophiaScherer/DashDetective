@@ -184,7 +184,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await CpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
@@ -199,7 +198,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await MemoryInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             MemoryModelText = FormatMemoryModel(info);
         } catch {
             MemoryModelText = "Unknown RAM";
@@ -211,7 +209,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await GpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             GpuModelShort = HardwareNameFormatter.ShortenGpu(info.Name);
             GpuModelText = info.Name;
         } catch {
@@ -225,7 +222,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await SystemInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             OsText = info.Os;
             DeviceText = info.Device;
             BiosText = info.Bios;
@@ -405,20 +401,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         UpdateNetwork(sample);
     }
 
-    /// <summary>
-    /// Updates the throughput readouts and both sparkline series. Download and upload share one
-    /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable; the scale
-    /// auto-fits to the busiest of the two 60-second windows, with headroom and a floor.
-    /// </summary>
+    /// <summary>Updates the throughput readouts and both sparkline series, which share one auto-fitted
+    /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable.</summary>
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its OWN value so a small flow shows kbps even beside a large one.
-        // Scaling from the actual value — never the floored axis scale — is what lets the unit switch.
+        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
         (NetworkDownText, NetworkDownUnit) = DataRateFormatter.Split(sample.DownMbps);
         (NetworkUpText, NetworkUpUnit) = DataRateFormatter.Split(sample.UpMbps);
         NetworkSubText = $"↑ {NetworkUpText} {NetworkUpUnit}";
 
-        // Both series share ONE axis (the peak of both windows, with headroom and floor) so equal pixel
-        // height means equal throughput.
         NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
         NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);
         NetworkUpPoints = SparklinePoints.Build(_upHistory, NetworkYMax);

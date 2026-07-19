@@ -244,7 +244,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         // surprise can't take down the app via an unobserved task exception.
         try {
             var info = await CpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             _cpuRow.Sub = FormatCpuSub(info);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
         } catch {
@@ -302,7 +301,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         // so a surprise can't take down the app via an unobserved task exception.
         try {
             var info = await MemoryInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             _memoryRow.Spec = FormatMemorySpec(info);
         } catch {
             _memoryRow.Spec = "Unknown RAM";
@@ -361,7 +359,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         // surprise can't take down the app via an unobserved task exception.
         try {
             var info = await DiskInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             _diskRow.Sub = string.IsNullOrEmpty(info.TypeLabel) ? "Drive" : info.TypeLabel;
             _diskRow.Spec = FormatDiskSpec(info);
         } catch {
@@ -405,7 +402,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         // surprise can't take down the app via an unobserved task exception.
         try {
             var info = await GpuInfoProvider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             _gpuRow.Sub = HardwareNameFormatter.ShortenGpu(info.Name);
             _gpuRow.Spec = info.Name;
         } catch {
