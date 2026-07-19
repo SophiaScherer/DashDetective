@@ -19,7 +19,7 @@ public static class SparklinePoints {
     /// Each sample is normalised to 0–1 (clamped) then mapped to <c>y = 100 · (1 − ratio)</c>. A
     /// non-positive <paramref name="valueMax"/> pins every point flat at the bottom.
     /// </summary>
-    public static string Build(double[] history, double valueMax) {
+    public static string Build(ReadOnlySpan<double> history, double valueMax) {
         var sb = new StringBuilder(history.Length * 8);
         for (var i = 0; i < history.Length; i++) {
             var ratio = valueMax > 0 ? Math.Clamp(history[i] / valueMax, 0, 1) : 0;
