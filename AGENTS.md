@@ -27,55 +27,34 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 **The feature currently being built (the only one you may modify):**
 
-- `Performance` — initial UI implementation, **static mock data** (status below).
-
-**Repo-hygiene / portfolio pass — COMPLETED (2026-07-18), under explicit sign-off.** A one-off,
-cross-cutting pass outside the usual per-feature boundaries was authorised and is done: a portfolio
-`README.md`, a reader-facing `docs/ARCHITECTURE.md` (distilled from the appendix below), project
-metadata in the csproj (`Version 0.1.0`, title/authors/copyright, retarget to `net10.0-windows`),
-analyzer + warning gates (`AnalysisLevel latest`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`)
-with a root `.editorconfig` encoding the existing style, a `dotnet format --verify-no-changes` step in
-CI, and the Settings footer wired to a real assembly version via `AppInfo` (`src/Shared`) instead of the
-old fictional string. This did **not** change any feature behaviour (the footer text is the sole
-exception). It does not widen the working boundaries: scope control still proceeds **phase-by-phase per
-the roadmap**, and any further cross-cutting or out-of-feature change still needs its own explicit
-sign-off.
-
-**De-duplication / composition refactor — COMPLETED (2026-07-19), under explicit sign-off.** A
-cross-cutting pass over `src/Shared`, `src/Services`, `src/Shell` and the Dashboard / Performance /
-Network / Processes tabs, with **zero user-visible behaviour change**. It replaced the ~10× copy-pasted
-per-metric `DispatcherTimer` + rolling-buffer pattern with `MetricChannel` + a shared
-`SystemMetricsService` (one sampler set, ref-counted subscriptions, removing the duplicate PDH GPU/disk
-queries); consolidated the chart/format/diff duplication into `SparklinePoints`, `ChartScale`,
-`HardwareNameFormatter` and `CollectionReconciler`; added real shutdown disposal via a manual composition
-root in `App`; switched `NavigationView`/`MainWindow` fan-out to `[NotifyPropertyChangedFor]`; replaced
-the reflection `ViewLocator` with a compile-time switch; and added the soft-failing `Log` seam. As with
-the portfolio pass, this did not widen the working boundaries — further cross-cutting work still needs
-its own sign-off.
+- `Storage` — initial UI implementation, **static mock data** (status below).
 
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
-patterns), but do NOT modify while building Performance** (full write-ups in *Appendix — Completed
+patterns), but do NOT modify while building Storage** (full write-ups in *Appendix — Completed
 Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (fully live — Appearance,
-Navigation, Monitoring and Export & Data), **File Explorer**, **Network**, **Processes**, **Hardware**.
-Editing any of these needs an explicit scope expansion.
+Navigation, Monitoring and Export & Data), **File Explorer**, **Network**, **Processes**, **Performance**,
+**Hardware**. Two cross-cutting passes are also complete (repo-hygiene / portfolio pass; de-duplication /
+composition refactor) — write-ups in the Appendix. Editing any of these needs an explicit scope expansion.
 
-**Performance — implementation status** (the already-live features' write-ups live in *Appendix —
+**Storage — implementation status** (the already-live features' write-ups live in *Appendix —
 Completed Feature Details* at the end of this file):
 
-- **Performance** — **initial UI in progress**, built in phases (plan:
-  `C:\Users\User\.claude\plans\develop-a-plan-to-elegant-thimble.md`). A Task-Manager-style live
-  resource drill-down per the design comp: a left **resource selector** rail (CPU · Memory · Disk 0 (C:)
-  · GPU · Ethernet) that swaps a right **detail pane** — one large utilization chart (reuses the shared
-  `Sparkline`, fixed 0–100 axis + gradient fill, **no grid**) plus a 4-tile stat strip. Self-contained
-  tab under `src/Tabs/Performance/` (`PerformanceView` + `PerformanceViewModel`, `ISelfScrollingPage`
-  master-detail like File Explorer), reusing the selectable-item pattern (`NavItem` / `FilterOption`),
-  shared styles, and the `Chart*` palette keys. **This UI pass is static mock data only** — live
-  samplers/providers, real metrics, `IRefreshablePage` / `ILiveSamplingPage`, and accent-reactive
-  brushes are a **later technical pass**, not built yet. No new packages, no new shared controls.
+- **Storage** — **initial UI in progress**, built in phases (plan:
+  `C:\Users\User\.claude\plans\develop-a-plan-to-radiant-raven.md`). A read-only drives/health view per
+  the design comp: a top row of three **drive summary cards** (name + health pill, model, usage bar,
+  used/free, Read / Write / Temp) over a bottom row of a **Partitions** table (Vol · Label · File System
+  · Capacity · Free) and a **Disk Activity (C:)** card (amber area chart + Active time / Avg response /
+  Queue). Self-contained tab under `src/Tabs/Storage/` (`StorageView` + `StorageViewModel`), **page-
+  scrolling like Network** (not `ISelfScrollingPage`), reusing `Border Classes="panel"`, the shared
+  `Sparkline` (with the `ChartStorage` amber key), and the built-in `ProgressBar` for the usage bars.
+  **This UI pass is static mock data only** — live samplers/providers (`StorageUsageSampler`,
+  `DiskInfoProvider`, both already in `src/Services/SystemMetrics`), real metrics, and the
+  `IRefreshablePage` / `ILiveSamplingPage` seams are a **later technical pass**, not built yet. No new
+  packages, no new shared controls.
 
-**Everything else (Storage) is out of scope until this document says otherwise.** Do not scaffold, stub,
-reference, or "prepare" folders for inactive features, even if it seems convenient or efficient. Wait
-until they are explicitly activated in a future revision of this file.
+**Nothing else is out of scope now that Storage is active** — every planned top-level feature is either
+live or being built, except the **Deferred Dashboard work** below (GPU temperature + multi-GPU, still
+explicitly not built). Do not scaffold, stub, or "prepare" for the deferred items without an explicit task.
 
 ### Deferred Dashboard work — DO NOT build without an explicit task
 
@@ -341,15 +320,20 @@ currently exist.
                                                          MemoryCatalog (each a spec record + Data dict).
                                                          Fills rated specs WMI can't report; unknown → "—")
       /Performance              PerformanceView.axaml(.cs) + PerformanceViewModel.cs
-                                (ACTIVE BUILD — initial UI, static mock data. Task-Manager-style
-                                 master-detail: a 220px resource-selector rail (ResourceRow item VMs)
-                                 swaps a right detail pane — one large Sparkline utilization chart +
-                                 a 4-tile stat strip (StatTile item VMs). Fills the viewport via
-                                 ISelfScrollingPage, like File Explorer. Built in phases — item VMs
-                                 (ResourceRow/StatTile) land in later UI phases; live samplers/
-                                 providers + IRefreshablePage/ILiveSamplingPage are a later
-                                 technical pass. See Current Scope + the plan file.)
-      (Storage — not yet started)
+                                (LIVE — Task-Manager-style master-detail: a 220px resource-selector
+                                 rail (ResourceRow item VMs) swaps a right detail pane — one large
+                                 Sparkline utilization chart + a 4-tile stat strip (StatTile item VMs).
+                                 Fills the viewport via ISelfScrollingPage, like File Explorer. All five
+                                 resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
+                                 SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IDisposable.)
+      /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
+                                (ACTIVE BUILD — initial UI, static mock data. Read-only drives/health
+                                 view: a top row of three DriveCard summary cards over a Partitions
+                                 table (PartitionRow item VMs) + a Disk Activity card (shared Sparkline,
+                                 ChartStorage amber). Page-scrolls like Network (not ISelfScrollingPage).
+                                 Built in phases — live samplers (StorageUsageSampler/DiskInfoProvider)
+                                 + IRefreshablePage/ILiveSamplingPage are a later technical pass. See
+                                 Current Scope + the plan file.)
 ```
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
@@ -708,3 +692,43 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   the shell; `IRefreshablePage` + `ILiveSamplingPage` + `IDisposable` + `ISelfScrollingPage`), the Network
   tab's keyed-diff live table, and the File Explorer sortable-header + Properties patterns. *Phase 0
   (scaffold + activation) is in place; the live table and features land in later phases.*
+
+- **Performance** — **live and functional** (built in phases; plan:
+  `C:\Users\User\.claude\plans\develop-a-plan-to-elegant-thimble.md`). A Task-Manager-style resource
+  drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
+  Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
+  (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
+  strip (`StatTile` item VMs). Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
+  `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
+  selectable-item pattern (`NavItem` / `FilterOption`), shared styles, and fixed per-metric legend
+  brushes. **All five resources are wired live**: each subscribes to the shared `SystemMetricsService`
+  (CPU / Memory / Storage / GPU / Network), keeps its own 60-sample rolling history rebuilt via
+  `SparklinePoints`, and pushes into the selected row; static hardware labels load once via the
+  `*InfoProvider` async-WMI providers. Implements `IRefreshablePage` (toolbar Refresh re-samples every
+  metric), `ILiveSamplingPage` (Live/Pause is the shared service's) and `IDisposable`. No new packages,
+  no new shared controls. GPU VRAM/Temp/Power and CPU Speed / Memory Cached tiles show "—" (no reliable
+  standard-Windows source; GPU temperature is deferred, see *Deferred Dashboard work*).
+
+### Completed cross-cutting passes
+
+> Two one-off passes outside the usual per-feature boundaries, each authorised under explicit sign-off.
+> Recorded here for history — completing them did **not** widen the working boundaries; any further
+> cross-cutting or out-of-feature change still needs its own explicit sign-off.
+
+- **Repo-hygiene / portfolio pass — COMPLETED (2026-07-18).** A portfolio `README.md`, a reader-facing
+  `docs/ARCHITECTURE.md` (distilled from this appendix), project metadata in the csproj (`Version 0.1.0`,
+  title/authors/copyright, retarget to `net10.0-windows`), analyzer + warning gates (`AnalysisLevel
+  latest`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`) with a root `.editorconfig` encoding the
+  existing style, a `dotnet format --verify-no-changes` step in CI, and the Settings footer wired to a
+  real assembly version via `AppInfo` (`src/Shared`) instead of the old fictional string. This did
+  **not** change any feature behaviour (the footer text is the sole exception).
+
+- **De-duplication / composition refactor — COMPLETED (2026-07-19).** A cross-cutting pass over
+  `src/Shared`, `src/Services`, `src/Shell` and the Dashboard / Performance / Network / Processes tabs,
+  with **zero user-visible behaviour change**. It replaced the ~10× copy-pasted per-metric
+  `DispatcherTimer` + rolling-buffer pattern with `MetricChannel` + a shared `SystemMetricsService` (one
+  sampler set, ref-counted subscriptions, removing the duplicate PDH GPU/disk queries); consolidated the
+  chart/format/diff duplication into `SparklinePoints`, `ChartScale`, `HardwareNameFormatter` and
+  `CollectionReconciler`; added real shutdown disposal via a manual composition root in `App`; switched
+  `NavigationView`/`MainWindow` fan-out to `[NotifyPropertyChangedFor]`; replaced the reflection
+  `ViewLocator` with a compile-time switch; and added the soft-failing `Log` seam.
