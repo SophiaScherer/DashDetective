@@ -17,7 +17,10 @@ namespace DashDetective.Services.Theming;
 ///     recoloured to match it.</item>
 /// </list>
 ///
-/// Session-only by design: selections are not persisted, so each run starts from the defaults.
+/// This service applies but does not persist: it stays the single place that writes appearance to the
+/// live application. Persistence is layered on separately — the composition root applies the saved
+/// theme/accent through here at startup and observes changes to save them (see
+/// <c>src/Services/Settings</c>), so the earlier "session-only by design" note no longer holds.
 /// </summary>
 public sealed class ThemeService {
     // Default per-graph colours for the multi-colour look (mirror the Chart* defaults in Palette.axaml).
