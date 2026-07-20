@@ -10,6 +10,22 @@
         <shell:ViewLocator/>
     </Application.DataTemplates>
 
+    <!-- System tray icon. Present whenever the app runs; the "Show in system tray" setting only
+         governs whether closing the window hides here (MainWindow.OnClosing) or exits. Show/Exit are
+         handled in App.axaml.cs, which holds the window reference. -->
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/avalonia-logo.ico" ToolTipText="DashDetective" Clicked="OnTrayShow">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Show DashDetective" Click="OnTrayShow"/>
+                        <NativeMenuItem Header="Exit" Click="OnTrayExit"/>
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

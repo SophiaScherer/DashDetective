@@ -346,6 +346,23 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _ = LoadDnsAsync();
     }
 
+    /// <summary>
+    /// The primary adapter's name and IPv4 configuration for the exported system report, from the
+    /// values already loaded into the tab. Read-only; the shell's report builder owns formatting.
+    /// </summary>
+    public IReadOnlyList<(string Key, string Value)> GetPrimaryConfigRows() {
+        var adapter = string.IsNullOrWhiteSpace(_networkSampler.AdapterName) ? "—" : _networkSampler.AdapterName;
+        return new[] {
+            ("Adapter", adapter),
+            ("IPv4", IpConfig.Ipv4),
+            ("Subnet mask", IpConfig.SubnetMask),
+            ("Gateway", IpConfig.Gateway),
+            ("DNS", IpConfig.Dns),
+            ("MAC", IpConfig.Mac),
+            ("DHCP", IpConfig.Dhcp),
+        };
+    }
+
     /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
     /// <see cref="Refresh"/> still works while paused.</summary>
     public void SetLive(bool live) {

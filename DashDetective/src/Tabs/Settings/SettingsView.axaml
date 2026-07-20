@@ -8,9 +8,11 @@
              x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
 
-    <!-- Appearance (Theme + Accent) is wired to SettingsViewModel via the ThemeService.
-         Monitoring and Export & Data below are still static layout.
-         Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
+    <!-- Every section is live and wired to SettingsViewModel: Appearance (Theme + Accent via the
+         ThemeService), Navigation (the shared NavigationViewModel), Monitoring (refresh interval,
+         resource-alert / tray / startup toggles) and Export & Data (report / CSV / clipboard, handled
+         in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
+         store. Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
     <UserControl.Styles>
         <Style Selector="TextBlock.settingName">
             <Setter Property="FontSize" Value="13"/>
@@ -182,37 +184,34 @@
                         <TextBlock Classes="settingDesc" Text="How often live metrics update"/>
                     </StackPanel>
                     <Border Grid.Column="1" Classes="segments">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Border Classes="seg"><TextBlock Text="0.5s"/></Border>
-                            <Border Classes="seg selected"><TextBlock Text="1s"/></Border>
-                            <Border Classes="seg"><TextBlock Text="2s"/></Border>
-                            <Border Classes="seg"><TextBlock Text="5s"/></Border>
-                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding IntervalOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:IntervalOption">
+                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Border>
                 </Grid>
 
-                <!-- Toggle rows -->
-                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
-                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="Desktop notifications"/>
-                            <TextBlock Classes="settingDesc" Text="Alert on threshold breaches"/>
-                        </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
-                        </Border>
-                    </Grid>
-                </Border>
-
+                <!-- Toggle rows. "Resource alerts" merges the comp's two notification toggles (there is
+                     no OS toast in scope, so both described the same in-app threshold banner). -->
                 <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="Resource alerts"/>
-                            <TextBlock Classes="settingDesc" Text="Warn when CPU or RAM exceeds 90%"/>
+                            <TextBlock Classes="settingDesc" Text="Show a banner when CPU or RAM exceeds 90%"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
-                        </Border>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ResourceAlerts}"/>
                     </Grid>
                 </Border>
 
@@ -222,9 +221,7 @@
                             <TextBlock Classes="settingName" Text="Show in system tray"/>
                             <TextBlock Classes="settingDesc" Text="Keep console running in background"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource Accent}">
-                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Right" Margin="0,0,3,0"/>
-                        </Border>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"/>
                     </Grid>
                 </Border>
 
@@ -234,9 +231,7 @@
                             <TextBlock Classes="settingName" Text="Launch at startup"/>
                             <TextBlock Classes="settingDesc" Text="Start with Windows"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="toggle" Background="{DynamicResource TrackOff}">
-                            <Ellipse Width="16" Height="16" Fill="{DynamicResource TextStrong}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
-                        </Border>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding LaunchAtStartup}"/>
                     </Grid>
                 </Border>
             </StackPanel>
@@ -247,9 +242,9 @@
             <StackPanel Spacing="14">
                 <TextBlock Classes="panelTitle" Text="Export &amp; Data"/>
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Button Classes="action primary" Content="Export report (PDF)"/>
-                    <Button Classes="action" Content="Export CSV"/>
-                    <Button Classes="action" Content="Copy diagnostics"/>
+                    <Button Classes="action primary" Content="Export report (.txt)" Click="OnExportReportClick"/>
+                    <Button Classes="action" Content="Export CSV" Click="OnExportCsvClick"/>
+                    <Button Classes="action" Content="Copy diagnostics" Click="OnCopyDiagnosticsClick"/>
                 </StackPanel>
             </StackPanel>
         </Border>

@@ -2,13 +2,43 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using System;
+using System.ComponentModel;
 using System.IO;
 
 namespace DashDetective.Shell;
 
 public partial class MainWindow : Window {
+    // Set by the tray "Exit" so a subsequent close actually exits instead of hiding to tray.
+    private bool _exitRequested;
+
     public MainWindow() {
         InitializeComponent();
+        Closing += OnClosing;
+    }
+
+    /// <summary>
+    /// Close handler: when the "Show in system tray" setting is on, closing the window hides it to the
+    /// tray (the app keeps running) rather than exiting. A close driven by the tray "Exit" item, or a
+    /// close while the setting is off, proceeds normally — the last window closing shuts the app down,
+    /// which runs the composition root's disposal (flushing settings, releasing timers/PDH handles).
+    /// </summary>
+    private void OnClosing(object? sender, WindowClosingEventArgs e) {
+        if (!_exitRequested && DataContext is MainWindowViewModel { ShowInTray: true }) {
+            e.Cancel = true;
+            Hide();
+        }
+    }
+
+    /// <summary>Restores and focuses the window from the tray.</summary>
+    public void ShowFromTray() {
+        Show();
+        Activate();
+    }
+
+    /// <summary>Really exits from the tray: closes the window (bypassing hide-to-tray).</summary>
+    public void ExitFromTray() {
+        _exitRequested = true;
+        Close();
     }
 
     /// <summary>
