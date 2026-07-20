@@ -30,6 +30,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Test-only visibility: exposes the internal seams (widened members + injection ctors) to
+             the unit-test assembly. No effect on the shipped app's public surface. -->
+        <InternalsVisibleTo Include="DashDetective.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Avalonia" Version="12.0.5"/>
         <PackageReference Include="Avalonia.Desktop" Version="12.0.5"/>
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5"/>
