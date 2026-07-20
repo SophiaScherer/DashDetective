@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Storage"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:StorageViewModel"
+             x:Class="DashDetective.Tabs.Storage.StorageView">
+
+    <!-- The design comp's Storage page: three drive summary cards (top row) over a Partitions table and a
+         Disk Activity card (bottom row). Surfaces/typography come from src/Shared/Styles; the Disk Activity
+         chart reuses the shared Sparkline. The page scrolls as a whole like the Dashboard/Network (not
+         self-scrolling). Panels are added per phase — this scaffold is intentionally empty. -->
+    <StackPanel Spacing="16">
+    </StackPanel>
+</UserControl>

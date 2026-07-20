@@ -8,6 +8,7 @@ using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
+using DashDetective.Tabs.Storage;
 
 namespace DashDetective.Shell;
 
@@ -22,6 +23,7 @@ public class ViewLocator : IDataTemplate {
         ProcessesViewModel => new ProcessesView(),
         PerformanceViewModel => new PerformanceView(),
         NetworkViewModel => new NetworkView(),
+        StorageViewModel => new StorageView(),
         HardwareViewModel => new HardwareView(),
         SettingsViewModel => new SettingsView(),
         null => null,
