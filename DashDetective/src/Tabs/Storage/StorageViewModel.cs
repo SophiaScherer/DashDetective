@@ -1,6 +1,9 @@
 using Avalonia.Media;
 using DashDetective.Shared;
+using DashDetective.Shared.Charts;
+using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace DashDetective.Tabs.Storage;
 
@@ -56,4 +59,32 @@ public partial class StorageViewModel : ViewModelBase {
         new PartitionRow { Vol = "—", Label = "Recovery", FileSystem = "NTFS", Capacity = "990 MB", Free = "120 MB" },
         new PartitionRow { Vol = "—", Label = "EFI System", FileSystem = "FAT32", Capacity = "260 MB", Free = "98 MB" },
     };
+
+    // Width of the Disk Activity history, matching the app's charts (60 samples = one per second).
+    private const int WindowSeconds = 60;
+
+    // A fixed, deterministic 60-sample mock "disk active time" history, so the chart resembles the design
+    // comp's drifting series until the live sampler is wired. Base ~14 % with bounded drift, like the comp.
+    private static readonly double[] MockDiskHistory = BuildMockDiskHistory();
+
+    /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
+    public string DiskPoints { get; } = SparklinePoints.Build(MockDiskHistory, 100);
+
+    /// <summary>The "Active time" readout — the latest sample of the mock history (e.g. "31%").</summary>
+    public string DiskActive { get; } =
+        Math.Round(MockDiskHistory[^1]).ToString("0", CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>Builds the deterministic mock disk history (fixed seed → identical across runs) as a
+    /// bounded random walk around the comp's ~14 % base, so the area chart looks alive without a sampler.</summary>
+    private static double[] BuildMockDiskHistory() {
+        var random = new Random(0x5104);
+        var history = new double[WindowSeconds];
+        var value = 14.0;
+        for (var i = 0; i < history.Length; i++) {
+            value += (random.NextDouble() - 0.5) * 14; // drift ±7 per step
+            value = Math.Clamp(value, 2, 46);
+            history[i] = value;
+        }
+        return history;
+    }
 }

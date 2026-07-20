@@ -53,6 +53,16 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
+        <!-- Disk Activity stat blocks: a muted label over a larger value. -->
+        <Style Selector="TextBlock.diskStatLabel">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="TextBlock.diskStatValue">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -121,7 +131,7 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right, added in a later phase) ===== -->
+        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right) ===== -->
         <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
             <Border Grid.Column="0" Classes="panel">
                 <StackPanel Spacing="0">
@@ -158,6 +168,33 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
+                 area fill, like the Dashboard), over three readouts. Active time is mock-live; Avg response
+                 and Queue are fixed placeholders for this UI pass. -->
+            <Border Grid.Column="1" Classes="panel">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="panelTitle" Text="Disk Activity (C:)"/>
+                    <controls:Sparkline Height="120" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                                        YMin="0" YMax="100"
+                                        Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
+                    <Grid ColumnDefinitions="*,*,*">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="diskStatLabel" Text="Active time"/>
+                            <TextBlock Classes="diskStatValue" Text="{Binding DiskActive}"
+                                       Foreground="{DynamicResource ChartStorage}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Classes="diskStatLabel" Text="Avg response"/>
+                            <TextBlock Classes="diskStatValue" Text="0.4 ms"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
+                            <TextBlock Classes="diskStatLabel" Text="Queue"/>
+                            <TextBlock Classes="diskStatValue" Text="0.03"/>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
             </Border>
         </Grid>
