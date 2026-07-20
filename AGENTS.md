@@ -55,9 +55,9 @@ its own sign-off.
 
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
 patterns), but do NOT modify while building Performance** (full write-ups in *Appendix — Completed
-Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (Appearance live;
-Monitoring/Export static), **File Explorer**, **Network**, **Processes**, **Hardware**. Editing any of
-these needs an explicit scope expansion.
+Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (fully live — Appearance,
+Navigation, Monitoring and Export & Data), **File Explorer**, **Network**, **Processes**, **Hardware**.
+Editing any of these needs an explicit scope expansion.
 
 **Performance — implementation status** (the already-live features' write-ups live in *Appendix —
 Completed Feature Details* at the end of this file):
@@ -187,6 +187,15 @@ currently exist.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal)
     /Services                   (cross-cutting app services)
+      /Settings
+        AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
+        SettingsStore.cs        (load-on-start soft-fail to defaults; debounced atomic save to
+                                 %AppData%/DashDetective/settings.json; Flush on shutdown. Pure
+                                 persistence — knows no view-models; the composition root applies/observes)
+        SettingsJsonContext.cs  (System.Text.Json source-gen context for AppSettings; string enums)
+      /Startup
+        StartupRegistration.cs  (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
+                                 Windows-guarded + soft-failing, like CurrentUserProvider)
       /Diagnostics
         Log.cs                  (minimal soft-failing logger → Debug output + a per-day rolling file in
                                  %LocalAppData%/DashDetective/logs; never throws. The sampler / provider /
@@ -257,8 +266,12 @@ currently exist.
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
-                                ThemeOption.cs, AccentOption.cs  (selectable item VMs for the
-                                                                  Appearance controls, like NavItem)
+                                                        (fully live: Appearance + Navigation + Monitoring
+                                                         + Export & Data; view code-behind owns the
+                                                         export save dialog + clipboard, like MainWindow)
+                                ThemeOption.cs, AccentOption.cs, IntervalOption.cs
+                                                        (selectable item VMs for the Appearance +
+                                                         refresh-interval controls, like NavItem)
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
                                                         (VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
@@ -415,6 +428,11 @@ revision + feature-update label). On the `net10.0` target this API is **provided
 reference is needed** (adding the `Microsoft.Win32.Registry` package is redundant and raises an
 `NU1510` "unnecessary" warning). So it, too, added **no** new dependency.
 
+The **Settings persistence** work (settings store + "Launch at startup" + system tray) likewise added
+**no** new package: `System.Text.Json` (source-generated `SettingsJsonContext`) and
+`Microsoft.Win32.Registry` (the HKCU `Run` key) are in-box on `net10.0-windows`, and Avalonia's
+`TrayIcon` ships with the framework. Reuse the in-box JSON + registry for future persisted state.
+
 ## Working Style
 
 - One detail at a time. Prefer small, focused changes over broad sweeps.
@@ -482,14 +500,40 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
   uses the in-box `Avalonia.Platform.Storage` picker — no new package.
 
-- **Settings** — the **Appearance** section is now live; the rest is still layout-only. The
-  **Theme** segmented control (Dark / Light / System) and the **Accent color** swatches are
-  data-bound to `SettingsViewModel` and applied at runtime through a single `ThemeService` (see
-  *Theming* below). The accent row's **first** swatch is a "Default" (multi-colour) option — a 2×2
-  four-colour square that restores the default look (each dashboard graph its own colour, highlight
-  blue); the four single-colour swatches recolour **every** dashboard graph to that one accent. The
-  **Monitoring** panel (interval segments + toggle pills) and **Export & Data** buttons remain static
-  `Border`s, not yet wired.
+- **Settings** — **fully live** (plan: `C:\Users\User\.claude\plans\you-are-working-in-silly-planet.md`).
+  - **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Accent color**
+    swatches are data-bound to `SettingsViewModel` and applied at runtime through a single
+    `ThemeService` (see *Theming* below). The accent row's **first** swatch is a "Default"
+    (multi-colour) option — a 2×2 four-colour square that restores the default look (each dashboard
+    graph its own colour, highlight blue); the four single-colour swatches recolour **every** dashboard
+    graph to that one accent.
+  - **Monitoring.** The **Refresh interval** segments (0.5 / 1 / 2 / 5 s) are real `IntervalOption`
+    selectable-item VMs (the `ThemeOption` pattern); selecting one calls
+    `SystemMetricsService.SetInterval`, which retimes **only** the five 1 Hz metric channels — the
+    coarse timers stay coarse (Dashboard uptime 30 s; Network adapters 5 s / connections 2.5 s /
+    ping 2 s are NOT retimed). The three toggles are real templated `ToggleButton`s (shared
+    `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
+    alerts** (merged from the comp's two notification toggles — no OS toast is in scope, so both meant
+    the same in-app banner), **Show in system tray**, **Launch at startup**. The alert watcher lives in
+    `SystemMetricsService` (raises `AlertActiveChanged` after CPU or memory stays ≥ 90 % for 10
+    consecutive samples); the shell shows an inline warning banner below the toolbar (auto-clears on
+    recovery, `×` to dismiss the current breach, gated by the setting). **Launch at startup** writes the
+    HKCU `…\Run` value via `StartupRegistration` (`src/Services/Startup`, soft-failing).
+  - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
+    with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
+    Real exit still runs the composition root's disposal.
+  - **Export & Data.** Handlers in `SettingsView.axaml.cs` (own the save dialog + clipboard, needing
+    the `TopLevel`, like `MainWindow`): **Copy diagnostics** → clipboard; **Export report (.txt)** →
+    the same plain-text report as the toolbar Export (no PDF library); **Export CSV** → the rolling
+    60-sample metric histories (`DashboardViewModel.BuildMetricsCsv`). `MainWindowViewModel.BuildReport`
+    now appends a Hardware summary and the primary network config (via small read-only accessors —
+    `HardwareViewModel.GetReportRows`, `NetworkViewModel.GetPrimaryConfigRows`).
+  - **Persistence.** All of the above (plus Appearance and Navigation) persist to
+    `%AppData%/DashDetective/settings.json` via `SettingsStore` (`src/Services/Settings`; System.Text.Json
+    source-gen, load-on-start with full soft-fail to defaults, debounced atomic save, `schemaVersion`).
+    The composition root (`App` → `MainWindowViewModel`) applies a loaded snapshot through the seams and
+    observes them to save; `ThemeService` stays the single theming applier — the store only observes.
+    This **supersedes the "session-only" note** for Theming and Navigation (their choices now persist).
 
 - **File Explorer** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
