@@ -179,6 +179,32 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private static void AppendReportRow(StringBuilder sb, string key, string value) =>
         sb.AppendLine($"  {(key + ":").PadRight(14)}{value}");
 
+    /// <summary>
+    /// Renders the rolling 60-second metric histories as CSV for the Settings "Export CSV" action.
+    /// One row per sample slot, oldest first: <c>offsetSeconds</c> counts back from 0 (now) to
+    /// −(window−1); the metric columns are the same buffers the sparklines draw. Values use the
+    /// invariant culture so the file parses consistently regardless of the machine's locale.
+    /// </summary>
+    public string BuildMetricsCsv() {
+        var sb = new StringBuilder();
+        sb.AppendLine("offsetSeconds,cpu,mem,gpu,disk,netDownMbps,netUpMbps");
+        for (var i = 0; i < WindowSeconds; i++) {
+            var offset = i - (WindowSeconds - 1);
+            sb.Append(offset.ToString(CultureInfo.InvariantCulture)).Append(',')
+              .Append(Csv(_cpuHistory[i])).Append(',')
+              .Append(Csv(_memoryHistory[i])).Append(',')
+              .Append(Csv(_gpuHistory[i])).Append(',')
+              .Append(Csv(_storageHistory[i])).Append(',')
+              .Append(Csv(_downHistory[i])).Append(',')
+              .Append(Csv(_upHistory[i]))
+              .Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Formats a metric value for CSV with two decimals, invariant culture.</summary>
+    private static string Csv(double value) => value.ToString("F2", CultureInfo.InvariantCulture);
+
     private async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.

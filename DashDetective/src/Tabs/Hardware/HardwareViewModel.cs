@@ -86,6 +86,20 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     /// swap). Fire-and-forget like the startup load; failures leave the current values in place.</summary>
     public void Refresh() => _ = LoadAsync();
 
+    /// <summary>
+    /// A compact hardware summary for the exported system report — one "component: name" row per card,
+    /// from the values already loaded into the cards. Read-only; the report builder in the shell owns
+    /// formatting, so this exposes the data without reaching into the card internals.
+    /// </summary>
+    public IReadOnlyList<(string Key, string Value)> GetReportRows() => new[] {
+        (_processor.Title, _processor.Subtitle),
+        (_graphics.Title, _graphics.Subtitle),
+        (_motherboard.Title, _motherboard.Subtitle),
+        (_memory.Title, _memory.Subtitle),
+        (_storage.Title, _storage.Subtitle),
+        (_sensors.Title, _sensors.Subtitle),
+    };
+
     private async Task LoadAsync() {
         // GetAsync never throws (each section falls back to its .Unknown record), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
