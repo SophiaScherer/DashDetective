@@ -58,7 +58,7 @@
         <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}"/>
 
         <!-- ================= MAIN ================= -->
-        <Grid RowDefinitions="54,*">
+        <Grid RowDefinitions="54,Auto,*">
 
             <!-- Toolbar -->
             <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
@@ -116,14 +116,34 @@
                 </Grid>
             </Border>
 
+            <!-- Resource-alert banner: shown when CPU/memory stays above the threshold and the user's
+                 "Resource alerts" setting is on. Auto-clears on recovery; the × dismisses the current
+                 breach. Fixed amber so it reads as a warning in both themes. -->
+            <Border Grid.Row="1" IsVisible="{Binding AlertBannerVisible}"
+                    Background="#26E0A82E" BorderBrush="#59E0A82E" BorderThickness="0,0,0,1" Padding="18,9">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Fill="#E0A82E" Data="M8,1 L15,14 H1 Z"/>
+                    <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                               Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
+                    <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
+                            ToolTip.Tip="Dismiss" Command="{Binding DismissAlertCommand}">
+                        <Path Width="11" Height="11" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                              StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L11,11 M11,1 L1,11"/>
+                    </Button>
+                </Grid>
+            </Border>
+
             <!-- Page content: normal pages get an outer scroll region; self-scrolling pages
                  (File Explorer) get a bounded, non-scrolling host so their panes scroll on their own.
                  Content is routed so only the active host is populated (view built once). -->
-            <Panel Grid.Row="1" Background="{DynamicResource AppBackground}">
-                <ScrollViewer Padding="22,20,22,30"
-                              HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+            <Panel Grid.Row="2" Background="{DynamicResource AppBackground}">
+                <!-- Padding lives on the inner content (as Margin), not the ScrollViewer: Avalonia's
+                     ScrollViewer does not include its own Padding in the scroll extent, so a bottom
+                     Padding here would make the last chunk of a long page unreachable. -->
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                               IsVisible="{Binding !CurrentPageSelfScrolls}">
-                    <ContentControl Content="{Binding ScrollingPage}"/>
+                    <ContentControl Margin="22,20,22,30" Content="{Binding ScrollingPage}"/>
                 </ScrollViewer>
                 <ContentControl Margin="22,20,22,30"
                                 Content="{Binding SelfScrollingPage}"
