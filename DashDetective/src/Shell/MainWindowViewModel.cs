@@ -14,6 +14,7 @@ using DashDetective.Tabs.Network;
 using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
+using DashDetective.Tabs.Storage;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -35,6 +36,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ProcessesViewModel _processes;
     private readonly PerformanceViewModel _performance;
     private readonly NetworkViewModel _network = new();
+    private readonly StorageViewModel _storage = new();
     private readonly HardwareViewModel _hardware = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
@@ -120,6 +122,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Performance, _performance, Nav.Navigate),
             new NavItem("Network", "Network", "Adapters, connections & diagnostics",
                         Icons.Network, _network, Nav.Navigate),
+            new NavItem("Storage", "Storage", "Drives, partitions & health",
+                        Icons.Storage, _storage, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
                         Icons.Hardware, _hardware, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",

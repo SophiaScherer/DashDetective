@@ -49,6 +49,13 @@ public static class Icons {
         "M9,2 C6.5,4 5.5,6.4 5.5,9 C5.5,11.6 6.5,14 9,16 " +
         "M9,2 C11.5,4 12.5,6.4 12.5,9 C12.5,11.6 11.5,14 9,16");
 
+    // Two stacked disk-drive platters, each with a small activity dot (a round-cap degenerate segment),
+    // forming a stacked-disk glyph that matches the design document's storage icon.
+    public static readonly Geometry Storage = Geometry.Parse(
+        "M5,4 H13 A1,1 0 0 1 14,5 V7 A1,1 0 0 1 13,8 H5 A1,1 0 0 1 4,7 V5 A1,1 0 0 1 5,4 Z " +
+        "M5,10 H13 A1,1 0 0 1 14,11 V13 A1,1 0 0 1 13,14 H5 A1,1 0 0 1 4,13 V11 A1,1 0 0 1 5,10 Z " +
+        "M11.8,6 h0.01 M11.8,12 h0.01");
+
     // Panel/sidebar-split glyph (stroked) used for the collapse/expand affordance, matching the design
     // document: a rounded panel outline with a thin divider carving off a narrow rail. The divider sits
     // on the side the bar will move toward, so the glyph reads directionally per dock edge and state.

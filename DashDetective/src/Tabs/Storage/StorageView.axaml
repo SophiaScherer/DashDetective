@@ -1,0 +1,202 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:vm="using:DashDetective.Tabs.Storage"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
+             x:DataType="vm:StorageViewModel"
+             x:Class="DashDetective.Tabs.Storage.StorageView">
+
+    <!-- The design comp's Storage page: three drive summary cards (top row) over a Partitions table and a
+         Disk Activity card (bottom row). Surfaces/typography come from src/Shared/Styles; the Disk Activity
+         chart reuses the shared Sparkline. The page scrolls as a whole like the Dashboard/Network (not
+         self-scrolling). Panels are added per phase. -->
+    <!-- Read/Write/Temp value tints are fixed semantic colours (blue/orange/green) shared by every card, so
+         they live here as tab-local resources rather than on each DriveCard. Promote to SharedStyles if a
+         second feature needs them. -->
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="MetricRead" Color="#4cc2ff"/>
+        <SolidColorBrush x:Key="MetricWrite" Color="#ff8a5c"/>
+        <SolidColorBrush x:Key="MetricTemp" Color="#6ccb5f"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Rounded status pill (drive health): soft-tinted fill + matching text, both bound per card. -->
+        <Style Selector="Border.healthPill">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.healthPill TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <!-- Slim rounded usage bar: a faint track (theme-aware) with the fill tinted per card. -->
+        <Style Selector="ProgressBar.usage">
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Height" Value="9"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- One Read/Write/Temp readout: a muted label followed by a fixed-colour, tabular-nums value. -->
+        <Style Selector="TextBlock.metricLabel">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="TextBlock.metricValue">
+            <Setter Property="FontSize" Value="11.5"/>
+        </Style>
+        <!-- Uppercase muted column header for the Partitions table (same idiom as the Network table). -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+        <!-- Disk Activity stat blocks: a muted label over a larger value. -->
+        <Style Selector="TextBlock.diskStatLabel">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="TextBlock.diskStatValue">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="16">
+
+        <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
+        <ItemsControl ItemsSource="{Binding Drives}" Margin="0,0,-16,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DriveCard">
+                    <!-- The 16px right margin is the inter-card gutter; the panel's -16 offset keeps the row
+                         flush right (same idiom as the Performance stat strip). -->
+                    <Border Classes="panel" Margin="0,0,16,0">
+                        <StackPanel Spacing="0">
+                            <!-- Header: name + health pill. -->
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                <Border Grid.Column="1" Classes="healthPill"
+                                        Background="{Binding HealthBackground}">
+                                    <TextBlock Text="{Binding Health}" Foreground="{Binding HealthForeground}"/>
+                                </Border>
+                            </Grid>
+                            <!-- Model subtitle. -->
+                            <TextBlock Text="{Binding Model}" FontSize="11.5" Margin="0,0,0,12"
+                                       Foreground="{DynamicResource TextSubtle}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <!-- Usage bar. -->
+                            <ProgressBar Classes="usage" Value="{Binding UsagePercent}"
+                                         Foreground="{Binding BarBrush}" Margin="0,0,0,7"/>
+                            <!-- Used / free split. -->
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+                                <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondary}">
+                                    <Run Text="{Binding Used}"/><Run Text=" used"/>
+                                </TextBlock>
+                                <TextBlock Grid.Column="1" FontSize="12" HorizontalAlignment="Right"
+                                           Foreground="{DynamicResource TextSecondary}">
+                                    <Run Text="{Binding Free}"/><Run Text=" free"/>
+                                </TextBlock>
+                            </Grid>
+                            <!-- Read / Write / Temp readouts (space-between). -->
+                            <Grid ColumnDefinitions="*,*,*">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <TextBlock Classes="metricLabel" Text="Read "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Read}"
+                                               Foreground="{StaticResource MetricRead}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Classes="metricLabel" Text="Write "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Write}"
+                                               Foreground="{StaticResource MetricWrite}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <TextBlock Classes="metricLabel" Text="Temp "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Temp}"
+                                               Foreground="{StaticResource MetricTemp}"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right) ===== -->
+        <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
+            <Border Grid.Column="0" Classes="panel">
+                <StackPanel Spacing="0">
+                    <TextBlock Classes="panelTitle" Text="Partitions" Margin="0,0,0,10"/>
+                    <!-- Column header: Vol · Label · File System · Capacity · Free (Free right-aligned). The
+                         data rows below share this exact column template so the columns stay aligned. -->
+                    <Grid ColumnDefinitions="0.7*,1.5*,*,*,*" Margin="0,0,0,6">
+                        <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
+                        <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
+                        <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
+                        <TextBlock Grid.Column="3" Classes="colHead" Text="CAPACITY"/>
+                        <TextBlock Grid.Column="4" Classes="colHead" Text="FREE" TextAlignment="Right"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Partitions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PartitionRow">
+                                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
+                                        Padding="0,9">
+                                    <Grid ColumnDefinitions="0.7*,1.5*,*,*,*">
+                                        <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
+                                                   FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextMuted}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Capacity}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Free}" FontSize="12.5"
+                                                   TextAlignment="Right"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
+                 area fill, like the Dashboard), over three readouts. Active time is mock-live; Avg response
+                 and Queue are fixed placeholders for this UI pass. -->
+            <Border Grid.Column="1" Classes="panel">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="panelTitle" Text="Disk Activity (C:)"/>
+                    <controls:Sparkline Height="120" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                                        YMin="0" YMax="100"
+                                        Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
+                    <Grid ColumnDefinitions="*,*,*">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="diskStatLabel" Text="Active time"/>
+                            <TextBlock Classes="diskStatValue" Text="{Binding DiskActive}"
+                                       Foreground="{DynamicResource ChartStorage}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
+                            <TextBlock Classes="diskStatLabel" Text="Avg response"/>
+                            <TextBlock Classes="diskStatValue" Text="0.4 ms"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
+                            <TextBlock Classes="diskStatLabel" Text="Queue"/>
+                            <TextBlock Classes="diskStatValue" Text="0.03"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+</UserControl>
