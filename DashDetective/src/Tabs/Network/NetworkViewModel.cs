@@ -248,11 +248,11 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// and rebuilds the header caption + pager. Clamps the page if the list shrank underneath us.</summary>
     private void RebuildPage() {
         var available = _allConnections.Count;
-        var totalPages = Math.Max(1, (available + PageSize - 1) / PageSize);
-        _currentPage = Math.Clamp(_currentPage, 1, totalPages);
+        var totalPages = PagerMath.PageCount(available, PageSize);
+        _currentPage = PagerMath.ClampPage(_currentPage, totalPages);
 
-        var start = (_currentPage - 1) * PageSize;
-        var count = Math.Clamp(available - start, 0, PageSize);
+        var start = PagerMath.PageStart(_currentPage, PageSize);
+        var count = PagerMath.SliceCount(available, start, PageSize);
         var slice = count > 0 ? _allConnections.GetRange(start, count) : (IReadOnlyList<ConnectionInfo>)Array.Empty<ConnectionInfo>();
         CollectionReconciler.Reconcile(Connections, slice,
             static row => row.Key, static info => info.Key,

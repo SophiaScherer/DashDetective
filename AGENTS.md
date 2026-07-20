@@ -433,6 +433,36 @@ The **Settings persistence** work (settings store + "Launch at startup" + system
 `Microsoft.Win32.Registry` (the HKCU `Run` key) are in-box on `net10.0-windows`, and Avalonia's
 `TrayIcon` ships with the framework. Reuse the in-box JSON + registry for future persisted state.
 
+## Testing conventions
+
+Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0-windows`, referenced by
+`DashDetective.sln`). CI runs them on `windows-latest` and collects coverage; `dotnet format` gates the
+test code too, so keep usings alphabetical (`System` is **not** sorted first).
+
+- **Layout mirrors the app.** A test file sits under the same relative path as its subject
+  (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`),
+  one `*Tests` class per production type, in a matching `DashDetective.Tests.*` namespace.
+- **Naming + voice.** Test methods read `Method_Scenario_Expectation`
+  (e.g. `Build_NonPositiveMax_PinsEveryPointFlat`); XML-doc each test class with the contract it pins,
+  mirroring this repo's documentation voice.
+- **Hand-rolled fakes, no mocking framework.** Fakes are small hand-written classes under
+  `tests/DashDetective.Tests/Fakes` (e.g. `FakeUiTimer`) — matching the codebase's zero-dependency ethos.
+- **Test seams are minimal and behaviour-preserving.** To keep logic testable headlessly, a few
+  `internal` seams are exposed via `InternalsVisibleTo("DashDetective.Tests")` (in the app csproj), never
+  a behaviour change:
+  - `IUiTimer` + `DispatcherTimerAdapter` (`src/Services/Threading`) — a UI-thread-timer seam so
+    `MetricChannel` / `SystemMetricsService` can be driven without an Avalonia dispatcher; production
+    still uses a real `DispatcherTimer` by default.
+  - `SystemMetricsService`'s `internal` ctor takes a `MetricSamplers` bundle + a timer factory, so the
+    five hardware samplers can be faked.
+  - `SettingsStore`'s `internal` ctor takes an explicit file path (production resolves `%AppData%`).
+  - `private → internal` widenings (`HardwareCatalog.Match`, `CurrentUserProvider.DeriveInitials`) and
+    one behaviour-preserving extraction (`NetworkViewModel`'s pager math → `PagerMath`).
+- **Every new `src/Shared` or `src/Services` type ships with tests.** Pure logic (formatters, catalogs,
+  chart/paging math) is tested directly; timer/sampler-driven types are tested through their seam with
+  fakes plus the synchronous entry points (`SampleNow` / `RefreshAll` / `Flush`), not by waiting on a
+  real timer.
+
 ## Working Style
 
 - One detail at a time. Prefer small, focused changes over broad sweeps.

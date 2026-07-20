@@ -24,8 +24,13 @@ public sealed class SettingsStore : IDisposable {
     private readonly DispatcherTimer _saveTimer;
     private AppSettings? _pending;
 
-    public SettingsStore() {
-        _path = BuildSettingsPath();
+    public SettingsStore()
+        : this(BuildSettingsPath()) { }
+
+    /// <summary>Test seam: takes the settings-file path explicitly (production resolves %AppData%). A
+    /// null path disables persistence, exactly as an unresolvable folder does.</summary>
+    internal SettingsStore(string? path) {
+        _path = path;
         _saveTimer = new DispatcherTimer { Interval = SaveDebounce };
         _saveTimer.Tick += (_, _) => Flush();
     }

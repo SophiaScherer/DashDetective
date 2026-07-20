@@ -25,7 +25,7 @@ public static class HardwareCatalog {
     /// keys — exact first, then a substring match either way (a short key like "7600X" inside the full
     /// WMI name, or vice-versa). When several keys match, the <b>longest</b> wins, so a variant like
     /// "RTX 4070 TI" isn't shadowed by its base "RTX 4070". Returns <c>null</c> when nothing matches.</summary>
-    private static TSpec? Match<TSpec>(IReadOnlyDictionary<string, TSpec> data, string raw)
+    internal static TSpec? Match<TSpec>(IReadOnlyDictionary<string, TSpec> data, string raw)
         where TSpec : class {
         if (string.IsNullOrWhiteSpace(raw) || data.Count == 0)
             return null;
