@@ -50,7 +50,7 @@ public static class CurrentUserProvider {
     /// <summary>Up to two uppercase letters for the avatar badge: the first letter of the first two
     /// name tokens (split on space/<c>.</c>/<c>_</c>/<c>-</c>), else the first two letters of the name,
     /// else "?".</summary>
-    private static string DeriveInitials(string name) {
+    internal static string DeriveInitials(string name) {
         var tokens = name.Split(new[] { ' ', '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
         if (tokens.Length >= 2)
             return $"{char.ToUpperInvariant(tokens[0][0])}{char.ToUpperInvariant(tokens[1][0])}";
