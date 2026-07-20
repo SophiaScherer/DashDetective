@@ -54,6 +54,10 @@ public class MetricChannel<TSample> : IDisposable {
     /// <summary>Samples once immediately whether or not the timer is running — for Refresh while paused.</summary>
     public void SampleNow() => Tick();
 
+    /// <summary>Retimes the sampling cadence (the Settings refresh-interval control). Takes effect on the
+    /// next tick; a running timer keeps running at the new interval, a stopped one stays stopped.</summary>
+    public void SetInterval(TimeSpan interval) => _timer.Interval = interval;
+
     private void OnTick(object? sender, EventArgs e) => Tick();
 
     private void Tick() {

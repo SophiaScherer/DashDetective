@@ -12,7 +12,12 @@ namespace DashDetective.Services.SystemMetrics;
 /// back the Live pill, <see cref="RefreshAll"/> backs Refresh, and per-metric fault isolation is kept.
 /// </summary>
 public sealed class SystemMetricsService : IDisposable {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>Utilisation level (%) at or above which a metric counts as breaching, and the number of
+    /// consecutive breaching samples that raises a resource alert (10 s at the default 1 Hz cadence).</summary>
+    private const double AlertThresholdPercent = 90;
+    private const int AlertConsecutiveSamples = 10;
 
     private readonly CpuUsageSampler _cpuSampler = new();
     private readonly MemoryUsageSampler _memorySampler = new();
@@ -27,14 +32,34 @@ public sealed class SystemMetricsService : IDisposable {
     private readonly MetricFeed<NetworkSample> _network;
     private readonly MetricFeed[] _feeds;
 
+    // Internal resource-alert watcher: consecutive-breach streaks per metric and the combined state.
+    private readonly IDisposable _cpuAlertSub;
+    private readonly IDisposable _memoryAlertSub;
+    private int _cpuBreachStreak;
+    private int _memoryBreachStreak;
+    private bool _alertActive;
+
     public SystemMetricsService() {
-        _cpu = new MetricFeed<double>(Interval, () => _cpuSampler.Sample());
-        _memory = new MetricFeed<MemorySample>(Interval, () => _memorySampler.Sample());
-        _gpu = new MetricFeed<double>(Interval, () => _gpuSampler.Sample());
-        _storage = new MetricFeed<StorageSample>(Interval, () => _storageSampler.Sample());
-        _network = new MetricFeed<NetworkSample>(Interval, () => _networkSampler.Sample());
+        _cpu = new MetricFeed<double>(DefaultInterval, () => _cpuSampler.Sample());
+        _memory = new MetricFeed<MemorySample>(DefaultInterval, () => _memorySampler.Sample());
+        _gpu = new MetricFeed<double>(DefaultInterval, () => _gpuSampler.Sample());
+        _storage = new MetricFeed<StorageSample>(DefaultInterval, () => _storageSampler.Sample());
+        _network = new MetricFeed<NetworkSample>(DefaultInterval, () => _networkSampler.Sample());
         _feeds = new MetricFeed[] { _cpu, _memory, _gpu, _storage, _network };
+
+        // Watch CPU + memory for a sustained breach. Subscribing keeps these two channels running, which
+        // the always-on Dashboard already does; Pause still halts them (the Live pill), holding the streaks.
+        _cpuAlertSub = _cpu.Subscribe(OnCpuAlertSample, static () => { });
+        _memoryAlertSub = _memory.Subscribe(OnMemoryAlertSample, static () => { });
     }
+
+    /// <summary>Raised when the resource-alert state flips: <c>true</c> once CPU or memory has stayed at or
+    /// above the threshold for <see cref="AlertConsecutiveSamples"/> samples, <c>false</c> when both recover.
+    /// The shell surfaces this as an inline banner (gated by the user's "Resource alerts" setting).</summary>
+    public event Action<bool>? AlertActiveChanged;
+
+    /// <summary>Whether a resource alert is currently active.</summary>
+    public bool AlertActive => _alertActive;
 
     /// <summary>Friendly name of the sampled network adapter, for the throughput caption.</summary>
     public string NetworkAdapterName => _networkSampler.AdapterName;
@@ -53,6 +78,39 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Subscribes to network throughput snapshots. Returns a token; dispose it to unsubscribe.</summary>
     public IDisposable SubscribeNetwork(Action<NetworkSample> onSample, Action onFailed) => _network.Subscribe(onSample, onFailed);
+
+    /// <summary>
+    /// Retimes the 1 Hz metric channels to the Settings refresh interval (0.5 / 1 / 2 / 5 s). Only the
+    /// five per-metric channels here scale; the coarse timers deliberately stay coarse and are NOT
+    /// retimed (the Dashboard's 30 s uptime tick, the Network tab's 5 s adapter / 2.5 s connections /
+    /// 2 s ping timers). Applies even while paused, so a later Resume runs at the new cadence.
+    /// </summary>
+    public void SetInterval(TimeSpan interval) {
+        foreach (var feed in _feeds)
+            feed.SetInterval(interval);
+    }
+
+    /// <summary>Updates the CPU breach streak and re-evaluates the alert state.</summary>
+    private void OnCpuAlertSample(double cpuPercent) {
+        _cpuBreachStreak = cpuPercent >= AlertThresholdPercent ? _cpuBreachStreak + 1 : 0;
+        EvaluateAlert();
+    }
+
+    /// <summary>Updates the memory breach streak and re-evaluates the alert state.</summary>
+    private void OnMemoryAlertSample(MemorySample sample) {
+        _memoryBreachStreak = sample.LoadPercent >= AlertThresholdPercent ? _memoryBreachStreak + 1 : 0;
+        EvaluateAlert();
+    }
+
+    /// <summary>An alert is active while either metric's streak has reached the consecutive-sample count;
+    /// raises <see cref="AlertActiveChanged"/> only on a transition.</summary>
+    private void EvaluateAlert() {
+        var active = _cpuBreachStreak >= AlertConsecutiveSamples || _memoryBreachStreak >= AlertConsecutiveSamples;
+        if (active == _alertActive)
+            return;
+        _alertActive = active;
+        AlertActiveChanged?.Invoke(active);
+    }
 
     /// <summary>Pauses all metric sampling (shell Live pill off). Refresh still works while paused.</summary>
     public void Pause() {
@@ -75,6 +133,8 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Stops all channels and disposes the samplers that own PDH query handles (GPU, Storage).</summary>
     public void Dispose() {
+        _cpuAlertSub.Dispose();
+        _memoryAlertSub.Dispose();
         foreach (var feed in _feeds)
             feed.Dispose();
         _gpuSampler.Dispose();
@@ -86,6 +146,7 @@ public sealed class SystemMetricsService : IDisposable {
         public abstract void Pause();
         public abstract void Resume();
         public abstract void SampleNow();
+        public abstract void SetInterval(TimeSpan interval);
         public abstract void Dispose();
     }
 
@@ -160,6 +221,8 @@ public sealed class SystemMetricsService : IDisposable {
             if (_onSample.Count > 0)
                 _channel.SampleNow();
         }
+
+        public override void SetInterval(TimeSpan interval) => _channel.SetInterval(interval);
 
         public override void Dispose() => _channel.Dispose();
 
