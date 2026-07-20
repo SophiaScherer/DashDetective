@@ -10,10 +10,10 @@ performance counters, and Win32 P/Invoke) with no elevation required, and is wri
 one-feature-at-a-time discipline: every tab is a self-contained module, and cross-cutting concerns
 (theming, sampling, page lifecycle) live behind small shared seams.
 
-> **Status:** actively built tab-by-tab. Dashboard, File Explorer, Processes, Performance, Network and
-> Hardware are live; in Settings, Appearance and Navigation are live while Monitoring and Export are
-> still static layout. See [Feature tour](#feature-tour) for the honest per-tab state and
-> [Roadmap](#roadmap) for what's next.
+> **Status:** actively built tab-by-tab. Dashboard, File Explorer, Processes, Performance, Network,
+> Hardware and Settings are live — Settings now including Monitoring (refresh interval, resource-alert
+> banner, system tray, launch-at-startup) and Export & Data, all persisted to disk. See
+> [Feature tour](#feature-tour) for the honest per-tab state and [Roadmap](#roadmap) for what's next.
 
 [//]: # (## Screenshots)
 
@@ -120,13 +120,20 @@ A spec sheet of cards — **Processor**, **Graphics**, **Motherboard**, **Memory
 and **Sensors** — populated from WMI, with a rated-spec catalog filling in details WMI can't report.
 The **Sensors** card is a placeholder (`—`) pending a sensor source.
 
-### Settings — *Appearance live; rest static*
+### Settings — *fully live, persisted*
 - **Appearance** (live) — a **Theme** control (Dark / Light / System) and **Accent color** swatches,
   applied at runtime through a single `ThemeService`. The first accent is a **Default** multi-colour
   option (each dashboard graph its own colour); the others recolour every graph to one accent.
 - **Navigation** (live) — Position (dock edge) and Collapse controls that drive the same shared
   navigation view-model as the on-bar controls.
-- **Monitoring** and **Export & Data** are static layout, not yet wired.
+- **Monitoring** (live) — a **Refresh interval** control (0.5 / 1 / 2 / 5 s) that retimes the live
+  metric channels, plus **Resource alerts** (an in-app banner when CPU or memory stays above 90 %),
+  **Show in system tray** (close hides to a tray icon instead of exiting), and **Launch at startup**
+  (a per-user Windows startup entry).
+- **Export & Data** (live) — **Copy diagnostics** (to the clipboard), **Export report (.txt)** (a
+  plain-text system report), and **Export CSV** (the rolling metric histories).
+- **Persistence** — every choice above is saved to `%AppData%/DashDetective/settings.json` and restored
+  on launch; a missing or corrupt file falls back to defaults without crashing.
 - The footer shows the real assembly version (e.g. `DashDetective v0.1.0 · © 2026`), read from
   assembly metadata rather than a hard-coded string.
 
@@ -198,7 +205,8 @@ DashDetective/
   Program.cs, App.axaml(.cs)      bootstrap
   src/
     Shared/                       marker interfaces, ViewModelBase, AppInfo, Controls, Styles
-    Services/                     Theming (ThemeService), SystemMetrics + Network samplers
+    Services/                     Theming (ThemeService), SystemMetrics + Network samplers, Settings
+                                  (persistence store), Startup (launch-at-startup), Diagnostics, Identity
     Shell/                        MainWindow, MainWindowViewModel, ViewLocator, Navigation
     Tabs/                         Dashboard, FileExplorer, Processes, Performance, Network, Hardware, Settings
 docs/
@@ -210,8 +218,9 @@ docs/
 
 Honest near-term work, roughly in priority order:
 
-- **Settings persistence** — theme, accent, nav position and pane sizes are session-only today; persist
-  them across launches.
+- **Settings persistence** — theme, accent, nav position/collapse, refresh interval, show-hidden and the
+  Monitoring toggles now persist to `settings.json`; the File-Explorer **pane sizes** remain session-only
+  (extend the store to cover them next).
 - **Automated tests** — there is no test project yet; the CI test step is a no-op placeholder. Add unit
   coverage for the formatters, catalogs and sampler math.
 - **Storage tab** — a dedicated storage view (per-volume capacity, activity, SMART) is planned but not
