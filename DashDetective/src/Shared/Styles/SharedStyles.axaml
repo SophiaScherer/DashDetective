@@ -123,11 +123,29 @@
         <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
     </Style>
 
-    <!-- ===== Pill toggle track ===== -->
-    <Style Selector="Border.toggle">
+    <!-- ===== Pill toggle ===== -->
+    <!-- A real ToggleButton templated to the design comp's pill: a 40×22 rounded track (grey off,
+         accent on) with a 16 px thumb that slides left↔right. Two-way bindable via IsChecked, so it
+         replaces the old decorative Border toggles while keeping the exact look. -->
+    <Style Selector="ToggleButton.toggle">
         <Setter Property="Width" Value="40"/>
         <Setter Property="Height" Value="22"/>
-        <Setter Property="CornerRadius" Value="11"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border x:Name="Track" Background="{DynamicResource TrackOff}" CornerRadius="11">
+                    <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="{DynamicResource TextStrong}"
+                             HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked /template/ Border#Track">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked /template/ Ellipse#Thumb">
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="Margin" Value="0,0,3,0"/>
     </Style>
 
     <!-- ===== Action buttons ===== -->
