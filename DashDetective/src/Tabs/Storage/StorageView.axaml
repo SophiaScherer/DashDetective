@@ -11,7 +11,108 @@
     <!-- The design comp's Storage page: three drive summary cards (top row) over a Partitions table and a
          Disk Activity card (bottom row). Surfaces/typography come from src/Shared/Styles; the Disk Activity
          chart reuses the shared Sparkline. The page scrolls as a whole like the Dashboard/Network (not
-         self-scrolling). Panels are added per phase — this scaffold is intentionally empty. -->
+         self-scrolling). Panels are added per phase. -->
+    <!-- Read/Write/Temp value tints are fixed semantic colours (blue/orange/green) shared by every card, so
+         they live here as tab-local resources rather than on each DriveCard. Promote to SharedStyles if a
+         second feature needs them. -->
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="MetricRead" Color="#4cc2ff"/>
+        <SolidColorBrush x:Key="MetricWrite" Color="#ff8a5c"/>
+        <SolidColorBrush x:Key="MetricTemp" Color="#6ccb5f"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Rounded status pill (drive health): soft-tinted fill + matching text, both bound per card. -->
+        <Style Selector="Border.healthPill">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.healthPill TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <!-- Slim rounded usage bar: a faint track (theme-aware) with the fill tinted per card. -->
+        <Style Selector="ProgressBar.usage">
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Height" Value="9"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- One Read/Write/Temp readout: a muted label followed by a fixed-colour, tabular-nums value. -->
+        <Style Selector="TextBlock.metricLabel">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="TextBlock.metricValue">
+            <Setter Property="FontSize" Value="11.5"/>
+        </Style>
+    </UserControl.Styles>
+
     <StackPanel Spacing="16">
+
+        <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
+        <ItemsControl ItemsSource="{Binding Drives}" Margin="0,0,-16,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DriveCard">
+                    <!-- The 16px right margin is the inter-card gutter; the panel's -16 offset keeps the row
+                         flush right (same idiom as the Performance stat strip). -->
+                    <Border Classes="panel" Margin="0,0,16,0">
+                        <StackPanel Spacing="0">
+                            <!-- Header: name + health pill. -->
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                <Border Grid.Column="1" Classes="healthPill"
+                                        Background="{Binding HealthBackground}">
+                                    <TextBlock Text="{Binding Health}" Foreground="{Binding HealthForeground}"/>
+                                </Border>
+                            </Grid>
+                            <!-- Model subtitle. -->
+                            <TextBlock Text="{Binding Model}" FontSize="11.5" Margin="0,0,0,12"
+                                       Foreground="{DynamicResource TextSubtle}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <!-- Usage bar. -->
+                            <ProgressBar Classes="usage" Value="{Binding UsagePercent}"
+                                         Foreground="{Binding BarBrush}" Margin="0,0,0,7"/>
+                            <!-- Used / free split. -->
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+                                <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondary}">
+                                    <Run Text="{Binding Used}"/><Run Text=" used"/>
+                                </TextBlock>
+                                <TextBlock Grid.Column="1" FontSize="12" HorizontalAlignment="Right"
+                                           Foreground="{DynamicResource TextSecondary}">
+                                    <Run Text="{Binding Free}"/><Run Text=" free"/>
+                                </TextBlock>
+                            </Grid>
+                            <!-- Read / Write / Temp readouts (space-between). -->
+                            <Grid ColumnDefinitions="*,*,*">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <TextBlock Classes="metricLabel" Text="Read "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Read}"
+                                               Foreground="{StaticResource MetricRead}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Classes="metricLabel" Text="Write "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Write}"
+                                               Foreground="{StaticResource MetricWrite}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <TextBlock Classes="metricLabel" Text="Temp "/>
+                                    <TextBlock Classes="metricValue" Text="{Binding Temp}"
+                                               Foreground="{StaticResource MetricTemp}"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </StackPanel>
 </UserControl>
