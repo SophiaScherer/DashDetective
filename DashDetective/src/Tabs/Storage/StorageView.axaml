@@ -47,6 +47,12 @@
         <Style Selector="TextBlock.metricValue">
             <Setter Property="FontSize" Value="11.5"/>
         </Style>
+        <!-- Uppercase muted column header for the Partitions table (same idiom as the Network table). -->
+        <Style Selector="TextBlock.colHead">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -114,5 +120,46 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right, added in a later phase) ===== -->
+        <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
+            <Border Grid.Column="0" Classes="panel">
+                <StackPanel Spacing="0">
+                    <TextBlock Classes="panelTitle" Text="Partitions" Margin="0,0,0,10"/>
+                    <!-- Column header: Vol · Label · File System · Capacity · Free (Free right-aligned). The
+                         data rows below share this exact column template so the columns stay aligned. -->
+                    <Grid ColumnDefinitions="0.7*,1.5*,*,*,*" Margin="0,0,0,6">
+                        <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
+                        <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
+                        <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
+                        <TextBlock Grid.Column="3" Classes="colHead" Text="CAPACITY"/>
+                        <TextBlock Grid.Column="4" Classes="colHead" Text="FREE" TextAlignment="Right"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Partitions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PartitionRow">
+                                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
+                                        Padding="0,9">
+                                    <Grid ColumnDefinitions="0.7*,1.5*,*,*,*">
+                                        <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
+                                                   FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextMuted}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Capacity}" FontSize="12.5"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Free}" FontSize="12.5"
+                                                   TextAlignment="Right"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Grid>
     </StackPanel>
 </UserControl>

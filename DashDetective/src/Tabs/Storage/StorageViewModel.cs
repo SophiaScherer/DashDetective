@@ -47,4 +47,13 @@ public partial class StorageViewModel : ViewModelBase {
             Used = "6.96 TB", Free = "1.04 TB", Read = "2 MB/s", Write = "0 MB/s", Temp = "44°C",
         },
     };
+
+    /// <summary>The partition rows shown in the Partitions table (one per volume, lettered or not).</summary>
+    public ObservableCollection<PartitionRow> Partitions { get; } = new() {
+        new PartitionRow { Vol = "C:", Label = "Windows", FileSystem = "NTFS", Capacity = "2.0 TB", Free = "640 GB" },
+        new PartitionRow { Vol = "D:", Label = "Data", FileSystem = "NTFS", Capacity = "4.0 TB", Free = "2.32 TB" },
+        new PartitionRow { Vol = "E:", Label = "Backup", FileSystem = "NTFS", Capacity = "8.0 TB", Free = "1.04 TB" },
+        new PartitionRow { Vol = "—", Label = "Recovery", FileSystem = "NTFS", Capacity = "990 MB", Free = "120 MB" },
+        new PartitionRow { Vol = "—", Label = "EFI System", FileSystem = "FAT32", Capacity = "260 MB", Free = "98 MB" },
+    };
 }
