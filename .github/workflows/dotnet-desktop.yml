@@ -65,11 +65,18 @@ jobs:
     - name: Build
       run: dotnet build $env:Solution_Name --configuration ${{ matrix.configuration }} --no-restore
 
-    # Execute all unit tests in the solution.
-    # No test project exists yet; this is a no-op today and will pick up tests
-    # automatically once a test project is added to the solution.
+    # Execute all unit tests in the solution and collect code coverage (Cobertura, via coverlet).
     - name: Execute unit tests
-      run: dotnet test $env:Solution_Name --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+      run: dotnet test $env:Solution_Name --configuration ${{ matrix.configuration }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage
+
+    # Upload the coverage report (coverage/**/coverage.cobertura.xml) as a downloadable artifact,
+    # named per configuration so the Debug and Release legs don't collide.
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.configuration }}
+        path: coverage/**/coverage.cobertura.xml
+        if-no-files-found: error
 
     # Publish the Release build so the compiled app can be downloaded from the run
     - name: Publish

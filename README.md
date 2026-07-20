@@ -194,9 +194,33 @@ dotnet format DashDetective.sln --verify-no-changes
 
 ### Continuous integration
 The [.NET Desktop (Avalonia)](.github/workflows/dotnet-desktop.yml) workflow restores, **verifies
-formatting** (`dotnet format --verify-no-changes`), builds Debug + Release, runs tests (no test
-project yet — see the Roadmap), and publishes the Release build as a downloadable artifact. It runs on
-`windows-latest`.
+formatting** (`dotnet format --verify-no-changes`), builds Debug + Release, runs the **test suite with
+code coverage** (uploaded as a per-configuration artifact), and publishes the Release build as a
+downloadable artifact. It runs on `windows-latest`.
+
+### Testing
+Unit tests live in **`tests/DashDetective.Tests`** (xUnit, hand-rolled fakes — no mocking framework).
+Run them from the repo root:
+```powershell
+dotnet test DashDetective.sln
+```
+Collect coverage locally (Cobertura, via coverlet — the same data CI uploads as an artifact):
+```powershell
+dotnet test DashDetective.sln --collect:"XPlat Code Coverage"
+```
+The suite has **153 tests** — a one-line harness smoke check plus 152 tests across 15 classes, covering
+the shared pure-logic seams and the sampling/persistence behaviour:
+
+| Area | Classes (tests) |
+| --- | --- |
+| Charts | SparklinePoints (7), ChartScale (11) |
+| Formatters | DataRateFormatter (25), UptimeFormatter (7), FileSizeFormatter (8), ProcessMemoryFormatter (6) |
+| Catalogs & identity | HardwareCatalog (15), HardwareNameFormatter (10), CurrentUserProvider (8) |
+| Collections & paging | ProcessTreeBuilder (9), CollectionReconciler (6), PagerMath (18) |
+| Sampling & settings | MetricChannel (8), SystemMetricsService (7), SettingsStore (7) |
+
+There is no coverage **badge** — that would need a third-party service (Codecov/Coveralls); the local
+command above plus the CI artifact stand in for it.
 
 ## Project layout
 
@@ -206,9 +230,12 @@ DashDetective/
   src/
     Shared/                       marker interfaces, ViewModelBase, AppInfo, Controls, Styles
     Services/                     Theming (ThemeService), SystemMetrics + Network samplers, Settings
-                                  (persistence store), Startup (launch-at-startup), Diagnostics, Identity
+                                  (persistence store), Startup (launch-at-startup), Diagnostics,
+                                  Identity, Threading (UI-timer seam)
     Shell/                        MainWindow, MainWindowViewModel, ViewLocator, Navigation
     Tabs/                         Dashboard, FileExplorer, Processes, Performance, Network, Hardware, Settings
+tests/
+  DashDetective.Tests/            xUnit suite (pure-logic + behaviour, hand-rolled fakes)
 docs/
   ARCHITECTURE.md                 reader-facing architecture doc
 .github/workflows/                CI
@@ -221,8 +248,9 @@ Honest near-term work, roughly in priority order:
 - **Settings persistence** — theme, accent, nav position/collapse, refresh interval, show-hidden and the
   Monitoring toggles now persist to `settings.json`; the File-Explorer **pane sizes** remain session-only
   (extend the store to cover them next).
-- **Automated tests** — there is no test project yet; the CI test step is a no-op placeholder. Add unit
-  coverage for the formatters, catalogs and sampler math.
+- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (153 tests) now covers the shared
+  pure-logic seams and the sampling/persistence behaviour, and CI collects code coverage. Extend it as
+  new `Shared`/`Services` types land.
 - **Storage tab** — a dedicated storage view (per-volume capacity, activity, SMART) is planned but not
   started.
 - **Hardware sensors** — wire the **Sensors** card to a real temperature/fan source (needs vendor SDKs
