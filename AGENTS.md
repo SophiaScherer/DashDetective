@@ -25,36 +25,38 @@ Not all of these exist yet. Only build what is listed below as "currently active
 
 ## Current Scope — READ THIS FIRST
 
-**The feature currently being built (the only one you may modify):**
-
-- `Storage` — initial UI implementation, **static mock data** (status below).
+**No feature is mid-build right now — every planned top-level feature is live.** Pick up only what a new
+task explicitly assigns, and do not modify a live feature without an explicit scope expansion.
 
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
-patterns), but do NOT modify while building Storage** (full write-ups in *Appendix — Completed
-Feature Details*): the shell **Navigation bar**, **Dashboard**, **Settings** (fully live — Appearance,
-Navigation, Monitoring and Export & Data), **File Explorer**, **Network**, **Processes**, **Performance**,
-**Hardware**. Two cross-cutting passes are also complete (repo-hygiene / portfolio pass; de-duplication /
-composition refactor) — write-ups in the Appendix. Editing any of these needs an explicit scope expansion.
+patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
+**Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
+**File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, and **Storage** (live —
+drives/health view; status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio
+pass; de-duplication / composition refactor) — write-ups in the Appendix.
 
-**Storage — implementation status** (the already-live features' write-ups live in *Appendix —
-Completed Feature Details* at the end of this file):
+**Storage — implementation status** (LIVE):
 
-- **Storage** — **initial UI in progress**, built in phases (plan:
+- **Storage** — **fully live**, built in phases (plan:
   `C:\Users\User\.claude\plans\develop-a-plan-to-radiant-raven.md`). A read-only drives/health view per
-  the design comp: a top row of three **drive summary cards** (name + health pill, model, usage bar,
-  used/free, Read / Write / Temp) over a bottom row of a **Partitions** table (Vol · Label · File System
+  the design comp: a top row of **drive summary cards** (name + health pill, model, usage bar, used/free,
+  and live **Read / Write / Temp**) over a bottom row of a **Partitions** table (Vol · Label · File System
   · Capacity · Free) and a **Disk Activity (C:)** card (amber area chart + Active time / Avg response /
   Queue). Self-contained tab under `src/Tabs/Storage/` (`StorageView` + `StorageViewModel`), **page-
   scrolling like Network** (not `ISelfScrollingPage`), reusing `Border Classes="panel"`, the shared
   `Sparkline` (with the `ChartStorage` amber key), and the built-in `ProgressBar` for the usage bars.
-  **This UI pass is static mock data only** — live samplers/providers (`StorageUsageSampler`,
-  `DiskInfoProvider`, both already in `src/Services/SystemMetrics`), real metrics, and the
-  `IRefreshablePage` / `ILiveSamplingPage` seams are a **later technical pass**, not built yet. No new
-  packages, no new shared controls.
+  Live sources: the drive cards from `PhysicalDiskProvider` + `StorageComposer` + `VolumeProvider`; the
+  Disk Activity chart + Active time / Avg response / **Queue** readouts from the shared `StorageUsageSampler`
+  feed (via `SystemMetricsService`); per-disk **Read/Write** from the page-local
+  `PhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
+  card's **Temp** from `DiskTemperatureProvider` (non-admin `IOCTL_STORAGE_QUERY_PROPERTY` health-log read,
+  refreshed on a slow ~15 s sub-cadence of the throughput timer). Wired to `IRefreshablePage` /
+  `ILiveSamplingPage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB + GPU temperature stay deferred
+  (need admin or vendor SDKs). No new packages, no new shared controls.
 
-**Nothing else is out of scope now that Storage is active** — every planned top-level feature is either
-live or being built, except the **Deferred Dashboard work** below (GPU temperature + multi-GPU, still
-explicitly not built). Do not scaffold, stub, or "prepare" for the deferred items without an explicit task.
+**Nothing is out of scope for lack of a live feature** — every planned top-level feature is live, except
+the **Deferred Dashboard work** below (GPU temperature + multi-GPU, still explicitly not built). Do not
+scaffold, stub, or "prepare" for the deferred items without an explicit task.
 
 ### Deferred Dashboard work — DO NOT build without an explicit task
 
@@ -65,6 +67,8 @@ a task explicitly reactivates this. Full plan:
 
 - **GPU temperature** — would append `· <temp>°C` to the GPU card caption. No universal Windows
   API; needs vendor SDKs (NVML / ADLX / IGCL) or a library, best-effort with graceful fallback.
+  (Note: this stays deferred even though **drive** temperature was solved in-box for NVMe — see the
+  Storage `DiskTemperatureProvider` note above. GPUs have no equivalent non-admin standard-Windows source.)
 
 - **Multi-GPU layout** — on multi-GPU machines, render one card per GPU via a dynamic
   `ObservableCollection` + `ItemsControl` in a single wrapping row, relocating the Storage/Network
@@ -327,13 +331,14 @@ currently exist.
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
                                  SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IDisposable.)
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
-                                (ACTIVE BUILD — initial UI, static mock data. Read-only drives/health
-                                 view: a top row of three DriveCard summary cards over a Partitions
-                                 table (PartitionRow item VMs) + a Disk Activity card (shared Sparkline,
-                                 ChartStorage amber). Page-scrolls like Network (not ISelfScrollingPage).
-                                 Built in phases — live samplers (StorageUsageSampler/DiskInfoProvider)
-                                 + IRefreshablePage/ILiveSamplingPage are a later technical pass. See
-                                 Current Scope + the plan file.)
+                                (LIVE — read-only drives/health view: a top row of DriveCard summary
+                                 cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
+                                 card (shared Sparkline, ChartStorage amber). Page-scrolls like Network
+                                 (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
+                                 VolumeProvider; Disk Activity + Queue from the shared StorageUsageSampler
+                                 feed; per-disk Read/Write from PhysicalDiskThroughputSampler; NVMe Temp
+                                 from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
+                                 ILiveSamplingPage/IDisposable.)
 ```
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
