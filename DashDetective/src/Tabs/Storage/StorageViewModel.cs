@@ -3,9 +3,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
+using DashDetective.Tabs.FileExplorer;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Storage;
 
@@ -31,6 +34,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         // Feed the Disk Activity surface from the shared storage feed. The subscription immediately replays
         // the latest cached sample, seeding the chart with real data on the first frame.
         _storageSubscription = service.SubscribeStorage(OnStorage, OnStorageFailed);
+
+        // Load the (static structural) volume list off the UI thread; the table fills in when ready.
+        _ = LoadPartitionsAsync();
     }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
@@ -66,14 +72,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         },
     };
 
-    /// <summary>The partition rows shown in the Partitions table (one per volume, lettered or not).</summary>
-    public ObservableCollection<PartitionRow> Partitions { get; } = new() {
-        new PartitionRow { Vol = "C:", Label = "Windows", FileSystem = "NTFS", Capacity = "2.0 TB", Free = "640 GB" },
-        new PartitionRow { Vol = "D:", Label = "Data", FileSystem = "NTFS", Capacity = "4.0 TB", Free = "2.32 TB" },
-        new PartitionRow { Vol = "E:", Label = "Backup", FileSystem = "NTFS", Capacity = "8.0 TB", Free = "1.04 TB" },
-        new PartitionRow { Vol = "—", Label = "Recovery", FileSystem = "NTFS", Capacity = "990 MB", Free = "120 MB" },
-        new PartitionRow { Vol = "—", Label = "EFI System", FileSystem = "FAT32", Capacity = "260 MB", Free = "98 MB" },
-    };
+    /// <summary>The partition rows shown in the Partitions table (one per volume, lettered or not). Loaded
+    /// from <see cref="VolumeProvider"/> at startup and rebuilt on Refresh; empty until the first load.</summary>
+    public ObservableCollection<PartitionRow> Partitions { get; } = new();
 
     // Width of the Disk Activity history, matching the app's charts (60 samples = one per second).
     private const int WindowSeconds = 60;
@@ -117,10 +118,41 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>
     /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
-    /// Disk Activity surface updates once even while paused). Re-reading the static drive/partition
-    /// providers is added when those surfaces go live. Drives the shell's Refresh action.
+    /// Disk Activity surface updates once even while paused) and re-reads the volume list. Drives the
+    /// shell's Refresh action.
     /// </summary>
-    public void Refresh() => _service.RefreshAll();
+    public void Refresh() {
+        _service.RefreshAll();
+        _ = LoadPartitionsAsync();
+    }
+
+    /// <summary>
+    /// Reads the mounted volumes via <see cref="VolumeProvider"/> and rebuilds the Partitions table:
+    /// lettered volumes first (by letter), then unlettered partitions (Recovery/EFI). The provider soft-
+    /// fails to an empty list, so any failure just leaves the table empty rather than faulting the task.
+    /// </summary>
+    private async Task LoadPartitionsAsync() {
+        try {
+            var volumes = await VolumeProvider.GetAsync();
+            Partitions.Clear();
+            foreach (var volume in volumes
+                         .OrderByDescending(v => v.DriveLetter.HasValue)
+                         .ThenBy(v => v.DriveLetter))
+                Partitions.Add(ToPartitionRow(volume));
+        } catch {
+            Partitions.Clear();
+        }
+    }
+
+    /// <summary>Maps one volume to a display row: "C:"/"—" for the letter, the formatted capacity/free
+    /// (binary units, like the Dashboard), and "—" for a missing label/file system.</summary>
+    private static PartitionRow ToPartitionRow(VolumeInfo volume) => new() {
+        Vol = volume.DriveLetter is { } letter ? $"{letter}:" : "—",
+        Label = string.IsNullOrEmpty(volume.Label) ? "—" : volume.Label,
+        FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
+        Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
+        Free = FileSizeFormatter.Format((long)volume.FreeBytes),
+    };
 
     /// <summary>
     /// Pauses/resumes the tab's own live sampling for the shell's Live pill. The shared metric feed is
