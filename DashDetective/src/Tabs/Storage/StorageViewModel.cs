@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using System;
@@ -12,11 +13,19 @@ namespace DashDetective.Tabs.Storage;
 /// a Partitions table and a Disk Activity chart. Page-scrolls as a whole like the Dashboard/Network (not
 /// <see cref="ISelfScrollingPage"/>).
 ///
-/// This is the initial UI pass: surfaces are seeded with <b>static mock data</b>. Live samplers/providers
-/// (<c>StorageUsageSampler</c>, <c>DiskInfoProvider</c> in <c>src/Services/SystemMetrics</c>) and the
-/// <see cref="IRefreshablePage"/> / <see cref="ILiveSamplingPage"/> seams are a later technical pass.
+/// The live technical pass is landing feature-by-feature: this view model now takes the shared
+/// <see cref="SystemMetricsService"/> and opts into the shell's <see cref="IRefreshablePage"/> /
+/// <see cref="ILiveSamplingPage"/> routing. The surfaces below are still seeded with <b>static mock
+/// data</b> and are replaced one per phase (Disk Activity → Partitions → drive cards).
 /// </summary>
-public partial class StorageViewModel : ViewModelBase {
+public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
+    // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
+    // storage feed in a later phase; held here now so the ctor injection and shell routing are in place.
+    private readonly SystemMetricsService _service;
+
+    public StorageViewModel(SystemMetricsService service) {
+        _service = service;
+    }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
     // soft (~0.16 alpha) tint of the same hue for the pill fill.
@@ -87,4 +96,22 @@ public partial class StorageViewModel : ViewModelBase {
         }
         return history;
     }
+
+    /// <summary>
+    /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
+    /// Disk Activity surface updates once even while paused). Re-reading the static drive/partition
+    /// providers is added when those surfaces go live. Drives the shell's Refresh action.
+    /// </summary>
+    public void Refresh() => _service.RefreshAll();
+
+    /// <summary>
+    /// Pauses/resumes the tab's own live sampling for the shell's Live pill. The shared metric feed is
+    /// paused separately by the shell via <see cref="SystemMetricsService.Pause"/>; this hook is for the
+    /// page-local per-disk throughput timer added in a later phase, so it is a no-op for now.
+    /// </summary>
+    public void SetLive(bool live) { }
+
+    /// <summary>Releases the tab's live resources (metric subscriptions and page-local timers) once those
+    /// phases land. Nothing to release yet. Safe to call more than once.</summary>
+    public void Dispose() { }
 }
