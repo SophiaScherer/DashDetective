@@ -65,6 +65,10 @@ a task explicitly reactivates this. Full plan:
 
 - **GPU temperature** — would append `· <temp>°C` to the GPU card caption. No universal Windows
   API; needs vendor SDKs (NVML / ADLX / IGCL) or a library, best-effort with graceful fallback.
+  (By contrast, **drive** temperature *is* available in-box: the Storage tab's drive cards now show a
+  live NVMe temperature read hand-rolled via `DiskTemperatureProvider` — the
+  `IOCTL_STORAGE_QUERY_PROPERTY` NVMe health-log query, no admin and no new package. Only NVMe drives
+  expose it; SATA/HDD/USB cards still show "—". This does **not** reopen GPU temperature.)
 
 - **Multi-GPU layout** — on multi-GPU machines, render one card per GPU via a dynamic
   `ObservableCollection` + `ItemsControl` in a single wrapping row, relocating the Storage/Network
