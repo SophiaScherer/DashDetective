@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
@@ -22,9 +23,14 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
     // storage feed in a later phase; held here now so the ctor injection and shell routing are in place.
     private readonly SystemMetricsService _service;
+    private readonly IDisposable _storageSubscription;
 
     public StorageViewModel(SystemMetricsService service) {
         _service = service;
+
+        // Feed the Disk Activity surface from the shared storage feed. The subscription immediately replays
+        // the latest cached sample, seeding the chart with real data on the first frame.
+        _storageSubscription = service.SubscribeStorage(OnStorage, OnStorageFailed);
     }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
@@ -72,30 +78,37 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Width of the Disk Activity history, matching the app's charts (60 samples = one per second).
     private const int WindowSeconds = 60;
 
-    // A fixed, deterministic 60-sample mock "disk active time" history, so the chart resembles the design
-    // comp's drifting series until the live sampler is wired. Base ~14 % with bounded drift, like the comp.
-    private static readonly double[] MockDiskHistory = BuildMockDiskHistory();
+    // The rolling active-time history the Disk Activity chart draws (Task Manager's disk "Active time",
+    // 0–100 %). The samplers are shared across pages; this history is this tab's own, like the Dashboard's.
+    private readonly double[] _diskHistory = new double[WindowSeconds];
 
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
-    public string DiskPoints { get; } = SparklinePoints.Build(MockDiskHistory, 100);
+    [ObservableProperty] private string _diskPoints = "";
 
-    /// <summary>The "Active time" readout — the latest sample of the mock history (e.g. "31%").</summary>
-    public string DiskActive { get; } =
-        Math.Round(MockDiskHistory[^1]).ToString("0", CultureInfo.InvariantCulture) + "%";
+    /// <summary>The "Active time" readout — the latest active-time sample (e.g. "31%").</summary>
+    [ObservableProperty] private string _diskActive = "0%";
 
-    /// <summary>Builds the deterministic mock disk history (fixed seed → identical across runs) as a
-    /// bounded random walk around the comp's ~14 % base, so the area chart looks alive without a sampler.</summary>
-    private static double[] BuildMockDiskHistory() {
-        var random = new Random(0x5104);
-        var history = new double[WindowSeconds];
-        var value = 14.0;
-        for (var i = 0; i < history.Length; i++) {
-            value += (random.NextDouble() - 0.5) * 14; // drift ±7 per step
-            value = Math.Clamp(value, 2, 46);
-            history[i] = value;
-        }
-        return history;
+    /// <summary>The "Avg response" readout — the average disk transfer time in ms (e.g. "0.4 ms").</summary>
+    [ObservableProperty] private string _diskResponse = "0 ms";
+
+    /// <summary>Storage subscription callback: append the active time to the history, then refresh the
+    /// Disk Activity surface (chart, Active time and Avg response readouts).</summary>
+    private void OnStorage(StorageSample sample) {
+        MetricChannel.PushHistory(_diskHistory, sample.ActivePercent);
+        DiskActive = Math.Round(sample.ActivePercent).ToString("0", CultureInfo.InvariantCulture) + "%";
+        DiskResponse = FormatResponse(sample.ResponseSeconds);
+        DiskPoints = SparklinePoints.Build(_diskHistory, 100);
     }
+
+    /// <summary>Sampler-failure handler for the Disk Activity surface: shows neutral placeholders.</summary>
+    private void OnStorageFailed() {
+        DiskActive = "—";
+        DiskResponse = "—";
+    }
+
+    /// <summary>Formats the average transfer time (seconds) as milliseconds, e.g. "0.4 ms".</summary>
+    private static string FormatResponse(double seconds) =>
+        (seconds * 1000).ToString("0.0", CultureInfo.InvariantCulture) + " ms";
 
     /// <summary>
     /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
@@ -111,7 +124,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// </summary>
     public void SetLive(bool live) { }
 
-    /// <summary>Releases the tab's live resources (metric subscriptions and page-local timers) once those
-    /// phases land. Nothing to release yet. Safe to call more than once.</summary>
-    public void Dispose() { }
+    /// <summary>Unsubscribes from the shared storage feed. The samplers are owned (and disposed) by the
+    /// shared service; page-local timers are released here as later phases add them. Safe to call twice.</summary>
+    public void Dispose() => _storageSubscription.Dispose();
 }
