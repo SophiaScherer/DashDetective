@@ -118,6 +118,16 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private static string FormatResponse(double seconds) =>
         (seconds * 1000).ToString("0.0", CultureInfo.InvariantCulture) + " ms";
 
+    /// <summary>Drive summary rows for the shell's system report: one line per drive with its capacity
+    /// split and health, read from the current on-screen cards (no re-sampling). Matches the Hardware /
+    /// Network report sections.</summary>
+    public IReadOnlyList<(string Key, string Value)> GetReportRows() {
+        var rows = new List<(string Key, string Value)>(Drives.Count);
+        foreach (var drive in Drives)
+            rows.Add((drive.Name, $"{drive.Used} used / {drive.Free} free · {drive.Health}"));
+        return rows;
+    }
+
     /// <summary>
     /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
     /// Disk Activity surface updates once even while paused) and re-reads the drive + volume info. Drives

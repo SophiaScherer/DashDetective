@@ -264,6 +264,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         sb.AppendLine("Network configuration");
         foreach (var (key, value) in _network.GetPrimaryConfigRows())
             AppendReportRow(sb, key, value);
+        sb.AppendLine();
+
+        sb.AppendLine("Storage");
+        foreach (var (key, value) in _storage.GetReportRows())
+            AppendReportRow(sb, key, value);
 
         return sb.ToString();
     }
