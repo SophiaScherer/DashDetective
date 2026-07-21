@@ -203,7 +203,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         foreach (var diskNumber in _temperatureDiskNumbers)
             if (DiskTemperatureProvider.ReadCelsius(diskNumber) is double celsius
                 && _cardsByDisk.TryGetValue(diskNumber, out var card))
-                card.Temp = FormatTemp(celsius);
+                card.Temp = DriveTemperatureFormatter.Format(celsius);
     }
 
     /// <summary>Samples per-disk throughput and updates each card's Read/Write readouts in place (bytes/sec
@@ -239,13 +239,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             Free = FileSizeFormatter.Format(data.FreeBytes),
             Read = "—",
             Write = "—",
-            Temp = FormatTemp(data.TemperatureCelsius),
+            Temp = DriveTemperatureFormatter.Format(data.TemperatureCelsius),
         };
     }
-
-    /// <summary>Formats a drive temperature as a whole-degree "NN°C", or "—" when there is no reading.</summary>
-    internal static string FormatTemp(double? celsius) =>
-        celsius is double c ? c.ToString("0", CultureInfo.InvariantCulture) + "°C" : "—";
 
     /// <summary>Usage-bar colour, warming as the drive fills: amber when in caution or ≥ 85 % full, blue in
     /// the mid range, green when comfortably free — reproducing the design comp's per-drive tints.</summary>

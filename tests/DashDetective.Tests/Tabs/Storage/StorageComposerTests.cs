@@ -8,8 +8,9 @@ namespace DashDetective.Tests.Tabs.Storage;
 /// disk's volumes, the volume→disk join, the card name (lowest-lettered volume, "Local Disk" when
 /// unlabelled, disk model when unlettered), health folding, and disk ordering.</summary>
 public class StorageComposerTests {
-    private static PhysicalDiskInfo Disk(int id, string model = "Test Disk", bool healthy = true) =>
-        new(id, model, "", 0, healthy);
+    private static PhysicalDiskInfo Disk(int id, string model = "Test Disk", bool healthy = true,
+        double? temperatureCelsius = null) =>
+        new(id, model, "", 0, healthy, temperatureCelsius);
 
     private static VolumeInfo Vol(int? disk, char? letter, ulong size, ulong free,
         string label = "", string fs = "NTFS") =>
@@ -93,6 +94,19 @@ public class StorageComposerTests {
     public void Compose_HealthyDisk_MapsToHealthy() {
         var cards = StorageComposer.Compose(new[] { Disk(0) }, new[] { Vol(0, 'C', 1000, 500) });
         Assert.Equal(DriveHealth.Healthy, Assert.Single(cards).Health);
+    }
+
+    [Fact]
+    public void Compose_CarriesDiskTemperatureOntoCard() {
+        var cards = StorageComposer.Compose(
+            new[] { Disk(0, temperatureCelsius: 42) }, new[] { Vol(0, 'C', 1000, 500) });
+        Assert.Equal(42, Assert.Single(cards).TemperatureCelsius);
+    }
+
+    [Fact]
+    public void Compose_DiskWithoutTemperature_LeavesCardTemperatureNull() {
+        var cards = StorageComposer.Compose(new[] { Disk(0) }, new[] { Vol(0, 'C', 1000, 500) });
+        Assert.Null(Assert.Single(cards).TemperatureCelsius);
     }
 
     [Fact]

@@ -69,12 +69,18 @@ public static class DiskTemperatureProvider {
 
             // Health log byte 0 is Critical Warning; bytes 1-2 are Composite Temperature in Kelvin.
             ushort kelvin = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(ProtocolDataOffset + 1));
-            double celsius = kelvin - KelvinOffset;
-            return celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
+            return KelvinToCelsius(kelvin);
         } catch (Exception e) {
             Log.Warn($"DiskTemperatureProvider read failed (drive {deviceId})", e);
             return null;
         }
+    }
+
+    /// <summary>Converts an NVMe composite temperature (Kelvin) to °C, returning <c>null</c> when the value
+    /// is outside a plausible drive range (e.g. 0 Kelvin = "not reported").</summary>
+    internal static double? KelvinToCelsius(ushort kelvin) {
+        double celsius = kelvin - KelvinOffset;
+        return celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
