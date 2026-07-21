@@ -21,6 +21,7 @@ public sealed class SystemMetricsService : IDisposable {
     private const int AlertConsecutiveSamples = 10;
 
     private readonly Func<string> _adapterName;
+    private readonly IDisposable? _cpuDisposable;
     private readonly IDisposable? _gpuDisposable;
     private readonly IDisposable? _storageDisposable;
 
@@ -41,17 +42,19 @@ public sealed class SystemMetricsService : IDisposable {
     public SystemMetricsService()
         : this(CreateSystemSamplers()) { }
 
-    // Unpacks the real sampler set, whose GPU/Storage samplers own PDH handles that must be disposed.
+    // Unpacks the real sampler set, whose CPU/GPU/Storage samplers own native handles that must be disposed.
     private SystemMetricsService(SystemSamplers real)
-        : this(real.Bundle, static () => new DispatcherTimerAdapter(), real.GpuDisposable, real.StorageDisposable) { }
+        : this(real.Bundle, static () => new DispatcherTimerAdapter(), real.CpuDisposable, real.GpuDisposable, real.StorageDisposable) { }
 
     /// <summary>Test seam: injects the sampler delegates and the timer factory so ref-counting, fault
     /// isolation and the alert watcher can be exercised with fakes headlessly (see <see cref="IUiTimer"/>).
     /// The public parameterless ctor builds the real samplers and delegates here, so production is
     /// unchanged.</summary>
     internal SystemMetricsService(MetricSamplers samplers, Func<IUiTimer> timerFactory,
-                                  IDisposable? gpuDisposable = null, IDisposable? storageDisposable = null) {
+                                  IDisposable? cpuDisposable = null, IDisposable? gpuDisposable = null,
+                                  IDisposable? storageDisposable = null) {
         _adapterName = samplers.AdapterName;
+        _cpuDisposable = cpuDisposable;
         _gpuDisposable = gpuDisposable;
         _storageDisposable = storageDisposable;
 
@@ -68,8 +71,8 @@ public sealed class SystemMetricsService : IDisposable {
         _memoryAlertSub = _memory.Subscribe(OnMemoryAlertSample, static () => { });
     }
 
-    // Builds the five real samplers, each wrapped in a Sample() delegate; the GPU/Storage instances are
-    // also returned as disposables (they own PDH query handles disposed in Dispose).
+    // Builds the five real samplers, each wrapped in a Sample() delegate; the CPU/GPU/Storage instances
+    // are also returned as disposables (they own native query handles disposed in Dispose).
     private static SystemSamplers CreateSystemSamplers() {
         var cpu = new CpuUsageSampler();
         var memory = new MemoryUsageSampler();
@@ -80,11 +83,11 @@ public sealed class SystemMetricsService : IDisposable {
         var bundle = new MetricSamplers(
             () => cpu.Sample(), () => memory.Sample(), () => gpu.Sample(),
             () => storage.Sample(), () => network.Sample(), () => network.AdapterName);
-        return new SystemSamplers(bundle, gpu, storage);
+        return new SystemSamplers(bundle, cpu, gpu, storage);
     }
 
-    // Carries the real sampler bundle plus the two PDH-handle owners that need disposing.
-    private readonly record struct SystemSamplers(MetricSamplers Bundle, IDisposable GpuDisposable, IDisposable StorageDisposable);
+    // Carries the real sampler bundle plus the three native-handle owners that need disposing.
+    private readonly record struct SystemSamplers(MetricSamplers Bundle, IDisposable CpuDisposable, IDisposable GpuDisposable, IDisposable StorageDisposable);
 
     /// <summary>Raised when the resource-alert state flips: <c>true</c> once CPU or memory has stayed at or
     /// above the threshold for <see cref="AlertConsecutiveSamples"/> samples, <c>false</c> when both recover.
@@ -164,12 +167,13 @@ public sealed class SystemMetricsService : IDisposable {
             feed.SampleNow();
     }
 
-    /// <summary>Stops all channels and disposes the samplers that own PDH query handles (GPU, Storage).</summary>
+    /// <summary>Stops all channels and disposes the samplers that own native query handles (CPU, GPU, Storage).</summary>
     public void Dispose() {
         _cpuAlertSub.Dispose();
         _memoryAlertSub.Dispose();
         foreach (var feed in _feeds)
             feed.Dispose();
+        _cpuDisposable?.Dispose();
         _gpuDisposable?.Dispose();
         _storageDisposable?.Dispose();
     }
