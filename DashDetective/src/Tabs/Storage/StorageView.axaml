@@ -192,7 +192,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
                             <TextBlock Classes="diskStatLabel" Text="Queue"/>
-                            <TextBlock Classes="diskStatValue" Text="0.03"/>
+                            <TextBlock Classes="diskStatValue" Text="{Binding DiskQueue}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

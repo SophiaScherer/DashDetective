@@ -5,10 +5,12 @@ namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// A single physical-disk snapshot on the aggregate <c>_Total</c> instance: activity as a percentage
-/// (0–100), read/write throughput in bytes per second, and average transfer response time in seconds.
+/// (0–100), read/write throughput in bytes per second, average transfer response time in seconds, and the
+/// average disk queue length (outstanding requests) — Task Manager's disk "Average response"/queue figures.
 /// </summary>
 public readonly record struct StorageSample(
-    double ActivePercent, double ReadBytesPerSec, double WriteBytesPerSec, double ResponseSeconds);
+    double ActivePercent, double ReadBytesPerSec, double WriteBytesPerSec, double ResponseSeconds,
+    double QueueLength);
 
 /// <summary>
 /// Samples total physical-disk metrics via Windows PDH <c>\PhysicalDisk(_Total)\*</c> performance
@@ -60,12 +62,14 @@ public sealed class StorageUsageSampler : IDisposable {
     private const string ReadPath = @"\PhysicalDisk(_Total)\Disk Read Bytes/sec";
     private const string WritePath = @"\PhysicalDisk(_Total)\Disk Write Bytes/sec";
     private const string ResponsePath = @"\PhysicalDisk(_Total)\Avg. Disk sec/Transfer";
+    private const string QueuePath = @"\PhysicalDisk(_Total)\Avg. Disk Queue Length";
 
     private readonly IntPtr _query;
     private readonly IntPtr _idleCounter;
     private readonly IntPtr _readCounter;
     private readonly IntPtr _writeCounter;
     private readonly IntPtr _responseCounter;
+    private readonly IntPtr _queueCounter;
     private readonly bool _ready;
 
     public StorageUsageSampler() {
@@ -77,7 +81,8 @@ public sealed class StorageUsageSampler : IDisposable {
         if (!AddCounter(IdlePath, out _idleCounter)
             || !AddCounter(ReadPath, out _readCounter)
             || !AddCounter(WritePath, out _writeCounter)
-            || !AddCounter(ResponsePath, out _responseCounter)) {
+            || !AddCounter(ResponsePath, out _responseCounter)
+            || !AddCounter(QueuePath, out _queueCounter)) {
             PdhCloseQuery(_query);
             _query = IntPtr.Zero;
             return;
@@ -105,7 +110,8 @@ public sealed class StorageUsageSampler : IDisposable {
         active = active < 0 ? 0 : active > 100 ? 100 : active;
 
         return new StorageSample(
-            active, ReadCounter(_readCounter), ReadCounter(_writeCounter), ReadCounter(_responseCounter));
+            active, ReadCounter(_readCounter), ReadCounter(_writeCounter), ReadCounter(_responseCounter),
+            ReadCounter(_queueCounter));
     }
 
     /// <summary>Reads one formatted counter as a non-negative double, or 0 on any failure/invalid status.</summary>

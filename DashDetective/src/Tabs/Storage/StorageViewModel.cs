@@ -91,12 +91,16 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The "Avg response" readout — the average disk transfer time in ms (e.g. "0.4 ms").</summary>
     [ObservableProperty] private string _diskResponse = "0 ms";
 
+    /// <summary>The "Queue" readout — the average disk queue length / outstanding requests (e.g. "0.03").</summary>
+    [ObservableProperty] private string _diskQueue = "0.00";
+
     /// <summary>Storage subscription callback: append the active time to the history, then refresh the
-    /// Disk Activity surface (chart, Active time and Avg response readouts).</summary>
+    /// Disk Activity surface (chart, Active time, Avg response and Queue readouts).</summary>
     private void OnStorage(StorageSample sample) {
         MetricChannel.PushHistory(_diskHistory, sample.ActivePercent);
         DiskActive = Math.Round(sample.ActivePercent).ToString("0", CultureInfo.InvariantCulture) + "%";
         DiskResponse = FormatResponse(sample.ResponseSeconds);
+        DiskQueue = sample.QueueLength.ToString("0.00", CultureInfo.InvariantCulture);
         DiskPoints = SparklinePoints.Build(_diskHistory, 100);
     }
 
@@ -104,6 +108,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private void OnStorageFailed() {
         DiskActive = "—";
         DiskResponse = "—";
+        DiskQueue = "—";
     }
 
     /// <summary>Formats the average transfer time (seconds) as milliseconds, e.g. "0.4 ms".</summary>
