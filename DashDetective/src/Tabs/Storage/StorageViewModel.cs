@@ -17,10 +17,12 @@ namespace DashDetective.Tabs.Storage;
 /// a Partitions table and a Disk Activity chart. Page-scrolls as a whole like the Dashboard/Network (not
 /// <see cref="ISelfScrollingPage"/>).
 ///
-/// The live technical pass is landing feature-by-feature: this view model now takes the shared
+/// The live technical pass is landing feature-by-feature: this view model takes the shared
 /// <see cref="SystemMetricsService"/> and opts into the shell's <see cref="IRefreshablePage"/> /
-/// <see cref="ILiveSamplingPage"/> routing. The surfaces below are still seeded with <b>static mock
-/// data</b> and are replaced one per phase (Disk Activity → Partitions → drive cards).
+/// <see cref="ILiveSamplingPage"/> routing. Live now: the Disk Activity chart + readouts (shared storage
+/// feed), the Partitions table (<see cref="VolumeProvider"/>) and the drive summary cards
+/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>). Still to come: per-disk Read/Write
+/// throughput (next phase); drive temperature is deferred (SMART), so cards show "—" for Temp.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
@@ -35,8 +37,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         // the latest cached sample, seeding the chart with real data on the first frame.
         _storageSubscription = service.SubscribeStorage(OnStorage, OnStorageFailed);
 
-        // Load the (static structural) volume list off the UI thread; the table fills in when ready.
-        _ = LoadPartitionsAsync();
+        // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
+        _ = LoadStorageAsync();
     }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
@@ -50,27 +52,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private static readonly IBrush BarGreen = Brush("#6ccb5f");
     private static readonly IBrush BarAmber = Brush("#ffcf4d");
 
-    /// <summary>The drive summary cards shown in the top row (one per physical drive).</summary>
-    public ObservableCollection<DriveCard> Drives { get; } = new() {
-        new DriveCard {
-            Name = "Local Disk (C:)", Model = "Samsung 990 Pro 2TB",
-            Health = "Healthy", HealthForeground = HealthyFg, HealthBackground = HealthyBg,
-            UsagePercent = 68, BarBrush = BarBlue,
-            Used = "1.36 TB", Free = "640 GB", Read = "48 MB/s", Write = "12 MB/s", Temp = "41°C",
-        },
-        new DriveCard {
-            Name = "Data (D:)", Model = "WD Black SN850X 4TB",
-            Health = "Healthy", HealthForeground = HealthyFg, HealthBackground = HealthyBg,
-            UsagePercent = 42, BarBrush = BarGreen,
-            Used = "1.68 TB", Free = "2.32 TB", Read = "8 MB/s", Write = "2 MB/s", Temp = "38°C",
-        },
-        new DriveCard {
-            Name = "Backup (E:)", Model = "Seagate Exos 8TB HDD",
-            Health = "Caution", HealthForeground = CautionFg, HealthBackground = CautionBg,
-            UsagePercent = 87, BarBrush = BarAmber,
-            Used = "6.96 TB", Free = "1.04 TB", Read = "2 MB/s", Write = "0 MB/s", Temp = "44°C",
-        },
-    };
+    /// <summary>The drive summary cards shown in the top row (one per physical disk). Composed from
+    /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/> at startup and rebuilt on Refresh;
+    /// empty until the first load.</summary>
+    public ObservableCollection<DriveCard> Drives { get; } = new();
 
     /// <summary>The partition rows shown in the Partitions table (one per volume, lettered or not). Loaded
     /// from <see cref="VolumeProvider"/> at startup and rebuilt on Refresh; empty until the first load.</summary>
@@ -118,30 +103,70 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>
     /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
-    /// Disk Activity surface updates once even while paused) and re-reads the volume list. Drives the
-    /// shell's Refresh action.
+    /// Disk Activity surface updates once even while paused) and re-reads the drive + volume info. Drives
+    /// the shell's Refresh action.
     /// </summary>
     public void Refresh() {
         _service.RefreshAll();
-        _ = LoadPartitionsAsync();
+        _ = LoadStorageAsync();
     }
 
     /// <summary>
-    /// Reads the mounted volumes via <see cref="VolumeProvider"/> and rebuilds the Partitions table:
-    /// lettered volumes first (by letter), then unlettered partitions (Recovery/EFI). The provider soft-
-    /// fails to an empty list, so any failure just leaves the table empty rather than faulting the task.
+    /// Reads the physical disks and volumes once (off the UI thread) and rebuilds both structural surfaces:
+    /// the drive summary cards (composed per disk) and the Partitions table (lettered volumes first, then
+    /// unlettered Recovery/EFI). Both providers soft-fail to empty lists, so any failure just clears the
+    /// surfaces rather than faulting the task.
     /// </summary>
-    private async Task LoadPartitionsAsync() {
+    private async Task LoadStorageAsync() {
         try {
-            var volumes = await VolumeProvider.GetAsync();
+            var disksTask = PhysicalDiskProvider.GetAsync();
+            var volumesTask = VolumeProvider.GetAsync();
+            await Task.WhenAll(disksTask, volumesTask);
+            var disks = disksTask.Result;
+            var volumes = volumesTask.Result;
+
+            Drives.Clear();
+            foreach (var card in StorageComposer.Compose(disks, volumes))
+                Drives.Add(ToDriveCard(card));
+
             Partitions.Clear();
             foreach (var volume in volumes
                          .OrderByDescending(v => v.DriveLetter.HasValue)
                          .ThenBy(v => v.DriveLetter))
                 Partitions.Add(ToPartitionRow(volume));
         } catch {
+            Drives.Clear();
             Partitions.Clear();
         }
+    }
+
+    /// <summary>Maps composed drive data to a summary card: the health pill + usage-bar brushes are the
+    /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are
+    /// placeholders until the live-throughput phase; Temp is "—" (SMART temperature is deferred).</summary>
+    private static DriveCard ToDriveCard(DriveCardData data) {
+        var healthy = data.Health == DriveHealth.Healthy;
+        return new DriveCard {
+            Name = data.Name,
+            Model = data.Model,
+            Health = healthy ? "Healthy" : "Caution",
+            HealthForeground = healthy ? HealthyFg : CautionFg,
+            HealthBackground = healthy ? HealthyBg : CautionBg,
+            UsagePercent = data.UsagePercent,
+            BarBrush = BarBrushFor(data),
+            Used = FileSizeFormatter.Format(data.UsedBytes),
+            Free = FileSizeFormatter.Format(data.FreeBytes),
+            Read = "—",
+            Write = "—",
+            Temp = "—",
+        };
+    }
+
+    /// <summary>Usage-bar colour, warming as the drive fills: amber when in caution or ≥ 85 % full, blue in
+    /// the mid range, green when comfortably free — reproducing the design comp's per-drive tints.</summary>
+    private static IBrush BarBrushFor(DriveCardData data) {
+        if (data.Health == DriveHealth.Caution || data.UsagePercent >= 85)
+            return BarAmber;
+        return data.UsagePercent >= 65 ? BarBlue : BarGreen;
     }
 
     /// <summary>Maps one volume to a display row: "C:"/"—" for the letter, the formatted capacity/free
