@@ -13,7 +13,8 @@ public enum DriveHealth { Healthy, Caution }
 /// bytes and picks brushes.
 /// </summary>
 public readonly record struct DriveCardData(
-    string Name, string Model, DriveHealth Health, double UsagePercent, long UsedBytes, long FreeBytes);
+    int DiskNumber, string Name, string Model, DriveHealth Health,
+    double UsagePercent, long UsedBytes, long FreeBytes);
 
 /// <summary>
 /// Joins physical disks (<see cref="PhysicalDiskInfo"/>) with their volumes (<see cref="VolumeInfo"/>, keyed
@@ -39,6 +40,7 @@ public static class StorageComposer {
             var usagePercent = totalSize > 0 ? used / (double)totalSize * 100 : 0;
 
             cards.Add(new DriveCardData(
+                disk.DeviceId,
                 DriveName(disk, diskVolumes),
                 disk.Model,
                 disk.IsHealthy ? DriveHealth.Healthy : DriveHealth.Caution,

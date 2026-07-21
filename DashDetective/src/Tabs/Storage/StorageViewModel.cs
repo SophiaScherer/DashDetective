@@ -1,10 +1,12 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.FileExplorer;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -21,14 +23,24 @@ namespace DashDetective.Tabs.Storage;
 /// <see cref="SystemMetricsService"/> and opts into the shell's <see cref="IRefreshablePage"/> /
 /// <see cref="ILiveSamplingPage"/> routing. Live now: the Disk Activity chart + readouts (shared storage
 /// feed), the Partitions table (<see cref="VolumeProvider"/>) and the drive summary cards
-/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>). Still to come: per-disk Read/Write
-/// throughput (next phase); drive temperature is deferred (SMART), so cards show "—" for Temp.
+/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), and each card's Read/Write from the
+/// page-local <see cref="PhysicalDiskThroughputSampler"/>. Drive temperature is deferred (SMART), so cards
+/// show "—" for Temp.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
     // storage feed in a later phase; held here now so the ctor injection and shell routing are in place.
+    // Interval of the page-local per-disk throughput timer. Like the Network tab's own coarse timers, this
+    // is deliberately NOT retimed by the Settings refresh interval (which scales only the shared feeds).
+    private static readonly TimeSpan ThroughputInterval = TimeSpan.FromSeconds(1);
+
     private readonly SystemMetricsService _service;
     private readonly IDisposable _storageSubscription;
+
+    // Page-local per-disk read/write sampler + its timer, and the disk-number → card map the tick updates.
+    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly DispatcherTimer _throughputTimer;
+    private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
 
     public StorageViewModel(SystemMetricsService service) {
         _service = service;
@@ -39,6 +51,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
         _ = LoadStorageAsync();
+
+        // Drive the per-disk Read/Write readouts from the page-local sampler on their own 1 Hz timer.
+        _throughputTimer = new DispatcherTimer { Interval = ThroughputInterval };
+        _throughputTimer.Tick += OnThroughputTick;
+        _throughputTimer.Start();
     }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
@@ -126,19 +143,45 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             var volumes = volumesTask.Result;
 
             Drives.Clear();
-            foreach (var card in StorageComposer.Compose(disks, volumes))
-                Drives.Add(ToDriveCard(card));
+            _cardsByDisk.Clear();
+            foreach (var data in StorageComposer.Compose(disks, volumes)) {
+                var card = ToDriveCard(data);
+                Drives.Add(card);
+                _cardsByDisk[data.DiskNumber] = card;
+            }
 
             Partitions.Clear();
             foreach (var volume in volumes
                          .OrderByDescending(v => v.DriveLetter.HasValue)
                          .ThenBy(v => v.DriveLetter))
                 Partitions.Add(ToPartitionRow(volume));
+
+            // Seed the new cards' Read/Write once so they don't sit on "—" until the next timer tick.
+            UpdateThroughput();
         } catch {
             Drives.Clear();
+            _cardsByDisk.Clear();
             Partitions.Clear();
         }
     }
+
+    private void OnThroughputTick(object? sender, EventArgs e) => UpdateThroughput();
+
+    /// <summary>Samples per-disk throughput and updates each card's Read/Write readouts in place (bytes/sec
+    /// formatted like "48 MB/s"). Disks without a current reading are left unchanged.</summary>
+    private void UpdateThroughput() {
+        foreach (var sample in _throughputSampler.Sample()) {
+            if (!_cardsByDisk.TryGetValue(sample.DiskNumber, out var card))
+                continue;
+            card.Read = FormatRate(sample.ReadBytesPerSec);
+            card.Write = FormatRate(sample.WriteBytesPerSec);
+        }
+    }
+
+    /// <summary>Formats a byte-per-second rate as "&lt;size&gt;/s" (e.g. "48 MB/s"), reusing the shared
+    /// binary size formatter.</summary>
+    private static string FormatRate(double bytesPerSec) =>
+        FileSizeFormatter.Format((long)bytesPerSec) + "/s";
 
     /// <summary>Maps composed drive data to a summary card: the health pill + usage-bar brushes are the
     /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are
@@ -180,13 +223,23 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     };
 
     /// <summary>
-    /// Pauses/resumes the tab's own live sampling for the shell's Live pill. The shared metric feed is
-    /// paused separately by the shell via <see cref="SystemMetricsService.Pause"/>; this hook is for the
-    /// page-local per-disk throughput timer added in a later phase, so it is a no-op for now.
+    /// Pauses/resumes the tab's own per-disk throughput timer for the shell's Live pill. The shared metric
+    /// feed (the Disk Activity surface) is paused separately by the shell via
+    /// <see cref="SystemMetricsService.Pause"/>.
     /// </summary>
-    public void SetLive(bool live) { }
+    public void SetLive(bool live) {
+        if (live)
+            _throughputTimer.Start();
+        else
+            _throughputTimer.Stop();
+    }
 
-    /// <summary>Unsubscribes from the shared storage feed. The samplers are owned (and disposed) by the
-    /// shared service; page-local timers are released here as later phases add them. Safe to call twice.</summary>
-    public void Dispose() => _storageSubscription.Dispose();
+    /// <summary>Unsubscribes from the shared storage feed and tears down the page-local throughput timer +
+    /// sampler (the shared feed's samplers are owned/disposed by the service). Safe to call more than once.</summary>
+    public void Dispose() {
+        _storageSubscription.Dispose();
+        _throughputTimer.Stop();
+        _throughputTimer.Tick -= OnThroughputTick;
+        _throughputSampler.Dispose();
+    }
 }
