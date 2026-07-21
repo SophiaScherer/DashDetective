@@ -36,7 +36,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ProcessesViewModel _processes;
     private readonly PerformanceViewModel _performance;
     private readonly NetworkViewModel _network = new();
-    private readonly StorageViewModel _storage = new();
+    private readonly StorageViewModel _storage;
     private readonly HardwareViewModel _hardware = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
@@ -95,6 +95,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
         _performance = new PerformanceViewModel(metrics);
+        _storage = new StorageViewModel(metrics);
 
         // Apply the persisted appearance + layout through the seams that own them, before wiring the
         // controls that observe them. ThemeService stays the only code that writes to the application.
@@ -262,6 +263,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         sb.AppendLine("Network configuration");
         foreach (var (key, value) in _network.GetPrimaryConfigRows())
+            AppendReportRow(sb, key, value);
+        sb.AppendLine();
+
+        sb.AppendLine("Storage");
+        foreach (var (key, value) in _storage.GetReportRows())
             AppendReportRow(sb, key, value);
 
         return sb.ToString();

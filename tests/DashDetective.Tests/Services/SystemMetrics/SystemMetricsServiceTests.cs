@@ -20,7 +20,7 @@ public class SystemMetricsServiceTests {
         public double Cpu = 50;
         public MemorySample Memory = new(10, 0, 0, 0, 0);
         public double Gpu = 33;
-        public StorageSample Storage = new(0, 0, 0, 0);
+        public StorageSample Storage = new(0, 0, 0, 0, 0);
         public NetworkSample Network = new(0, 0);
         public bool NetworkThrows;
         public string AdapterName = "TestNIC";

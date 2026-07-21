@@ -172,8 +172,8 @@
             </Border>
 
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
-                 area fill, like the Dashboard), over three readouts. Active time is mock-live; Avg response
-                 and Queue are fixed placeholders for this UI pass. -->
+                 area fill, like the Dashboard), over three readouts. Active time and Avg response are live
+                 (from the shared _Total storage feed); Queue is a fixed placeholder until its phase. -->
             <Border Grid.Column="1" Classes="panel">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="Disk Activity (C:)"/>
@@ -188,11 +188,11 @@
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
                             <TextBlock Classes="diskStatLabel" Text="Avg response"/>
-                            <TextBlock Classes="diskStatValue" Text="0.4 ms"/>
+                            <TextBlock Classes="diskStatValue" Text="{Binding DiskResponse}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
                             <TextBlock Classes="diskStatLabel" Text="Queue"/>
-                            <TextBlock Classes="diskStatValue" Text="0.03"/>
+                            <TextBlock Classes="diskStatValue" Text="{Binding DiskQueue}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
