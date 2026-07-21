@@ -8,13 +8,13 @@ namespace DashDetective.Tabs.Storage;
 public enum DriveHealth { Healthy, Caution }
 
 /// <summary>
-/// The composed data for one drive summary card: display name, model, health, and the used-space rollup
-/// (usage %, used and free bytes) summed across the disk's volumes. Pure data — the view model formats the
-/// bytes and picks brushes.
+/// The composed data for one drive summary card: display name, model, health, the used-space rollup
+/// (usage %, used and free bytes) summed across the disk's volumes, and the disk's temperature in °C when
+/// available (NVMe only; <c>null</c> otherwise). Pure data — the view model formats the bytes and picks brushes.
 /// </summary>
 public readonly record struct DriveCardData(
     int DiskNumber, string Name, string Model, DriveHealth Health,
-    double UsagePercent, long UsedBytes, long FreeBytes);
+    double UsagePercent, long UsedBytes, long FreeBytes, double? TemperatureCelsius = null);
 
 /// <summary>
 /// Joins physical disks (<see cref="PhysicalDiskInfo"/>) with their volumes (<see cref="VolumeInfo"/>, keyed
@@ -46,7 +46,8 @@ public static class StorageComposer {
                 disk.IsHealthy ? DriveHealth.Healthy : DriveHealth.Caution,
                 usagePercent,
                 (long)used,
-                (long)totalFree));
+                (long)totalFree,
+                disk.TemperatureCelsius));
         }
 
         return cards;

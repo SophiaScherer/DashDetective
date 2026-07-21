@@ -23,9 +23,10 @@ namespace DashDetective.Tabs.Storage;
 /// <see cref="SystemMetricsService"/> and opts into the shell's <see cref="IRefreshablePage"/> /
 /// <see cref="ILiveSamplingPage"/> routing. Live now: the Disk Activity chart + readouts (shared storage
 /// feed), the Partitions table (<see cref="VolumeProvider"/>) and the drive summary cards
-/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), and each card's Read/Write from the
-/// page-local <see cref="PhysicalDiskThroughputSampler"/>. Drive temperature is deferred (SMART), so cards
-/// show "—" for Temp.
+/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), each card's Read/Write from the
+/// page-local <see cref="PhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
+/// <see cref="DiskTemperatureProvider"/> (refreshed on a slow sub-cadence of the throughput timer). Non-NVMe
+/// drives show "—" for Temp (no readable SMART temperature without admin).
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
     // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
@@ -34,6 +35,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // is deliberately NOT retimed by the Settings refresh interval (which scales only the shared feeds).
     private static readonly TimeSpan ThroughputInterval = TimeSpan.FromSeconds(1);
 
+    // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
+    // (≈ every 15 s) rather than every second.
+    private const int TemperatureRefreshTicks = 15;
+
     private readonly SystemMetricsService _service;
     private readonly IDisposable _storageSubscription;
 
@@ -41,6 +46,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
     private readonly DispatcherTimer _throughputTimer;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
+
+    // Disk numbers that reported a temperature at load (NVMe drives) — the ones the slow poll re-reads.
+    private readonly List<int> _temperatureDiskNumbers = new();
+    private int _temperatureTickCounter;
 
     public StorageViewModel(SystemMetricsService service) {
         _service = service;
@@ -154,10 +163,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
             Drives.Clear();
             _cardsByDisk.Clear();
+            _temperatureDiskNumbers.Clear();
             foreach (var data in StorageComposer.Compose(disks, volumes)) {
                 var card = ToDriveCard(data);
                 Drives.Add(card);
                 _cardsByDisk[data.DiskNumber] = card;
+                if (data.TemperatureCelsius.HasValue)
+                    _temperatureDiskNumbers.Add(data.DiskNumber);
             }
 
             Partitions.Clear();
@@ -171,11 +183,28 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         } catch {
             Drives.Clear();
             _cardsByDisk.Clear();
+            _temperatureDiskNumbers.Clear();
             Partitions.Clear();
         }
     }
 
-    private void OnThroughputTick(object? sender, EventArgs e) => UpdateThroughput();
+    private void OnThroughputTick(object? sender, EventArgs e) {
+        UpdateThroughput();
+        // Poll temperature far less often than Read/Write — it barely moves and each read hits the drive.
+        if (++_temperatureTickCounter >= TemperatureRefreshTicks) {
+            _temperatureTickCounter = 0;
+            UpdateTemperatures();
+        }
+    }
+
+    /// <summary>Re-reads each NVMe drive's temperature and updates its card in place. A transient read miss
+    /// leaves the last shown value untouched.</summary>
+    private void UpdateTemperatures() {
+        foreach (var diskNumber in _temperatureDiskNumbers)
+            if (DiskTemperatureProvider.ReadCelsius(diskNumber) is double celsius
+                && _cardsByDisk.TryGetValue(diskNumber, out var card))
+                card.Temp = FormatTemp(celsius);
+    }
 
     /// <summary>Samples per-disk throughput and updates each card's Read/Write readouts in place (bytes/sec
     /// formatted like "48 MB/s"). Disks without a current reading are left unchanged.</summary>
@@ -195,7 +224,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Maps composed drive data to a summary card: the health pill + usage-bar brushes are the
     /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are
-    /// placeholders until the live-throughput phase; Temp is "—" (SMART temperature is deferred).</summary>
+    /// seeded by the throughput sampler; Temp shows the NVMe reading or "—" when none is available.</summary>
     private static DriveCard ToDriveCard(DriveCardData data) {
         var healthy = data.Health == DriveHealth.Healthy;
         return new DriveCard {
@@ -210,9 +239,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             Free = FileSizeFormatter.Format(data.FreeBytes),
             Read = "—",
             Write = "—",
-            Temp = "—",
+            Temp = FormatTemp(data.TemperatureCelsius),
         };
     }
+
+    /// <summary>Formats a drive temperature as a whole-degree "NN°C", or "—" when there is no reading.</summary>
+    internal static string FormatTemp(double? celsius) =>
+        celsius is double c ? c.ToString("0", CultureInfo.InvariantCulture) + "°C" : "—";
 
     /// <summary>Usage-bar colour, warming as the drive fills: amber when in caution or ≥ 85 % full, blue in
     /// the mid range, green when comfortably free — reproducing the design comp's per-drive tints.</summary>

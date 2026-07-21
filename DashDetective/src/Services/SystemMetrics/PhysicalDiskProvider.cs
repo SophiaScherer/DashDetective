@@ -8,11 +8,13 @@ namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
 /// One physical disk: its number (<c>DeviceId</c>, matching <see cref="VolumeInfo.DiskNumber"/>), friendly
-/// model, media/bus type label (e.g. "NVMe SSD"), capacity in bytes, and whether it reports healthy. The
-/// number is the join key the drive-card rollup uses to sum each disk's volumes.
+/// model, media/bus type label (e.g. "NVMe SSD"), capacity in bytes, whether it reports healthy, and its
+/// temperature in °C when available (NVMe drives only; <c>null</c> otherwise). The number is the join key the
+/// drive-card rollup uses to sum each disk's volumes.
 /// </summary>
 public readonly record struct PhysicalDiskInfo(
-    int DeviceId, string Model, string TypeLabel, ulong SizeBytes, bool IsHealthy);
+    int DeviceId, string Model, string TypeLabel, ulong SizeBytes, bool IsHealthy,
+    double? TemperatureCelsius = null);
 
 /// <summary>
 /// Enumerates every physical disk from WMI <c>MSFT_PhysicalDisk</c> (<c>root\Microsoft\Windows\Storage</c>) —
@@ -26,9 +28,17 @@ public static class PhysicalDiskProvider {
     // HealthStatus 0 = Healthy; anything else (Warning/Unhealthy/Unknown) is surfaced as "Caution".
     private const int HealthStatusHealthy = 0;
 
-    public static Task<IReadOnlyList<PhysicalDiskInfo>> GetAsync() => Task.Run(Read);
+    // BusType 17 = NVMe — the only bus we can read a composite temperature from (via DiskTemperatureProvider).
+    private const int BusTypeNvme = 17;
 
-    private static IReadOnlyList<PhysicalDiskInfo> Read() {
+    public static Task<IReadOnlyList<PhysicalDiskInfo>> GetAsync() => GetAsync(DiskTemperatureProvider.ReadCelsius);
+
+    /// <summary>Test seam: the same read with an injected per-disk temperature reader (production passes the
+    /// live NVMe reader). Keeps the WMI enumeration and the temperature read out of tests' way.</summary>
+    internal static Task<IReadOnlyList<PhysicalDiskInfo>> GetAsync(Func<int, double?> readTemperatureCelsius) =>
+        Task.Run(() => Read(readTemperatureCelsius));
+
+    private static IReadOnlyList<PhysicalDiskInfo> Read(Func<int, double?> readTemperatureCelsius) {
         // Guard doubles as the platform-compatibility check for the WMI calls below.
         if (!OperatingSystem.IsWindows())
             return Array.Empty<PhysicalDiskInfo>();
@@ -45,12 +55,17 @@ public static class PhysicalDiskProvider {
                 var disks = new List<PhysicalDiskInfo>();
                 foreach (var obj in results) {
                     using (obj) {
+                        int deviceId = ToInt(obj["DeviceId"]);
+                        int busType = ToInt(obj["BusType"]);
+                        // Only NVMe drives expose a readable composite temperature; leave others at null.
+                        double? temperature = busType == BusTypeNvme ? readTemperatureCelsius(deviceId) : null;
                         disks.Add(new PhysicalDiskInfo(
-                            ToInt(obj["DeviceId"]),
+                            deviceId,
                             ModelOrDefault(obj["FriendlyName"] as string),
-                            DriveTypeLabel(ToInt(obj["MediaType"]), ToInt(obj["BusType"])),
+                            DriveTypeLabel(ToInt(obj["MediaType"]), busType),
                             ToUInt64(obj["Size"]),
-                            ToInt(obj["HealthStatus"]) == HealthStatusHealthy));
+                            ToInt(obj["HealthStatus"]) == HealthStatusHealthy,
+                            temperature));
                     }
                 }
 
@@ -88,7 +103,7 @@ public static class PhysicalDiskProvider {
     /// or "" when unknown. BusType 17 = NVMe; MediaType 4 = SSD, 3 = HDD (same codes as
     /// <see cref="DiskInfoProvider"/> / <c>HardwareInfoProvider</c>).</summary>
     private static string DriveTypeLabel(int mediaType, int busType) {
-        if (busType == 17)
+        if (busType == BusTypeNvme)
             return "NVMe SSD";
         if (mediaType == 4)
             return "SSD";
