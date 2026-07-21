@@ -115,6 +115,20 @@ A six-panel network inspector:
 
 All in-box (`System.Net.NetworkInformation`, `Ping`, `Dns`, `iphlpapi`). IPv6 connections are deferred.
 
+### Storage — *live*
+A read-only drives/health view:
+- **Drive summary cards** — one per physical disk: name + health pill, model, a usage bar with the
+  used/free split, and live **Read / Write** throughput plus **Temp** (NVMe drives).
+- **Partitions** table — every volume (Vol · Label · File System · Capacity · Free).
+- **Disk Activity** chart — the system drive's active-time % as an amber area chart, with Active time /
+  Avg response / Queue readouts.
+
+Drive and volume structure come from WMI (`MSFT_PhysicalDisk` / volumes); disk activity, response and
+queue from PDH `\PhysicalDisk` counters on the shared sampler; per-disk Read/Write from a page-local
+throughput sampler; and NVMe **temperature** from an in-box `IOCTL_STORAGE_QUERY_PROPERTY` health-log
+read — no admin, no third-party library. SATA/HDD/USB temperature stays deferred (needs admin or vendor
+tooling), so those cards show `—`.
+
 ### Hardware — *live*
 A spec sheet of cards — **Processor**, **Graphics**, **Motherboard**, **Memory**, **Storage Devices**
 and **Sensors** — populated from WMI, with a rated-spec catalog filling in details WMI can't report.
@@ -248,12 +262,11 @@ Honest near-term work, roughly in priority order:
 - **Settings persistence** — theme, accent, nav position/collapse, refresh interval, show-hidden and the
   Monitoring toggles now persist to `settings.json`; the File-Explorer **pane sizes** remain session-only
   (extend the store to cover them next).
-- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (153 tests) now covers the shared
+- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (174 tests) now covers the shared
   pure-logic seams and the sampling/persistence behaviour, and CI collects code coverage. Extend it as
   new `Shared`/`Services` types land.
-- **Storage tab** — a dedicated storage view (per-volume capacity, activity, SMART) is planned but not
-  started.
 - **Hardware sensors** — wire the **Sensors** card to a real temperature/fan source (needs vendor SDKs
-  or a sensor library), and revisit deferred GPU temperature / multi-GPU layouts.
+  or a sensor library), and revisit deferred GPU temperature / multi-GPU layouts. (Drive temperature is
+  already live for NVMe on the Storage tab via an in-box IOCTL read; SATA/HDD/USB still need admin.)
 - **Deferred metrics** — per-process **network throughput** in Processes and **IPv6** active
   connections in Network both await a suitable in-box data source.
