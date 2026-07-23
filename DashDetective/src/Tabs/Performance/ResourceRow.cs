@@ -73,17 +73,18 @@ public partial class ResourceRow : ObservableObject {
     [ObservableProperty] private bool _isSelected;
 
     /// <summary>Whether this resource offers an "Overall / Detailed" chart toggle (CPU logical processors,
-    /// GPU engines). False for resources with only a single utilization series. Set once at build time.</summary>
-    public bool SupportsDetail { get; set; }
+    /// GPU engines). False for resources with only a single utilization series. Observable because the CPU row
+    /// gains it once the per-core sampler enumerates its logical processors on the first tick.</summary>
+    [ObservableProperty] private bool _supportsDetail;
 
     /// <summary>The "Detailed" segment's label, e.g. "Logical processors" (CPU) or "Individual engines"
     /// (GPU). Only meaningful when <see cref="SupportsDetail"/> is true.</summary>
-    public string DetailLabel { get; set; } = "";
+    [ObservableProperty] private string _detailLabel = "";
 
     /// <summary>The per-subunit mini charts shown in the Detailed view (one per logical processor / engine).
     /// Empty unless <see cref="SupportsDetail"/> is true; each chart's points are live-updated by the owning
-    /// view model.</summary>
-    public IReadOnlyList<SubChart> SubCharts { get; set; } = Array.Empty<SubChart>();
+    /// view model. Observable so a lazily-built set (CPU cores) refreshes the bound grid.</summary>
+    [ObservableProperty] private IReadOnlyList<SubChart> _subCharts = Array.Empty<SubChart>();
 
     /// <summary>Whether the Detailed (per-subunit) view is shown rather than the single overall chart.
     /// Persisted per category (CPU / GPU) by the shell.</summary>

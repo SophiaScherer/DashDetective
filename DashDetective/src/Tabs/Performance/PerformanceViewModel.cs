@@ -69,6 +69,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         set => _gpuRow.IsDetailed = value;
     }
 
+    /// <summary>Whether the CPU resource shows its per-logical-processor "Detailed" charts. Persisted by the shell.</summary>
+    public bool CpuDetailedView {
+        get => _cpuRow.IsDetailed;
+        set => _cpuRow.IsDetailed = value;
+    }
+
     private readonly SystemMetricsService _service;
     private readonly IDisposable[] _subscriptions;
 
@@ -78,6 +84,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _cpuUtilTile;
     private readonly StatTile _cpuProcessesTile;
     private readonly StatTile _cpuUptimeTile;
+
+    // CPU per-logical-processor "Detailed" view: a page-local per-core sampler drives one mini chart per
+    // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
+    // on the disk timer. Capped so an extreme core count stays responsive.
+    private const int MaxLogicalProcessorCharts = 64;
+    private readonly LogicalProcessorSampler _cpuSampler = new();
+    private readonly List<CoreChart> _cpuCores = new();
+    private readonly Dictionary<string, CoreChart> _cpuCoresByInstance = new();
 
     // ---- Memory (live) ----
     private readonly double[] _memoryHistory = new double[WindowSeconds];
@@ -178,6 +192,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // DetailChanged (the shell subscribes to that after seeding, so the seed doesn't trigger a save).
         BuildGpuEngines();
         _gpuRow.PropertyChanged += OnResourceDetailChanged;
+        _cpuRow.PropertyChanged += OnResourceDetailChanged;
 
         // Populate the rail (CPU, Memory, [disks], GPU, Network) and select the first row. Disk rows are added
         // once the inventory load completes.
@@ -263,6 +278,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     public void Refresh() {
         _service.RefreshAll();
         UpdateDisks();
+        UpdateGpuEngines();
+        UpdateCpuCores();
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadGpuInfoAsync();
@@ -441,6 +458,44 @@ public partial class PerformanceViewModel : ViewModelBase,
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
         UpdateGpuEngines();
+        UpdateCpuCores();
+    }
+
+    /// <summary>Samples per-logical-processor utilisation and rebuilds each core's mini chart. Builds the core
+    /// charts lazily on the first non-empty sample (its instances name and count the charts, capped for very
+    /// high core counts). Sampled every tick so the Detailed view is warm when opened.</summary>
+    private void UpdateCpuCores() {
+        var samples = _cpuSampler.Sample();
+        if (samples.Count == 0)
+            return;
+        if (_cpuCores.Count == 0)
+            BuildCpuCores(samples);
+
+        foreach (var sample in samples) {
+            if (!_cpuCoresByInstance.TryGetValue(sample.Instance, out var core))
+                continue;
+            MetricChannel.PushHistory(core.History, Math.Clamp(sample.Percent, 0, 100));
+            core.Chart.Points = SparklinePoints.Build(core.History, 100);
+        }
+    }
+
+    /// <summary>Creates one mini chart per logical processor (labelled "CPU 0", "CPU 1", … in group/core order)
+    /// and marks the CPU row detail-capable. Called once, on the first sample that reports cores.</summary>
+    private void BuildCpuCores(IReadOnlyList<LogicalProcessorSample> samples) {
+        var count = Math.Min(samples.Count, MaxLogicalProcessorCharts);
+        for (var i = 0; i < count; i++) {
+            var core = new CoreChart {
+                Instance = samples[i].Instance, Chart = new SubChart($"CPU {i}", _cpuRow.ValueBrush),
+                History = new double[WindowSeconds],
+            };
+            _cpuCores.Add(core);
+            _cpuCoresByInstance[core.Instance] = core;
+        }
+
+        // Set SupportsDetail last (after the label + charts) so the toggle only appears once the grid is ready.
+        _cpuRow.DetailLabel = "Logical processors";
+        _cpuRow.SubCharts = _cpuCores.ConvertAll(c => c.Chart);
+        _cpuRow.SupportsDetail = true;
     }
 
     /// <summary>Builds the GPU row's per-engine mini charts (a fixed set matching Task Manager's breakdown;
@@ -629,8 +684,10 @@ public partial class PerformanceViewModel : ViewModelBase,
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _gpuRow.PropertyChanged -= OnResourceDetailChanged;
+        _cpuRow.PropertyChanged -= OnResourceDetailChanged;
         _throughputSampler.Dispose();
         _gpuEngineSampler.Dispose();
+        _cpuSampler.Dispose();
     }
 
     /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four
@@ -649,6 +706,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and the rolling history the view model rebuilds into <see cref="SubChart.Points"/> each tick.</summary>
     private sealed class EngineChart {
         public required string Key { get; init; }
+        public required SubChart Chart { get; init; }
+        public required double[] History { get; init; }
+    }
+
+    /// <summary>One logical processor's mini chart and its backing state: the PDH instance name the sampler
+    /// reports under and the rolling history rebuilt into <see cref="SubChart.Points"/> each tick.</summary>
+    private sealed class CoreChart {
+        public required string Instance { get; init; }
         public required SubChart Chart { get; init; }
         public required double[] History { get; init; }
     }
