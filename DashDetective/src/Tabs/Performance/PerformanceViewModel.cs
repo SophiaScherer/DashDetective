@@ -118,6 +118,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // busiest-engine figure) drives one mini chart per engine type on the disk timer.
     private readonly GpuUsageSampler _gpuEngineSampler = new();
     private readonly List<EngineChart> _gpuEngines = new();
+    private readonly Dictionary<string, EngineChart> _gpuEnginesByBase = new(StringComparer.Ordinal);
 
     // ---- Ethernet / network (live) ----
     private readonly double[] _downHistory = new double[WindowSeconds];
@@ -188,9 +189,9 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select);
 
-        // Give the GPU row its per-engine Detailed charts and forward its Overall/Detailed flips to
-        // DetailChanged (the shell subscribes to that after seeding, so the seed doesn't trigger a save).
-        BuildGpuEngines();
+        // The GPU engine and CPU core charts are discovered on their first sample. Forward each row's
+        // Overall/Detailed flip to DetailChanged (the shell subscribes after seeding, so the seed doesn't
+        // trigger a save).
         _gpuRow.PropertyChanged += OnResourceDetailChanged;
         _cpuRow.PropertyChanged += OnResourceDetailChanged;
 
@@ -498,33 +499,109 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.SupportsDetail = true;
     }
 
-    /// <summary>Builds the GPU row's per-engine mini charts (a fixed set matching Task Manager's breakdown;
-    /// engines the adapter doesn't expose simply read 0) and marks the row as detail-capable.</summary>
-    private void BuildGpuEngines() {
-        var engineDefs = new[] {
-            ("3D", "3D"), ("Copy", "Copy"), ("VideoDecode", "Video Decode"),
-            ("VideoEncode", "Video Encode"), ("Compute", "Compute"),
-        };
-        foreach (var (key, label) in engineDefs)
-            _gpuEngines.Add(new EngineChart {
-                Key = key, Chart = new SubChart(label, _gpuRow.ValueBrush), History = new double[WindowSeconds],
-            });
-
-        _gpuRow.SupportsDetail = true;
-        _gpuRow.DetailLabel = "Individual engines";
-        _gpuRow.SubCharts = _gpuEngines.Select(e => e.Chart).ToList();
-    }
-
-    /// <summary>Samples per-engine GPU utilisation and rebuilds each engine's mini chart in place. Sampled
-    /// every tick (like the disks) so the Detailed view is already warm when the user opens it.</summary>
+    /// <summary>
+    /// Samples per-engine GPU utilisation and rebuilds each engine's mini chart. Drivers expose different,
+    /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
+    /// are discovered dynamically rather than hardcoded: raw engtype instances are aggregated by base engine
+    /// (dropping a trailing instance index, so "compute 0" + "compute 1" fold into "Compute"), and a chart is
+    /// added the first time each engine reports. Sampled every tick so the Detailed view is warm when opened.
+    /// </summary>
     private void UpdateGpuEngines() {
-        var engines = _gpuEngineSampler.SampleEngines();
+        var raw = _gpuEngineSampler.SampleEngines();
+        if (raw.Count == 0)
+            return;
+
+        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var (token, value) in raw) {
+            var key = NormalizeEngine(token);
+            byEngine[key] = byEngine.GetValueOrDefault(key) + value;
+        }
+
+        if (AddNewEngines(byEngine.Keys))
+            PublishGpuEngines();
+
         foreach (var engine in _gpuEngines) {
-            engines.TryGetValue(engine.Key, out var value);
+            byEngine.TryGetValue(engine.Key, out var value);
             MetricChannel.PushHistory(engine.History, Math.Clamp(value, 0, 100));
             engine.Chart.Points = SparklinePoints.Build(engine.History, 100);
         }
     }
+
+    /// <summary>Adds a mini chart for any base engine not seen before; returns whether the set changed.</summary>
+    private bool AddNewEngines(IEnumerable<string> engineKeys) {
+        var added = false;
+        foreach (var key in engineKeys) {
+            if (_gpuEnginesByBase.ContainsKey(key))
+                continue;
+            var chart = new EngineChart {
+                Key = key, Chart = new SubChart(FormatEngineLabel(key), _gpuRow.ValueBrush),
+                History = new double[WindowSeconds],
+            };
+            _gpuEngines.Add(chart);
+            _gpuEnginesByBase[key] = chart;
+            added = true;
+        }
+        return added;
+    }
+
+    /// <summary>Orders the engine charts (main engines first) and republishes them to the GPU row, marking it
+    /// detail-capable once the first engine appears.</summary>
+    private void PublishGpuEngines() {
+        _gpuEngines.Sort(static (a, b) => {
+            var order = EngineOrder(a.Key).CompareTo(EngineOrder(b.Key));
+            return order != 0 ? order : string.CompareOrdinal(a.Key, b.Key);
+        });
+        _gpuRow.SubCharts = _gpuEngines.ConvertAll(e => e.Chart);
+        if (!_gpuRow.SupportsDetail) {
+            _gpuRow.DetailLabel = "Individual engines";
+            _gpuRow.SupportsDetail = true;
+        }
+    }
+
+    // Curated labels for the common engtype tokens; anything else falls back to a title-cased form.
+    private static readonly Dictionary<string, string> KnownEngineLabels = new(StringComparer.Ordinal) {
+        ["3d"] = "3D", ["copy"] = "Copy", ["compute"] = "Compute",
+        ["videodecode"] = "Video Decode", ["video decode"] = "Video Decode",
+        ["videoencode"] = "Video Encode", ["video encode"] = "Video Encode",
+        ["videoprocessing"] = "Video Processing", ["videocodec"] = "Video Codec", ["video codec"] = "Video Codec",
+        ["videojpeg"] = "Video JPEG", ["video jpeg"] = "Video JPEG", ["legacyoverlay"] = "Legacy Overlay",
+        ["security"] = "Security", ["timer"] = "Timer", ["ofa"] = "OFA", ["vr"] = "VR",
+    };
+
+    /// <summary>Normalises a raw engtype token to a base engine name: lower-cased, underscores → spaces, with a
+    /// trailing instance index dropped so "compute 0" and "compute 1" fold together.</summary>
+    private static string NormalizeEngine(string token) {
+        var name = token.Replace('_', ' ').Trim().ToLowerInvariant();
+        var lastSpace = name.LastIndexOf(' ');
+        if (lastSpace > 0 && int.TryParse(name.AsSpan(lastSpace + 1), out _))
+            name = name[..lastSpace];
+        return name;
+    }
+
+    /// <summary>Friendly label for a base engine name — a curated name where known, else a title-cased form
+    /// (tokens containing a digit, e.g. "3d", are upper-cased whole).</summary>
+    private static string FormatEngineLabel(string baseName) {
+        if (KnownEngineLabels.TryGetValue(baseName, out var label))
+            return label;
+        var words = baseName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < words.Length; i++) {
+            var w = words[i];
+            words[i] = w.Any(char.IsDigit) ? w.ToUpperInvariant() : char.ToUpperInvariant(w[0]) + w[1..];
+        }
+        return string.Join(' ', words);
+    }
+
+    /// <summary>Display order for the engine grid — the main engines first, everything else after.</summary>
+    private static int EngineOrder(string baseName) => baseName switch {
+        "3d" => 0,
+        "compute" => 1,
+        "copy" => 2,
+        "videodecode" or "video decode" => 3,
+        "videoencode" or "video encode" => 4,
+        "videoprocessing" => 5,
+        "videocodec" or "video codec" => 6,
+        _ => 9,
+    };
 
     /// <summary>Samples each disk and refreshes its row + tiles in place: rail value + chart + Active tile show
     /// Task Manager's "Active time" (0–100 %); Read/Write show throughput; Response shows the average transfer
