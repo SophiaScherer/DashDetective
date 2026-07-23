@@ -71,4 +71,21 @@ public partial class ResourceRow : ObservableObject {
     public ICommand SelectCommand { get; }
 
     [ObservableProperty] private bool _isSelected;
+
+    /// <summary>Whether this resource offers an "Overall / Detailed" chart toggle (CPU logical processors,
+    /// GPU engines). False for resources with only a single utilization series. Set once at build time.</summary>
+    public bool SupportsDetail { get; set; }
+
+    /// <summary>The "Detailed" segment's label, e.g. "Logical processors" (CPU) or "Individual engines"
+    /// (GPU). Only meaningful when <see cref="SupportsDetail"/> is true.</summary>
+    public string DetailLabel { get; set; } = "";
+
+    /// <summary>The per-subunit mini charts shown in the Detailed view (one per logical processor / engine).
+    /// Empty unless <see cref="SupportsDetail"/> is true; each chart's points are live-updated by the owning
+    /// view model.</summary>
+    public IReadOnlyList<SubChart> SubCharts { get; set; } = Array.Empty<SubChart>();
+
+    /// <summary>Whether the Detailed (per-subunit) view is shown rather than the single overall chart.
+    /// Persisted per category (CPU / GPU) by the shell.</summary>
+    [ObservableProperty] private bool _isDetailed;
 }

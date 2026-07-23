@@ -156,11 +156,60 @@
                         <TextBlock Grid.Column="1" Classes="cardSub" VerticalAlignment="Center"
                                    Text="{Binding SelectedResource.Spec}"/>
                     </Grid>
-                    <TextBlock Classes="cardSub" Text="% Utilization over 60 seconds"/>
+                    <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
+                         supports it: CPU logical processors / GPU engines). -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                   Text="% Utilization over 60 seconds"/>
+                        <Border Grid.Column="1" Classes="segments"
+                                IsVisible="{Binding SelectedResource.SupportsDetail}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button Classes="resButton" Command="{Binding SelectOverallViewCommand}">
+                                    <Border Classes="seg" Classes.selected="{Binding !SelectedResource.IsDetailed}">
+                                        <TextBlock Text="Overall"/>
+                                    </Border>
+                                </Button>
+                                <Button Classes="resButton" Command="{Binding SelectDetailedViewCommand}">
+                                    <Border Classes="seg" Classes.selected="{Binding SelectedResource.IsDetailed}">
+                                        <TextBlock Text="{Binding SelectedResource.DetailLabel}"/>
+                                    </Border>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Overall: one fixed-axis area chart tinted in the resource's colour. -->
                     <controls:Sparkline Height="240" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
+                                        IsVisible="{Binding !SelectedResource.IsDetailed}"
                                         Stroke="{Binding SelectedResource.ValueBrush}"
                                         Points="{Binding SelectedResource.Points}"/>
+
+                    <!-- Detailed: one mini chart per logical processor / engine, wrapping in a scroll area. -->
+                    <ScrollViewer Height="240" HorizontalScrollBarVisibility="Disabled"
+                                  IsVisible="{Binding SelectedResource.IsDetailed}">
+                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SubChart">
+                                    <Border Width="96" Margin="0,0,8,8" Padding="8" CornerRadius="6"
+                                            Background="{DynamicResource AppBackground}">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Label}" FontSize="10"
+                                                       Foreground="{DynamicResource TextMuted}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <controls:Sparkline Height="40" YMin="0" YMax="100"
+                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </StackPanel>
             </Border>
 

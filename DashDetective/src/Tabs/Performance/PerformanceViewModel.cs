@@ -10,8 +10,10 @@ using DashDetective.Tabs.Dashboard;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
@@ -58,6 +60,15 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Raised when <see cref="ShowAllDevices"/> changes, so the shell can persist the choice.</summary>
     public event Action? ScopeChanged;
 
+    /// <summary>Raised when a resource's Overall/Detailed view changes, so the shell can persist the choice.</summary>
+    public event Action? DetailChanged;
+
+    /// <summary>Whether the GPU resource shows its per-engine "Detailed" charts. Persisted by the shell.</summary>
+    public bool GpuDetailedView {
+        get => _gpuRow.IsDetailed;
+        set => _gpuRow.IsDetailed = value;
+    }
+
     private readonly SystemMetricsService _service;
     private readonly IDisposable[] _subscriptions;
 
@@ -88,6 +99,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly double[] _gpuHistory = new double[WindowSeconds];
     private readonly ResourceRow _gpuRow;
     private readonly StatTile _gpu3dTile;
+
+    // GPU per-engine "Detailed" view: a page-local engine sampler (the shared feed carries only the overall
+    // busiest-engine figure) drives one mini chart per engine type on the disk timer.
+    private readonly GpuUsageSampler _gpuEngineSampler = new();
+    private readonly List<EngineChart> _gpuEngines = new();
 
     // ---- Ethernet / network (live) ----
     private readonly double[] _downHistory = new double[WindowSeconds];
@@ -158,6 +174,11 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select);
 
+        // Give the GPU row its per-engine Detailed charts and forward its Overall/Detailed flips to
+        // DetailChanged (the shell subscribes to that after seeding, so the seed doesn't trigger a save).
+        BuildGpuEngines();
+        _gpuRow.PropertyChanged += OnResourceDetailChanged;
+
         // Populate the rail (CPU, Memory, [disks], GPU, Network) and select the first row. Disk rows are added
         // once the inventory load completes.
         RebuildResources();
@@ -215,6 +236,27 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Rail scope segments: "Primary" (one of each kind) and "All devices" (every instance).</summary>
     [RelayCommand] private void SelectPrimaryScope() => ShowAllDevices = false;
     [RelayCommand] private void SelectAllScope() => ShowAllDevices = true;
+
+    /// <summary>Detail segments (shown only for resources that <see cref="ResourceRow.SupportsDetail"/>):
+    /// "Overall" (one chart) and "Detailed" (per-subunit mini charts) on the selected resource.</summary>
+    [RelayCommand]
+    private void SelectOverallView() {
+        if (SelectedResource is not null)
+            SelectedResource.IsDetailed = false;
+    }
+
+    [RelayCommand]
+    private void SelectDetailedView() {
+        if (SelectedResource is not null)
+            SelectedResource.IsDetailed = true;
+    }
+
+    /// <summary>Forwards a resource's Overall/Detailed flip to <see cref="DetailChanged"/> so the shell can
+    /// persist it.</summary>
+    private void OnResourceDetailChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(ResourceRow.IsDetailed))
+            DetailChanged?.Invoke();
+    }
 
     /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused, plus a
     /// re-enumeration of the physical disks.</summary>
@@ -396,7 +438,38 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateDisks();
     }
 
-    private void OnThroughputTick(object? sender, EventArgs e) => UpdateDisks();
+    private void OnThroughputTick(object? sender, EventArgs e) {
+        UpdateDisks();
+        UpdateGpuEngines();
+    }
+
+    /// <summary>Builds the GPU row's per-engine mini charts (a fixed set matching Task Manager's breakdown;
+    /// engines the adapter doesn't expose simply read 0) and marks the row as detail-capable.</summary>
+    private void BuildGpuEngines() {
+        var engineDefs = new[] {
+            ("3D", "3D"), ("Copy", "Copy"), ("VideoDecode", "Video Decode"),
+            ("VideoEncode", "Video Encode"), ("Compute", "Compute"),
+        };
+        foreach (var (key, label) in engineDefs)
+            _gpuEngines.Add(new EngineChart {
+                Key = key, Chart = new SubChart(label, _gpuRow.ValueBrush), History = new double[WindowSeconds],
+            });
+
+        _gpuRow.SupportsDetail = true;
+        _gpuRow.DetailLabel = "Individual engines";
+        _gpuRow.SubCharts = _gpuEngines.Select(e => e.Chart).ToList();
+    }
+
+    /// <summary>Samples per-engine GPU utilisation and rebuilds each engine's mini chart in place. Sampled
+    /// every tick (like the disks) so the Detailed view is already warm when the user opens it.</summary>
+    private void UpdateGpuEngines() {
+        var engines = _gpuEngineSampler.SampleEngines();
+        foreach (var engine in _gpuEngines) {
+            engines.TryGetValue(engine.Key, out var value);
+            MetricChannel.PushHistory(engine.History, Math.Clamp(value, 0, 100));
+            engine.Chart.Points = SparklinePoints.Build(engine.History, 100);
+        }
+    }
 
     /// <summary>Samples each disk and refreshes its row + tiles in place: rail value + chart + Active tile show
     /// Task Manager's "Active time" (0–100 %); Read/Write show throughput; Response shows the average transfer
@@ -547,14 +620,17 @@ public partial class PerformanceViewModel : ViewModelBase,
         row.IsSelected = true;
     }
 
-    /// <summary>Unsubscribes from the shared metrics and tears down the page-local per-disk sampler + timer.
-    /// The shared feed's samplers are owned (and disposed) by the service. Safe to call more than once.</summary>
+    /// <summary>Unsubscribes from the shared metrics and tears down the page-local per-disk + GPU-engine
+    /// samplers and the timer. The shared feed's samplers are owned (and disposed) by the service. Safe to
+    /// call more than once.</summary>
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
+        _gpuRow.PropertyChanged -= OnResourceDetailChanged;
         _throughputSampler.Dispose();
+        _gpuEngineSampler.Dispose();
     }
 
     /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four
@@ -567,5 +643,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required StatTile ReadTile { get; init; }
         public required StatTile WriteTile { get; init; }
         public required StatTile ResponseTile { get; init; }
+    }
+
+    /// <summary>One GPU engine's mini chart and its backing state: the engtype key the sampler reports under
+    /// and the rolling history the view model rebuilds into <see cref="SubChart.Points"/> each tick.</summary>
+    private sealed class EngineChart {
+        public required string Key { get; init; }
+        public required SubChart Chart { get; init; }
+        public required double[] History { get; init; }
     }
 }

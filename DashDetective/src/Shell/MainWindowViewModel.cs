@@ -110,6 +110,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.PropertyChanged += OnNavPropertyChanged;
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
         _performance.ScopeChanged += Persist;
+        _performance.DetailChanged += Persist;
         _metrics.AlertActiveChanged += OnAlertActiveChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
@@ -156,6 +157,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.IsCollapsed = settings.NavCollapsed;
         _fileExplorer.ShowHidden = settings.ShowHiddenFiles;
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
+        _performance.GpuDetailedView = settings.GpuDetailedView;
     }
 
     /// <summary>Resolves a persisted accent name to its preset, or <c>null</c> for the default look
@@ -181,6 +183,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         ResourceAlerts = _settings.ResourceAlerts,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
+        GpuDetailedView = _performance.GpuDetailedView,
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
