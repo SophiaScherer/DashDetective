@@ -1,14 +1,19 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.Dashboard;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
@@ -41,11 +46,34 @@ public partial class PerformanceViewModel : ViewModelBase,
     // comp's palette — parsed like MainWindowViewModel's live dots.
     private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
 
-    /// <summary>The resource rows shown in the left rail, in display order.</summary>
+    /// <summary>The resource rows shown in the left rail, in display order (filtered by <see cref="ShowAllDevices"/>).</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
 
     /// <summary>The currently selected resource, whose detail the right pane shows.</summary>
     [ObservableProperty] private ResourceRow _selectedResource = null!;
+
+    /// <summary>Whether the rail shows every detected instance ("All devices") or just the primary of each kind
+    /// ("Primary"). Persisted by the shell; today it only changes the disk rows (the sole multi-instance
+    /// category), but the filtering is instance-count-agnostic.</summary>
+    [ObservableProperty] private bool _showAllDevices;
+
+    /// <summary>Raised when <see cref="ShowAllDevices"/> changes, so the shell can persist the choice.</summary>
+    public event Action? ScopeChanged;
+
+    /// <summary>Raised when a resource's Overall/Detailed view changes, so the shell can persist the choice.</summary>
+    public event Action? DetailChanged;
+
+    /// <summary>Whether the GPU resource shows its per-engine "Detailed" charts. Persisted by the shell.</summary>
+    public bool GpuDetailedView {
+        get => _gpuRow.IsDetailed;
+        set => _gpuRow.IsDetailed = value;
+    }
+
+    /// <summary>Whether the CPU resource shows its per-logical-processor "Detailed" charts. Persisted by the shell.</summary>
+    public bool CpuDetailedView {
+        get => _cpuRow.IsDetailed;
+        set => _cpuRow.IsDetailed = value;
+    }
 
     private readonly SystemMetricsService _service;
     private readonly IDisposable[] _subscriptions;
@@ -57,6 +85,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _cpuProcessesTile;
     private readonly StatTile _cpuUptimeTile;
 
+    // CPU per-logical-processor "Detailed" view: a page-local per-core sampler drives one mini chart per
+    // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
+    // on the disk timer. Capped so an extreme core count stays responsive.
+    private const int MaxLogicalProcessorCharts = 64;
+    private readonly LogicalProcessorSampler _cpuSampler = new();
+    private readonly List<CoreChart> _cpuCores = new();
+    private readonly Dictionary<string, CoreChart> _cpuCoresByInstance = new();
+
     // ---- Memory (live) ----
     private readonly double[] _memoryHistory = new double[WindowSeconds];
     private readonly ResourceRow _memoryRow;
@@ -64,18 +100,25 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _memAvailableTile;
     private readonly StatTile _memCommittedTile;
 
-    // ---- Disk (live) ----
-    private readonly double[] _storageHistory = new double[WindowSeconds];
-    private readonly ResourceRow _diskRow;
-    private readonly StatTile _diskActiveTile;
-    private readonly StatTile _diskReadTile;
-    private readonly StatTile _diskWriteTile;
-    private readonly StatTile _diskResponseTile;
+    // ---- Disks (live, one row per physical disk) ----
+    // Rows are built from the DeviceInventory; each disk's active-time / read / write / response come from the
+    // page-local per-disk sampler (the shared storage feed is _Total-only) on its own timer, keyed by disk
+    // number. This is the multi-instance category the Primary/All toggle expands or collapses.
+    private readonly List<DiskResource> _disks = new();
+    private readonly Dictionary<int, DiskResource> _disksByNumber = new();
+    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly DispatcherTimer _throughputTimer;
 
     // ---- GPU (live) ----
     private readonly double[] _gpuHistory = new double[WindowSeconds];
     private readonly ResourceRow _gpuRow;
     private readonly StatTile _gpu3dTile;
+
+    // GPU per-engine "Detailed" view: a page-local engine sampler (the shared feed carries only the overall
+    // busiest-engine figure) drives one mini chart per engine type on the disk timer.
+    private readonly GpuUsageSampler _gpuEngineSampler = new();
+    private readonly List<EngineChart> _gpuEngines = new();
+    private readonly Dictionary<string, EngineChart> _gpuEnginesByBase = new(StringComparer.Ordinal);
 
     // ---- Ethernet / network (live) ----
     private readonly double[] _downHistory = new double[WindowSeconds];
@@ -103,13 +146,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memAvailableTile = new StatTile("Available", "0 GB");
         _memCommittedTile = new StatTile("Committed", "0 / 0 GB");
 
-        // Disk — live. Rail value + chart show Task Manager's disk "Active time"; tiles show Active /
-        // Read / Write / Response, all sampled from the aggregate _Total PhysicalDisk counters.
-        _diskActiveTile = new StatTile("Active", "0 %");
-        _diskReadTile = new StatTile("Read", "0 MB/s");
-        _diskWriteTile = new StatTile("Write", "0 MB/s");
-        _diskResponseTile = new StatTile("Response", "0 ms");
-
         // GPU — live. Rail value + chart show the busiest GPU engine's utilization; 3D tile mirrors it.
         _gpu3dTile = new StatTile("3D", "0 %");
 
@@ -125,7 +161,6 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       _cpuUtilTile, new StatTile("Speed", "—"),
                                       _cpuProcessesTile, _cpuUptimeTile,
                                   }, Select);
-        Resources.Add(_cpuRow);
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
                                      SparklinePoints.Build(_memoryHistory, 100),
@@ -133,14 +168,6 @@ public partial class PerformanceViewModel : ViewModelBase,
                                          _memInUseTile, _memAvailableTile,
                                          new StatTile("Cached", "—"), _memCommittedTile,
                                      }, Select);
-        Resources.Add(_memoryRow);
-
-        _diskRow = new ResourceRow("Disk 0 (C:)", "", "", "0", "%", Brush("#ffcf4d"),
-                                   SparklinePoints.Build(_storageHistory, 100),
-                                   new[] {
-                                       _diskActiveTile, _diskReadTile, _diskWriteTile, _diskResponseTile,
-                                   }, Select);
-        Resources.Add(_diskRow);
 
         // GPU — VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU
         // temperature is already deferred out of scope in the project).
@@ -150,7 +177,6 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       _gpu3dTile, new StatTile("VRAM", "—"),
                                       new StatTile("Temp", "—"), new StatTile("Power", "—"),
                                   }, Select);
-        Resources.Add(_gpuRow);
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
         // read once at construction (it rarely changes).
@@ -162,42 +188,115 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select);
-        Resources.Add(_networkRow);
 
-        SelectedResource = Resources[0];
-        SelectedResource.IsSelected = true;
+        // The GPU engine and CPU core charts are discovered on their first sample. Forward each row's
+        // Overall/Detailed flip to DetailChanged (the shell subscribes after seeding, so the seed doesn't
+        // trigger a save).
+        _gpuRow.PropertyChanged += OnResourceDetailChanged;
+        _cpuRow.PropertyChanged += OnResourceDetailChanged;
+
+        // Populate the rail (CPU, Memory, [disks], GPU, Network) and select the first row. Disk rows are added
+        // once the inventory load completes.
+        RebuildResources();
 
         // Subscribe to the shared metrics; each subscription immediately replays the latest cached sample,
-        // seeding the surfaces with real data on the first frame.
+        // seeding the surfaces with real data on the first frame. Disks are driven by the page-local per-disk
+        // sampler instead — the shared storage feed reports only the _Total aggregate, not per drive.
         _subscriptions = new[] {
             service.SubscribeCpu(OnCpu, OnCpuFailed),
             service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeStorage(OnStorage, OnStorageFailed),
             service.SubscribeGpu(OnGpu, OnGpuFailed),
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
-        // Load static hardware info off the UI thread; the sub/spec labels fill in when ready.
+        // Drive the per-disk rows from the page-local throughput sampler on its own 1 Hz timer.
+        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _throughputTimer.Tick += OnThroughputTick;
+        _throughputTimer.Start();
+
+        // Load static hardware info off the UI thread; the sub/spec labels fill in when ready. The device
+        // inventory enumerates the physical disks into their own rows.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadDiskInfoAsync();
         _ = LoadGpuInfoAsync();
         _ = LoadNetworkInfoAsync();
+        _ = LoadInventoryAsync();
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused.</summary>
+    /// <summary>Rebuilds the rail from the current rows, filtered by <see cref="ShowAllDevices"/>: the single
+    /// categories always show, while the disks collapse to the primary drive ("Primary") or expand to every
+    /// drive ("All devices"). Keeps the current selection when it survives the filter, else selects the first
+    /// row.</summary>
+    private void RebuildResources() {
+        var previous = SelectedResource;
+
+        Resources.Clear();
+        Resources.Add(_cpuRow);
+        Resources.Add(_memoryRow);
+        if (ShowAllDevices)
+            foreach (var disk in _disks)
+                Resources.Add(disk.Row);
+        else if (_disks.Count > 0)
+            Resources.Add(_disks[0].Row);
+        Resources.Add(_gpuRow);
+        Resources.Add(_networkRow);
+
+        Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
+    }
+
+    partial void OnShowAllDevicesChanged(bool value) {
+        RebuildResources();
+        ScopeChanged?.Invoke();
+    }
+
+    /// <summary>Rail scope segments: "Primary" (one of each kind) and "All devices" (every instance).</summary>
+    [RelayCommand] private void SelectPrimaryScope() => ShowAllDevices = false;
+    [RelayCommand] private void SelectAllScope() => ShowAllDevices = true;
+
+    /// <summary>Detail segments (shown only for resources that <see cref="ResourceRow.SupportsDetail"/>):
+    /// "Overall" (one chart) and "Detailed" (per-subunit mini charts) on the selected resource.</summary>
+    [RelayCommand]
+    private void SelectOverallView() {
+        if (SelectedResource is not null)
+            SelectedResource.IsDetailed = false;
+    }
+
+    [RelayCommand]
+    private void SelectDetailedView() {
+        if (SelectedResource is not null)
+            SelectedResource.IsDetailed = true;
+    }
+
+    /// <summary>Forwards a resource's Overall/Detailed flip to <see cref="DetailChanged"/> so the shell can
+    /// persist it.</summary>
+    private void OnResourceDetailChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(ResourceRow.IsDetailed))
+            DetailChanged?.Invoke();
+    }
+
+    /// <summary>Toolbar Refresh: an immediate re-sample of every live metric, even while paused, plus a
+    /// re-enumeration of the physical disks.</summary>
     public void Refresh() {
         _service.RefreshAll();
+        UpdateDisks();
+        UpdateGpuEngines();
+        UpdateCpuCores();
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadDiskInfoAsync();
         _ = LoadGpuInfoAsync();
         _ = LoadNetworkInfoAsync();
+        _ = LoadInventoryAsync();
     }
 
-    /// <summary>No local timers to pause — all sampling is the shared service's, which the shell pauses
-    /// via <see cref="SystemMetricsService.Pause"/>. Present for the <see cref="ILiveSamplingPage"/> seam.</summary>
-    public void SetLive(bool live) { }
+    /// <summary>Pauses/resumes the page-local per-disk throughput timer for the shell's Live toggle. The shared
+    /// CPU/Memory/GPU/Network feeds are paused separately by the shell via
+    /// <see cref="SystemMetricsService.Pause"/>.</summary>
+    public void SetLive(bool live) {
+        if (live)
+            _throughputTimer.Start();
+        else
+            _throughputTimer.Stop();
+    }
 
     /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
     /// plus the live process count and uptime tiles (all keyed off the CPU tick).</summary>
@@ -317,31 +416,210 @@ public partial class PerformanceViewModel : ViewModelBase,
             : label;
     }
 
-    /// <summary>Disk subscription callback: append active-time to the history, then refresh the surface.</summary>
-    private void OnStorage(StorageSample sample) {
-        MetricChannel.PushHistory(_storageHistory, sample.ActivePercent);
-        UpdateStorage(sample);
+    /// <summary>Enumerates the physical disks (off the UI thread) via the shared <see cref="DeviceInventory"/>
+    /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
+    private async Task LoadInventoryAsync() {
+        try {
+            var inventory = await DeviceInventory.LoadAsync();
+            BuildDiskRows(inventory.All(DeviceCategory.Disk));
+        } catch {
+            // Leave the rail without disk rows on a transient failure.
+        }
     }
 
-    /// <summary>Sampler-failure handler for the Disk metric: shows neutral placeholders.</summary>
-    private void OnStorageFailed() {
-        _diskRow.ValueText = "—";
-        _diskActiveTile.Value = "—";
-        _diskReadTile.Value = "—";
-        _diskWriteTile.Value = "—";
-        _diskResponseTile.Value = "—";
+    /// <summary>Builds one live rail row per physical disk (identity from the inventory; live active-time /
+    /// read / write / response from the page-local sampler), then re-filters the rail and seeds the readouts
+    /// once so the new rows aren't blank until the next tick.</summary>
+    private void BuildDiskRows(IReadOnlyList<DeviceInstance> disks) {
+        _disks.Clear();
+        _disksByNumber.Clear();
+
+        foreach (var disk in disks) {
+            var history = new double[WindowSeconds];
+            var activeTile = new StatTile("Active", "0 %");
+            var readTile = new StatTile("Read", "0 MB/s");
+            var writeTile = new StatTile("Write", "0 MB/s");
+            var responseTile = new StatTile("Response", "0 ms");
+            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", Brush("#ffcf4d"),
+                                      SparklinePoints.Build(history, 100),
+                                      new[] { activeTile, readTile, writeTile, responseTile }, Select);
+            var resource = new DiskResource {
+                DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
+                ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
+            };
+            _disks.Add(resource);
+            if (resource.DiskNumber >= 0)
+                _disksByNumber[resource.DiskNumber] = resource;
+        }
+
+        RebuildResources();
+        UpdateDisks();
     }
 
-    private void UpdateStorage(StorageSample sample) {
-        var rounded = Math.Round(sample.ActivePercent);
-        _diskRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
-        _diskRow.Points = SparklinePoints.Build(_storageHistory, 100);
+    private void OnThroughputTick(object? sender, EventArgs e) {
+        UpdateDisks();
+        UpdateGpuEngines();
+        UpdateCpuCores();
+    }
 
-        _diskActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-        _diskReadTile.Value = FormatRate(sample.ReadBytesPerSec);
-        _diskWriteTile.Value = FormatRate(sample.WriteBytesPerSec);
-        // Avg. Disk sec/Transfer is in seconds; show it in milliseconds like Task Manager's "Response".
-        _diskResponseTile.Value = $"{(sample.ResponseSeconds * 1000).ToString("0.0", CultureInfo.InvariantCulture)} ms";
+    /// <summary>Samples per-logical-processor utilisation and rebuilds each core's mini chart. Builds the core
+    /// charts lazily on the first non-empty sample (its instances name and count the charts, capped for very
+    /// high core counts). Sampled every tick so the Detailed view is warm when opened.</summary>
+    private void UpdateCpuCores() {
+        var samples = _cpuSampler.Sample();
+        if (samples.Count == 0)
+            return;
+        if (_cpuCores.Count == 0)
+            BuildCpuCores(samples);
+
+        foreach (var sample in samples) {
+            if (!_cpuCoresByInstance.TryGetValue(sample.Instance, out var core))
+                continue;
+            MetricChannel.PushHistory(core.History, Math.Clamp(sample.Percent, 0, 100));
+            core.Chart.Points = SparklinePoints.Build(core.History, 100);
+        }
+    }
+
+    /// <summary>Creates one mini chart per logical processor (labelled "CPU 0", "CPU 1", … in group/core order)
+    /// and marks the CPU row detail-capable. Called once, on the first sample that reports cores.</summary>
+    private void BuildCpuCores(IReadOnlyList<LogicalProcessorSample> samples) {
+        var count = Math.Min(samples.Count, MaxLogicalProcessorCharts);
+        for (var i = 0; i < count; i++) {
+            var core = new CoreChart {
+                Instance = samples[i].Instance, Chart = new SubChart($"CPU {i}", _cpuRow.ValueBrush),
+                History = new double[WindowSeconds],
+            };
+            _cpuCores.Add(core);
+            _cpuCoresByInstance[core.Instance] = core;
+        }
+
+        // Set SupportsDetail last (after the label + charts) so the toggle only appears once the grid is ready.
+        _cpuRow.DetailLabel = "Logical processors";
+        _cpuRow.SubCharts = _cpuCores.ConvertAll(c => c.Chart);
+        _cpuRow.SupportsDetail = true;
+    }
+
+    /// <summary>
+    /// Samples per-engine GPU utilisation and rebuilds each engine's mini chart. Drivers expose different,
+    /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
+    /// are discovered dynamically rather than hardcoded: raw engtype instances are aggregated by base engine
+    /// (dropping a trailing instance index, so "compute 0" + "compute 1" fold into "Compute"), and a chart is
+    /// added the first time each engine reports. Sampled every tick so the Detailed view is warm when opened.
+    /// </summary>
+    private void UpdateGpuEngines() {
+        var raw = _gpuEngineSampler.SampleEngines();
+        if (raw.Count == 0)
+            return;
+
+        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var (token, value) in raw) {
+            var key = NormalizeEngine(token);
+            byEngine[key] = byEngine.GetValueOrDefault(key) + value;
+        }
+
+        if (AddNewEngines(byEngine.Keys))
+            PublishGpuEngines();
+
+        foreach (var engine in _gpuEngines) {
+            byEngine.TryGetValue(engine.Key, out var value);
+            MetricChannel.PushHistory(engine.History, Math.Clamp(value, 0, 100));
+            engine.Chart.Points = SparklinePoints.Build(engine.History, 100);
+        }
+    }
+
+    /// <summary>Adds a mini chart for any base engine not seen before; returns whether the set changed.</summary>
+    private bool AddNewEngines(IEnumerable<string> engineKeys) {
+        var added = false;
+        foreach (var key in engineKeys) {
+            if (_gpuEnginesByBase.ContainsKey(key))
+                continue;
+            var chart = new EngineChart {
+                Key = key, Chart = new SubChart(FormatEngineLabel(key), _gpuRow.ValueBrush),
+                History = new double[WindowSeconds],
+            };
+            _gpuEngines.Add(chart);
+            _gpuEnginesByBase[key] = chart;
+            added = true;
+        }
+        return added;
+    }
+
+    /// <summary>Orders the engine charts (main engines first) and republishes them to the GPU row, marking it
+    /// detail-capable once the first engine appears.</summary>
+    private void PublishGpuEngines() {
+        _gpuEngines.Sort(static (a, b) => {
+            var order = EngineOrder(a.Key).CompareTo(EngineOrder(b.Key));
+            return order != 0 ? order : string.CompareOrdinal(a.Key, b.Key);
+        });
+        _gpuRow.SubCharts = _gpuEngines.ConvertAll(e => e.Chart);
+        if (!_gpuRow.SupportsDetail) {
+            _gpuRow.DetailLabel = "Individual engines";
+            _gpuRow.SupportsDetail = true;
+        }
+    }
+
+    // Curated labels for the common engtype tokens; anything else falls back to a title-cased form.
+    private static readonly Dictionary<string, string> KnownEngineLabels = new(StringComparer.Ordinal) {
+        ["3d"] = "3D", ["copy"] = "Copy", ["compute"] = "Compute",
+        ["videodecode"] = "Video Decode", ["video decode"] = "Video Decode",
+        ["videoencode"] = "Video Encode", ["video encode"] = "Video Encode",
+        ["videoprocessing"] = "Video Processing", ["videocodec"] = "Video Codec", ["video codec"] = "Video Codec",
+        ["videojpeg"] = "Video JPEG", ["video jpeg"] = "Video JPEG", ["legacyoverlay"] = "Legacy Overlay",
+        ["security"] = "Security", ["timer"] = "Timer", ["ofa"] = "OFA", ["vr"] = "VR",
+    };
+
+    /// <summary>Normalises a raw engtype token to a base engine name: lower-cased, underscores → spaces, with a
+    /// trailing instance index dropped so "compute 0" and "compute 1" fold together.</summary>
+    private static string NormalizeEngine(string token) {
+        var name = token.Replace('_', ' ').Trim().ToLowerInvariant();
+        var lastSpace = name.LastIndexOf(' ');
+        if (lastSpace > 0 && int.TryParse(name.AsSpan(lastSpace + 1), out _))
+            name = name[..lastSpace];
+        return name;
+    }
+
+    /// <summary>Friendly label for a base engine name — a curated name where known, else a title-cased form
+    /// (tokens containing a digit, e.g. "3d", are upper-cased whole).</summary>
+    private static string FormatEngineLabel(string baseName) {
+        if (KnownEngineLabels.TryGetValue(baseName, out var label))
+            return label;
+        var words = baseName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < words.Length; i++) {
+            var w = words[i];
+            words[i] = w.Any(char.IsDigit) ? w.ToUpperInvariant() : char.ToUpperInvariant(w[0]) + w[1..];
+        }
+        return string.Join(' ', words);
+    }
+
+    /// <summary>Display order for the engine grid — the main engines first, everything else after.</summary>
+    private static int EngineOrder(string baseName) => baseName switch {
+        "3d" => 0,
+        "compute" => 1,
+        "copy" => 2,
+        "videodecode" or "video decode" => 3,
+        "videoencode" or "video encode" => 4,
+        "videoprocessing" => 5,
+        "videocodec" or "video codec" => 6,
+        _ => 9,
+    };
+
+    /// <summary>Samples each disk and refreshes its row + tiles in place: rail value + chart + Active tile show
+    /// Task Manager's "Active time" (0–100 %); Read/Write show throughput; Response shows the average transfer
+    /// time. Disks without a current reading are left unchanged.</summary>
+    private void UpdateDisks() {
+        foreach (var sample in _throughputSampler.Sample()) {
+            if (!_disksByNumber.TryGetValue(sample.DiskNumber, out var disk))
+                continue;
+            MetricChannel.PushHistory(disk.History, sample.ActivePercent);
+            var rounded = Math.Round(sample.ActivePercent);
+            disk.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+            disk.Row.Points = SparklinePoints.Build(disk.History, 100);
+            disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+            disk.ReadTile.Value = FormatRate(sample.ReadBytesPerSec);
+            disk.WriteTile.Value = FormatRate(sample.WriteBytesPerSec);
+            // Avg. Disk sec/Transfer is in seconds; show it in milliseconds like Task Manager's "Response".
+            disk.ResponseTile.Value = $"{(sample.ResponseSeconds * 1000).ToString("0.0", CultureInfo.InvariantCulture)} ms";
+        }
     }
 
     /// <summary>Formats a byte/second throughput as "N MB/s" (binary MiB), whole at ≥ 10 and one
@@ -352,30 +630,6 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? Math.Round(mib).ToString(CultureInfo.InvariantCulture)
             : mib.ToString("F1", CultureInfo.InvariantCulture);
         return $"{value} MB/s";
-    }
-
-    private async Task LoadDiskInfoAsync() {
-        // GetAsync never throws (it falls back to DiskStaticInfo.Unknown), but guard the whole path so a
-        // surprise can't take down the app via an unobserved task exception.
-        try {
-            var info = await DiskInfoProvider.GetAsync();
-            _diskRow.Sub = string.IsNullOrEmpty(info.TypeLabel) ? "Drive" : info.TypeLabel;
-            _diskRow.Spec = FormatDiskSpec(info);
-        } catch {
-            _diskRow.Sub = "";
-            _diskRow.Spec = "Unknown drive";
-        }
-    }
-
-    /// <summary>Model plus capacity for the detail spec header, e.g. "Samsung SSD 990 Pro 1.8 TB".
-    /// Uses the app's binary TB/GB convention (1 TB = 1024 GB), matching the Dashboard storage card.</summary>
-    private static string FormatDiskSpec(DiskStaticInfo info) {
-        if (info.SizeGb <= 0)
-            return info.Model;
-        var size = info.SizeGb >= 1024
-            ? $"{(info.SizeGb / 1024.0).ToString("0.#", CultureInfo.InvariantCulture)} TB"
-            : $"{info.SizeGb.ToString("0", CultureInfo.InvariantCulture)} GB";
-        return $"{info.Model} {size}";
     }
 
     /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
@@ -489,18 +743,55 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Selects a resource (single-select) so the detail pane swaps to it. No-ops when the
     /// resource is already selected. Same idiom as <c>NavigationViewModel.Navigate</c>.</summary>
     private void Select(ResourceRow row) {
-        if (row == SelectedResource)
+        if (ReferenceEquals(row, SelectedResource))
             return;
 
-        SelectedResource.IsSelected = false;
+        if (SelectedResource is not null)
+            SelectedResource.IsSelected = false;
         SelectedResource = row;
         row.IsSelected = true;
     }
 
-    /// <summary>Unsubscribes from the shared metrics. The samplers are owned (and disposed) by the shared
-    /// service. Safe to call more than once.</summary>
+    /// <summary>Unsubscribes from the shared metrics and tears down the page-local per-disk + GPU-engine
+    /// samplers and the timer. The shared feed's samplers are owned (and disposed) by the service. Safe to
+    /// call more than once.</summary>
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
+        _throughputTimer.Stop();
+        _throughputTimer.Tick -= OnThroughputTick;
+        _gpuRow.PropertyChanged -= OnResourceDetailChanged;
+        _cpuRow.PropertyChanged -= OnResourceDetailChanged;
+        _throughputSampler.Dispose();
+        _gpuEngineSampler.Dispose();
+        _cpuSampler.Dispose();
+    }
+
+    /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four
+    /// stat tiles (Active / Read / Write / Response) the throughput sampler updates in place each tick.</summary>
+    private sealed class DiskResource {
+        public required int DiskNumber { get; init; }
+        public required ResourceRow Row { get; init; }
+        public required double[] History { get; init; }
+        public required StatTile ActiveTile { get; init; }
+        public required StatTile ReadTile { get; init; }
+        public required StatTile WriteTile { get; init; }
+        public required StatTile ResponseTile { get; init; }
+    }
+
+    /// <summary>One GPU engine's mini chart and its backing state: the engtype key the sampler reports under
+    /// and the rolling history the view model rebuilds into <see cref="SubChart.Points"/> each tick.</summary>
+    private sealed class EngineChart {
+        public required string Key { get; init; }
+        public required SubChart Chart { get; init; }
+        public required double[] History { get; init; }
+    }
+
+    /// <summary>One logical processor's mini chart and its backing state: the PDH instance name the sampler
+    /// reports under and the rolling history rebuilt into <see cref="SubChart.Points"/> each tick.</summary>
+    private sealed class CoreChart {
+        public required string Instance { get; init; }
+        public required SubChart Chart { get; init; }
+        public required double[] History { get; init; }
     }
 }

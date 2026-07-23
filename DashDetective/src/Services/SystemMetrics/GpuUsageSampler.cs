@@ -75,40 +75,53 @@ public sealed class GpuUsageSampler : IDisposable {
     }
 
     /// <summary>
-    /// Returns total GPU utilisation (0–100) at the moment of the call. GPU work is split across
-    /// engine types (3D, Copy, VideoDecode, …) with one counter instance per process and engine;
-    /// utilisation is summed per engine type and the busiest type is reported, matching Task
-    /// Manager's headline figure. Any failure yields 0.
+    /// Returns total GPU utilisation (0–100) at the moment of the call: the busiest engine type's
+    /// utilisation, matching Task Manager's headline figure. Any failure yields 0.
     /// </summary>
     public double Sample() {
+        double max = 0;
+        foreach (var total in SampleEngines().Values)
+            if (total > max)
+                max = total;
+        return max < 0 ? 0 : max > 100 ? 100 : max;
+    }
+
+    /// <summary>
+    /// Returns per-engine-type utilisation at the moment of the call, keyed by engine type ("3D", "Copy",
+    /// "VideoDecode", "VideoEncode", "Compute", …): each is the sum across that engine's process instances.
+    /// Values are raw sums (they can exceed 100 under heavy multi-process load); callers clamp for display.
+    /// Drives the Performance tab's per-engine detail charts. Any failure yields an empty map.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> SampleEngines() {
         if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
-            return 0;
+            return EmptyEngines;
 
         // First call sizes the buffer (returns PDH_MORE_DATA); the second fills it.
         uint bufferSize = 0;
         var status = PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out _, IntPtr.Zero);
         if (status != PdhMoreData || bufferSize == 0)
-            return 0;
+            return EmptyEngines;
 
         var buffer = Marshal.AllocHGlobal((int)bufferSize);
         try {
             if (PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out var itemCount, buffer) != ErrorSuccess)
-                return 0;
+                return EmptyEngines;
 
-            return Aggregate(buffer, itemCount);
+            return AggregateEngines(buffer, itemCount);
         } finally {
             Marshal.FreeHGlobal(buffer);
         }
     }
 
+    private static readonly IReadOnlyDictionary<string, double> EmptyEngines = new Dictionary<string, double>();
+
     /// <summary>
-    /// Sums utilisation across the instances of each engine type, then returns the largest
-    /// per-engine total (clamped 0–100). Instance names look like
-    /// <c>pid_1234_luid_0x0_0xC4C7_phys_0_eng_0_engtype_3D</c>; the <c>luid</c> token identifies
-    /// which physical adapter an instance belongs to and is what a future multi-GPU split will key
-    /// on, but a single combined reading needs only the <c>engtype</c> grouping.
+    /// Sums utilisation across the instances of each engine type into a per-engine map. Instance names
+    /// look like <c>pid_1234_luid_0x0_0xC4C7_phys_0_eng_0_engtype_3D</c>; the <c>luid</c> token identifies
+    /// which physical adapter an instance belongs to and is what a future multi-GPU split will key on, but
+    /// a single combined reading needs only the <c>engtype</c> grouping.
     /// </summary>
-    private static double Aggregate(IntPtr buffer, uint itemCount) {
+    private static Dictionary<string, double> AggregateEngines(IntPtr buffer, uint itemCount) {
         var itemSize = Marshal.SizeOf<CounterValueItem>();
         var perEngine = new Dictionary<string, double>(StringComparer.Ordinal);
 
@@ -126,12 +139,7 @@ public sealed class GpuUsageSampler : IDisposable {
             perEngine[engine] = running + item.Value;
         }
 
-        double max = 0;
-        foreach (var total in perEngine.Values)
-            if (total > max)
-                max = total;
-
-        return max < 0 ? 0 : max > 100 ? 100 : max;
+        return perEngine;
     }
 
     /// <summary>Extracts the engine type after the trailing <c>engtype_</c> token, or null.</summary>

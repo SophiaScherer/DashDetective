@@ -34,6 +34,9 @@ public sealed class SettingsStoreTests : IDisposable {
             AccentName = "Teal",
             RefreshIntervalSeconds = 2,
             LaunchAtStartup = true,
+            PerformanceShowAllDevices = true,
+            CpuDetailedView = true,
+            GpuDetailedView = true,
         };
 
         using (var store = new SettingsStore(_path)) {

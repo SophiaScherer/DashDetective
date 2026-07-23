@@ -8,28 +8,39 @@
              x:DataType="vm:DashboardViewModel"
              x:Class="DashDetective.Tabs.Dashboard.DashboardView">
 
-    <!-- Layout only: static sample data. Surfaces/typography come from src/Shared/Styles;
-         StatCard / Sparkline / InfoRow come from src/Shared/Controls. -->
+    <UserControl.Styles>
+        <!-- Each stat card's accent brush is picked by its category class, keeping the dot + sparkline
+             theme/accent-aware (as the fixed per-card bindings did before the row became collection-bound). -->
+        <Style Selector="controls|StatCard.cpu"><Setter Property="Accent" Value="{DynamicResource ChartCpu}"/></Style>
+        <Style Selector="controls|StatCard.mem"><Setter Property="Accent" Value="{DynamicResource ChartMemory}"/></Style>
+        <Style Selector="controls|StatCard.gpu"><Setter Property="Accent" Value="{DynamicResource ChartGpu}"/></Style>
+        <Style Selector="controls|StatCard.disk"><Setter Property="Accent" Value="{DynamicResource ChartStorage}"/></Style>
+        <Style Selector="controls|StatCard.net"><Setter Property="Accent" Value="{DynamicResource ChartNetDown}"/></Style>
+    </UserControl.Styles>
+
+    <!-- Surfaces/typography come from src/Shared/Styles; StatCard / Sparkline / InfoRow come from
+         src/Shared/Controls. -->
     <StackPanel Spacing="16">
 
-        <!-- ===== Stat cards ===== -->
-        <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="12">
-            <controls:StatCard Grid.Column="0" Label="CPU" Value="{Binding CpuValueText}" Unit="%"
-                               Sub="{Binding CpuModelShort}" Accent="{DynamicResource ChartCpu}"
-                               YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
-            <controls:StatCard Grid.Column="1" Label="MEMORY" Value="{Binding MemoryValueText}" Unit="GB"
-                               Sub="{Binding MemorySubText}" Accent="{DynamicResource ChartMemory}"
-                               YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
-            <controls:StatCard Grid.Column="2" Label="GPU" Value="{Binding GpuValueText}" Unit="%"
-                               Sub="{Binding GpuModelShort}" Accent="{DynamicResource ChartGpu}"
-                               YMin="0" YMax="100" Points="{Binding GpuPoints}"/>
-            <controls:StatCard Grid.Column="3" Label="STORAGE" Value="{Binding StorageValueText}" Unit="%"
-                               Sub="{Binding StorageSubText}" Accent="{DynamicResource ChartStorage}"
-                               YMin="0" YMax="100" Points="{Binding StoragePoints}"/>
-            <controls:StatCard Grid.Column="4" Label="NETWORK" Value="{Binding NetworkDownText}" Unit="{Binding NetworkDownUnit}"
-                               Sub="{Binding NetworkSubText}" Accent="{DynamicResource ChartNetDown}"
-                               YMin="0" YMax="100" Points="{Binding NetworkDownPoints}"/>
-        </Grid>
+        <!-- ===== Stat cards: one per detected device, up to five per row then wrapping, grouped by kind
+             (CPUs → Memory → GPUs → Disks → Network). The -6/+6 margins keep the row flush at the edges. -->
+        <ItemsControl ItemsSource="{Binding Cards}" Margin="-6">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="5"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DashboardCard">
+                    <controls:StatCard Margin="6"
+                                       Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
+                                       Classes.gpu="{Binding IsGpu}" Classes.disk="{Binding IsDisk}"
+                                       Classes.net="{Binding IsNetwork}"
+                                       Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
+                                       Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <!-- ===== Utilization charts ===== -->
         <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
