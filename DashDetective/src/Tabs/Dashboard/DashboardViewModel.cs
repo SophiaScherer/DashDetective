@@ -4,7 +4,10 @@ using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
+using DashDetective.Tabs.Storage;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -39,6 +42,29 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly double[] _upHistory = new double[WindowSeconds];
 
     private readonly DispatcherTimer _uptimeTimer;
+
+    /// <summary>Floor for each disk chart's auto-scaled axis, in bytes/sec (1 MiB/s), so an idle drive sits
+    /// flat rather than amplifying counter noise.</summary>
+    private const double MinDiskScaleBytesPerSec = 1L << 20;
+
+    // ---- Top stat-card row (collection-bound; one card per detected device) ----
+
+    /// <summary>The Dashboard's top stat cards, in grouped order: CPU → Memory → GPU → Disks → Network. Disks
+    /// are inserted once enumerated, so several drives each get their own card (up to five per row, wrapping).</summary>
+    public ObservableCollection<DashboardCard> Cards { get; } = new();
+
+    private readonly DashboardCard _cpuCard = new(DeviceCategory.Cpu, "CPU", "%");
+    private readonly DashboardCard _memoryCard = new(DeviceCategory.Memory, "MEMORY", "GB");
+    private readonly DashboardCard _gpuCard = new(DeviceCategory.Gpu, "GPU", "%");
+    private readonly DashboardCard _networkCard = new(DeviceCategory.Network, "NETWORK", "Mbps");
+
+    // Per-disk cards + rolling throughput histories keyed by disk number, and the page-local sampler/timer that
+    // drives their sparklines (like the Storage tab). A disk card's value shows capacity used; its chart shows
+    // live read+write throughput.
+    private readonly Dictionary<int, DashboardCard> _diskCards = new();
+    private readonly Dictionary<int, double[]> _diskHistories = new();
+    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly DispatcherTimer _throughputTimer;
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
@@ -102,6 +128,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
+        // Seed the top stat row: the singleton cards show live data immediately; disk cards insert once
+        // enumerated (before the Network card, keeping the CPU→Memory→GPU→Disks→Network grouping).
+        Cards.Add(_cpuCard);
+        Cards.Add(_memoryCard);
+        Cards.Add(_gpuCard);
+        Cards.Add(_networkCard);
+
         // Uptime has no sampler/history, so it stays a plain 30 s timer. Seed once for the first frame.
         UpdateUptime();
 
@@ -109,11 +142,17 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _uptimeTimer.Tick += OnUptimeTick;
         _uptimeTimer.Start();
 
+        // Drive the per-disk card sparklines from the page-local throughput sampler on their own 1 Hz timer.
+        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _throughputTimer.Tick += OnThroughputTick;
+        _throughputTimer.Start();
+
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadGpuInfoAsync();
         _ = LoadSystemInfoAsync();
+        _ = LoadDisksAsync();
     }
 
     /// <summary>
@@ -129,20 +168,24 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _ = LoadMemoryInfoAsync();
         _ = LoadGpuInfoAsync();
         _ = LoadSystemInfoAsync();
+        _ = LoadDisksAsync();
     }
 
     /// <summary>Toolbar Refresh for the Dashboard: an immediate re-sample of every metric.</summary>
     public void Refresh() => RefreshNow();
 
     /// <summary>
-    /// Pauses/resumes the Dashboard's own uptime timer for the shell's Live toggle. The shared metric
-    /// sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.
+    /// Pauses/resumes the Dashboard's own uptime + per-disk throughput timers for the shell's Live toggle. The
+    /// shared metric sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.
     /// </summary>
     public void SetLive(bool live) {
-        if (live)
+        if (live) {
             _uptimeTimer.Start();
-        else
+            _throughputTimer.Start();
+        } else {
             _uptimeTimer.Stop();
+            _throughputTimer.Stop();
+        }
     }
 
     /// <summary>
@@ -213,9 +256,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
+            _cpuCard.Sub = CpuModelShort;
         } catch {
             CpuModelShort = "Unknown CPU";
             CpuModelText = "Unknown CPU";
+            _cpuCard.Sub = CpuModelShort;
         }
     }
 
@@ -237,9 +282,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var info = await GpuInfoProvider.GetAsync();
             GpuModelShort = HardwareNameFormatter.ShortenGpu(info.Name);
             GpuModelText = info.Name;
+            _gpuCard.Sub = GpuModelShort;
         } catch {
             GpuModelShort = "Unknown GPU";
             GpuModelText = "Unknown GPU";
+            _gpuCard.Sub = GpuModelShort;
         }
     }
 
@@ -306,6 +353,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnCpuFailed() {
         CpuValueText = "—";
         CpuPercentText = "—";
+        _cpuCard.Value = "—";
     }
 
     private void UpdateCpu(double value) {
@@ -314,6 +362,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
         CpuPercentText = $"{rounded}%";
         CpuPoints = SparklinePoints.Build(_cpuHistory, 100);
+        _cpuCard.Value = CpuValueText;
+        _cpuCard.Points = CpuPoints;
     }
 
     /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
@@ -323,13 +373,18 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>Sampler-failure handler for the GPU metric: shows a neutral placeholder.</summary>
-    private void OnGpuFailed() => GpuValueText = "—";
+    private void OnGpuFailed() {
+        GpuValueText = "—";
+        _gpuCard.Value = "—";
+    }
 
     private void UpdateGpu(double value) {
         var rounded = Math.Round(value);
         GpuPercent = value;
         GpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
         GpuPoints = SparklinePoints.Build(_gpuHistory, 100);
+        _gpuCard.Value = GpuValueText;
+        _gpuCard.Points = GpuPoints;
     }
 
     /// <summary>Storage subscription callback: append active-time to the history, then refresh.</summary>
@@ -396,6 +451,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnMemoryFailed() {
         MemoryValueText = "—";
         MemorySubText = "";
+        _memoryCard.Value = "—";
+        _memoryCard.Sub = "";
     }
 
     private void UpdateMemory(MemorySample sample) {
@@ -411,12 +468,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
         MemoryPoints = SparklinePoints.Build(_memoryHistory, 100);
+        _memoryCard.Value = MemoryValueText;
+        _memoryCard.Sub = MemorySubText;
+        _memoryCard.Points = MemoryPoints;
     }
 
     /// <summary>Sampler-failure handler for the Network metric: shows a neutral placeholder.</summary>
     private void OnNetworkFailed() {
         NetworkDownText = "—";
         NetworkUpText = "—";
+        _networkCard.Value = "—";
     }
 
     /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
@@ -438,14 +499,76 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
         NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);
         NetworkUpPoints = SparklinePoints.Build(_upHistory, NetworkYMax);
+
+        _networkCard.Value = NetworkDownText;
+        _networkCard.Unit = NetworkDownUnit;
+        _networkCard.Sub = NetworkSubText;
+        _networkCard.Points = NetworkDownPoints;
     }
 
-    /// <summary>Unsubscribes from the shared metrics and stops the uptime timer. The samplers are owned
-    /// (and disposed) by the shared service. Safe to call more than once.</summary>
+    /// <summary>
+    /// Enumerates the physical disks + volumes once (off the UI thread) and rebuilds the per-disk stat cards.
+    /// Both providers soft-fail to empty lists, so any failure just leaves the existing cards in place.
+    /// </summary>
+    private async Task LoadDisksAsync() {
+        try {
+            var disksTask = PhysicalDiskProvider.GetAsync();
+            var volumesTask = VolumeProvider.GetAsync();
+            await Task.WhenAll(disksTask, volumesTask);
+            RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
+        } catch {
+            // Leave the existing disk cards in place on a transient failure.
+        }
+    }
+
+    /// <summary>Reconciles the disk cards to the current drive set: drops the old disk cards, then inserts one
+    /// per drive just before the Network card (keeping the CPU→Memory→GPU→Disks→Network grouping). A disk
+    /// card's value is its capacity used; its sparkline is seeded and then driven by the throughput timer.</summary>
+    private void RebuildDiskCards(IReadOnlyList<DriveCardData> drives) {
+        foreach (var card in _diskCards.Values)
+            Cards.Remove(card);
+        _diskCards.Clear();
+        _diskHistories.Clear();
+
+        var insertAt = Cards.IndexOf(_networkCard);
+        foreach (var drive in drives) {
+            var card = new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
+                Value = Math.Round(drive.UsagePercent).ToString(CultureInfo.InvariantCulture),
+                Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
+            };
+            Cards.Insert(insertAt++, card);
+            _diskCards[drive.DiskNumber] = card;
+            _diskHistories[drive.DiskNumber] = new double[WindowSeconds];
+        }
+
+        // Seed the new cards' charts once so they aren't blank until the next throughput tick.
+        UpdateDiskThroughput();
+    }
+
+    private void OnThroughputTick(object? sender, EventArgs e) => UpdateDiskThroughput();
+
+    /// <summary>Samples per-disk read/write throughput and rebuilds each disk card's sparkline (auto-scaled to
+    /// its own rolling peak). Disks without a current reading are left unchanged.</summary>
+    private void UpdateDiskThroughput() {
+        foreach (var sample in _throughputSampler.Sample()) {
+            if (!_diskHistories.TryGetValue(sample.DiskNumber, out var history)
+                || !_diskCards.TryGetValue(sample.DiskNumber, out var card))
+                continue;
+            MetricChannel.PushHistory(history, sample.ReadBytesPerSec + sample.WriteBytesPerSec);
+            card.Points = SparklinePoints.Build(history, ChartScale.FitAxis(history, floor: MinDiskScaleBytesPerSec));
+        }
+    }
+
+    /// <summary>Unsubscribes from the shared metrics and tears down the uptime + throughput timers and the
+    /// per-disk sampler. The shared feed's samplers are owned (and disposed) by the service. Safe to call more
+    /// than once.</summary>
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
         _uptimeTimer.Stop();
         _uptimeTimer.Tick -= OnUptimeTick;
+        _throughputTimer.Stop();
+        _throughputTimer.Tick -= OnThroughputTick;
+        _throughputSampler.Dispose();
     }
 }

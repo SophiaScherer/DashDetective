@@ -39,7 +39,7 @@ public class DeviceInventoryTests {
             new[] { Vol(0, 'C'), Vol(1, 'D'), Vol(2, 'E') });
 
         var disks = inv.All(DeviceCategory.Disk);
-        Assert.Equal(new[] { 0, 1, 2 }, disks.Select(d => d.DiskNumber));
+        Assert.Equal(new int?[] { 0, 1, 2 }, disks.Select(d => d.DiskNumber));
         // Disk instances sit contiguously between GPU and Network.
         Assert.Equal(3, inv.Instances.Count(d => d.Category == DeviceCategory.Disk));
     }
