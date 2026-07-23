@@ -77,12 +77,35 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
-            <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
-            <ColumnDefinition Width="*"   MinWidth="360"/>                 <!-- detail pane -->
-        </Grid.ColumnDefinitions>
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Rail scope: "Primary" shows one of each kind; "All devices" shows every detected instance
+             (e.g. all disks). Reuses the shared segmented-toggle styles (Border.segments / seg). -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                       Text="Detected configuration"/>
+            <Border Grid.Column="1" Classes="segments">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Classes="resButton" Command="{Binding SelectPrimaryScopeCommand}">
+                        <Border Classes="seg" Classes.selected="{Binding !ShowAllDevices}">
+                            <TextBlock Text="Primary"/>
+                        </Border>
+                    </Button>
+                    <Button Classes="resButton" Command="{Binding SelectAllScopeCommand}">
+                        <Border Classes="seg" Classes.selected="{Binding ShowAllDevices}">
+                            <TextBlock Text="All devices"/>
+                        </Border>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
+                <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
+                <ColumnDefinition Width="*"   MinWidth="360"/>                 <!-- detail pane -->
+            </Grid.ColumnDefinitions>
 
         <!-- ===== Resource selector (left) ===== -->
         <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
@@ -161,5 +184,6 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

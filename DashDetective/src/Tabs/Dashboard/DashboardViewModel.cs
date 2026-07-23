@@ -43,10 +43,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     private readonly DispatcherTimer _uptimeTimer;
 
-    /// <summary>Floor for each disk chart's auto-scaled axis, in bytes/sec (1 MiB/s), so an idle drive sits
-    /// flat rather than amplifying counter noise.</summary>
-    private const double MinDiskScaleBytesPerSec = 1L << 20;
-
     // ---- Top stat-card row (collection-bound; one card per detected device) ----
 
     /// <summary>The Dashboard's top stat cards, in grouped order: CPU → Memory → GPU → Disks → Network. Disks
@@ -58,9 +54,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly DashboardCard _gpuCard = new(DeviceCategory.Gpu, "GPU", "%");
     private readonly DashboardCard _networkCard = new(DeviceCategory.Network, "NETWORK", "Mbps");
 
-    // Per-disk cards + rolling throughput histories keyed by disk number, and the page-local sampler/timer that
-    // drives their sparklines (like the Storage tab). A disk card's value shows capacity used; its chart shows
-    // live read+write throughput.
+    // Per-disk cards + rolling active-time histories keyed by disk number, and the page-local sampler/timer that
+    // drives them (like the Storage tab). A disk card's value + chart show Task Manager's disk "Active time";
+    // its caption shows capacity used.
     private readonly Dictionary<int, DashboardCard> _diskCards = new();
     private readonly Dictionary<int, double[]> _diskHistories = new();
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
@@ -523,7 +519,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Reconciles the disk cards to the current drive set: drops the old disk cards, then inserts one
     /// per drive just before the Network card (keeping the CPU→Memory→GPU→Disks→Network grouping). A disk
-    /// card's value is its capacity used; its sparkline is seeded and then driven by the throughput timer.</summary>
+    /// card's caption is its capacity used; its value + sparkline (Active time) are seeded here and then driven
+    /// by the throughput timer.</summary>
     private void RebuildDiskCards(IReadOnlyList<DriveCardData> drives) {
         foreach (var card in _diskCards.Values)
             Cards.Remove(card);
@@ -533,7 +530,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         var insertAt = Cards.IndexOf(_networkCard);
         foreach (var drive in drives) {
             var card = new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
-                Value = Math.Round(drive.UsagePercent).ToString(CultureInfo.InvariantCulture),
                 Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
             };
             Cards.Insert(insertAt++, card);
@@ -541,21 +537,22 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             _diskHistories[drive.DiskNumber] = new double[WindowSeconds];
         }
 
-        // Seed the new cards' charts once so they aren't blank until the next throughput tick.
+        // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
         UpdateDiskThroughput();
     }
 
     private void OnThroughputTick(object? sender, EventArgs e) => UpdateDiskThroughput();
 
-    /// <summary>Samples per-disk read/write throughput and rebuilds each disk card's sparkline (auto-scaled to
-    /// its own rolling peak). Disks without a current reading are left unchanged.</summary>
+    /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
+    /// Manager's disk "Active time", 0–100 %). Disks without a current reading are left unchanged.</summary>
     private void UpdateDiskThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_diskHistories.TryGetValue(sample.DiskNumber, out var history)
                 || !_diskCards.TryGetValue(sample.DiskNumber, out var card))
                 continue;
-            MetricChannel.PushHistory(history, sample.ReadBytesPerSec + sample.WriteBytesPerSec);
-            card.Points = SparklinePoints.Build(history, ChartScale.FitAxis(history, floor: MinDiskScaleBytesPerSec));
+            MetricChannel.PushHistory(history, sample.ActivePercent);
+            card.Value = Math.Round(sample.ActivePercent).ToString(CultureInfo.InvariantCulture);
+            card.Points = SparklinePoints.Build(history, 100);
         }
     }
 
