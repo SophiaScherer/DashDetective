@@ -2,6 +2,7 @@ using DashDetective.Services.Network;
 using DashDetective.Shared;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.Storage;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -21,15 +22,16 @@ public enum DeviceCategory { Cpu, Memory, Gpu, Disk, Network }
 /// <see cref="DiskNumber"/>.
 /// </summary>
 public sealed record DeviceInstance(
-    DeviceCategory Category, string Id, string Name, string Sub, string Spec, int? DiskNumber = null);
+    DeviceCategory Category, string Id, string Name, string Sub, string Spec,
+    int? DiskNumber = null, string? GpuLuid = null);
 
 /// <summary>
 /// The single source of truth for "what hardware exists, grouped by kind." Composes the existing static-info
-/// providers (<see cref="CpuInfoProvider"/>, <see cref="MemoryInfoProvider"/>, <see cref="GpuInfoProvider"/>,
+/// providers (<see cref="CpuInfoProvider"/>, <see cref="MemoryInfoProvider"/>, <see cref="GpuAdapterProvider"/>,
 /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/>, and the primary network adapter) into an
-/// ordered list of <see cref="DeviceInstance"/>s. Today only disks are multi-instance; CPU/Memory/GPU/Network
-/// are single, but the shape is instance-count-agnostic so multi-GPU / multi-socket enumeration lights up the
-/// same UI once the samplers enumerate them.
+/// ordered list of <see cref="DeviceInstance"/>s. Disks and GPUs are multi-instance (N drives, N physical
+/// adapters); CPU/Memory/Network are single, but the shape is instance-count-agnostic so multi-socket
+/// enumeration would light up the same UI once a sampler enumerates it.
 ///
 /// <see cref="Compose"/> is pure (no IO/UI) and unit-tested directly, mirroring <see cref="StorageComposer"/>;
 /// <see cref="LoadAsync"/> is the thin wrapper that fetches from the providers off the UI thread.
@@ -59,15 +61,28 @@ public sealed class DeviceInventory {
     public static async Task<DeviceInventory> LoadAsync() {
         var cpuTask = CpuInfoProvider.GetAsync();
         var memoryTask = MemoryInfoProvider.GetAsync();
-        var gpuTask = GpuInfoProvider.GetAsync();
+        var gpusTask = GpuAdapterProvider.GetAsync();
+        var gpuLuidsTask = Task.Run(SampleActiveGpuLuids);
         var disksTask = PhysicalDiskProvider.GetAsync();
         var volumesTask = VolumeProvider.GetAsync();
         var networkTask = Task.Run(ReadNetwork);
-        await Task.WhenAll(cpuTask, memoryTask, gpuTask, disksTask, volumesTask, networkTask);
+        await Task.WhenAll(cpuTask, memoryTask, gpusTask, gpuLuidsTask, disksTask, volumesTask, networkTask);
 
         var (networkName, networkSpec) = networkTask.Result;
-        return Compose(cpuTask.Result, memoryTask.Result, gpuTask.Result,
+        return Compose(cpuTask.Result, memoryTask.Result, gpusTask.Result, gpuLuidsTask.Result,
                        disksTask.Result, volumesTask.Result, networkName, networkSpec);
+    }
+
+    /// <summary>The LUID tokens present in the PDH GPU-engine counters right now — the adapters actually
+    /// backed by a driver. <see cref="Compose"/> intersects the DXGI adapter list with this set so phantom
+    /// duplicate LUIDs (DXGI can list one GPU under several) are dropped. Soft-fails to an empty set.</summary>
+    private static IReadOnlySet<string> SampleActiveGpuLuids() {
+        try {
+            using var sampler = new GpuUsageSampler();
+            return sampler.SampleAdapters().Keys.ToHashSet(StringComparer.Ordinal);
+        } catch {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
     }
 
     /// <summary>
@@ -77,7 +92,7 @@ public sealed class DeviceInventory {
     /// Performance rail's captions.
     /// </summary>
     public static DeviceInventory Compose(
-        CpuStaticInfo cpu, MemoryStaticInfo memory, GpuStaticInfo gpu,
+        CpuStaticInfo cpu, MemoryStaticInfo memory, IReadOnlyList<GpuAdapter> gpus, IReadOnlySet<string> activeGpuLuids,
         IReadOnlyList<PhysicalDiskInfo> disks, IReadOnlyList<VolumeInfo> volumes,
         string networkName, string networkSpec) {
         var instances = new List<DeviceInstance> {
@@ -85,8 +100,20 @@ public sealed class DeviceInventory {
             // Memory's caption is the live used/total figure the view model fills each tick, so the static Sub
             // is blank; the Spec carries the module type/speed/slots.
             new(DeviceCategory.Memory, "mem", "Memory", "", FormatMemorySpec(memory)),
-            new(DeviceCategory.Gpu, "gpu", "GPU", HardwareNameFormatter.ShortenGpu(gpu.Name), gpu.Name),
         };
+
+        // GPUs: one instance per real adapter — DXGI's non-software adapters intersected with the LUIDs
+        // actually present in the PDH engine counters (drops software adapters and the phantom duplicate
+        // LUIDs DXGI lists a single GPU under). A lone GPU keeps the plain "GPU" label; several are indexed
+        // "GPU 0", "GPU 1", … (the design comp), each keyed by its LUID for the samplers to join on.
+        var realGpus = gpus.Where(g => !g.IsSoftware && activeGpuLuids.Contains(g.LuidToken)).ToList();
+        for (var i = 0; i < realGpus.Count; i++) {
+            var gpu = realGpus[i];
+            var name = realGpus.Count > 1 ? $"GPU {i.ToString(CultureInfo.InvariantCulture)}" : "GPU";
+            instances.Add(new DeviceInstance(
+                DeviceCategory.Gpu, $"gpu:{gpu.LuidToken}", name,
+                HardwareNameFormatter.ShortenGpu(gpu.Name), gpu.Name, GpuLuid: gpu.LuidToken));
+        }
 
         // Disks are the one multi-instance category today. Reuse StorageComposer for the display name (keyed by
         // disk number), then join with the physical-disk record for its type label + model/size spec.

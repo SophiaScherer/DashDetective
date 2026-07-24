@@ -4,6 +4,10 @@ using System.Runtime.InteropServices;
 
 namespace DashDetective.Services.SystemMetrics;
 
+/// <summary>One physical GPU's reading, keyed by adapter LUID: its overall utilisation (the busiest engine
+/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).</summary>
+public sealed record GpuAdapterSample(double Overall, IReadOnlyDictionary<string, double> Engines);
+
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>
 /// performance counter — the same source Task Manager uses. Each <see cref="Sample"/> call returns
@@ -114,6 +118,101 @@ public sealed class GpuUsageSampler : IDisposable {
     }
 
     private static readonly IReadOnlyDictionary<string, double> EmptyEngines = new Dictionary<string, double>();
+
+    /// <summary>
+    /// Returns per-physical-GPU utilisation at the moment of the call, keyed by adapter LUID token
+    /// (<c>luid_0x{High:x8}_0x{Low:x8}</c>, matching <see cref="GpuAdapterProvider"/>). Each
+    /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine type) and its
+    /// per-engine-type map — the multi-GPU split of the single combined <see cref="SampleEngines"/> reading.
+    /// Callers join the LUID keys against the inventory to attribute each reading to a named GPU. Any
+    /// failure yields an empty map.
+    /// </summary>
+    public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() {
+        if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
+            return EmptyAdapters;
+
+        // First call sizes the buffer (returns PDH_MORE_DATA); the second fills it.
+        uint bufferSize = 0;
+        var status = PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out _, IntPtr.Zero);
+        if (status != PdhMoreData || bufferSize == 0)
+            return EmptyAdapters;
+
+        var buffer = Marshal.AllocHGlobal((int)bufferSize);
+        try {
+            if (PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out var itemCount, buffer) != ErrorSuccess)
+                return EmptyAdapters;
+
+            return AggregateAdapters(ReadItems(buffer, itemCount));
+        } finally {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static readonly IReadOnlyDictionary<string, GpuAdapterSample> EmptyAdapters =
+        new Dictionary<string, GpuAdapterSample>();
+
+    /// <summary>Marshals a formatted counter array into (instance name, value) pairs.</summary>
+    private static List<(string? Name, double Value)> ReadItems(IntPtr buffer, uint itemCount) {
+        var itemSize = Marshal.SizeOf<CounterValueItem>();
+        var items = new List<(string?, double)>((int)itemCount);
+        for (var i = 0; i < itemCount; i++) {
+            var item = Marshal.PtrToStructure<CounterValueItem>(buffer + i * itemSize);
+            if (item.Name == IntPtr.Zero)
+                continue;
+            items.Add((Marshal.PtrToStringUni(item.Name), item.Value));
+        }
+        return items;
+    }
+
+    /// <summary>
+    /// Groups counter instances by adapter LUID then engine type, summing within each engine and taking the
+    /// busiest engine type as the adapter's overall % (clamped 0–100). Pure (no PDH/marshalling) so it is
+    /// unit-tested directly. Instances that carry no LUID or engine token are skipped.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, GpuAdapterSample> AggregateAdapters(
+        IEnumerable<(string? Name, double Value)> items) {
+        var perAdapter = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
+
+        foreach (var (name, value) in items) {
+            var luid = ParseLuidToken(name);
+            var engine = EngineType(name);
+            if (luid is null || engine is null)
+                continue;
+
+            if (!perAdapter.TryGetValue(luid, out var engines))
+                perAdapter[luid] = engines = new Dictionary<string, double>(StringComparer.Ordinal);
+            engines.TryGetValue(engine, out var running);
+            engines[engine] = running + value;
+        }
+
+        var result = new Dictionary<string, GpuAdapterSample>(StringComparer.Ordinal);
+        foreach (var (luid, engines) in perAdapter) {
+            double max = 0;
+            foreach (var total in engines.Values)
+                if (total > max)
+                    max = total;
+            result[luid] = new GpuAdapterSample(max < 0 ? 0 : max > 100 ? 100 : max, engines);
+        }
+        return result;
+    }
+
+    /// <summary>Extracts the adapter LUID token (<c>luid_0x…_0x…</c>, lower-cased) from an instance name like
+    /// <c>pid_1234_luid_0x00000000_0x0000e54b_phys_0_eng_0_engtype_3D</c>, or null when absent.</summary>
+    internal static string? ParseLuidToken(string? instanceName) {
+        if (string.IsNullOrEmpty(instanceName))
+            return null;
+
+        const string token = "luid_";
+        var start = instanceName.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+        if (start < 0)
+            return null;
+
+        // The LUID token is followed by the "_phys" segment; slice between them (falling back to end of
+        // string) and normalise casing so it joins the DXGI-formatted token regardless of PDH's casing.
+        var phys = instanceName.IndexOf("_phys", start, StringComparison.OrdinalIgnoreCase);
+        var end = phys > start ? phys : instanceName.Length;
+        return instanceName[start..end].ToLowerInvariant();
+    }
 
     /// <summary>
     /// Sums utilisation across the instances of each engine type into a per-engine map. Instance names

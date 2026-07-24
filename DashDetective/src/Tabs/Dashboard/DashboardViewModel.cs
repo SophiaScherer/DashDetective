@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -51,7 +52,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     private readonly DashboardCard _cpuCard = new(DeviceCategory.Cpu, "CPU", "%");
     private readonly DashboardCard _memoryCard = new(DeviceCategory.Memory, "MEMORY", "GB");
-    private readonly DashboardCard _gpuCard = new(DeviceCategory.Gpu, "GPU", "%");
     private readonly DashboardCard _networkCard = new(DeviceCategory.Network, "NETWORK", "Mbps");
 
     // Per-disk cards + rolling active-time histories keyed by disk number, and the page-local sampler/timer that
@@ -61,6 +61,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly Dictionary<int, double[]> _diskHistories = new();
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
     private readonly DispatcherTimer _throughputTimer;
+
+    // Per-GPU cards + rolling utilisation histories keyed by adapter LUID, driven by a page-local per-adapter
+    // sampler on the same throughput timer (the shared GPU feed reports only one combined figure). One card per
+    // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
+    private readonly Dictionary<string, DashboardCard> _gpuCards = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
+    private readonly GpuUsageSampler _gpuSampler = new();
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
@@ -76,10 +83,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _memoryPoints = "";
     [ObservableProperty] private string _memoryModelText = "";
 
-    [ObservableProperty] private double _gpuPercent;
+    // Overall GPU % (busiest adapter) and the joined adapter names — used by the text report and the System
+    // Information "GPU" row; the live per-GPU cards are collection-bound instead.
     [ObservableProperty] private string _gpuValueText = "0";
-    [ObservableProperty] private string _gpuPoints = "";
-    [ObservableProperty] private string _gpuModelShort = "";
     [ObservableProperty] private string _gpuModelText = "";
 
     [ObservableProperty] private string _storageValueText = "0";
@@ -119,7 +125,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _subscriptions = new[] {
             service.SubscribeCpu(OnCpu, OnCpuFailed),
             service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeGpu(OnGpu, OnGpuFailed),
             service.SubscribeStorage(OnStorage, OnStorageFailed),
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
@@ -128,7 +133,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // enumerated (before the Network card, keeping the CPU→Memory→GPU→Disks→Network grouping).
         Cards.Add(_cpuCard);
         Cards.Add(_memoryCard);
-        Cards.Add(_gpuCard);
         Cards.Add(_networkCard);
 
         // Uptime has no sampler/history, so it stays a plain 30 s timer. Seed once for the first frame.
@@ -146,7 +150,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadGpuInfoAsync();
+        _ = LoadGpusAsync();
         _ = LoadSystemInfoAsync();
         _ = LoadDisksAsync();
     }
@@ -162,9 +166,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadGpuInfoAsync();
+        _ = LoadGpusAsync();
         _ = LoadSystemInfoAsync();
         _ = LoadDisksAsync();
+        UpdateGpuAdapters();
     }
 
     /// <summary>Toolbar Refresh for the Dashboard: an immediate re-sample of every metric.</summary>
@@ -271,19 +276,40 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         }
     }
 
-    private async Task LoadGpuInfoAsync() {
-        // GetAsync never throws (it falls back to GpuStaticInfo.Unknown), but guard the whole path
-        // so a surprise can't take down the app via an unobserved task exception.
+    /// <summary>Enumerates the physical GPUs (off the UI thread) via the shared <see cref="DeviceInventory"/>
+    /// and rebuilds the per-GPU cards + the System-Information "GPU" row. Soft-fails to no GPU cards on any
+    /// error.</summary>
+    private async Task LoadGpusAsync() {
         try {
-            var info = await GpuInfoProvider.GetAsync();
-            GpuModelShort = HardwareNameFormatter.ShortenGpu(info.Name);
-            GpuModelText = info.Name;
-            _gpuCard.Sub = GpuModelShort;
+            var inventory = await DeviceInventory.LoadAsync();
+            RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
         } catch {
-            GpuModelShort = "Unknown GPU";
-            GpuModelText = "Unknown GPU";
-            _gpuCard.Sub = GpuModelShort;
+            // Leave the existing GPU cards in place on a transient failure.
         }
+    }
+
+    /// <summary>Reconciles the GPU cards to the current adapter set: drops the old GPU cards, then inserts one
+    /// per real adapter just after the Memory card (keeping the CPU→Memory→GPU→Disks→Network grouping). Each
+    /// card's caption is its short model; its value + sparkline (busiest-engine %) are seeded here and then
+    /// driven by the throughput timer. The System-Information "GPU" row lists every adapter's full name.</summary>
+    private void RebuildGpuCards(IReadOnlyList<DeviceInstance> gpus) {
+        foreach (var card in _gpuCards.Values)
+            Cards.Remove(card);
+        _gpuCards.Clear();
+        _gpuHistories.Clear();
+
+        var insertAt = Cards.IndexOf(_memoryCard) + 1;
+        foreach (var gpu in gpus) {
+            var card = new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub };
+            Cards.Insert(insertAt++, card);
+            _gpuCards[gpu.GpuLuid ?? gpu.Id] = card;
+            _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new double[WindowSeconds];
+        }
+
+        GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : "Unknown GPU";
+
+        // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
+        UpdateGpuAdapters();
     }
 
     private async Task LoadSystemInfoAsync() {
@@ -362,25 +388,28 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _cpuCard.Points = CpuPoints;
     }
 
-    /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
-    private void OnGpu(double value) {
-        MetricChannel.PushHistory(_gpuHistory, value);
-        UpdateGpu(value);
-    }
+    /// <summary>Samples every physical GPU (busiest-engine %) and refreshes each card's headline value +
+    /// sparkline in place, keyed by adapter LUID. Also feeds the single overall history (busiest adapter) that
+    /// the CSV export + text report read. GPUs without a current reading are left unchanged.</summary>
+    private void UpdateGpuAdapters() {
+        var adapters = _gpuSampler.SampleAdapters();
+        if (adapters.Count == 0)
+            return;
 
-    /// <summary>Sampler-failure handler for the GPU metric: shows a neutral placeholder.</summary>
-    private void OnGpuFailed() {
-        GpuValueText = "—";
-        _gpuCard.Value = "—";
-    }
+        double overall = 0;
+        foreach (var (luid, sample) in adapters) {
+            var value = Math.Clamp(sample.Overall, 0, 100);
+            if (value > overall)
+                overall = value;
+            if (!_gpuHistories.TryGetValue(luid, out var history) || !_gpuCards.TryGetValue(luid, out var card))
+                continue;
+            MetricChannel.PushHistory(history, value);
+            card.Value = Math.Round(value).ToString(CultureInfo.InvariantCulture);
+            card.Points = SparklinePoints.Build(history, 100);
+        }
 
-    private void UpdateGpu(double value) {
-        var rounded = Math.Round(value);
-        GpuPercent = value;
-        GpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
-        GpuPoints = SparklinePoints.Build(_gpuHistory, 100);
-        _gpuCard.Value = GpuValueText;
-        _gpuCard.Points = GpuPoints;
+        MetricChannel.PushHistory(_gpuHistory, overall);
+        GpuValueText = Math.Round(overall).ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>Storage subscription callback: append active-time to the history, then refresh.</summary>
@@ -541,7 +570,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         UpdateDiskThroughput();
     }
 
-    private void OnThroughputTick(object? sender, EventArgs e) => UpdateDiskThroughput();
+    private void OnThroughputTick(object? sender, EventArgs e) {
+        UpdateDiskThroughput();
+        UpdateGpuAdapters();
+    }
 
     /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
     /// Manager's disk "Active time", 0–100 %). Disks without a current reading are left unchanged.</summary>
@@ -567,5 +599,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _throughputSampler.Dispose();
+        _gpuSampler.Dispose();
     }
 }
