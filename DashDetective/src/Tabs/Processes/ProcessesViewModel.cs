@@ -69,14 +69,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// place — Task Manager's third group.</summary>
     public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
-    // Clickable column headers. Disk/Network/Gpu sort as no-ops until they carry values.
+    // Clickable column headers.
     public ProcessSortColumn NameSort { get; }
     public ProcessSortColumn PidSort { get; }
     public ProcessSortColumn StatusSort { get; }
     public ProcessSortColumn CpuSort { get; }
     public ProcessSortColumn MemorySort { get; }
     public ProcessSortColumn DiskSort { get; }
-    public ProcessSortColumn NetworkSort { get; }
     public ProcessSortColumn GpuSort { get; }
 
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
@@ -134,10 +133,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuSort = new ProcessSortColumn(ProcessSortKey.Cpu, OnSort);
         MemorySort = new ProcessSortColumn(ProcessSortKey.Memory, OnSort);
         DiskSort = new ProcessSortColumn(ProcessSortKey.Disk, OnSort);
-        NetworkSort = new ProcessSortColumn(ProcessSortKey.Network, OnSort);
         GpuSort = new ProcessSortColumn(ProcessSortKey.Gpu, OnSort);
         _sortColumns = new[] {
-            NameSort, PidSort, StatusSort, CpuSort, MemorySort, DiskSort, NetworkSort, GpuSort,
+            NameSort, PidSort, StatusSort, CpuSort, MemorySort, DiskSort, GpuSort,
         };
         UpdateSortIndicators();
 
@@ -338,7 +336,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         ProcessSortKey.Name => true,
         ProcessSortKey.Pid => true,
         ProcessSortKey.Status => true,
-        _ => false, // CPU / Memory / Disk / Network / GPU
+        _ => false, // CPU / Memory / Disk / GPU
     };
 
     /// <summary>Tints the active column and shows its ↑/↓ arrow; clears the rest.</summary>
@@ -360,7 +358,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             ProcessSortKey.Memory => a.MemoryBytes.CompareTo(b.MemoryBytes),
             ProcessSortKey.Disk => a.DiskBytesPerSec.CompareTo(b.DiskBytesPerSec),
             ProcessSortKey.Gpu => a.GpuPercent.CompareTo(b.GpuPercent),
-            _ => 0, // Network is deferred (no data) — fall through to the tie-break.
+            _ => 0, // Unreachable — every key is handled above; the arm satisfies exhaustiveness.
         };
         if (!_ascending)
             cmp = -cmp;

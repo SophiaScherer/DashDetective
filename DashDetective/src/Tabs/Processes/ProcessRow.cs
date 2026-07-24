@@ -13,8 +13,6 @@ namespace DashDetective.Tabs.Processes;
 /// Running, amber = otherwise), not themed — matching the app's other status indicators. CPU
 /// elevation is exposed as <see cref="CpuHigh"/>/<see cref="CpuMed"/> booleans so the view can tint
 /// the cell via style classes while the normal value keeps following the theme text ramp.
-///
-/// Disk and GPU arrive in a later phase; Network is deferred, so those cells render "—" for now.
 /// </summary>
 public partial class ProcessRow : ObservableObject {
     private static readonly IBrush RunningBrush = new SolidColorBrush(Color.Parse("#6ccb5f"));
@@ -82,9 +80,6 @@ public partial class ProcessRow : ObservableObject {
 
     partial void OnDepthChanged(int value) => OnPropertyChanged(nameof(IndentMargin));
     partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ChevronGlyph));
-
-    // Per-process Network throughput is deferred (no in-box per-process rate API).
-    public string NetworkText => "—";
 
     /// <summary>Refreshes the mutable fields from a newer snapshot of the same process (and its current
     /// place in the tree — depth, whether it has children, and whether it's expanded).</summary>
