@@ -63,10 +63,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Raised when a resource's Overall/Detailed view changes, so the shell can persist the choice.</summary>
     public event Action? DetailChanged;
 
-    /// <summary>Whether the GPU resource shows its per-engine "Detailed" charts. Persisted by the shell.</summary>
+    /// <summary>Whether the GPU resources show their per-engine "Detailed" charts. Persisted by the shell as a
+    /// single category-wide flag applied to every GPU row (multi-GPU machines share the choice).</summary>
     public bool GpuDetailedView {
-        get => _gpuRow.IsDetailed;
-        set => _gpuRow.IsDetailed = value;
+        get => _gpuDetailed;
+        set => SetGpuDetailed(value, persist: false);
     }
 
     /// <summary>Whether the CPU resource shows its per-logical-processor "Detailed" charts. Persisted by the shell.</summary>
@@ -109,16 +110,15 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
     private readonly DispatcherTimer _throughputTimer;
 
-    // ---- GPU (live) ----
-    private readonly double[] _gpuHistory = new double[WindowSeconds];
-    private readonly ResourceRow _gpuRow;
-    private readonly StatTile _gpu3dTile;
-
-    // GPU per-engine "Detailed" view: a page-local engine sampler (the shared feed carries only the overall
-    // busiest-engine figure) drives one mini chart per engine type on the disk timer.
-    private readonly GpuUsageSampler _gpuEngineSampler = new();
-    private readonly List<EngineChart> _gpuEngines = new();
-    private readonly Dictionary<string, EngineChart> _gpuEnginesByBase = new(StringComparer.Ordinal);
+    // ---- GPUs (live, one row per physical adapter) ----
+    // Rows are built from the DeviceInventory; each GPU's overall busiest-engine % + per-engine Detailed charts
+    // come from the page-local per-adapter sampler (the shared GPU feed reports only one combined figure) on the
+    // throughput timer, keyed by adapter LUID. Like disks, this is a multi-instance category the Primary/All
+    // toggle expands or collapses; the Detailed flag is shared across every GPU row.
+    private readonly List<GpuResource> _gpus = new();
+    private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
+    private readonly GpuUsageSampler _gpuSampler = new();
+    private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
     private readonly double[] _downHistory = new double[WindowSeconds];
@@ -146,9 +146,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memAvailableTile = new StatTile("Available", "0 GB");
         _memCommittedTile = new StatTile("Committed", "0 / 0 GB");
 
-        // GPU — live. Rail value + chart show the busiest GPU engine's utilization; 3D tile mirrors it.
-        _gpu3dTile = new StatTile("3D", "0 %");
-
         // Ethernet / network — live. Rail value + chart show the primary adapter's receive throughput;
         // tiles show Receive / Send / Link / Errors.
         _netReceiveTile = new StatTile("Receive", "0 Mbps");
@@ -169,15 +166,6 @@ public partial class PerformanceViewModel : ViewModelBase,
                                          new StatTile("Cached", "—"), _memCommittedTile,
                                      }, Select);
 
-        // GPU — VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU
-        // temperature is already deferred out of scope in the project).
-        _gpuRow = new ResourceRow("GPU", "", "", "0", "%", Brush("#6ccb5f"),
-                                  SparklinePoints.Build(_gpuHistory, 100),
-                                  new[] {
-                                      _gpu3dTile, new StatTile("VRAM", "—"),
-                                      new StatTile("Temp", "—"), new StatTile("Power", "—"),
-                                  }, Select);
-
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
         // read once at construction (it rarely changes).
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
@@ -189,10 +177,9 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select);
 
-        // The GPU engine and CPU core charts are discovered on their first sample. Forward each row's
-        // Overall/Detailed flip to DetailChanged (the shell subscribes after seeding, so the seed doesn't
-        // trigger a save).
-        _gpuRow.PropertyChanged += OnResourceDetailChanged;
+        // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
+        // to DetailChanged (the shell subscribes after seeding, so the seed doesn't trigger a save); the GPU
+        // rows share one flag, persisted explicitly through SetGpuDetailed.
         _cpuRow.PropertyChanged += OnResourceDetailChanged;
 
         // Populate the rail (CPU, Memory, [disks], GPU, Network) and select the first row. Disk rows are added
@@ -205,7 +192,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         _subscriptions = new[] {
             service.SubscribeCpu(OnCpu, OnCpuFailed),
             service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeGpu(OnGpu, OnGpuFailed),
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
@@ -218,7 +204,6 @@ public partial class PerformanceViewModel : ViewModelBase,
         // inventory enumerates the physical disks into their own rows.
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadGpuInfoAsync();
         _ = LoadNetworkInfoAsync();
         _ = LoadInventoryAsync();
     }
@@ -238,7 +223,11 @@ public partial class PerformanceViewModel : ViewModelBase,
                 Resources.Add(disk.Row);
         else if (_disks.Count > 0)
             Resources.Add(_disks[0].Row);
-        Resources.Add(_gpuRow);
+        if (ShowAllDevices)
+            foreach (var gpu in _gpus)
+                Resources.Add(gpu.Row);
+        else if (_gpus.Count > 0)
+            Resources.Add(_gpus[0].Row);
         Resources.Add(_networkRow);
 
         Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
@@ -255,17 +244,31 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Detail segments (shown only for resources that <see cref="ResourceRow.SupportsDetail"/>):
     /// "Overall" (one chart) and "Detailed" (per-subunit mini charts) on the selected resource.</summary>
-    [RelayCommand]
-    private void SelectOverallView() {
-        if (SelectedResource is not null)
-            SelectedResource.IsDetailed = false;
+    [RelayCommand] private void SelectOverallView() => SetSelectedDetailed(false);
+    [RelayCommand] private void SelectDetailedView() => SetSelectedDetailed(true);
+
+    /// <summary>Flips the selected resource's Overall/Detailed view. GPU rows share one category-wide flag, so a
+    /// flip on any GPU applies to every GPU row and persists once; other resources flip their own row.</summary>
+    private void SetSelectedDetailed(bool value) {
+        if (SelectedResource is null)
+            return;
+        if (IsGpuRow(SelectedResource))
+            SetGpuDetailed(value, persist: true);
+        else
+            SelectedResource.IsDetailed = value;
     }
 
-    [RelayCommand]
-    private void SelectDetailedView() {
-        if (SelectedResource is not null)
-            SelectedResource.IsDetailed = true;
+    /// <summary>Applies the shared GPU Detailed flag to every GPU row; persists only on a genuine user flip (the
+    /// shell's startup seed passes <c>persist: false</c>, and GPU rows don't self-persist via PropertyChanged).</summary>
+    private void SetGpuDetailed(bool value, bool persist) {
+        _gpuDetailed = value;
+        foreach (var gpu in _gpus)
+            gpu.Row.IsDetailed = value;
+        if (persist)
+            DetailChanged?.Invoke();
     }
+
+    private bool IsGpuRow(ResourceRow row) => _gpus.Exists(g => ReferenceEquals(g.Row, row));
 
     /// <summary>Forwards a resource's Overall/Detailed flip to <see cref="DetailChanged"/> so the shell can
     /// persist it.</summary>
@@ -279,11 +282,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     public void Refresh() {
         _service.RefreshAll();
         UpdateDisks();
-        UpdateGpuEngines();
+        UpdateGpuAdapters();
         UpdateCpuCores();
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
-        _ = LoadGpuInfoAsync();
         _ = LoadNetworkInfoAsync();
         _ = LoadInventoryAsync();
     }
@@ -422,8 +424,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         try {
             var inventory = await DeviceInventory.LoadAsync();
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
+            BuildGpuRows(inventory.All(DeviceCategory.Gpu));
         } catch {
-            // Leave the rail without disk rows on a transient failure.
+            // Leave the rail without the enumerated disk/GPU rows on a transient failure.
         }
     }
 
@@ -456,9 +459,39 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateDisks();
     }
 
+    /// <summary>Builds one live rail row per physical GPU (identity from the inventory; live overall % + per-engine
+    /// Detailed charts from the page-local per-adapter sampler, keyed by adapter LUID), then re-filters the rail
+    /// and seeds the readouts once. Each new row inherits the shared Detailed flag before it participates, so
+    /// seeding doesn't count as a user flip.</summary>
+    private void BuildGpuRows(IReadOnlyList<DeviceInstance> gpus) {
+        _gpus.Clear();
+        _gpusByLuid.Clear();
+
+        foreach (var gpu in gpus) {
+            var history = new double[WindowSeconds];
+            var threeDTile = new StatTile("3D", "0 %");
+            // VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU temperature is
+            // deferred out of scope).
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, "0", "%", Brush("#6ccb5f"),
+                                      SparklinePoints.Build(history, 100),
+                                      new[] {
+                                          threeDTile, new StatTile("VRAM", "—"),
+                                          new StatTile("Temp", "—"), new StatTile("Power", "—"),
+                                      }, Select) { IsDetailed = _gpuDetailed };
+            var resource = new GpuResource {
+                Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
+            };
+            _gpus.Add(resource);
+            _gpusByLuid[resource.Luid] = resource;
+        }
+
+        RebuildResources();
+        UpdateGpuAdapters();
+    }
+
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
-        UpdateGpuEngines();
+        UpdateGpuAdapters();
         UpdateCpuCores();
     }
 
@@ -499,62 +532,83 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.SupportsDetail = true;
     }
 
+    /// <summary>Samples every physical GPU and refreshes each row in place, keyed by adapter LUID: the rail value
+    /// + chart + 3D tile show the adapter's busiest-engine % (its overall utilisation), and the Detailed grid is
+    /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged.</summary>
+    private void UpdateGpuAdapters() {
+        var adapters = _gpuSampler.SampleAdapters();
+        if (adapters.Count == 0)
+            return;
+
+        foreach (var (luid, sample) in adapters) {
+            if (!_gpusByLuid.TryGetValue(luid, out var gpu))
+                continue;
+            var overall = Math.Clamp(sample.Overall, 0, 100);
+            MetricChannel.PushHistory(gpu.History, overall);
+            var rounded = Math.Round(overall);
+            gpu.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+            gpu.Row.Points = SparklinePoints.Build(gpu.History, 100);
+            gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+            UpdateGpuEngines(gpu, sample.Engines);
+        }
+    }
+
     /// <summary>
-    /// Samples per-engine GPU utilisation and rebuilds each engine's mini chart. Drivers expose different,
+    /// Rebuilds one GPU's per-engine mini charts from its raw engtype map. Drivers expose different,
     /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
     /// are discovered dynamically rather than hardcoded: raw engtype instances are aggregated by base engine
     /// (dropping a trailing instance index, so "compute 0" + "compute 1" fold into "Compute"), and a chart is
     /// added the first time each engine reports. Sampled every tick so the Detailed view is warm when opened.
     /// </summary>
-    private void UpdateGpuEngines() {
-        var raw = _gpuEngineSampler.SampleEngines();
-        if (raw.Count == 0)
+    private static void UpdateGpuEngines(GpuResource gpu, IReadOnlyDictionary<string, double> rawEngines) {
+        if (rawEngines.Count == 0)
             return;
 
         var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
-        foreach (var (token, value) in raw) {
+        foreach (var (token, value) in rawEngines) {
             var key = NormalizeEngine(token);
             byEngine[key] = byEngine.GetValueOrDefault(key) + value;
         }
 
-        if (AddNewEngines(byEngine.Keys))
-            PublishGpuEngines();
+        if (AddNewEngines(gpu, byEngine.Keys))
+            PublishGpuEngines(gpu);
 
-        foreach (var engine in _gpuEngines) {
+        foreach (var engine in gpu.Engines) {
             byEngine.TryGetValue(engine.Key, out var value);
             MetricChannel.PushHistory(engine.History, Math.Clamp(value, 0, 100));
             engine.Chart.Points = SparklinePoints.Build(engine.History, 100);
         }
     }
 
-    /// <summary>Adds a mini chart for any base engine not seen before; returns whether the set changed.</summary>
-    private bool AddNewEngines(IEnumerable<string> engineKeys) {
+    /// <summary>Adds a mini chart for any base engine this GPU hasn't shown before; returns whether the set
+    /// changed.</summary>
+    private static bool AddNewEngines(GpuResource gpu, IEnumerable<string> engineKeys) {
         var added = false;
         foreach (var key in engineKeys) {
-            if (_gpuEnginesByBase.ContainsKey(key))
+            if (gpu.EnginesByBase.ContainsKey(key))
                 continue;
             var chart = new EngineChart {
-                Key = key, Chart = new SubChart(FormatEngineLabel(key), _gpuRow.ValueBrush),
+                Key = key, Chart = new SubChart(FormatEngineLabel(key), gpu.Row.ValueBrush),
                 History = new double[WindowSeconds],
             };
-            _gpuEngines.Add(chart);
-            _gpuEnginesByBase[key] = chart;
+            gpu.Engines.Add(chart);
+            gpu.EnginesByBase[key] = chart;
             added = true;
         }
         return added;
     }
 
-    /// <summary>Orders the engine charts (main engines first) and republishes them to the GPU row, marking it
-    /// detail-capable once the first engine appears.</summary>
-    private void PublishGpuEngines() {
-        _gpuEngines.Sort(static (a, b) => {
+    /// <summary>Orders a GPU's engine charts (main engines first) and republishes them to its row, marking the
+    /// row detail-capable once its first engine appears.</summary>
+    private static void PublishGpuEngines(GpuResource gpu) {
+        gpu.Engines.Sort(static (a, b) => {
             var order = EngineOrder(a.Key).CompareTo(EngineOrder(b.Key));
             return order != 0 ? order : string.CompareOrdinal(a.Key, b.Key);
         });
-        _gpuRow.SubCharts = _gpuEngines.ConvertAll(e => e.Chart);
-        if (!_gpuRow.SupportsDetail) {
-            _gpuRow.DetailLabel = "Individual engines";
-            _gpuRow.SupportsDetail = true;
+        gpu.Row.SubCharts = gpu.Engines.ConvertAll(e => e.Chart);
+        if (!gpu.Row.SupportsDetail) {
+            gpu.Row.DetailLabel = "Individual engines";
+            gpu.Row.SupportsDetail = true;
         }
     }
 
@@ -630,38 +684,6 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? Math.Round(mib).ToString(CultureInfo.InvariantCulture)
             : mib.ToString("F1", CultureInfo.InvariantCulture);
         return $"{value} MB/s";
-    }
-
-    /// <summary>GPU subscription callback: append to the history, then refresh the surface.</summary>
-    private void OnGpu(double value) {
-        MetricChannel.PushHistory(_gpuHistory, value);
-        UpdateGpu(value);
-    }
-
-    /// <summary>Sampler-failure handler for the GPU metric: shows neutral placeholders.</summary>
-    private void OnGpuFailed() {
-        _gpuRow.ValueText = "—";
-        _gpu3dTile.Value = "—";
-    }
-
-    private void UpdateGpu(double value) {
-        var rounded = Math.Round(value);
-        _gpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
-        _gpu3dTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-        _gpuRow.Points = SparklinePoints.Build(_gpuHistory, 100);
-    }
-
-    private async Task LoadGpuInfoAsync() {
-        // GetAsync never throws (it falls back to GpuStaticInfo.Unknown), but guard the whole path so a
-        // surprise can't take down the app via an unobserved task exception.
-        try {
-            var info = await GpuInfoProvider.GetAsync();
-            _gpuRow.Sub = HardwareNameFormatter.ShortenGpu(info.Name);
-            _gpuRow.Spec = info.Name;
-        } catch {
-            _gpuRow.Sub = "";
-            _gpuRow.Spec = "Unknown GPU";
-        }
     }
 
     /// <summary>Network subscription callback: append the download rate to the history, then refresh.</summary>
@@ -760,10 +782,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             subscription.Dispose();
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
-        _gpuRow.PropertyChanged -= OnResourceDetailChanged;
         _cpuRow.PropertyChanged -= OnResourceDetailChanged;
         _throughputSampler.Dispose();
-        _gpuEngineSampler.Dispose();
+        _gpuSampler.Dispose();
         _cpuSampler.Dispose();
     }
 
@@ -777,6 +798,18 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required StatTile ReadTile { get; init; }
         public required StatTile WriteTile { get; init; }
         public required StatTile ResponseTile { get; init; }
+    }
+
+    /// <summary>A live per-GPU rail row and its backing state: the rolling overall-utilisation history, the 3D
+    /// stat tile, and this adapter's own per-engine mini-chart set (discovered lazily), all keyed to the
+    /// adapter's <see cref="Luid"/> so <see cref="UpdateGpuAdapters"/> can update it in place each tick.</summary>
+    private sealed class GpuResource {
+        public required string Luid { get; init; }
+        public required ResourceRow Row { get; init; }
+        public required double[] History { get; init; }
+        public required StatTile ThreeDTile { get; init; }
+        public List<EngineChart> Engines { get; } = new();
+        public Dictionary<string, EngineChart> EnginesByBase { get; } = new(StringComparer.Ordinal);
     }
 
     /// <summary>One GPU engine's mini chart and its backing state: the engtype key the sampler reports under
