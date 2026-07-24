@@ -187,8 +187,9 @@
 
                     <!-- Detailed: one mini chart per logical processor / engine in a compact square grid
                          (ceil(√n) columns, so 12 → 4×3). Cards stretch to fill their cell; the -8 right/bottom
-                         margin absorbs each cell's gutter so the grid stays flush. -->
-                    <ScrollViewer Height="240" HorizontalScrollBarVisibility="Disabled"
+                         margin absorbs each cell's gutter so the grid stays flush. The panel sizes to its
+                         content up to MaxHeight, so a small grid shows flush while many cores scroll. -->
+                    <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding SelectedResource.IsDetailed}">
                         <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}" Margin="0,0,-8,-8">
                             <ItemsControl.ItemsPanel>
@@ -202,7 +203,7 @@
                                     <Border Margin="0,0,8,8" Padding="8" CornerRadius="6"
                                             Background="{DynamicResource AppBackground}">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="{Binding Label}" FontSize="10"
+                                            <TextBlock Text="{Binding Label}" FontSize="11"
                                                        Foreground="{DynamicResource TextMuted}"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <controls:Sparkline Height="52" Fill="True" ShowGrid="True"
