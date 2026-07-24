@@ -94,8 +94,8 @@ A Task-Manager-style live process view: the list split into **Apps** and **Backg
 per-process PID / status / CPU % / Memory / Disk / GPU %, sortable headers, a summary strip (process
 counts, total CPU/memory, thread count), **End task**, and native **Properties**. Data is entirely
 in-box and needs no admin (`System.Diagnostics.Process`, `GetProcessIoCounters` P/Invoke, PDH GPU
-counters), with the live table keyed-diffed in place. *Per-process network throughput is deferred (the
-**Net** column shows `—`) — there is no clean in-box per-process rate API.*
+counters), with the live table keyed-diffed in place. *There is deliberately no per-process network
+column — Windows exposes no in-box, non-admin per-process rate API.*
 
 ### Performance — *live*
 A Task-Manager-style resource drill-down: a left **resource-selector rail** (CPU · Memory · Disk · GPU ·
