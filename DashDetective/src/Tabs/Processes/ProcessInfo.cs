@@ -8,8 +8,6 @@ namespace DashDetective.Tabs.Processes;
 /// diff (unique among live processes). <see cref="ParentPid"/> ties each process to its creator so
 /// <see cref="ProcessTreeBuilder"/> can collapse a multi-process app (e.g. all of Edge's helpers)
 /// under one entry, the way Task Manager does.
-///
-/// Per-process Network throughput is deferred (no clean in-box API), so the Net column stays "—".
 /// </summary>
 public sealed record ProcessInfo(
     int Pid,
