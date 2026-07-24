@@ -185,24 +185,29 @@
                                         Stroke="{Binding SelectedResource.ValueBrush}"
                                         Points="{Binding SelectedResource.Points}"/>
 
-                    <!-- Detailed: one mini chart per logical processor / engine, wrapping in a scroll area. -->
-                    <ScrollViewer Height="240" HorizontalScrollBarVisibility="Disabled"
+                    <!-- Detailed: one mini chart per logical processor / engine in a compact square grid
+                         (ceil(√n) columns, so 12 → 4×3). Cards stretch to fill their cell; the -8 right/bottom
+                         margin absorbs each cell's gutter so the grid stays flush. The panel sizes to its
+                         content up to MaxHeight, so a small grid shows flush while many cores scroll. -->
+                    <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding SelectedResource.IsDetailed}">
-                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
+                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}" Margin="0,0,-8,-8">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <WrapPanel/>
+                                    <UniformGrid x:DataType="vm:PerformanceViewModel"
+                                                 Columns="{Binding SelectedResource.DetailColumns}"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SubChart">
-                                    <Border Width="96" Margin="0,0,8,8" Padding="8" CornerRadius="6"
+                                    <Border Margin="0,0,8,8" Padding="8" CornerRadius="6"
                                             Background="{DynamicResource AppBackground}">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="{Binding Label}" FontSize="10"
+                                            <TextBlock Text="{Binding Label}" FontSize="11"
                                                        Foreground="{DynamicResource TextMuted}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <controls:Sparkline Height="40" YMin="0" YMax="100"
+                                            <controls:Sparkline Height="52" Fill="True" ShowGrid="True"
+                                                                GridRows="2" GridColumns="6" YMin="0" YMax="100"
                                                                 Stroke="{Binding Stroke}" Points="{Binding Points}"/>
                                         </StackPanel>
                                     </Border>

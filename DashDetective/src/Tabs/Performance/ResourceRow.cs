@@ -86,6 +86,14 @@ public partial class ResourceRow : ObservableObject {
     /// view model. Observable so a lazily-built set (CPU cores) refreshes the bound grid.</summary>
     [ObservableProperty] private IReadOnlyList<SubChart> _subCharts = Array.Empty<SubChart>();
 
+    /// <summary>Column count for the Detailed mini-chart grid. Square-ish (ceil(√n)) so the cells stay
+    /// compact regardless of pane width — e.g. 12 logical processors lay out 4×3. Recomputed whenever the
+    /// <see cref="SubCharts"/> set changes.</summary>
+    [ObservableProperty] private int _detailColumns = 1;
+
+    partial void OnSubChartsChanged(IReadOnlyList<SubChart> value) =>
+        DetailColumns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(value.Count)));
+
     /// <summary>Whether the Detailed (per-subunit) view is shown rather than the single overall chart.
     /// Persisted per category (CPU / GPU) by the shell.</summary>
     [ObservableProperty] private bool _isDetailed;
