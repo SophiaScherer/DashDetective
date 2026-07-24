@@ -6,11 +6,12 @@ using System.Collections.Generic;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// Single owner of the live samplers (CPU, Memory, GPU, Storage, Network). Each metric is sampled once
-/// per 1 Hz tick and fanned out to every subscriber, so pages share one sampler — removing the duplicate
-/// PDH GPU/disk queries the Dashboard and Performance tabs used to run in parallel. Subscriptions are
-/// ref-counted (a channel runs only while it has subscribers); <see cref="Pause"/>/<see cref="Resume"/>
-/// back the Live pill, <see cref="RefreshAll"/> backs Refresh, and per-metric fault isolation is kept.
+/// Single owner of the shared live samplers (CPU, Memory, Storage, Network). Each metric is sampled once
+/// per 1 Hz tick and fanned out to every subscriber, so pages share one sampler. Per-GPU and per-disk
+/// readings are page-local instead (the Dashboard and Performance tabs own their own samplers), since those
+/// are multi-instance and this shared feed carries only a single aggregate. Subscriptions are ref-counted
+/// (a channel runs only while it has subscribers); <see cref="Pause"/>/<see cref="Resume"/> back the Live
+/// pill, <see cref="RefreshAll"/> backs Refresh, and per-metric fault isolation is kept.
 /// </summary>
 public sealed class SystemMetricsService : IDisposable {
     private static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds(1);
@@ -22,12 +23,10 @@ public sealed class SystemMetricsService : IDisposable {
 
     private readonly Func<string> _adapterName;
     private readonly IDisposable? _cpuDisposable;
-    private readonly IDisposable? _gpuDisposable;
     private readonly IDisposable? _storageDisposable;
 
     private readonly MetricFeed<double> _cpu;
     private readonly MetricFeed<MemorySample> _memory;
-    private readonly MetricFeed<double> _gpu;
     private readonly MetricFeed<StorageSample> _storage;
     private readonly MetricFeed<NetworkSample> _network;
     private readonly MetricFeed[] _feeds;
@@ -42,28 +41,25 @@ public sealed class SystemMetricsService : IDisposable {
     public SystemMetricsService()
         : this(CreateSystemSamplers()) { }
 
-    // Unpacks the real sampler set, whose CPU/GPU/Storage samplers own native handles that must be disposed.
+    // Unpacks the real sampler set, whose CPU/Storage samplers own native handles that must be disposed.
     private SystemMetricsService(SystemSamplers real)
-        : this(real.Bundle, static () => new DispatcherTimerAdapter(), real.CpuDisposable, real.GpuDisposable, real.StorageDisposable) { }
+        : this(real.Bundle, static () => new DispatcherTimerAdapter(), real.CpuDisposable, real.StorageDisposable) { }
 
     /// <summary>Test seam: injects the sampler delegates and the timer factory so ref-counting, fault
     /// isolation and the alert watcher can be exercised with fakes headlessly (see <see cref="IUiTimer"/>).
     /// The public parameterless ctor builds the real samplers and delegates here, so production is
     /// unchanged.</summary>
     internal SystemMetricsService(MetricSamplers samplers, Func<IUiTimer> timerFactory,
-                                  IDisposable? cpuDisposable = null, IDisposable? gpuDisposable = null,
-                                  IDisposable? storageDisposable = null) {
+                                  IDisposable? cpuDisposable = null, IDisposable? storageDisposable = null) {
         _adapterName = samplers.AdapterName;
         _cpuDisposable = cpuDisposable;
-        _gpuDisposable = gpuDisposable;
         _storageDisposable = storageDisposable;
 
         _cpu = new MetricFeed<double>(DefaultInterval, samplers.Cpu, timerFactory);
         _memory = new MetricFeed<MemorySample>(DefaultInterval, samplers.Memory, timerFactory);
-        _gpu = new MetricFeed<double>(DefaultInterval, samplers.Gpu, timerFactory);
         _storage = new MetricFeed<StorageSample>(DefaultInterval, samplers.Storage, timerFactory);
         _network = new MetricFeed<NetworkSample>(DefaultInterval, samplers.Network, timerFactory);
-        _feeds = new MetricFeed[] { _cpu, _memory, _gpu, _storage, _network };
+        _feeds = new MetricFeed[] { _cpu, _memory, _storage, _network };
 
         // Watch CPU + memory for a sustained breach. Subscribing keeps these two channels running, which
         // the always-on Dashboard already does; Pause still halts them (the Live pill), holding the streaks.
@@ -71,23 +67,23 @@ public sealed class SystemMetricsService : IDisposable {
         _memoryAlertSub = _memory.Subscribe(OnMemoryAlertSample, static () => { });
     }
 
-    // Builds the five real samplers, each wrapped in a Sample() delegate; the CPU/GPU/Storage instances
-    // are also returned as disposables (they own native query handles disposed in Dispose).
+    // Builds the four shared real samplers, each wrapped in a Sample() delegate; the CPU/Storage instances
+    // are also returned as disposables (they own native query handles disposed in Dispose). GPU sampling is
+    // page-local (per adapter), so no shared GPU sampler lives here.
     private static SystemSamplers CreateSystemSamplers() {
         var cpu = new CpuUsageSampler();
         var memory = new MemoryUsageSampler();
-        var gpu = new GpuUsageSampler();
         var storage = new StorageUsageSampler();
         var network = new NetworkUsageSampler();
 
         var bundle = new MetricSamplers(
-            () => cpu.Sample(), () => memory.Sample(), () => gpu.Sample(),
+            () => cpu.Sample(), () => memory.Sample(),
             () => storage.Sample(), () => network.Sample(), () => network.AdapterName);
-        return new SystemSamplers(bundle, cpu, gpu, storage);
+        return new SystemSamplers(bundle, cpu, storage);
     }
 
-    // Carries the real sampler bundle plus the three native-handle owners that need disposing.
-    private readonly record struct SystemSamplers(MetricSamplers Bundle, IDisposable CpuDisposable, IDisposable GpuDisposable, IDisposable StorageDisposable);
+    // Carries the real sampler bundle plus the two native-handle owners that need disposing.
+    private readonly record struct SystemSamplers(MetricSamplers Bundle, IDisposable CpuDisposable, IDisposable StorageDisposable);
 
     /// <summary>Raised when the resource-alert state flips: <c>true</c> once CPU or memory has stayed at or
     /// above the threshold for <see cref="AlertConsecutiveSamples"/> samples, <c>false</c> when both recover.
@@ -105,9 +101,6 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Subscribes to physical-memory snapshots. Returns a token; dispose it to unsubscribe.</summary>
     public IDisposable SubscribeMemory(Action<MemorySample> onSample, Action onFailed) => _memory.Subscribe(onSample, onFailed);
-
-    /// <summary>Subscribes to GPU utilisation (0–100). Returns a token; dispose it to unsubscribe.</summary>
-    public IDisposable SubscribeGpu(Action<double> onSample, Action onFailed) => _gpu.Subscribe(onSample, onFailed);
 
     /// <summary>Subscribes to physical-disk snapshots. Returns a token; dispose it to unsubscribe.</summary>
     public IDisposable SubscribeStorage(Action<StorageSample> onSample, Action onFailed) => _storage.Subscribe(onSample, onFailed);
@@ -167,14 +160,13 @@ public sealed class SystemMetricsService : IDisposable {
             feed.SampleNow();
     }
 
-    /// <summary>Stops all channels and disposes the samplers that own native query handles (CPU, GPU, Storage).</summary>
+    /// <summary>Stops all channels and disposes the samplers that own native query handles (CPU, Storage).</summary>
     public void Dispose() {
         _cpuAlertSub.Dispose();
         _memoryAlertSub.Dispose();
         foreach (var feed in _feeds)
             feed.Dispose();
         _cpuDisposable?.Dispose();
-        _gpuDisposable?.Dispose();
         _storageDisposable?.Dispose();
     }
 
@@ -278,10 +270,10 @@ public sealed class SystemMetricsService : IDisposable {
 }
 
 /// <summary>
-/// The five per-metric sampler delegates plus the network adapter-name accessor that
+/// The four shared per-metric sampler delegates plus the network adapter-name accessor that
 /// <see cref="SystemMetricsService"/> fans out. The parameterless ctor wraps the real hardware samplers;
 /// the test seam injects fakes so the service's behaviour can be driven deterministically.
 /// </summary>
 internal sealed record MetricSamplers(
-    Func<double> Cpu, Func<MemorySample> Memory, Func<double> Gpu,
+    Func<double> Cpu, Func<MemorySample> Memory,
     Func<StorageSample> Storage, Func<NetworkSample> Network, Func<string> AdapterName);

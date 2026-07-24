@@ -11,22 +11,22 @@ namespace DashDetective.Tests.Services.SystemMetrics;
 /// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe, per-metric fault isolation, and
 /// the sustained-breach alert watcher.</summary>
 public class SystemMetricsServiceTests {
-    // Feeds are constructed in this order, so the captured timers line up by index.
-    private const int Cpu = 0, Memory = 1, Gpu = 2, Storage = 3, Network = 4;
+    // Feeds are constructed in this order, so the captured timers line up by index. Storage is the
+    // no-auto-subscriber exemplar (CPU + Memory auto-subscribe for the alert watcher).
+    private const int Cpu = 0, Memory = 1, Storage = 2, Network = 3;
 
     /// <summary>Mutable fake sampler values; the bundle closes over these so a test can change a reading
     /// between refreshes (or make the network sampler throw).</summary>
     private sealed class FakeSamplers {
         public double Cpu = 50;
         public MemorySample Memory = new(10, 0, 0, 0, 0);
-        public double Gpu = 33;
         public StorageSample Storage = new(0, 0, 0, 0, 0);
         public NetworkSample Network = new(0, 0);
         public bool NetworkThrows;
         public string AdapterName = "TestNIC";
 
         public MetricSamplers Bundle() => new(
-            () => Cpu, () => Memory, () => Gpu, () => Storage,
+            () => Cpu, () => Memory, () => Storage,
             () => NetworkThrows ? throw new InvalidOperationException("nic gone") : Network,
             () => AdapterName);
     }
@@ -44,16 +44,16 @@ public class SystemMetricsServiceTests {
     [Fact]
     public void Subscribe_FirstStartsChannel_LastUnsubscribeStops() {
         var (service, timers) = Create(new FakeSamplers());
-        var gpuTimer = timers[Gpu];
-        Assert.Equal(0, gpuTimer.StartCount);   // GPU has no auto-subscriber
+        var storageTimer = timers[Storage];
+        Assert.Equal(0, storageTimer.StartCount);   // Storage has no auto-subscriber
 
-        var token = service.SubscribeGpu(_ => { }, () => { });
-        Assert.True(gpuTimer.IsRunning);
-        Assert.Equal(1, gpuTimer.StartCount);
+        var token = service.SubscribeStorage(_ => { }, () => { });
+        Assert.True(storageTimer.IsRunning);
+        Assert.Equal(1, storageTimer.StartCount);
 
         token.Dispose();
-        Assert.False(gpuTimer.IsRunning);
-        Assert.True(gpuTimer.StopCount >= 1);
+        Assert.False(storageTimer.IsRunning);
+        Assert.True(storageTimer.StopCount >= 1);
     }
 
     [Fact]
@@ -61,13 +61,13 @@ public class SystemMetricsServiceTests {
         var (_, timers) = Create(new FakeSamplers());
         Assert.True(timers[Cpu].IsRunning);
         Assert.True(timers[Memory].IsRunning);
-        Assert.False(timers[Gpu].IsRunning);
+        Assert.False(timers[Storage].IsRunning);
     }
 
     [Fact]
     public void PauseThenResume_StopsAllThenRestartsOnlySubscribed() {
         var (service, timers) = Create(new FakeSamplers());
-        service.SubscribeGpu(_ => { }, () => { });   // GPU now has a subscriber
+        service.SubscribeStorage(_ => { }, () => { });   // Storage now has a subscriber
 
         service.Pause();
         Assert.All(timers, t => Assert.False(t.IsRunning));
@@ -75,33 +75,32 @@ public class SystemMetricsServiceTests {
         service.Resume();
         Assert.True(timers[Cpu].IsRunning);       // alert subscriber
         Assert.True(timers[Memory].IsRunning);    // alert subscriber
-        Assert.True(timers[Gpu].IsRunning);       // our subscriber
-        Assert.False(timers[Storage].IsRunning);  // no subscriber
-        Assert.False(timers[Network].IsRunning);
+        Assert.True(timers[Storage].IsRunning);   // our subscriber
+        Assert.False(timers[Network].IsRunning);  // no subscriber
     }
 
     [Fact]
     public void RefreshAll_FansLatestSampleToSubscribers() {
         var fakes = new FakeSamplers();
         var (service, _) = Create(fakes);
-        double? received = null;
-        service.SubscribeGpu(v => received = v, () => { });
+        StorageSample? received = null;
+        service.SubscribeStorage(v => received = v, () => { });
 
-        fakes.Gpu = 77;
+        fakes.Storage = new StorageSample(77, 0, 0, 0, 0);
         service.RefreshAll();
 
-        Assert.Equal(77, received);
+        Assert.Equal(77, received?.ActivePercent);
     }
 
     [Fact]
     public void Subscribe_SeedsWithCachedLatest() {
-        var fakes = new FakeSamplers { Gpu = 42 };   // primed into the cache at construction
+        var fakes = new FakeSamplers { Storage = new StorageSample(42, 0, 0, 0, 0) };   // primed into the cache
         var (service, _) = Create(fakes);
 
-        double? seeded = null;
-        service.SubscribeGpu(v => seeded = v, () => { });
+        StorageSample? seeded = null;
+        service.SubscribeStorage(v => seeded = v, () => { });
 
-        Assert.Equal(42, seeded);
+        Assert.Equal(42, seeded?.ActivePercent);
     }
 
     [Fact]

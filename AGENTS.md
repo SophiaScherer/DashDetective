@@ -55,38 +55,33 @@ pass; de-duplication / composition refactor) — write-ups in the Appendix.
   (need admin or vendor SDKs). No new packages, no new shared controls.
 
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live, except
-the **Deferred Dashboard work** below (GPU temperature + multi-GPU, still explicitly not built). Do not
-scaffold, stub, or "prepare" for the deferred items without an explicit task.
+**GPU temperature** (the sole remaining deferred item, below). Do not scaffold, stub, or "prepare" for it
+without an explicit task.
 
 ### Deferred Dashboard work — DO NOT build without an explicit task
-
-These were scoped and researched but are **intentionally not built**. The notes exist so the
-research isn't lost, not as a licence to start. Leave the GPU card as a single fixed card until
-a task explicitly reactivates this. Full plan:
-`C:\Users\User\.claude\plans\i-was-in-the-iridescent-pretzel.md`.
 
 - **GPU temperature** — would append `· <temp>°C` to the GPU card caption. No universal Windows
   API; needs vendor SDKs (NVML / ADLX / IGCL) or a library, best-effort with graceful fallback.
   (Note: this stays deferred even though **drive** temperature was solved in-box for NVMe — see the
   Storage `DiskTemperatureProvider` note above. GPUs have no equivalent non-admin standard-Windows source.)
 
-- **Multi-GPU layout** — on multi-GPU machines, render one card per GPU via a dynamic
-  `ObservableCollection` + `ItemsControl` in a single wrapping row, relocating the Storage/Network
-  cards to reflow. This is an **architecture change** (per the boundaries below, stop and get
-  sign-off first). Research findings from a part-built, since-discarded attempt:
-  - Per-GPU utilisation must be **attributed by adapter LUID**: the PDH `\GPU Engine(*)` and
-    `\GPU Adapter Memory(*)` counter instances are keyed by `luid_0x{High:x8}_0x{Low:x8}` but carry
-    no friendly name.
-  - **DXGI** (`dxgi.dll`, `CreateDXGIFactory1` → `EnumAdapters1` → `GetDesc1`) is the authoritative
-    LUID→name map; it also reports **true VRAM** (WMI `AdapterRAM` is capped at 4 GB) and flags
-    software adapters. It **must be called via raw vtable function pointers, not `[ComImport]`** —
-    built-in COM is disabled by a runtime feature switch (`NotSupportedException: Built-in COM has
-    been disabled`). The vtable approach needs no `unsafe` and no csproj change.
-  - `Win32_VideoController` has **no utilisation counter** and its `AdapterRAM` is 4 GB-capped, so
-    it's only good for the name; filter to physical adapters by `PNPDeviceID` starting with `PCI\`.
-  - The correct card set is **the LUIDs present in the PDH counters ∩ the DXGI adapter names, minus
-    software adapters**. DXGI can list one physical GPU under several LUIDs and also enumerates a
-    "Microsoft Basic Render Driver" (software) — both are noise to be discarded.
+### Multi-GPU — SHIPPED (branch `multiplePerformanceCards`, 2026-07)
+
+No longer deferred. Multiple physical GPUs now render one card per adapter on the Dashboard and one rail
+row per adapter on the Performance tab (each with its own overall % + per-engine Detailed grid), following
+the disk multi-instance pattern. Key pieces (the DXGI research below was correct and is now implemented):
+- `GpuAdapterProvider` — DXGI (`dxgi.dll`, `CreateDXGIFactory1` → `EnumAdapters1` → `GetDesc1`) is the
+  authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
+  `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
+  been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
+  though VRAM display stays deferred.
+- Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
+  `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
+- The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
+  (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
+  LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
+- `Win32_VideoController` (`GpuInfoProvider`) is retained only for the single-name callers; the inventory
+  uses `GpuAdapterProvider`.
 
 ## Strict Working Boundaries
 
@@ -192,7 +187,12 @@ currently exist.
       /SystemMetrics
         CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
         MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
-        GpuUsageSampler.cs      (live total GPU % via PDH GPU Engine counters; owns a PDH query handle)
+        GpuUsageSampler.cs      (live GPU % via PDH GPU Engine counters; owns a PDH query handle. Sample()
+                                 = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
+                                 = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
+                                 the Dashboard cards + Performance rows each own one for per-adapter readings)
+        GpuAdapterProvider.cs   (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
+                                 flag + VRAM; the authoritative LUID→name map for multi-GPU, async)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
         DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
@@ -200,13 +200,14 @@ currently exist.
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
                                  generic MetricChannel<TSample> for snapshot samples + a no-history variant)
-        SystemMetricsService.cs (SINGLE owner of the five samplers; per-metric 1 Hz channel fans each
-                                 sample out to subscribers (ref-counted — a channel runs only while it has
-                                 one), Pause/Resume for the Live pill, RefreshAll for Refresh, per-metric
-                                 fault isolation. Dashboard / Performance / Processes SUBSCRIBE instead of
-                                 owning samplers — this removes the duplicate PDH GPU/disk queries. The
-                                 Network tab keeps its own NetworkUsageSampler. Built in the App composition
-                                 root and disposed on shutdown.)
+        SystemMetricsService.cs (SINGLE owner of the four SHARED samplers — CPU, Memory, Storage, Network;
+                                 per-metric 1 Hz channel fans each sample out to subscribers (ref-counted — a
+                                 channel runs only while it has one), Pause/Resume for the Live pill,
+                                 RefreshAll for Refresh, per-metric fault isolation. Dashboard / Performance /
+                                 Processes SUBSCRIBE instead of owning these samplers. Per-GPU and per-disk
+                                 readings are page-local instead (multi-instance; this feed carries only a
+                                 single aggregate), as is the Network tab's own NetworkUsageSampler. Built in
+                                 the App composition root and disposed on shutdown.)
       /Network
         NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
                                  adapter — internet-facing, has a default gateway — NOT a sum of all
@@ -490,10 +491,11 @@ When a new feature becomes active, or an existing one is completed/paused, updat
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
-  Information **RAM** row all read the real machine. GPU: the GPU `StatCard` (live utilisation
-  % + sparkline via PDH) and the System Information **GPU** row (adapter name via WMI); GPU
-  **temperature** and **multi-GPU** layout are **deferred and out of scope for now** (research
-  notes under *Deferred Dashboard work* below). Storage: the Storage `StatCard` shows live disk
+  Information **RAM** row all read the real machine. GPU: one live GPU `StatCard` **per physical
+  adapter** (utilisation % + sparkline via PDH `\GPU Engine`, attributed by adapter LUID; adapters named
+  via DXGI in `GpuAdapterProvider`) and the System Information **GPU** row listing every adapter; GPU
+  **temperature** is the sole remaining deferred item (research under *Deferred Dashboard work* above).
+  Storage: the Storage `StatCard` shows live disk
   **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
   as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
   no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
