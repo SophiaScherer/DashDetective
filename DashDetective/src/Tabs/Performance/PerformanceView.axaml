@@ -202,7 +202,8 @@
                                             <TextBlock Text="{Binding Label}" FontSize="10"
                                                        Foreground="{DynamicResource TextMuted}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <controls:Sparkline Height="40" YMin="0" YMax="100"
+                                            <controls:Sparkline Height="40" Fill="True" ShowGrid="True"
+                                                                GridRows="2" GridColumns="6" YMin="0" YMax="100"
                                                                 Stroke="{Binding Stroke}" Points="{Binding Points}"/>
                                         </StackPanel>
                                     </Border>
