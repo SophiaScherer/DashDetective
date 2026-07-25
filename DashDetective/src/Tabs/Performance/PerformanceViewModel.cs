@@ -83,8 +83,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly double[] _cpuHistory = new double[WindowSeconds];
     private readonly ResourceRow _cpuRow;
     private readonly StatTile _cpuUtilTile;
+    private readonly StatTile _cpuSpeedTile;
     private readonly StatTile _cpuProcessesTile;
     private readonly StatTile _cpuUptimeTile;
+
+    // CPU current clock: a page-local sampler reads the % Processor Performance ratio (the shared CPU feed
+    // carries only the clamped utilisation figure), scaled by the base clock cached from the static info.
+    private readonly ProcessorFrequencySampler _speedSampler = new();
+    private double _cpuMaxClockMhz;
 
     // CPU per-logical-processor "Detailed" view: a page-local per-core sampler drives one mini chart per
     // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
@@ -134,9 +140,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Build the stat tiles first, then the resource rows (their initial charts come from the all-zero
         // histories), then subscribe to the shared metrics.
 
-        // CPU — live. Tiles: Utilization / Processes / Up time update every tick; Speed is blanked to
-        // "—" (no reliable current-clock source, and the base clock already appears in the sub-label).
+        // CPU — live. Every tile updates: Utilization / Processes / Up time on the shared CPU tick, Speed
+        // on the throughput timer from the page-local frequency sampler (base clock × the % Processor
+        // Performance ratio, like Task Manager). Speed starts at "—" until the first reading.
         _cpuUtilTile = new StatTile("Utilization", "0 %");
+        _cpuSpeedTile = new StatTile("Speed", "—");
         _cpuProcessesTile = new StatTile("Processes", "0");
         _cpuUptimeTile = new StatTile("Up time", "0m");
 
@@ -155,7 +163,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
                                   SparklinePoints.Build(_cpuHistory, 100),
                                   new[] {
-                                      _cpuUtilTile, new StatTile("Speed", "—"),
+                                      _cpuUtilTile, _cpuSpeedTile,
                                       _cpuProcessesTile, _cpuUptimeTile,
                                   }, Select);
 
@@ -284,6 +292,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateDisks();
         UpdateGpuAdapters();
         UpdateCpuCores();
+        UpdateCpuSpeed();
         _ = LoadCpuInfoAsync();
         _ = LoadMemoryInfoAsync();
         _ = LoadNetworkInfoAsync();
@@ -340,14 +349,22 @@ public partial class PerformanceViewModel : ViewModelBase,
     private void UpdateCpuUptime() =>
         _cpuUptimeTile.Value = UptimeFormatter.Format(TimeSpan.FromMilliseconds(Environment.TickCount64));
 
+    /// <summary>Refreshes the Speed tile from the current clock ratio and the cached base clock. Pumped on
+    /// the throughput timer (not the shared CPU tick) so it survives a shared-feed fault, like the other
+    /// page-local samplers; the formatter renders "—" until the base clock loads or if the counter is inert.</summary>
+    private void UpdateCpuSpeed() =>
+        _cpuSpeedTile.Value = CpuSpeedFormatter.Format(_cpuMaxClockMhz, _speedSampler.Sample());
+
     private async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole path so a
         // surprise can't take down the app via an unobserved task exception.
         try {
             var info = await CpuInfoProvider.GetAsync();
+            _cpuMaxClockMhz = info.MaxClockMhz;
             _cpuRow.Sub = FormatCpuSub(info);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
         } catch {
+            _cpuMaxClockMhz = 0;
             _cpuRow.Sub = "";
             _cpuRow.Spec = "Unknown CPU";
         }
@@ -493,6 +510,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateDisks();
         UpdateGpuAdapters();
         UpdateCpuCores();
+        UpdateCpuSpeed();
     }
 
     /// <summary>Samples per-logical-processor utilisation and rebuilds each core's mini chart. Builds the core
@@ -786,6 +804,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _throughputSampler.Dispose();
         _gpuSampler.Dispose();
         _cpuSampler.Dispose();
+        _speedSampler.Dispose();
     }
 
     /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four

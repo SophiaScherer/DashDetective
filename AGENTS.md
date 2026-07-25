@@ -185,6 +185,10 @@ currently exist.
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
       /SystemMetrics
+        ProcessorFrequencySampler.cs (live CPU current-clock ratio via PDH
+                                 \Processor Information(_Total)\% Processor Performance; page-local to the
+                                 Performance tab's CPU Speed tile — × the WMI base clock, like Task Manager.
+                                 NOT the % Processor Utility counter, which is utilisation, not clock speed)
         CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
         MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
         GpuUsageSampler.cs      (live GPU % via PDH GPU Engine counters; owns a PDH query handle. Sample()
@@ -729,8 +733,16 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `SparklinePoints`, and pushes into the selected row; static hardware labels load once via the
   `*InfoProvider` async-WMI providers. Implements `IRefreshablePage` (toolbar Refresh re-samples every
   metric), `ILiveSamplingPage` (Live/Pause is the shared service's) and `IDisposable`. No new packages,
-  no new shared controls. GPU VRAM/Temp/Power and CPU Speed / Memory Cached tiles show "—" (no reliable
-  standard-Windows source; GPU temperature is deferred, see *Deferred Dashboard work*).
+  no new shared controls. The CPU **Speed** tile is live: a page-local `ProcessorFrequencySampler`
+  (`src/Services/SystemMetrics`) reads the PDH `\Processor Information(_Total)\% Processor Performance`
+  ratio and `CpuSpeedFormatter` scales the WMI base clock (`CpuStaticInfo.MaxClockMhz`) by it — exactly
+  Task Manager's Speed figure, so it rises above the base clock under Turbo (deliberately uncapped) and
+  falls at idle. Pumped on the page-local throughput timer (fixed 1 Hz, not retimed by the Settings
+  refresh interval) and on Refresh; degrades to "—" if the counter or base clock is unavailable. This is
+  page-local, like the disk/GPU/per-core samplers — the shared CPU feed carries only the clamped
+  utilisation figure, and this reads a *different* counter, so `ProcessorUtilityCpuSampler` /
+  `SystemMetricsService` were untouched. GPU VRAM/Temp/Power and the Memory Cached tile still show "—"
+  (no reliable standard-Windows source; GPU temperature is deferred, see *Deferred Dashboard work*).
 
 ### Completed cross-cutting passes
 
