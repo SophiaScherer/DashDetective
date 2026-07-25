@@ -105,6 +105,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly ResourceRow _memoryRow;
     private readonly StatTile _memInUseTile;
     private readonly StatTile _memAvailableTile;
+    private readonly StatTile _memCachedTile;
     private readonly StatTile _memCommittedTile;
 
     // ---- Disks (live, one row per physical disk) ----
@@ -148,10 +149,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuProcessesTile = new StatTile("Processes", "0");
         _cpuUptimeTile = new StatTile("Up time", "0m");
 
-        // Memory — live. Tiles: In use / Available / Committed update every tick; Cached is blanked to
-        // "—" (no reliable source without adding a PDH counter to the pure-Win32 memory sampler).
+        // Memory — live. All four tiles update every tick: In use / Available / Committed come from the
+        // shared GlobalMemoryStatusEx sample, while Cached is a separate psapi read (see UpdateMemory).
         _memInUseTile = new StatTile("In use", "0 GB");
         _memAvailableTile = new StatTile("Available", "0 GB");
+        _memCachedTile = new StatTile("Cached", "0 GB");
         _memCommittedTile = new StatTile("Committed", "0 / 0 GB");
 
         // Ethernet / network — live. Rail value + chart show the primary adapter's receive throughput;
@@ -171,7 +173,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                      SparklinePoints.Build(_memoryHistory, 100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
-                                         new StatTile("Cached", "—"), _memCommittedTile,
+                                         _memCachedTile, _memCommittedTile,
                                      }, Select);
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
@@ -389,6 +391,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryRow.ValueText = "—";
         _memInUseTile.Value = "—";
         _memAvailableTile.Value = "—";
+        _memCachedTile.Value = "—";
         _memCommittedTile.Value = "—";
     }
 
@@ -412,6 +415,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memCommittedTile.Value = limitGb > 0
             ? $"{committedGb.ToString("F0", CultureInfo.InvariantCulture)} / {limitGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "—";
+
+        // Cached is not a field of the sample: GlobalMemoryStatusEx doesn't report it, and the sampler
+        // behind this feed is shared with Dashboard/Processes. It's a separate absolute psapi read taken
+        // on the same tick, so it re-times, pauses and refreshes with its neighbours.
+        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemCacheProvider.ReadCachedBytes());
     }
 
     private async Task LoadMemoryInfoAsync() {
