@@ -74,7 +74,8 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
   `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
   been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
-  though VRAM display stays deferred.
+  which now feeds the Performance tab's GPU **VRAM** tile — carried per adapter on
+  `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
@@ -196,7 +197,9 @@ currently exist.
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
                                  the Dashboard cards + Performance rows each own one for per-adapter readings)
         GpuAdapterProvider.cs   (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
-                                 flag + VRAM; the authoritative LUID→name map for multi-GPU, async)
+                                 flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
+                                 DedicatedVideoMemory rides through DeviceInventory onto
+                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
         DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
@@ -763,9 +766,18 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `MemoryUsageSampler` and the `MemorySample` record — consumed by Dashboard and Processes too — were
   **left untouched**. Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
   so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
-  blanks to "—" alongside its neighbours if that feed faults. GPU VRAM/Temp/Power are the only stat tiles
-  still showing "—" (no reliable standard-Windows source; GPU temperature is deferred, see *Deferred
-  Dashboard work*).
+  blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM** tile is live too, and it is
+  the one tile that is **not** sampled: DXGI's dedicated video memory is static per adapter, so
+  `GpuAdapterProvider`'s `DedicatedVideoMemory` (already read for the multi-GPU work, previously discarded)
+  is now carried on `DeviceInstance.VramBytes` and set once in `BuildGpuRows` when the row is built —
+  re-read only when Refresh re-runs the inventory. It is formatted by **reusing** `FileSizeFormatter`
+  (File Explorer's binary byte humanizer, already called cross-tab by Storage), so a 12 GB discrete card
+  and a 512 MB integrated adapter each read naturally instead of forcing a fixed GB unit; zero/absent
+  yields "—". This was the one change that reached outside `src/Tabs/Performance/` — `DeviceInstance` gained
+  a trailing optional `ulong? VramBytes`, and `DeviceInventory.Compose` passes it through (both under
+  explicit sign-off; `GpuAdapterProvider` itself was untouched). **GPU Temp and Power are now the only
+  stat tiles still showing "—"** (no reliable standard-Windows source; GPU temperature is deferred, see
+  *Deferred Dashboard work*).
 
 ### Completed cross-cutting passes
 

@@ -10,7 +10,8 @@ namespace DashDetective.Services.SystemMetrics;
 /// <summary>One graphics adapter as DXGI reports it: the PDH-style <see cref="LuidToken"/> that joins to
 /// the <c>\GPU Engine(*)</c> counter instances, the friendly <see cref="Name"/> (DXGI's description),
 /// whether it is a software/basic-render adapter (<see cref="IsSoftware"/>, to be filtered out), and its
-/// dedicated VRAM in bytes (unused for now — VRAM display is deferred).</summary>
+/// dedicated VRAM in bytes (carried onto <see cref="DeviceInstance.VramBytes"/> for the Performance tab's
+/// GPU VRAM tile).</summary>
 public sealed record GpuAdapter(string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory);
 
 /// <summary>
