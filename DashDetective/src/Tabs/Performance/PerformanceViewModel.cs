@@ -7,6 +7,7 @@ using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.Dashboard;
+using DashDetective.Tabs.FileExplorer;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -495,12 +496,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var gpu in gpus) {
             var history = new double[WindowSeconds];
             var threeDTile = new StatTile("3D", "0 %");
-            // VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU temperature is
-            // deferred out of scope).
+            // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
+            // so it's set once here rather than sampled. Temp / Power stay blanked to "—": no reliable
+            // standard Windows source (GPU temperature is deferred out of scope).
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, "0", "%", Brush("#6ccb5f"),
                                       SparklinePoints.Build(history, 100),
                                       new[] {
-                                          threeDTile, new StatTile("VRAM", "—"),
+                                          threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
                                           new StatTile("Temp", "—"), new StatTile("Power", "—"),
                                       }, Select) { IsDetailed = _gpuDetailed };
             var resource = new GpuResource {
@@ -513,6 +515,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         RebuildResources();
         UpdateGpuAdapters();
     }
+
+    /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
+    /// shared-memory adapter, or a failed read). Reuses the shared byte humanizer, so a small integrated
+    /// GPU reads "128 MB" rather than "0.1 GB".</summary>
+    private static string FormatVram(ulong? bytes) =>
+        bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
