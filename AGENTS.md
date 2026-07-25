@@ -335,6 +335,14 @@ currently exist.
                                  Fills the viewport via ISelfScrollingPage, like File Explorer. All five
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
                                  SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IDisposable.)
+                                CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
+                                                         ratio, as GHz; "—" when either is missing)
+                                SystemCacheProvider.cs  (page-local psapi GetPerformanceInfo P/Invoke:
+                                                         SystemCache pages × PageSize = Task Manager's
+                                                         memory "Cached". Soft-fails to null; a thrown
+                                                         exception is logged once, then latches it off)
+                                MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
+                                                         provider reports nothing)
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
                                 (LIVE — read-only drives/health view: a top row of DriveCard summary
                                  cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
@@ -741,8 +749,23 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   refresh interval) and on Refresh; degrades to "—" if the counter or base clock is unavailable. This is
   page-local, like the disk/GPU/per-core samplers — the shared CPU feed carries only the clamped
   utilisation figure, and this reads a *different* counter, so `ProcessorUtilityCpuSampler` /
-  `SystemMetricsService` were untouched. GPU VRAM/Temp/Power and the Memory Cached tile still show "—"
-  (no reliable standard-Windows source; GPU temperature is deferred, see *Deferred Dashboard work*).
+  `SystemMetricsService` were untouched. The Memory **Cached** tile is live too: the page-local
+  `SystemCacheProvider` calls the in-box psapi `GetPerformanceInfo` and scales its
+  `PERFORMANCE_INFORMATION.SystemCache` (pages) by the struct's own `PageSize`, which `MemoryCacheFormatter`
+  renders as binary GB — Task Manager's own "Cached" figure (verified against it: 15.3 GB on the tile vs
+  15.42 GB summed from the standby + modified page-list counters). **This corrects the old rationale**,
+  which claimed there was no source short of "adding a PDH counter to the pure-Win32 memory sampler": it
+  is *not* a PDH counter, needs no admin and no package, and — like `GlobalMemoryStatusEx` — is an
+  absolute one-shot reading, so it needs no rate-style sampler. (Do **not** reach for the PDH
+  `\Memory\Cache Bytes` counter instead: that reports the system *working set*, a different and far
+  smaller number — 0.5 GB where Cached was 15 GB.) Deliberately a **page-local** P/Invoke under
+  `src/Tabs/Performance/` (the `ShellInterop` / `ConnectionsInterop` precedent), so the shared
+  `MemoryUsageSampler` and the `MemorySample` record — consumed by Dashboard and Processes too — were
+  **left untouched**. Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
+  so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
+  blanks to "—" alongside its neighbours if that feed faults. GPU VRAM/Temp/Power are the only stat tiles
+  still showing "—" (no reliable standard-Windows source; GPU temperature is deferred, see *Deferred
+  Dashboard work*).
 
 ### Completed cross-cutting passes
 
