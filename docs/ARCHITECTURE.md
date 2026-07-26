@@ -1,9 +1,12 @@
 # DashDetective — Architecture
 
 This document explains how DashDetective is put together: the shell, how pages are hosted and kept
-alive, the sampler/provider conventions behind the live data, the theming seam, and the inventory of
-shared controls. It is a reader-facing distillation of the project's internal working notes — enough to
-find your way around the code without reading every file.
+alive, the sampler/provider conventions behind the live data, the theming seam, settings persistence,
+the shared control inventory, and the seams that make the whole thing testable. It is a reader-facing
+distillation of the project's internal working notes — enough to find your way around the code without
+reading every file.
+
+Build, run and test instructions live in the [README](../README.md).
 
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0-windows`, using the
 MVVM pattern with `CommunityToolkit.Mvvm`. It is Windows-only on purpose (WMI, PDH performance
@@ -21,16 +24,16 @@ counters, registry, and Win32 P/Invoke).
 
 ## Source layout
 
-Source lives under `DashDetective/src/`, split into three areas. Namespaces follow folders
+Source lives under `DashDetective/src/`, split into four areas. Namespaces follow folders
 (`DashDetective.Shared`, `DashDetective.Services.Theming`, `DashDetective.Shell`,
 `DashDetective.Tabs.<Feature>`, …).
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette. |
-| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers), and the shared `Network` throughput sampler. |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the pure-logic `Charts` helpers (`ChartScale`, `SparklinePoints`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, and the dockable `Navigation` bar. |
-| `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Hardware, Settings). |
+| `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
 
 **Rule of thumb:** anything reused by more than one tab (a control, a colour, a sampler) belongs in
 `Shared`/`Services`; everything else stays inside its tab folder.
@@ -47,15 +50,15 @@ component. Its view-model owns orientation and collapsed state and exposes *ever
 axis — as **computed properties, with no value converters**. Two entry points drive the *same* shared
 view-model: on-bar controls (a collapse chevron and a kebab menu offering the four dock positions), and
 the **Navigation** group in Settings → Appearance. The bar can also be **dragged to an edge to dock**,
-with a floating hint chip showing the target. Navigation state is session-only (resets to left/expanded
-each launch).
+with a floating hint chip showing the target. Dock edge and collapsed state are persisted and restored
+on the next launch (see *Settings persistence* below).
 
 `ViewLocator` maps a `*ViewModel` to its `*View` by type name, so a tab's view and view-model must
 share a namespace.
 
 ## Page lifecycle: always-on pages and marker interfaces
 
-Data-bearing tabs (Dashboard, Network, Processes, Performance) are **always-on singletons**: their
+Data-bearing tabs (Dashboard, Network, Processes, Performance, Storage) are **always-on singletons**: their
 view-models are constructed once by the shell and live for the app's lifetime, so their timers and
 rolling buffers keep running as you switch tabs. Rather than a common base class dictating behaviour, pages opt into shell
 behaviours by implementing small **marker interfaces** in `src/Shared`:
@@ -64,13 +67,15 @@ behaviours by implementing small **marker interfaces** in `src/Shared`:
   shell must *not* wrap it in a page-level scroll region. The page host is a panel with two
   mutually-exclusive content hosts (a scrolling `ScrollViewer` and a bounded `ContentControl`); the
   current page is routed to whichever matches, so its view is only built once. File Explorer uses this
-  to give each of its three panes an independent scrollbar.
+  to give each of its three panes an independent scrollbar; Processes and Performance use it for their
+  own bounded, internally-scrolling layouts. Network and Storage deliberately page-scroll instead.
 - **`IRefreshablePage`** — the toolbar **Refresh** button routes to `Refresh()`. The Dashboard
   re-samples every metric; File Explorer reloads the current folder; pages that don't implement it
-  simply ignore Refresh.
+  simply ignore Refresh. Every data-bearing tab implements it, Hardware included.
 - **`ILiveSamplingPage`** — the toolbar **Live** pill pauses/resumes sampling. `MainWindowViewModel`
   routes a single toggle across every page that implements the interface, so one control governs all
-  live sampling at once.
+  live sampling at once. Hardware is the one data tab that opts out: it reads static facts, so there is
+  nothing to pause.
 
 This keeps the shell decoupled from any specific tab: it reasons about capabilities
 ("is the current page refreshable?"), never concrete types.
@@ -130,8 +135,28 @@ constructed once in `MainWindowViewModel`, applied at startup, and handed to `Se
 
 **The one rule:** any resource key that can change at runtime must be referenced with
 `{DynamicResource …}`, never `{StaticResource}`. Only the fixed legend colours
-(`Blue`/`Green`/`Purple`/`Orange`/`Yellow`) stay static. Theming is session-only by choice (no
-persistence yet — see the Roadmap).
+(`Blue`/`Green`/`Purple`/`Orange`/`Yellow`) stay static. The chosen theme and accent are persisted and
+reapplied at launch (see *Settings persistence* below).
+
+## Settings persistence
+
+User choices are persisted as JSON at `%AppData%/DashDetective/settings.json` by **`SettingsStore`**
+(`src/Services/Settings`). **`AppSettings`** is an immutable record holding the whole of that state —
+theme, accent name, nav orientation/collapse, refresh interval, show-hidden-files, launch-at-startup,
+tray, resource alerts, and the Performance tab's view toggles. The composition root applies it on load
+and captures a fresh snapshot to save whenever a control changes. `SettingsJsonContext` is a
+source-generated `System.Text.Json` context, so serialization stays reflection-free and trim-friendly.
+
+Two conventions keep a bad file from being fatal:
+
+- **Every property has a default**, so a file written by an older schema — or missing fields after a
+  hand-edit — still deserializes rather than failing.
+- **A `SchemaVersion` guards incompatible changes**; a mismatch falls back to `AppSettings.Defaults`.
+  Combined with the store's soft-fail read (a missing, unreadable or corrupt file logs a warning and
+  returns defaults), a broken settings file can never prevent launch.
+
+`SettingsStore` has an `internal` constructor taking an explicit file path — production resolves
+`%AppData%` — which is how the persistence tests run against a temporary file.
 
 ## Shared control inventory
 
@@ -144,6 +169,13 @@ Reusable widgets live in `src/Shared/Controls`:
 - **`StatCard`** — a headline metric card wrapping a `Sparkline` (it forwards `YMin`/`YMax` through).
 - **`InfoRow`** — a key/value row; long values wrap flush-right onto multiple lines instead of clipping,
   so verbose vendor strings (e.g. a full BIOS manufacturer name) are shown in full.
+- **`ExpandablePathRow`** — an `InfoRow` variant for long filesystem paths, which expands to show the
+  full value rather than truncating it.
+
+The geometry behind the charts is kept out of the controls in `src/Shared/Charts`, as pure static
+helpers: **`ChartScale`** resolves the Y axis (auto-fit or fixed `YMin`/`YMax`) and **`SparklinePoints`**
+projects samples to points. Keeping them free of Avalonia types is what lets them be unit-tested
+directly, without a headless render pass.
 
 Shared styles (card, panel, segmented control, toggle, buttons, the draggable `paneSplitter`, …) live
 in `src/Shared/Styles/SharedStyles.axaml`. Controls or styles used by only one tab stay tab-local until
@@ -152,15 +184,59 @@ current examples).
 
 ## Dependencies
 
-Beyond Avalonia and `CommunityToolkit.Mvvm`, the only added package is **`System.Management`** (WMI).
-Everything else is in-box: `System.Net.NetworkInformation` / `Ping` / `Dns`, `Microsoft.Win32.Registry`,
-`System.Diagnostics.Process`, PDH performance counters, and hand-written P/Invoke (`shell32`,
-`iphlpapi`, and process/GPU counters). Adding a new package is a deliberate, signed-off decision.
+Beyond Avalonia (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`, `Avalonia.Fonts.Inter`) and
+`CommunityToolkit.Mvvm`, the only added runtime package is **`System.Management`** (WMI).
+`AvaloniaUI.DiagnosticsSupport` is referenced for the Debug configuration only and is excluded from
+Release builds. Everything else is in-box: `System.Net.NetworkInformation` / `Ping` / `Dns`,
+`Microsoft.Win32.Registry`, `System.Text.Json`, `System.Diagnostics.Process`, and PDH performance
+counters. Adding a new package is a deliberate, signed-off decision.
+
+Native access is all hand-written P/Invoke against DLLs already present on the machine — nothing is
+referenced, redistributed or shipped, and none of it needs admin rights:
+
+| Library | Used for |
+| --- | --- |
+| `pdh.dll` | Performance-counter queries (GPU, disk, per-process metrics) |
+| `iphlpapi.dll` | The TCP/UDP connections table with owning PIDs |
+| `shell32.dll` | Shell integration — Open and the native Properties sheet |
+| `kernel32.dll`, `psapi.dll` | Process I/O counters and memory reads; the NVMe health-log IOCTL |
+| `dxgi.dll` | Enumerating physical GPU adapters by LUID |
+| `user32.dll`, `dwmapi.dll` | Window and title-bar integration |
+| `nvapi64.dll`, `nvml.dll`, `atiadlxx.dll` | GPU temperature and power, installed by the display driver |
+
+The three vendor GPU libraries are the reason a unified sensor library is not needed. If a machine
+lacks a given vendor's driver, the `DllImport` simply fails and that tile degrades to "—" on its own.
+
+## Testing
+
+Unit tests live in `tests/DashDetective.Tests` (xUnit, also targeting `net10.0-windows` because it
+references the Windows-only app assembly). Fakes are small hand-written classes under `Fakes/` — there
+is no mocking framework, matching the codebase's zero-dependency ethos. The test layout mirrors the app,
+so a test file sits at the same relative path as its subject
+(`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`).
+
+The architecture is shaped to make this possible headlessly, without an Avalonia dispatcher or real
+hardware. Two seams do most of that work:
+
+- **`IUiTimer` + `DispatcherTimerAdapter`** (`src/Services/Threading`) abstract the UI-thread timer, so
+  `MetricChannel` and `SystemMetricsService` can be stepped deterministically by `FakeUiTimer` instead of
+  waiting on wall-clock ticks. Production still uses a real `DispatcherTimer` by default.
+- **`InternalsVisibleTo("DashDetective.Tests")`** (in the app csproj) exposes a small number of
+  `internal` constructors and widened members — `SystemMetricsService`'s sampler-bundle ctor,
+  `SettingsStore`'s explicit-path ctor — so the hardware samplers and the settings file can be faked.
+  These seams are additive: they never change production behaviour.
+
+The consequence for new code is a convention: **pure logic belongs outside the view-models.** Formatters,
+catalogs, chart maths and paging maths are extracted as static helpers in `src/Shared` or the tab folder
+precisely so they can be tested directly, which is why `ChartScale`, `PagerMath`, `ProcessTreeBuilder`
+and the formatter family exist as separate types.
 
 ## Quality gates
 
 - **`.editorconfig`** (repo root) encodes the house style: four-space indent, file-scoped namespaces,
-  K&R braces, broad `var` usage.
+  K&R braces, broad `var` usage. Usings are sorted alphabetically, with `System` **not** first.
 - The build sets **`TreatWarningsAsErrors`**, **`EnforceCodeStyleInBuild`** and **`AnalysisLevel=latest`**
   (platform-compatibility analyzers), so style and platform issues fail the build.
-- **CI** runs `dotnet format --verify-no-changes` before building, so unformatted code fails fast.
+- **CI** (`.github/workflows/dotnet-desktop.yml`) runs on `windows-latest` over a Debug/Release matrix:
+  `dotnet format --verify-no-changes` runs before building, so unformatted code fails fast, then the test
+  suite runs with Cobertura coverage collected via coverlet.
