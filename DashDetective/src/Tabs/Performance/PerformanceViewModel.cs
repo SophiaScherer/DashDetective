@@ -126,6 +126,9 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
     private readonly GpuUsageSampler _gpuSampler = new();
+    // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
+    // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
+    private readonly GpuSensorProvider _gpuSensors = new();
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
@@ -294,6 +297,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _service.RefreshAll();
         UpdateDisks();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
         UpdateCpuCores();
         UpdateCpuSpeed();
         _ = LoadCpuInfoAsync();
@@ -497,16 +501,19 @@ public partial class PerformanceViewModel : ViewModelBase,
             var history = new double[WindowSeconds];
             var threeDTile = new StatTile("3D", "0 %");
             // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
-            // so it's set once here rather than sampled. Temp / Power stay blanked to "—": no reliable
-            // standard Windows source (GPU temperature is deferred out of scope).
+            // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
+            // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            var tempTile = new StatTile("Temp", "—");
+            var powerTile = new StatTile("Power", "—");
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, "0", "%", Brush("#6ccb5f"),
                                       SparklinePoints.Build(history, 100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
-                                          new StatTile("Temp", "—"), new StatTile("Power", "—"),
+                                          tempTile, powerTile,
                                       }, Select) { IsDetailed = _gpuDetailed };
             var resource = new GpuResource {
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
+                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             _gpus.Add(resource);
             _gpusByLuid[resource.Luid] = resource;
@@ -514,6 +521,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         RebuildResources();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
     }
 
     /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
@@ -525,8 +533,24 @@ public partial class PerformanceViewModel : ViewModelBase,
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
         UpdateCpuCores();
         UpdateCpuSpeed();
+    }
+
+    /// <summary>Refreshes every GPU's Temp / Power tiles from its vendor SDK. Deliberately iterates the rows
+    /// rather than a sampler's results (unlike <see cref="UpdateGpuAdapters"/>): the sensor read is
+    /// independent of whether PDH reported that adapter this tick, so the tiles don't freeze when the engine
+    /// counters go quiet. A transient miss leaves the last shown value; an adapter whose vendor has no reader
+    /// is never written to at all, so its tiles keep the "—" they were built with.</summary>
+    private void UpdateGpuSensors() {
+        foreach (var gpu in _gpus) {
+            var sample = _gpuSensors.Read(gpu.Pci);
+            if (sample.TemperatureCelsius is not null)
+                gpu.TempTile.Value = GpuSensorFormatter.FormatTemperature(sample.TemperatureCelsius);
+            if (sample.PowerWatts is not null)
+                gpu.PowerTile.Value = GpuSensorFormatter.FormatPower(sample.PowerWatts);
+        }
     }
 
     /// <summary>Samples per-logical-processor utilisation and rebuilds each core's mini chart. Builds the core
@@ -819,6 +843,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.PropertyChanged -= OnResourceDetailChanged;
         _throughputSampler.Dispose();
         _gpuSampler.Dispose();
+        _gpuSensors.Dispose();
         _cpuSampler.Dispose();
         _speedSampler.Dispose();
     }
@@ -837,12 +862,16 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>A live per-GPU rail row and its backing state: the rolling overall-utilisation history, the 3D
     /// stat tile, and this adapter's own per-engine mini-chart set (discovered lazily), all keyed to the
-    /// adapter's <see cref="Luid"/> so <see cref="UpdateGpuAdapters"/> can update it in place each tick.</summary>
+    /// adapter's <see cref="Luid"/> so <see cref="UpdateGpuAdapters"/> can update it in place each tick. The
+    /// Temp / Power tiles are keyed by <see cref="Pci"/> instead — the vendor SDKs report no LUID.</summary>
     private sealed class GpuResource {
         public required string Luid { get; init; }
         public required ResourceRow Row { get; init; }
         public required double[] History { get; init; }
         public required StatTile ThreeDTile { get; init; }
+        public required StatTile TempTile { get; init; }
+        public required StatTile PowerTile { get; init; }
+        public GpuPciId? Pci { get; init; }
         public List<EngineChart> Engines { get; } = new();
         public Dictionary<string, EngineChart> EnginesByBase { get; } = new(StringComparer.Ordinal);
     }

@@ -20,11 +20,13 @@ public enum DeviceCategory { Cpu, Memory, Gpu, Disk, Network }
 /// (<see cref="Name"/> / <see cref="Sub"/> / <see cref="Spec"/>). Live values (utilisation %, throughput)
 /// are not carried here: the view models overlay those per tick, keyed by <see cref="Id"/> /
 /// <see cref="DiskNumber"/> / <see cref="GpuLuid"/>. <see cref="VramBytes"/> is a GPU's dedicated video
-/// memory — static per adapter, so it rides along with the identity rather than being sampled.
+/// memory and <see cref="GpuPci"/> its PCI identity — both static per adapter, so they ride along with the
+/// identity rather than being sampled. <see cref="GpuPci"/> is what the Performance tab's per-vendor GPU
+/// sensor readers attribute a temperature/power reading by.
 /// </summary>
 public sealed record DeviceInstance(
     DeviceCategory Category, string Id, string Name, string Sub, string Spec,
-    int? DiskNumber = null, string? GpuLuid = null, ulong? VramBytes = null);
+    int? DiskNumber = null, string? GpuLuid = null, ulong? VramBytes = null, GpuPciId? GpuPci = null);
 
 /// <summary>
 /// The single source of truth for "what hardware exists, grouped by kind." Composes the existing static-info
@@ -114,7 +116,7 @@ public sealed class DeviceInventory {
             instances.Add(new DeviceInstance(
                 DeviceCategory.Gpu, $"gpu:{gpu.LuidToken}", name,
                 HardwareNameFormatter.ShortenGpu(gpu.Name), gpu.Name,
-                GpuLuid: gpu.LuidToken, VramBytes: gpu.DedicatedVideoMemory));
+                GpuLuid: gpu.LuidToken, VramBytes: gpu.DedicatedVideoMemory, GpuPci: gpu.Pci));
         }
 
         // Disks are the one multi-instance category today. Reuse StorageComposer for the display name (keyed by
