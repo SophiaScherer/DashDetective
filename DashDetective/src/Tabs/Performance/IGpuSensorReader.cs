@@ -23,6 +23,7 @@ internal interface IGpuSensorReader : IDisposable {
     uint VendorId { get; }
 
     /// <summary>Reads the adapter with the given PCI identity, or <see cref="GpuSensorSample.None"/> when this
-    /// reader can't see it.</summary>
-    GpuSensorSample Read(GpuPciId pci);
+    /// reader can't see it. <paramref name="adapterKey"/> is a stable per-adapter key (the DXGI LUID token);
+    /// two identical cards share a PCI identity, so it is the only thing that tells them apart.</summary>
+    GpuSensorSample Read(string adapterKey, GpuPciId pci);
 }

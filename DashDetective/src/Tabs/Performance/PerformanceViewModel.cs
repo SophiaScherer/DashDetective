@@ -545,7 +545,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// is never written to at all, so its tiles keep the "—" they were built with.</summary>
     private void UpdateGpuSensors() {
         foreach (var gpu in _gpus) {
-            var sample = _gpuSensors.Read(gpu.Pci);
+            var sample = _gpuSensors.Read(gpu.Luid, gpu.Pci);
             if (sample.TemperatureCelsius is not null)
                 gpu.TempTile.Value = GpuSensorFormatter.FormatTemperature(sample.TemperatureCelsius);
             if (sample.PowerWatts is not null)

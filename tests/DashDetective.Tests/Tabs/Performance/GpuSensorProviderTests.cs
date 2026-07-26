@@ -35,7 +35,7 @@ public class GpuSensorProviderTests {
     public void Read_VendorWithAReader_ReturnsItsSample() {
         using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
-        var sample = provider.Read(Nvidia);
+        var sample = provider.Read("gpu-a", Nvidia);
 
         Assert.Equal(41, sample.TemperatureCelsius);
         Assert.Equal(16.42, sample.PowerWatts);
@@ -47,7 +47,7 @@ public class GpuSensorProviderTests {
     public void Read_VendorWithoutAReader_ReportsNothing() {
         using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
-        Assert.Equal(GpuSensorSample.None, provider.Read(Amd));
+        Assert.Equal(GpuSensorSample.None, provider.Read("gpu-b", Amd));
     }
 
     /// <summary>DXGI can fail to report a PCI identity; that must not be treated as a vendor.</summary>
@@ -55,7 +55,7 @@ public class GpuSensorProviderTests {
     public void Read_NoPciIdentity_ReportsNothing() {
         using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
-        Assert.Equal(GpuSensorSample.None, provider.Read(null));
+        Assert.Equal(GpuSensorSample.None, provider.Read("gpu-a", null));
     }
 
     /// <summary>Readers are contracted never to throw. One that does is dropped for the rest of the session
@@ -65,11 +65,11 @@ public class GpuSensorProviderTests {
         var reader = new ThrowingReader(0x10DE);
         using var provider = new GpuSensorProvider(new[] { reader });
 
-        Assert.Equal(GpuSensorSample.None, provider.Read(Nvidia));
+        Assert.Equal(GpuSensorSample.None, provider.Read("gpu-a", Nvidia));
         Assert.Equal(1, reader.Calls);
         Assert.True(reader.Disposed);
 
-        Assert.Equal(GpuSensorSample.None, provider.Read(Nvidia));
+        Assert.Equal(GpuSensorSample.None, provider.Read("gpu-a", Nvidia));
         Assert.Equal(1, reader.Calls);
     }
 
@@ -88,7 +88,7 @@ public class GpuSensorProviderTests {
     private sealed class FakeReader(uint vendorId, GpuSensorSample sample = default) : IGpuSensorReader {
         public uint VendorId => vendorId;
         public bool Disposed { get; private set; }
-        public GpuSensorSample Read(GpuPciId pci) => sample;
+        public GpuSensorSample Read(string adapterKey, GpuPciId pci) => sample;
         public void Dispose() => Disposed = true;
     }
 
@@ -96,7 +96,7 @@ public class GpuSensorProviderTests {
         public uint VendorId => vendorId;
         public int Calls { get; private set; }
         public bool Disposed { get; private set; }
-        public GpuSensorSample Read(GpuPciId pci) {
+        public GpuSensorSample Read(string adapterKey, GpuPciId pci) {
             Calls++;
             throw new InvalidOperationException("reader is broken");
         }
