@@ -12,6 +12,15 @@ public class AmdGpuSensorReaderTests {
     private const int Edge = 8;
     private const int Hotspot = 27;
     private const int Gfx = 28;
+    private const int AsicPower = 23;
+    private const int GfxPower = 30;
+    private const int BoardPower = 73;
+
+    // ADL_ASIC_* family-type bits.
+    private const int Discrete = 1 << 0;
+    private const int Integrated = 1 << 1;
+    private const int Workstation = 1 << 2;
+    private const int Fusion = 1 << 5;
 
     /// <summary>Builds a PMLOG snapshot in which only the given sensors are supported.</summary>
     private static (int[] Supported, int[] Values) Snapshot(params (int Sensor, int Value)[] sensors) {
@@ -80,5 +89,83 @@ public class AmdGpuSensorReaderTests {
     [Fact]
     public void SelectTemperature_SnapshotShorterThanTheSensorIndices_ReturnsNull() {
         Assert.Null(AmdGpuSensorReader.SelectTemperature(new int[4], new int[4]));
+    }
+
+    // ---- Discrete gate. Power is read only on discrete boards: on integrated parts ADL's power sensors
+    // report whole-package power, measured climbing to ~50 W under a pure CPU load at 0 % GPU activity.
+
+    /// <summary>The Radeon iGPU in the development machine reports INTEGRATED|FUSION (0x22).</summary>
+    [Fact]
+    public void IsDiscrete_TheIntegratedRadeonsRealValue_IsNotDiscrete() {
+        Assert.False(AmdGpuSensorReader.IsDiscrete(0x22));
+    }
+
+    [Fact]
+    public void IsDiscrete_DiscreteBitOnly_IsDiscrete() {
+        Assert.True(AmdGpuSensorReader.IsDiscrete(Discrete));
+    }
+
+    /// <summary>A workstation board is still discrete silicon.</summary>
+    [Fact]
+    public void IsDiscrete_DiscreteWorkstation_IsDiscrete() {
+        Assert.True(AmdGpuSensorReader.IsDiscrete(Discrete | Workstation));
+    }
+
+    /// <summary>An APU that also claims the discrete bit must not be trusted with power: integrated wins.</summary>
+    [Theory]
+    [InlineData(Discrete | Integrated)]
+    [InlineData(Discrete | Fusion)]
+    [InlineData(Discrete | Integrated | Fusion)]
+    public void IsDiscrete_ClaimsBothDiscreteAndIntegrated_IsNotDiscrete(int asicTypes) {
+        Assert.False(AmdGpuSensorReader.IsDiscrete(asicTypes));
+    }
+
+    /// <summary>ADL returns an error (so, no bits) for adapters it doesn't own; that must read as "not
+    /// discrete" so an unknown board never reports power.</summary>
+    [Fact]
+    public void IsDiscrete_Undefined_IsNotDiscrete() {
+        Assert.False(AmdGpuSensorReader.IsDiscrete(0));
+    }
+
+    // ---- Board power.
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(230)]
+    [InlineData(2000)]
+    public void SelectBoardPower_PlausibleReading_IsAccepted(int watts) {
+        var (supported, values) = Snapshot((BoardPower, watts));
+        Assert.Equal(watts, AmdGpuSensorReader.SelectBoardPower(supported, values));
+    }
+
+    /// <summary>The Radeon iGPU here reports no board-power sensor at all — the common case.</summary>
+    [Fact]
+    public void SelectBoardPower_SensorUnsupported_ReturnsNull() {
+        var (supported, values) = Snapshot((Gfx, 43));
+        Assert.Null(AmdGpuSensorReader.SelectBoardPower(supported, values));
+    }
+
+    /// <summary>A grossly wrong unit scale (milliwatts, say) lands outside the window and blanks the tile
+    /// rather than displaying a nonsense figure.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(230_000)]
+    public void SelectBoardPower_ImplausibleReading_ReturnsNull(int watts) {
+        var (supported, values) = Snapshot((BoardPower, watts));
+        Assert.Null(AmdGpuSensorReader.SelectBoardPower(supported, values));
+    }
+
+    /// <summary>ASIC_POWER is deliberately never used as a fallback: on older discrete cards it is chip-only
+    /// power, which would understate real draw while looking plausible.</summary>
+    [Fact]
+    public void SelectBoardPower_OnlyAsicPowerReported_ReturnsNullRatherThanFallingBack() {
+        var (supported, values) = Snapshot((AsicPower, 180), (GfxPower, 150));
+        Assert.Null(AmdGpuSensorReader.SelectBoardPower(supported, values));
+    }
+
+    [Fact]
+    public void SelectBoardPower_SnapshotShorterThanTheSensorIndex_ReturnsNull() {
+        Assert.Null(AmdGpuSensorReader.SelectBoardPower(new int[4], new int[4]));
     }
 }

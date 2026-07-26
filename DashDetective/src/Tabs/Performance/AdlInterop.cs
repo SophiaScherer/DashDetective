@@ -82,6 +82,22 @@ internal static class AdlInterop {
         }
     }
 
+    /// <summary>The adapter's <c>ADL_ASIC_*</c> family-type bits, or <c>null</c> when ADL won't say — which
+    /// includes every non-AMD adapter, since ADL returns an error for those. Callers treat "won't say" as
+    /// "not discrete". Interpreted by <see cref="AmdGpuSensorReader.IsDiscrete"/>.</summary>
+    internal static int? ReadAsicFamilyType(int adapterIndex) {
+        if (_context == IntPtr.Zero)
+            return null;
+
+        try {
+            return ADL2_Adapter_ASICFamilyType_Get(_context, adapterIndex, out var asicTypes, out _) == AdlOk
+                ? asicTypes
+                : null;
+        } catch (EntryPointNotFoundException) {
+            return null;
+        }
+    }
+
     /// <summary>Fills <paramref name="supported"/> / <paramref name="values"/> (both
     /// <see cref="MaxSensors"/> long) from ADL's PMLOG snapshot for one adapter. Plain arrays rather than the
     /// interop struct, so the sensor-selection logic that consumes them stays free of marshalling and is
@@ -140,6 +156,9 @@ internal static class AdlInterop {
 
     [DllImport("atiadlxx.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern int ADL2_New_QueryPMLogData_Get(IntPtr context, int adapterIndex, ref PMLogDataOutput data);
+
+    [DllImport("atiadlxx.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ADL2_Adapter_ASICFamilyType_Get(IntPtr context, int adapterIndex, out int asicTypes, out int valids);
 
     /// <summary>Layout of ADL's <c>AdapterInfo</c>: 1572 bytes, six fixed 256-byte ANSI string fields
     /// interleaved with 4-byte ints, so no padding is inserted.</summary>

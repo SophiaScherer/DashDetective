@@ -61,13 +61,20 @@ explicit task.
 
 ### Deferred work — DO NOT build without an explicit task
 
-- **AMD GPU power** — the Performance tab's Power tile stays "—" for AMD adapters. This is a **deliberate
-  negative result, not an unfinished job**: ADL's power sensors were measured against a pure CPU load on a
-  Radeon integrated GPU and `GFX_POWER` climbed to ~50 W while `INFO_ACTIVITY_GFX` stayed pinned at 0 %
-  (i.e. it reports whole-package power, not the GPU's), while `ASIC_POWER` swung erratically between 0 and
-  64 W on an idle part. `ASIC_POWER` may well be correct on a **discrete** Radeon, but that is unverified —
-  no discrete AMD hardware was available. Do not wire either sensor to the tile without verifying it against
-  a known-good reading on real hardware first. Rationale is also recorded on `AmdGpuSensorReader`.
+- **AMD GPU power — written but NEVER VERIFIED on hardware.** `AmdGpuSensorReader` reads `PMLOG_BOARD_POWER`
+  (sensor 73) on adapters ADL reports as discrete, and has produced a reading **exactly zero times**: no
+  discrete Radeon was available, and the only AMD part on the development machine is an iGPU, which the
+  discrete gate correctly excludes. **First job for anyone with a discrete Radeon: check the tile against a
+  known-good reading** (the vendor's own overlay, HWiNFO, or a wall meter). Two decisions inside it are
+  deliberate and must not be "simplified":
+  - The **discrete gate** (`ADL2_Adapter_ASICFamilyType_Get`, verified — it reports INTEGRATED|FUSION for the
+    iGPU and errors for non-AMD adapters) exists because integrated parts report *package* power: measured
+    against a pure CPU load, `GFX_POWER` climbed to ~50 W while `INFO_ACTIVITY_GFX` stayed pinned at 0 %, and
+    `ASIC_POWER` swung erratically between 0 and 64 W on an idle part.
+  - There is **no `ASIC_POWER` fallback**, on purpose. On older discrete cards it is *chip* power excluding
+    some rails — it would look plausible, understate real draw, and not mean the same thing as the NVIDIA
+    tile beside it. A board that doesn't report `BOARD_POWER` shows "—". (Note the converse trap: newer cards
+    report **0** for `ASIC_POWER`, which is why upstream projects moved to `BOARD_POWER`.)
 - **Intel GPU sensors** — no Intel adapter and no `igcl64.dll` were available, so the IGCL path was never
   written. Intel adapters fall through to no reader and show "—" for both tiles, which is the designed
   behaviour, not a bug. Adding it means a new `IGpuSensorReader` implementation and nothing else.
@@ -815,10 +822,12 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     (`ClientPowerTopologyGetStatus`, `0xEDCF624E`) is **absent from NVIDIA's published `nvapi_interface.h`**
     and known only from reverse-engineered sources, whereas the NVML one is documented and supported.
     Verified on a GeForce RTX 3060 against `nvidia-smi` — power agreeing to the watt over consecutive samples.
-  - **AMD — temperature only.** From ADL's PMLOG snapshot, preferring `TEMPERATURE_EDGE` and falling back to
-    `TEMPERATURE_GFX` (integrated parts report no edge sensor). **ADL, not ADLX**: ADL's exports are flat C
-    functions needing only `[DllImport]`, where ADLX's C API is interface/vtable-based. Verified on a
-    Radeon(TM) Graphics iGPU. **Power stays "—" by decision — see *Deferred work*.**
+  - **AMD — temperature (verified), power (written but unverified).** Temperature from ADL's PMLOG snapshot,
+    preferring `TEMPERATURE_EDGE` and falling back to `TEMPERATURE_GFX` (integrated parts report no edge
+    sensor) — verified on a Radeon(TM) Graphics iGPU. Power reads `BOARD_POWER` on **discrete boards only**
+    and has never produced a reading on real hardware; see *Deferred work* before trusting it. **ADL, not
+    ADLX**: ADL's exports are flat C functions needing only `[DllImport]`, where ADLX's C API is
+    interface/vtable-based.
   - **Intel — neither** (no reader written; see *Deferred work*).
 
   Design notes worth keeping: each vendor is one `IGpuSensorReader` behind `GpuSensorProvider`, so vendors

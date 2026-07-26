@@ -106,10 +106,11 @@ sampler, mirroring the Dashboard, and honours the toolbar Live/Refresh controls.
 
 The GPU rows' **Temp** and **Power** tiles read the real sensors. Windows has no in-box GPU sensor API, so
 each vendor is served by the SDK its own display driver already installs — no package, no redistributable
-and no admin. NVIDIA reports **temperature** (NVAPI) and **power** (NVML); AMD reports **temperature**
-(ADL). AMD power and Intel adapters show `—`: ADL's power sensors were measured reporting whole-package
-rather than GPU power, and no Intel hardware was available to verify against. Each vendor — and each
-metric — degrades to `—` on its own, so an unsupported reading never blanks a working one.
+and no admin. NVIDIA reports **temperature** (NVAPI) and **power** (NVML); AMD reports **temperature** (ADL),
+plus **power** on discrete boards only — integrated Radeons report whole-package rather than GPU power, so
+they are deliberately excluded. Intel adapters show `—` (no reader; no hardware was available to develop
+against). Each vendor — and each metric — degrades to `—` on its own, so an unsupported reading never blanks
+a working one.
 
 ### Network — *live*
 A six-panel network inspector:
@@ -275,8 +276,9 @@ Honest near-term work, roughly in priority order:
   new `Shared`/`Services` types land.
 - **Hardware sensors** — wire the Hardware tab's **Sensors** card to a real temperature/fan source. The
   per-vendor GPU sensor readers behind the Performance tab's Temp/Power tiles are the obvious source to
-  reuse. Still open: **AMD GPU power** (ADL's sensors report package rather than GPU power on the hardware
-  tested), **Intel** GPU sensors (no hardware available), and **SATA/HDD/USB** drive temperature (needs
-  admin). Drive temperature is already live for NVMe via an in-box IOCTL read.
+  reuse. Still open: **AMD GPU power on discrete boards** (implemented, but never verified — no discrete
+  Radeon was available, so it needs checking against a known-good reading), **Intel** GPU sensors (no
+  hardware available), and **SATA/HDD/USB** drive temperature (needs admin). Drive temperature is already
+  live for NVMe via an in-box IOCTL read.
 - **Deferred metrics** — per-process **network throughput** in Processes and **IPv6** active
   connections in Network both await a suitable in-box data source.
