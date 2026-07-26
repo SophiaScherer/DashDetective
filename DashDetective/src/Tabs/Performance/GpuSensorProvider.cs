@@ -25,10 +25,11 @@ internal sealed class GpuSensorProvider : IDisposable {
     /// <summary>Test seam: the same routing over an explicit reader set.</summary>
     internal GpuSensorProvider(IEnumerable<IGpuSensorReader> readers) => _readers = new List<IGpuSensorReader>(readers);
 
-    /// <summary>The vendor readers to run on this machine. AMD and Intel are deferred — their adapters fall
-    /// through to no reader and keep showing "—". Constructing a reader is cheap: each one initializes its
-    /// libraries lazily, on the first adapter it is actually asked about.</summary>
-    private static IEnumerable<IGpuSensorReader> CreateReaders() => [new NvidiaGpuSensorReader()];
+    /// <summary>The vendor readers to run on this machine. Intel is deferred — its adapters fall through to no
+    /// reader and keep showing "—". Constructing a reader is cheap: each one initializes its libraries lazily,
+    /// on the first adapter it is actually asked about.</summary>
+    private static IEnumerable<IGpuSensorReader> CreateReaders() =>
+        [new NvidiaGpuSensorReader(), new AmdGpuSensorReader()];
 
     /// <summary>Reads one adapter's sensors, or <see cref="GpuSensorSample.None"/> when its vendor has no
     /// reader (or the read reports nothing). <paramref name="adapterKey"/> is the adapter's LUID token.</summary>
