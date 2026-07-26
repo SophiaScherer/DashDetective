@@ -7,6 +7,7 @@ using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.Dashboard;
+using DashDetective.Tabs.FileExplorer;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -105,6 +106,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly ResourceRow _memoryRow;
     private readonly StatTile _memInUseTile;
     private readonly StatTile _memAvailableTile;
+    private readonly StatTile _memCachedTile;
     private readonly StatTile _memCommittedTile;
 
     // ---- Disks (live, one row per physical disk) ----
@@ -124,6 +126,9 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
     private readonly GpuUsageSampler _gpuSampler = new();
+    // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
+    // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
+    private readonly GpuSensorProvider _gpuSensors = new();
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
@@ -148,10 +153,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuProcessesTile = new StatTile("Processes", "0");
         _cpuUptimeTile = new StatTile("Up time", "0m");
 
-        // Memory — live. Tiles: In use / Available / Committed update every tick; Cached is blanked to
-        // "—" (no reliable source without adding a PDH counter to the pure-Win32 memory sampler).
+        // Memory — live. All four tiles update every tick: In use / Available / Committed come from the
+        // shared GlobalMemoryStatusEx sample, while Cached is a separate psapi read (see UpdateMemory).
         _memInUseTile = new StatTile("In use", "0 GB");
         _memAvailableTile = new StatTile("Available", "0 GB");
+        _memCachedTile = new StatTile("Cached", "0 GB");
         _memCommittedTile = new StatTile("Committed", "0 / 0 GB");
 
         // Ethernet / network — live. Rail value + chart show the primary adapter's receive throughput;
@@ -171,7 +177,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                      SparklinePoints.Build(_memoryHistory, 100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
-                                         new StatTile("Cached", "—"), _memCommittedTile,
+                                         _memCachedTile, _memCommittedTile,
                                      }, Select);
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
@@ -291,6 +297,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _service.RefreshAll();
         UpdateDisks();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
         UpdateCpuCores();
         UpdateCpuSpeed();
         _ = LoadCpuInfoAsync();
@@ -389,6 +396,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryRow.ValueText = "—";
         _memInUseTile.Value = "—";
         _memAvailableTile.Value = "—";
+        _memCachedTile.Value = "—";
         _memCommittedTile.Value = "—";
     }
 
@@ -412,6 +420,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memCommittedTile.Value = limitGb > 0
             ? $"{committedGb.ToString("F0", CultureInfo.InvariantCulture)} / {limitGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "—";
+
+        // Cached is not a field of the sample: GlobalMemoryStatusEx doesn't report it, and the sampler
+        // behind this feed is shared with Dashboard/Processes. It's a separate absolute psapi read taken
+        // on the same tick, so it re-times, pauses and refreshes with its neighbours.
+        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemCacheProvider.ReadCachedBytes());
     }
 
     private async Task LoadMemoryInfoAsync() {
@@ -487,16 +500,20 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var gpu in gpus) {
             var history = new double[WindowSeconds];
             var threeDTile = new StatTile("3D", "0 %");
-            // VRAM / Temp / Power are blanked to "—": no reliable standard Windows source (GPU temperature is
-            // deferred out of scope).
+            // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
+            // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
+            // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            var tempTile = new StatTile("Temp", "—");
+            var powerTile = new StatTile("Power", "—");
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, "0", "%", Brush("#6ccb5f"),
                                       SparklinePoints.Build(history, 100),
                                       new[] {
-                                          threeDTile, new StatTile("VRAM", "—"),
-                                          new StatTile("Temp", "—"), new StatTile("Power", "—"),
+                                          threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
+                                          tempTile, powerTile,
                                       }, Select) { IsDetailed = _gpuDetailed };
             var resource = new GpuResource {
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
+                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             _gpus.Add(resource);
             _gpusByLuid[resource.Luid] = resource;
@@ -504,13 +521,36 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         RebuildResources();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
     }
+
+    /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
+    /// shared-memory adapter, or a failed read). Reuses the shared byte humanizer, so a small integrated
+    /// GPU reads "128 MB" rather than "0.1 GB".</summary>
+    private static string FormatVram(ulong? bytes) =>
+        bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
         UpdateGpuAdapters();
+        UpdateGpuSensors();
         UpdateCpuCores();
         UpdateCpuSpeed();
+    }
+
+    /// <summary>Refreshes every GPU's Temp / Power tiles from its vendor SDK. Deliberately iterates the rows
+    /// rather than a sampler's results (unlike <see cref="UpdateGpuAdapters"/>): the sensor read is
+    /// independent of whether PDH reported that adapter this tick, so the tiles don't freeze when the engine
+    /// counters go quiet. A transient miss leaves the last shown value; an adapter whose vendor has no reader
+    /// is never written to at all, so its tiles keep the "—" they were built with.</summary>
+    private void UpdateGpuSensors() {
+        foreach (var gpu in _gpus) {
+            var sample = _gpuSensors.Read(gpu.Luid, gpu.Pci);
+            if (sample.TemperatureCelsius is not null)
+                gpu.TempTile.Value = GpuSensorFormatter.FormatTemperature(sample.TemperatureCelsius);
+            if (sample.PowerWatts is not null)
+                gpu.PowerTile.Value = GpuSensorFormatter.FormatPower(sample.PowerWatts);
+        }
     }
 
     /// <summary>Samples per-logical-processor utilisation and rebuilds each core's mini chart. Builds the core
@@ -803,6 +843,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.PropertyChanged -= OnResourceDetailChanged;
         _throughputSampler.Dispose();
         _gpuSampler.Dispose();
+        _gpuSensors.Dispose();
         _cpuSampler.Dispose();
         _speedSampler.Dispose();
     }
@@ -821,12 +862,16 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>A live per-GPU rail row and its backing state: the rolling overall-utilisation history, the 3D
     /// stat tile, and this adapter's own per-engine mini-chart set (discovered lazily), all keyed to the
-    /// adapter's <see cref="Luid"/> so <see cref="UpdateGpuAdapters"/> can update it in place each tick.</summary>
+    /// adapter's <see cref="Luid"/> so <see cref="UpdateGpuAdapters"/> can update it in place each tick. The
+    /// Temp / Power tiles are keyed by <see cref="Pci"/> instead — the vendor SDKs report no LUID.</summary>
     private sealed class GpuResource {
         public required string Luid { get; init; }
         public required ResourceRow Row { get; init; }
         public required double[] History { get; init; }
         public required StatTile ThreeDTile { get; init; }
+        public required StatTile TempTile { get; init; }
+        public required StatTile PowerTile { get; init; }
+        public GpuPciId? Pci { get; init; }
         public List<EngineChart> Engines { get; } = new();
         public Dictionary<string, EngineChart> EnginesByBase { get; } = new(StringComparer.Ordinal);
     }

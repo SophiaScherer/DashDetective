@@ -51,19 +51,36 @@ pass; de-duplication / composition refactor) — write-ups in the Appendix.
   `PhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
   card's **Temp** from `DiskTemperatureProvider` (non-admin `IOCTL_STORAGE_QUERY_PROPERTY` health-log read,
   refreshed on a slow ~15 s sub-cadence of the throughput timer). Wired to `IRefreshablePage` /
-  `ILiveSamplingPage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB + GPU temperature stay deferred
-  (need admin or vendor SDKs). No new packages, no new shared controls.
+  `ILiveSamplingPage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
+  (needs admin or vendor SDKs). No new packages, no new shared controls. (**GPU** temperature is no longer
+  deferred — it is live on the Performance tab via per-vendor SDKs; see the write-up in the Appendix.)
 
-**Nothing is out of scope for lack of a live feature** — every planned top-level feature is live, except
-**GPU temperature** (the sole remaining deferred item, below). Do not scaffold, stub, or "prepare" for it
-without an explicit task.
+**Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
+narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
+explicit task.
 
-### Deferred Dashboard work — DO NOT build without an explicit task
+### Deferred work — DO NOT build without an explicit task
 
-- **GPU temperature** — would append `· <temp>°C` to the GPU card caption. No universal Windows
-  API; needs vendor SDKs (NVML / ADLX / IGCL) or a library, best-effort with graceful fallback.
-  (Note: this stays deferred even though **drive** temperature was solved in-box for NVMe — see the
-  Storage `DiskTemperatureProvider` note above. GPUs have no equivalent non-admin standard-Windows source.)
+- **AMD GPU power — written but NEVER VERIFIED on hardware.** `AmdGpuSensorReader` reads `PMLOG_BOARD_POWER`
+  (sensor 73) on adapters ADL reports as discrete, and has produced a reading **exactly zero times**: no
+  discrete Radeon was available, and the only AMD part on the development machine is an iGPU, which the
+  discrete gate correctly excludes. **First job for anyone with a discrete Radeon: check the tile against a
+  known-good reading** (the vendor's own overlay, HWiNFO, or a wall meter). Two decisions inside it are
+  deliberate and must not be "simplified":
+  - The **discrete gate** (`ADL2_Adapter_ASICFamilyType_Get`, verified — it reports INTEGRATED|FUSION for the
+    iGPU and errors for non-AMD adapters) exists because integrated parts report *package* power: measured
+    against a pure CPU load, `GFX_POWER` climbed to ~50 W while `INFO_ACTIVITY_GFX` stayed pinned at 0 %, and
+    `ASIC_POWER` swung erratically between 0 and 64 W on an idle part.
+  - There is **no `ASIC_POWER` fallback**, on purpose. On older discrete cards it is *chip* power excluding
+    some rails — it would look plausible, understate real draw, and not mean the same thing as the NVIDIA
+    tile beside it. A board that doesn't report `BOARD_POWER` shows "—". (Note the converse trap: newer cards
+    report **0** for `ASIC_POWER`, which is why upstream projects moved to `BOARD_POWER`.)
+- **Intel GPU sensors** — no Intel adapter and no `igcl64.dll` were available, so the IGCL path was never
+  written. Intel adapters fall through to no reader and show "—" for both tiles, which is the designed
+  behaviour, not a bug. Adding it means a new `IGpuSensorReader` implementation and nothing else.
+- **GPU temperature on the Dashboard card caption** — would append `· <temp>°C` to the GPU card's caption.
+  The *data* is no longer the obstacle (the Performance tab reads it live); this is simply Dashboard UI work
+  that has not been asked for.
 
 ### Multi-GPU — SHIPPED (branch `multiplePerformanceCards`, 2026-07)
 
@@ -74,7 +91,8 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
   `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
   been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
-  though VRAM display stays deferred.
+  which now feeds the Performance tab's GPU **VRAM** tile — carried per adapter on
+  `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
@@ -196,7 +214,9 @@ currently exist.
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
                                  the Dashboard cards + Performance rows each own one for per-adapter readings)
         GpuAdapterProvider.cs   (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
-                                 flag + VRAM; the authoritative LUID→name map for multi-GPU, async)
+                                 flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
+                                 DedicatedVideoMemory rides through DeviceInventory onto
+                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
         DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
@@ -335,6 +355,27 @@ currently exist.
                                  Fills the viewport via ISelfScrollingPage, like File Explorer. All five
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
                                  SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IDisposable.)
+                                CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
+                                                         ratio, as GHz; "—" when either is missing)
+                                SystemCacheProvider.cs  (page-local psapi GetPerformanceInfo P/Invoke:
+                                                         SystemCache pages × PageSize = Task Manager's
+                                                         memory "Cached". Soft-fails to null; a thrown
+                                                         exception is logged once, then latches it off)
+                                MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
+                                                         provider reports nothing)
+                                IGpuSensorReader.cs     (GPU Temp/Power tiles — one swappable reader per GPU
+                                GpuSensorProvider.cs     vendor behind a common interface, plus the routing
+                                GpuPciMatcher.cs         + pure join/format helpers. Windows has no in-box GPU
+                                GpuSensorFormatter.cs    sensor API, so each vendor is served by the SDK its
+                                NvApiInterop.cs          own driver installs: NVIDIA temperature via NVAPI
+                                NvmlInterop.cs           (nvapi_QueryInterface function-id dispatch, the
+                                NvidiaGpuSensorReader.cs GpuAdapterProvider vtable technique) and power via
+                                AdlInterop.cs            NVML; AMD temperature via ADL's PMLOG snapshot.
+                                AmdGpuSensorReader.cs    Adapters are attributed by PCI identity, not LUID —
+                                PnpPciParser.cs          the vendor SDKs report no LUID. No packages, no
+                                                         admin. Every vendor and EVERY METRIC soft-fails to
+                                                         "—" independently. AMD power + Intel are deferred —
+                                                         see Deferred work above)
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
                                 (LIVE — read-only drives/health view: a top row of DriveCard summary
                                  cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
@@ -417,6 +458,12 @@ throughput **and** the full Network tab) added **no** new package — it uses th
 like File Explorer's `ShellInterop`). Adding any *new* package still requires asking first (see Strict
 Working Boundaries).
 
+The **GPU sensor** work (Performance Temp/Power tiles) also added **no** new package. It P/Invokes three
+DLLs that the *display driver* installs into `System32` — `nvapi64.dll`, `nvml.dll` and `atiadlxx.dll` —
+so there is nothing to reference, redistribute or ship, and no admin rights are involved. A unified sensor
+library (LibreHardwareMonitorLib and similar) was **deliberately ruled out** for this project; do not
+propose one. If a machine lacks a vendor's driver the `DllImport` simply fails and the tile stays "—".
+
 The System Information work reads the **registry** via the `Microsoft.Win32.Registry` API (build
 revision + feature-update label). On the `net10.0` target this API is **provided in-box — no package
 reference is needed** (adding the `Microsoft.Win32.Registry` package is redundant and raises an
@@ -497,8 +544,9 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System
   Information **RAM** row all read the real machine. GPU: one live GPU `StatCard` **per physical
   adapter** (utilisation % + sparkline via PDH `\GPU Engine`, attributed by adapter LUID; adapters named
-  via DXGI in `GpuAdapterProvider`) and the System Information **GPU** row listing every adapter; GPU
-  **temperature** is the sole remaining deferred item (research under *Deferred Dashboard work* above).
+  via DXGI in `GpuAdapterProvider`) and the System Information **GPU** row listing every adapter. GPU
+  **temperature** is now read live, but on the **Performance** tab only — appending it to this card's
+  caption is unbuilt Dashboard UI work (see *Deferred work* above).
   Storage: the Storage `StatCard` shows live disk
   **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
   as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
@@ -741,8 +789,60 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   refresh interval) and on Refresh; degrades to "—" if the counter or base clock is unavailable. This is
   page-local, like the disk/GPU/per-core samplers — the shared CPU feed carries only the clamped
   utilisation figure, and this reads a *different* counter, so `ProcessorUtilityCpuSampler` /
-  `SystemMetricsService` were untouched. GPU VRAM/Temp/Power and the Memory Cached tile still show "—"
-  (no reliable standard-Windows source; GPU temperature is deferred, see *Deferred Dashboard work*).
+  `SystemMetricsService` were untouched. The Memory **Cached** tile is live too: the page-local
+  `SystemCacheProvider` calls the in-box psapi `GetPerformanceInfo` and scales its
+  `PERFORMANCE_INFORMATION.SystemCache` (pages) by the struct's own `PageSize`, which `MemoryCacheFormatter`
+  renders as binary GB — Task Manager's own "Cached" figure (verified against it: 15.3 GB on the tile vs
+  15.42 GB summed from the standby + modified page-list counters). **This corrects the old rationale**,
+  which claimed there was no source short of "adding a PDH counter to the pure-Win32 memory sampler": it
+  is *not* a PDH counter, needs no admin and no package, and — like `GlobalMemoryStatusEx` — is an
+  absolute one-shot reading, so it needs no rate-style sampler. (Do **not** reach for the PDH
+  `\Memory\Cache Bytes` counter instead: that reports the system *working set*, a different and far
+  smaller number — 0.5 GB where Cached was 15 GB.) Deliberately a **page-local** P/Invoke under
+  `src/Tabs/Performance/` (the `ShellInterop` / `ConnectionsInterop` precedent), so the shared
+  `MemoryUsageSampler` and the `MemorySample` record — consumed by Dashboard and Processes too — were
+  **left untouched**. Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
+  so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
+  blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM** tile is live too, and it is
+  the one tile that is **not** sampled: DXGI's dedicated video memory is static per adapter, so
+  `GpuAdapterProvider`'s `DedicatedVideoMemory` (already read for the multi-GPU work, previously discarded)
+  is now carried on `DeviceInstance.VramBytes` and set once in `BuildGpuRows` when the row is built —
+  re-read only when Refresh re-runs the inventory. It is formatted by **reusing** `FileSizeFormatter`
+  (File Explorer's binary byte humanizer, already called cross-tab by Storage), so a 12 GB discrete card
+  and a 512 MB integrated adapter each read naturally instead of forcing a fixed GB unit; zero/absent
+  yields "—". `DeviceInstance` gained a trailing optional `ulong? VramBytes` and `DeviceInventory.Compose`
+  passes it through (both under explicit sign-off; `GpuAdapterProvider` itself was untouched).
+
+  **GPU Temp and Power are live too** (2026-07, plan:
+  `C:\Users\User\.claude\plans\you-re-working-in-the-melodic-star.md`). This **supersedes the old claim that
+  there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
+  no package, no redistributable and **no admin** are needed. Support by vendor:
+  - **NVIDIA — temperature and power.** Temperature from NVAPI's `NvAPI_GPU_GetThermalSettings`, power from
+    NVML's `nvmlDeviceGetPowerUsage`. Power deliberately does **not** go through NVAPI: its power call
+    (`ClientPowerTopologyGetStatus`, `0xEDCF624E`) is **absent from NVIDIA's published `nvapi_interface.h`**
+    and known only from reverse-engineered sources, whereas the NVML one is documented and supported.
+    Verified on a GeForce RTX 3060 against `nvidia-smi` — power agreeing to the watt over consecutive samples.
+  - **AMD — temperature (verified), power (written but unverified).** Temperature from ADL's PMLOG snapshot,
+    preferring `TEMPERATURE_EDGE` and falling back to `TEMPERATURE_GFX` (integrated parts report no edge
+    sensor) — verified on a Radeon(TM) Graphics iGPU. Power reads `BOARD_POWER` on **discrete boards only**
+    and has never produced a reading on real hardware; see *Deferred work* before trusting it. **ADL, not
+    ADLX**: ADL's exports are flat C functions needing only `[DllImport]`, where ADLX's C API is
+    interface/vtable-based.
+  - **Intel — neither** (no reader written; see *Deferred work*).
+
+  Design notes worth keeping: each vendor is one `IGpuSensorReader` behind `GpuSensorProvider`, so vendors
+  are swappable and never entangled; readers are contracted **never to throw**, and one that does is logged
+  once and dropped for the session. Every vendor **and every metric** degrades independently — a board that
+  reports temperature but not power shows one and blanks the other. Attribution is by **PCI identity, not
+  LUID** (no vendor SDK exposes a LUID): `GpuAdapter`/`DeviceInstance` now carry a `GpuPciId` read from the
+  `DXGI_ADAPTER_DESC1` fields that were already being fetched and discarded, and NVAPI/NVML/ADL all report the
+  same ids — so the join is exact, not positional. Each vendor's libraries initialize **lazily** on the first
+  adapter that reader is asked about (measured ~37 ms for NVIDIA, ~26 ms for AMD, once each), and cost
+  ~0.6–1.0 ms per 1 Hz tick for both GPUs thereafter. Two ADL traps are handled and must not be "fixed": its
+  `AdapterInfo.iVendorID` is **unusable** (reports `0x03EA` for AMD, `0x000A` for NVIDIA), and it enumerates
+  other vendors' adapters, listing each GPU once per display output — hence `PnpPciParser`. This reached
+  outside `src/Tabs/Performance/` only to add `GpuPciId` to `GpuAdapterProvider` and thread it through
+  `DeviceInventory`, both under explicit sign-off.
 
 ### Completed cross-cutting passes
 

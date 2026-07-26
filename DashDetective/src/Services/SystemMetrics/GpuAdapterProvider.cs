@@ -7,11 +7,18 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Services.SystemMetrics;
 
+/// <summary>An adapter's PCI identity, exactly as <c>DXGI_ADAPTER_DESC1</c> reports it. The vendor sensor
+/// SDKs (NVAPI, NVML) report the same three ids, so this is what a sensor reading is attributed by;
+/// <see cref="VendorId"/> also selects which vendor reader — if any — applies to the adapter.</summary>
+public sealed record GpuPciId(uint VendorId, uint DeviceId, uint SubSysId, uint Revision);
+
 /// <summary>One graphics adapter as DXGI reports it: the PDH-style <see cref="LuidToken"/> that joins to
 /// the <c>\GPU Engine(*)</c> counter instances, the friendly <see cref="Name"/> (DXGI's description),
-/// whether it is a software/basic-render adapter (<see cref="IsSoftware"/>, to be filtered out), and its
-/// dedicated VRAM in bytes (unused for now — VRAM display is deferred).</summary>
-public sealed record GpuAdapter(string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory);
+/// whether it is a software/basic-render adapter (<see cref="IsSoftware"/>, to be filtered out), its
+/// dedicated VRAM in bytes (carried onto <see cref="DeviceInstance.VramBytes"/> for the Performance tab's
+/// GPU VRAM tile), and its <see cref="Pci"/> identity (which vendor sensor readings join on).</summary>
+public sealed record GpuAdapter(
+    string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory, GpuPciId? Pci = null);
 
 /// <summary>
 /// Enumerates the machine's graphics adapters via DXGI (<c>dxgi.dll</c>: <c>CreateDXGIFactory1</c> →
@@ -107,7 +114,8 @@ public static class GpuAdapterProvider {
                         FormatLuidToken(desc.LuidHigh, desc.LuidLow),
                         (desc.Description ?? "").Trim(),
                         (desc.Flags & DxgiAdapterFlagSoftware) != 0,
-                        (ulong)desc.DedicatedVideoMemory));
+                        (ulong)desc.DedicatedVideoMemory,
+                        new GpuPciId(desc.VendorId, desc.DeviceId, desc.SubSysId, desc.Revision)));
                 } finally {
                     GetMethod<ReleaseFn>(adapter, VtRelease)(adapter);
                 }

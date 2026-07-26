@@ -8,13 +8,15 @@ namespace DashDetective.Tests.Services.SystemMetrics;
 
 /// <summary>Covers <see cref="DeviceInventory.Compose"/>: the grouped instance list (CPU → Memory → GPU →
 /// Disks → Network), the per-category <see cref="DeviceInventory.All"/> / <see cref="DeviceInventory.Primary"/>
-/// accessors, multi-disk enumeration + ordering, and the static display identity (captions/specs).</summary>
+/// accessors, multi-disk enumeration + ordering, the static display identity (captions/specs), and each
+/// GPU's dedicated VRAM.</summary>
 public class DeviceInventoryTests {
     private static readonly CpuStaticInfo Cpu = new("Intel Core i9-14900K", 24, 32, 3200);
     private static readonly MemoryStaticInfo Memory = new(32, "DDR5", 6000, 2);
 
     private const string GpuLuid = "luid_0x00000000_0x0000e54b";
-    private static readonly GpuAdapter[] Gpus = { new(GpuLuid, "NVIDIA GeForce RTX 4080", false, 0) };
+    private const ulong GpuVramBytes = 16UL << 30;   // 16 GB, as DXGI reports an RTX 4080
+    private static readonly GpuAdapter[] Gpus = { new(GpuLuid, "NVIDIA GeForce RTX 4080", false, GpuVramBytes) };
     private static readonly IReadOnlySet<string> ActiveGpus = new HashSet<string> { GpuLuid };
 
     private static PhysicalDiskInfo Disk(int id, string model = "Test Disk", ulong sizeBytes = 0) =>
@@ -104,10 +106,21 @@ public class DeviceInventoryTests {
     }
 
     [Fact]
+    public void Compose_GpuIdentity_CarriesDedicatedVram() {
+        var inv = Compose(new[] { Disk(0) }, new[] { Vol(0, 'C') });
+
+        // DXGI's dedicated video memory rides along with the GPU's static identity (the Performance tab's
+        // VRAM tile reads it straight off the instance); every other category leaves it unset.
+        Assert.Equal(GpuVramBytes, inv.Primary(DeviceCategory.Gpu)!.VramBytes);
+        Assert.Null(inv.Primary(DeviceCategory.Cpu)!.VramBytes);
+        Assert.Null(inv.Primary(DeviceCategory.Disk)!.VramBytes);
+    }
+
+    [Fact]
     public void Compose_MultipleGpus_EnumeratesRealAdaptersIndexedByLuid() {
         var gpus = new[] {
-            new GpuAdapter("luid_0x00000000_0x0000e54b", "NVIDIA GeForce RTX 3060", false, 0),
-            new GpuAdapter("luid_0x00000000_0x0000f83d", "AMD Radeon(TM) Graphics", false, 0),
+            new GpuAdapter("luid_0x00000000_0x0000e54b", "NVIDIA GeForce RTX 3060", false, 12UL << 30),
+            new GpuAdapter("luid_0x00000000_0x0000f83d", "AMD Radeon(TM) Graphics", false, 512UL << 20),
         };
         var active = new HashSet<string> { "luid_0x00000000_0x0000e54b", "luid_0x00000000_0x0000f83d" };
         var inv = DeviceInventory.Compose(
@@ -121,6 +134,8 @@ public class DeviceInventoryTests {
             g.Select(x => x.Id));
         Assert.Equal("luid_0x00000000_0x0000e54b", g[0].GpuLuid);
         Assert.Equal("GeForce RTX 3060", g[0].Sub);
+        // Each adapter keeps its own VRAM — a discrete card beside an integrated one.
+        Assert.Equal(new ulong?[] { 12UL << 30, 512UL << 20 }, g.Select(x => x.VramBytes));
         // GPU instances sit contiguously between Memory and Disk.
         Assert.Equal(
             new[] { DeviceCategory.Cpu, DeviceCategory.Memory, DeviceCategory.Gpu, DeviceCategory.Gpu,
