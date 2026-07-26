@@ -73,8 +73,9 @@ An at-a-glance overview of the machine. Every surface reads the real hardware:
   **Refresh** button that re-reads whichever page is active, and an **Export** button that writes a
   plain-text diagnostics report via the native save dialog.
 
-GPU temperature and multi-GPU layouts are researched but intentionally deferred (no universal Windows
-API).
+Multi-GPU machines render one card per physical adapter, attributed by adapter LUID. GPU temperature and
+power are live on the **Performance** tab (see below); folding the temperature into this card's caption is
+simply UI work that hasn't been done.
 
 ### File Explorer — *live*
 A read-only three-pane file browser:
@@ -102,6 +103,13 @@ A Task-Manager-style resource drill-down: a left **resource-selector rail** (CPU
 network adapter) with a live value per resource swaps a right **detail pane** — one large utilization
 chart (fixed 0–100 axis, gradient fill) plus a four-tile stat strip. Each metric runs on its own 1 Hz
 sampler, mirroring the Dashboard, and honours the toolbar Live/Refresh controls.
+
+The GPU rows' **Temp** and **Power** tiles read the real sensors. Windows has no in-box GPU sensor API, so
+each vendor is served by the SDK its own display driver already installs — no package, no redistributable
+and no admin. NVIDIA reports **temperature** (NVAPI) and **power** (NVML); AMD reports **temperature**
+(ADL). AMD power and Intel adapters show `—`: ADL's power sensors were measured reporting whole-package
+rather than GPU power, and no Intel hardware was available to verify against. Each vendor — and each
+metric — degrades to `—` on its own, so an unsupported reading never blanks a working one.
 
 ### Network — *live*
 A six-panel network inspector:
@@ -262,11 +270,13 @@ Honest near-term work, roughly in priority order:
 - **Settings persistence** — theme, accent, nav position/collapse, refresh interval, show-hidden and the
   Monitoring toggles now persist to `settings.json`; the File-Explorer **pane sizes** remain session-only
   (extend the store to cover them next).
-- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (174 tests) now covers the shared
+- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (330 tests) now covers the shared
   pure-logic seams and the sampling/persistence behaviour, and CI collects code coverage. Extend it as
   new `Shared`/`Services` types land.
-- **Hardware sensors** — wire the **Sensors** card to a real temperature/fan source (needs vendor SDKs
-  or a sensor library), and revisit deferred GPU temperature / multi-GPU layouts. (Drive temperature is
-  already live for NVMe on the Storage tab via an in-box IOCTL read; SATA/HDD/USB still need admin.)
+- **Hardware sensors** — wire the Hardware tab's **Sensors** card to a real temperature/fan source. The
+  per-vendor GPU sensor readers behind the Performance tab's Temp/Power tiles are the obvious source to
+  reuse. Still open: **AMD GPU power** (ADL's sensors report package rather than GPU power on the hardware
+  tested), **Intel** GPU sensors (no hardware available), and **SATA/HDD/USB** drive temperature (needs
+  admin). Drive temperature is already live for NVMe via an in-box IOCTL read.
 - **Deferred metrics** — per-process **network throughput** in Processes and **IPv6** active
   connections in Network both await a suitable in-box data source.
