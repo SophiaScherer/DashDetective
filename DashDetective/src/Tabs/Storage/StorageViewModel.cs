@@ -94,6 +94,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // 0–100 %). The samplers are shared across pages; this history is this tab's own, like the Dashboard's.
     private readonly double[] _diskHistory = new double[WindowSeconds];
 
+    /// <summary>The Disk Activity panel title, carrying the real system-drive letter rather than a
+    /// hardcoded "C:". Fixed for the process lifetime, so no change notification is needed.</summary>
+    public string DiskActivityTitle { get; } = $"Disk Activity ({SystemDrive.Letter}:)";
+
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
     [ObservableProperty] private string _diskPoints = "";
 

@@ -172,11 +172,11 @@
             </Border>
 
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
-                 area fill, like the Dashboard), over three readouts. Active time and Avg response are live
-                 (from the shared _Total storage feed); Queue is a fixed placeholder until its phase. -->
+                 area fill, like the Dashboard), over three readouts. The title carries the real system-drive
+                 letter (see DiskActivityTitle); the readouts come from the shared _Total storage feed. -->
             <Border Grid.Column="1" Classes="panel">
                 <StackPanel Spacing="12">
-                    <TextBlock Classes="panelTitle" Text="Disk Activity (C:)"/>
+                    <TextBlock Classes="panelTitle" Text="{Binding DiskActivityTitle}"/>
                     <controls:Sparkline Height="120" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
