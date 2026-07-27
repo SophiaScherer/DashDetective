@@ -31,7 +31,8 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     public HardwareViewModel() {
         _processor = new HardwareCard("Processor", "—", HardwareIcons.Chip,
             HardwareIcons.Blue, HardwareIcons.BlueBg, new[] {
-                new HardwareSpec("Cores / Threads"),
+                new HardwareSpec("Cores"),
+                new HardwareSpec("Logical Processors"),
                 new HardwareSpec("Base / Boost"),
                 new HardwareSpec("Cache (L3)"),
                 new HardwareSpec("TDP"),
@@ -119,7 +120,8 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
 
     private void ApplyProcessor(ProcessorInfo p) {
         _processor.Subtitle = p.Name;
-        _processor.SetRow("Cores / Threads", p.CoresThreads);
+        _processor.SetRow("Cores", p.Cores);
+        _processor.SetRow("Logical Processors", p.LogicalProcessors);
         _processor.SetRow("Base / Boost", p.BaseBoost);
         _processor.SetRow("Cache (L3)", p.CacheL3);
         _processor.SetRow("TDP", p.Tdp);

@@ -81,7 +81,8 @@ public static class HardwareInfoProvider {
 
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
-                CoresThreads: cores > 0 ? $"{cores} / {threads}" : $"— / {threads}",
+                Cores: cores > 0 ? cores.ToString() : "—",
+                LogicalProcessors: threads.ToString(),
                 BaseBoost: FormatBaseBoost(maxClockMhz, spec?.Boost),
                 CacheL3: l3CacheKb > 0 ? $"{l3CacheKb / 1024} MB" : "—",
                 Tdp: spec?.Tdp ?? "—",
