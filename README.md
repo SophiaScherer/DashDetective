@@ -2,283 +2,106 @@
 
 [![.NET Desktop (Avalonia)](https://github.com/SophiaScherer/DashDetective/actions/workflows/dotnet-desktop.yml/badge.svg)](https://github.com/SophiaScherer/DashDetective/actions/workflows/dotnet-desktop.yml)
 
-**DashDetective** is a Windows system-information console built with [Avalonia UI](https://avaloniaui.net/)
-and .NET 10. It presents a Task-Manager-class view of the machine — live CPU, memory, GPU, storage and
-network metrics; a read-only file browser; a network inspector; and a hardware spec sheet — behind a
-single dockable, themeable shell. It reads the real machine through in-box Windows facilities (WMI, PDH
-performance counters, and Win32 P/Invoke) with no elevation required, and is written to a strict
-one-feature-at-a-time discipline: every tab is a self-contained module, and cross-cutting concerns
-(theming, sampling, page lifecycle) live behind small shared seams.
+A Windows system-information console built with [Avalonia UI](https://avaloniaui.net/) and .NET 10.
+It presents live machine metrics and hardware details across eight tabs — Dashboard, File Explorer,
+Processes, Performance, Network, Storage, Hardware and Settings — in a single themeable window.
 
-> **Status:** actively built tab-by-tab. Dashboard, File Explorer, Processes, Performance, Network,
-> Hardware and Settings are live — Settings now including Monitoring (refresh interval, resource-alert
-> banner, system tray, launch-at-startup) and Export & Data, all persisted to disk. See
-> [Feature tour](#feature-tour) for the honest per-tab state and [Roadmap](#roadmap) for what's next.
+## Requirements
 
-[//]: # (## Screenshots)
+1. [.NET 10 SDK](https://dotnet.microsoft.com/download) — both projects target `net10.0-windows`
+2. Windows 10 or 11
+3. Git
 
-[//]: # ()
-[//]: # (<!--)
+## Building and Running
 
-[//]: # (  Screenshots live in docs/images/ &#40;captured from the running app, maximised at 1936x1080&#41;.)
+1. Clone the repository:
 
-[//]: # (  The full set is available there; the grid below shows a representative selection:)
+   ```powershell
+   git clone https://github.com/SophiaScherer/DashDetective.git
+   cd DashDetective
+   ```
 
-[//]: # (    Every tab in both themes: <tab>-dark.png and <tab>-light.png for)
+2. Restore dependencies:
 
-[//]: # (      dashboard, file-explorer, processes, performance, network, hardware, settings)
+   ```powershell
+   dotnet restore DashDetective.sln
+   ```
 
-[//]: # (    Accent variant:  dashboard-accent-purple.png  &#40;dark theme, purple accent&#41;)
+3. Build the solution:
 
-[//]: # (    Nav gesture:     nav-drag-to-dock.png          &#40;bar lifted, "Dock top" hint chip visible&#41;)
+   ```powershell
+   dotnet build DashDetective.sln -c Release
+   ```
 
-[//]: # (  To refresh them, re-run the capture &#40;see docs/images&#41; after a Release build; keep the file names)
+4. Run the application:
 
-[//]: # (  stable so these links keep resolving.)
+   ```powershell
+   dotnet run --project DashDetective
+   ```
 
-[//]: # (-->)
+The build sets `TreatWarningsAsErrors` and `EnforceCodeStyleInBuild`, so any compiler warning or
+`.editorconfig` style violation fails the build. Verify formatting the way CI does before pushing:
 
-[//]: # ()
-[//]: # (| Dashboard &#40;dark&#41; | File Explorer &#40;dark&#41; | Network &#40;dark&#41; |)
-
-[//]: # (| --- | --- | --- |)
-
-[//]: # (| ![Dashboard]&#40;docs/images/dashboard-dark.png&#41; | ![File Explorer]&#40;docs/images/file-explorer-dark.png&#41; | ![Network]&#40;docs/images/network-dark.png&#41; |)
-
-[//]: # ()
-[//]: # (| Hardware &#40;light&#41; | Performance &#40;dark&#41; | Settings — accent &#40;purple&#41; |)
-
-[//]: # (| --- | --- | --- |)
-
-[//]: # (| ![Hardware]&#40;docs/images/hardware-light.png&#41; | ![Performance]&#40;docs/images/performance-dark.png&#41; | ![Settings accent]&#40;docs/images/dashboard-accent-purple.png&#41; |)
-
-[//]: # (Drag-to-dock navigation gesture:)
-
-[//]: # ()
-[//]: # (![Drag to dock]&#40;docs/images/nav-drag-to-dock.png&#41;)
-
-## Feature tour
-
-DashDetective is organised as a set of tabs behind a dockable navigation bar. Each is a self-contained
-feature folder under `DashDetective/src/Tabs/`.
-
-### Dashboard — *live*
-An at-a-glance overview of the machine. Every surface reads the real hardware:
-- **Live stat cards + utilization charts** for CPU, Memory, GPU, Storage (disk active-time %) and
-  Network (download/upload in Mbps), each on its own 1 Hz sampler with a 60-sample rolling sparkline.
-- **System Information** panel — OS edition + feature update, device name, BIOS, motherboard, full
-  build number, and a live-updating uptime (read once at startup via WMI + registry; uptime ticks off
-  `Environment.TickCount64`).
-- **Wired toolbar** — a live 24-hour clock, a **Live** pill that pauses/resumes all sampling, a
-  **Refresh** button that re-reads whichever page is active, and an **Export** button that writes a
-  plain-text diagnostics report via the native save dialog.
-
-Multi-GPU machines render one card per physical adapter, attributed by adapter LUID. GPU temperature and
-power are live on the **Performance** tab (see below); folding the temperature into this card's caption is
-simply UI work that hasn't been done.
-
-### File Explorer — *live*
-A read-only three-pane file browser:
-- **Folder tree** (drives as roots, lazily-loaded subfolders), a **file list** with a clickable
-  breadcrumb, **filter chips** (All / Documents / Images / Archives), **sortable column headers**, and
-  a **Show hidden** toggle.
-- **Details / preview pane** with Type / Size / Modified / Created / Attributes / Location and **Open**
-  + **Properties** (the native Windows property sheet) actions.
-- **Live auto-refresh** — a debounced `FileSystemWatcher` keeps the open folder current as the disk
-  changes, preserving selection and scroll position. Panes scroll independently and are user-resizable.
-
-Built on `System.IO` with per-entry soft-fail off the UI thread; friendly type names and shell actions
-via `shell32` P/Invoke.
-
-### Processes — *live*
-A Task-Manager-style live process view: the list split into **Apps** and **Background processes**, with
-per-process PID / status / CPU % / Memory / Disk / GPU %, sortable headers, a summary strip (process
-counts, total CPU/memory, thread count), **End task**, and native **Properties**. Data is entirely
-in-box and needs no admin (`System.Diagnostics.Process`, `GetProcessIoCounters` P/Invoke, PDH GPU
-counters), with the live table keyed-diffed in place. *There is deliberately no per-process network
-column — Windows exposes no in-box, non-admin per-process rate API.*
-
-### Performance — *live*
-A Task-Manager-style resource drill-down: a left **resource-selector rail** (CPU · Memory · Disk · GPU ·
-network adapter) with a live value per resource swaps a right **detail pane** — one large utilization
-chart (fixed 0–100 axis, gradient fill) plus a four-tile stat strip. Each metric runs on its own 1 Hz
-sampler, mirroring the Dashboard, and honours the toolbar Live/Refresh controls.
-
-The GPU rows' **Temp** and **Power** tiles read the real sensors. Windows has no in-box GPU sensor API, so
-each vendor is served by the SDK its own display driver already installs — no package, no redistributable
-and no admin. NVIDIA reports **temperature** (NVAPI) and **power** (NVML); AMD reports **temperature** (ADL),
-plus **power** on discrete boards only — integrated Radeons report whole-package rather than GPU power, so
-they are deliberately excluded. Intel adapters show `—` (no reader; no hardware was available to develop
-against). Each vendor — and each metric — degrades to `—` on its own, so an unsupported reading never blanks
-a working one.
-
-### Network — *live*
-A six-panel network inspector:
-- **Adapters** — every adapter (physical + virtual) with a status dot, state and link speed.
-- **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP.
-- **Throughput** — live download/upload in Mbps as dual sparklines.
-- **Active Connections** — a netstat-style TCP + UDP table with owning process names (via `iphlpapi`
-  P/Invoke), keyed-diffed in place and capped at 100.
-- **Ping** — a continuous ping to `8.8.8.8` with rolling average RTT and loss.
-- **DNS Lookup** — a one-shot resolve of `example.com` with the record type.
-
-All in-box (`System.Net.NetworkInformation`, `Ping`, `Dns`, `iphlpapi`). IPv6 connections are deferred.
-
-### Storage — *live*
-A read-only drives/health view:
-- **Drive summary cards** — one per physical disk: name + health pill, model, a usage bar with the
-  used/free split, and live **Read / Write** throughput plus **Temp** (NVMe drives).
-- **Partitions** table — every volume (Vol · Label · File System · Capacity · Free).
-- **Disk Activity** chart — the system drive's active-time % as an amber area chart, with Active time /
-  Avg response / Queue readouts.
-
-Drive and volume structure come from WMI (`MSFT_PhysicalDisk` / volumes); disk activity, response and
-queue from PDH `\PhysicalDisk` counters on the shared sampler; per-disk Read/Write from a page-local
-throughput sampler; and NVMe **temperature** from an in-box `IOCTL_STORAGE_QUERY_PROPERTY` health-log
-read — no admin, no third-party library. SATA/HDD/USB temperature stays deferred (needs admin or vendor
-tooling), so those cards show `—`.
-
-### Hardware — *live*
-A spec sheet of cards — **Processor**, **Graphics**, **Motherboard**, **Memory**, **Storage Devices**
-and **Sensors** — populated from WMI, with a rated-spec catalog filling in details WMI can't report.
-The **Sensors** card is a placeholder (`—`) pending a sensor source.
-
-### Settings — *fully live, persisted*
-- **Appearance** (live) — a **Theme** control (Dark / Light / System) and **Accent color** swatches,
-  applied at runtime through a single `ThemeService`. The first accent is a **Default** multi-colour
-  option (each dashboard graph its own colour); the others recolour every graph to one accent.
-- **Navigation** (live) — Position (dock edge) and Collapse controls that drive the same shared
-  navigation view-model as the on-bar controls.
-- **Monitoring** (live) — a **Refresh interval** control (0.5 / 1 / 2 / 5 s) that retimes the live
-  metric channels, plus **Resource alerts** (an in-app banner when CPU or memory stays above 90 %),
-  **Show in system tray** (close hides to a tray icon instead of exiting), and **Launch at startup**
-  (a per-user Windows startup entry).
-- **Export & Data** (live) — **Copy diagnostics** (to the clipboard), **Export report (.txt)** (a
-  plain-text system report), and **Export CSV** (the rolling metric histories).
-- **Persistence** — every choice above is saved to `%AppData%/DashDetective/settings.json` and restored
-  on launch; a missing or corrupt file falls back to defaults without crashing.
-- The footer shows the real assembly version (e.g. `DashDetective v0.1.0 · © 2026`), read from
-  assembly metadata rather than a hard-coded string.
-
-## Architecture at a glance
-
-A fuller write-up lives in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**; the essentials:
-
-- **Single-window shell.** `MainWindow` is a `DockPanel` hosting a dockable/collapsible navigation bar
-  plus a page host. A `ViewLocator` maps each `*ViewModel` to its `*View` by name.
-- **Marker interfaces for page behaviour.** Instead of a heavyweight base class, pages opt into shell
-  behaviours by implementing small interfaces in `src/Shared`:
-  - `ISelfScrollingPage` — the page fills the viewport and scrolls its own panes (the shell does not
-    wrap it in a scroll region).
-  - `IRefreshablePage` — the toolbar **Refresh** routes to `Refresh()`.
-  - `ILiveSamplingPage` — the toolbar **Live** pill pauses/resumes the page's sampling.
-- **Feature-folder layout.** Source is split three ways:
-  - `src/Shared` — feature-agnostic building blocks (view-model base, the marker interfaces, reusable
-    controls like `Sparkline` / `StatCard` / `InfoRow`, styles and palette).
-  - `src/Services` — cross-cutting services (theming, system-metric samplers, network sampler) that
-    are shared by more than one tab.
-  - `src/Tabs/<Feature>` — one self-contained folder per tab (view, view-model, and its
-    feature-local helpers). A helper moves up to `Services`/`Shared` only once a second tab needs it.
-- **Sampler / provider soft-fail convention.** *Samplers* produce live values on a timer; *providers*
-  read static facts once, off the UI thread (`Task.Run`), behind an `OperatingSystem.IsWindows()`
-  guard. Both degrade to neutral fallbacks ("—", "Unknown …") rather than throwing, so one dead source
-  never blanks a whole page.
-- **`ThemeService` — the single theming seam.** It is the only code that writes theme/accent to
-  `Application.Current`. Anything that can change at runtime is referenced with `{DynamicResource}`.
-  Theming is session-only by design.
-
-## Build & run
-
-DashDetective targets **`net10.0-windows`** and is **Windows-only** — it depends on facilities that
-only exist on Windows: **WMI** (`System.Management`) for static hardware identity, **PDH performance
-counters** for live GPU/disk metrics, the **registry** for build details, and various **Win32
-P/Invoke** (`shell32`, `iphlpapi`) for shell integration and the connections table. There is no
-cross-platform fallback by design.
-
-**Prerequisites**
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Windows 10/11
-
-**Run**
-```powershell
-dotnet run --project DashDetective
-```
-
-**Build**
-```powershell
-dotnet build DashDetective.sln -c Release
-```
-
-The build treats warnings as errors and enforces code style from `.editorconfig`
-(`EnforceCodeStyleInBuild`). Before pushing, verify formatting the same way CI does:
 ```powershell
 dotnet format DashDetective.sln --verify-no-changes
 ```
 
-### Continuous integration
-The [.NET Desktop (Avalonia)](.github/workflows/dotnet-desktop.yml) workflow restores, **verifies
-formatting** (`dotnet format --verify-no-changes`), builds Debug + Release, runs the **test suite with
-code coverage** (uploaded as a per-configuration artifact), and publishes the Release build as a
-downloadable artifact. It runs on `windows-latest`.
+To produce a self-contained output directory, use the same command CI publishes with:
 
-### Testing
-Unit tests live in **`tests/DashDetective.Tests`** (xUnit, hand-rolled fakes — no mocking framework).
-Run them from the repo root:
+```powershell
+dotnet publish DashDetective/DashDetective.csproj -c Release -o publish
+```
+
+## Testing
+
+Unit tests live in `tests/DashDetective.Tests` and use xUnit with hand-rolled fakes — no mocking
+framework. Coverage is collected through coverlet.
+
 ```powershell
 dotnet test DashDetective.sln
 ```
-Collect coverage locally (Cobertura, via coverlet — the same data CI uploads as an artifact):
+
 ```powershell
 dotnet test DashDetective.sln --collect:"XPlat Code Coverage"
 ```
-The suite has **153 tests** — a one-line harness smoke check plus 152 tests across 15 classes, covering
-the shared pure-logic seams and the sampling/persistence behaviour:
 
-| Area | Classes (tests) |
-| --- | --- |
-| Charts | SparklinePoints (7), ChartScale (11) |
-| Formatters | DataRateFormatter (25), UptimeFormatter (7), FileSizeFormatter (8), ProcessMemoryFormatter (6) |
-| Catalogs & identity | HardwareCatalog (15), HardwareNameFormatter (10), CurrentUserProvider (8) |
-| Collections & paging | ProcessTreeBuilder (9), CollectionReconciler (6), PagerMath (18) |
-| Sampling & settings | MetricChannel (8), SystemMetricsService (7), SettingsStore (7) |
+## Continuous Integration
 
-There is no coverage **badge** — that would need a third-party service (Codecov/Coveralls); the local
-command above plus the CI artifact stand in for it.
+The [.NET Desktop (Avalonia)](.github/workflows/dotnet-desktop.yml) workflow runs on
+`windows-latest` across a `Debug` and `Release` matrix. Each leg restores, verifies formatting with
+`dotnet format --verify-no-changes`, builds, and runs the test suite with Cobertura coverage. The
+coverage report is uploaded as a per-configuration artifact, and the `Release` leg also publishes
+the compiled application as a downloadable artifact.
 
-## Project layout
+## Project Structure
 
 ```
 DashDetective/
-  Program.cs, App.axaml(.cs)      bootstrap
+  Program.cs, App.axaml            application bootstrap
+  app.manifest                     Win32 application manifest
+  Assets/                          application icon
   src/
-    Shared/                       marker interfaces, ViewModelBase, AppInfo, Controls, Styles
-    Services/                     Theming (ThemeService), SystemMetrics + Network samplers, Settings
-                                  (persistence store), Startup (launch-at-startup), Diagnostics,
-                                  Identity, Threading (UI-timer seam)
-    Shell/                        MainWindow, MainWindowViewModel, ViewLocator, Navigation
-    Tabs/                         Dashboard, FileExplorer, Processes, Performance, Network, Hardware, Settings
+    Shared/                        ViewModelBase, page marker interfaces, AppInfo,
+                                   Charts, Controls, Styles, formatters
+    Services/                      Theming, SystemMetrics, Network, Settings, Startup,
+                                   Diagnostics, Identity, Threading
+    Shell/                         MainWindow, MainWindowViewModel, ViewLocator, Navigation
+    Tabs/                          Dashboard, FileExplorer, Processes, Performance,
+                                   Network, Storage, Hardware, Settings
 tests/
-  DashDetective.Tests/            xUnit suite (pure-logic + behaviour, hand-rolled fakes)
+  DashDetective.Tests/             xUnit test suite
 docs/
-  ARCHITECTURE.md                 reader-facing architecture doc
-.github/workflows/                CI
+  ARCHITECTURE.md                  architecture reference
+.github/workflows/                 CI
 ```
 
-## Roadmap
+Source layout and design conventions are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Honest near-term work, roughly in priority order:
+## Platform Support
 
-- **Settings persistence** — theme, accent, nav position/collapse, refresh interval, show-hidden and the
-  Monitoring toggles now persist to `settings.json`; the File-Explorer **pane sizes** remain session-only
-  (extend the store to cover them next).
-- **Automated tests** — a `tests/DashDetective.Tests` xUnit suite (330 tests) now covers the shared
-  pure-logic seams and the sampling/persistence behaviour, and CI collects code coverage. Extend it as
-  new `Shared`/`Services` types land.
-- **Hardware sensors** — wire the Hardware tab's **Sensors** card to a real temperature/fan source. The
-  per-vendor GPU sensor readers behind the Performance tab's Temp/Power tiles are the obvious source to
-  reuse. Still open: **AMD GPU power on discrete boards** (implemented, but never verified — no discrete
-  Radeon was available, so it needs checking against a known-good reading), **Intel** GPU sensors (no
-  hardware available), and **SATA/HDD/USB** drive temperature (needs admin). Drive temperature is already
-  live for NVMe via an in-box IOCTL read.
-- **Deferred metrics** — per-process **network throughput** in Processes and **IPv6** active
-  connections in Network both await a suitable in-box data source.
+DashDetective is Windows-only by design. Both projects target `net10.0-windows`, and the application
+reads the machine through facilities that exist only on Windows: WMI (`System.Management`) for static
+hardware identity, PDH performance counters for live CPU/GPU/disk metrics, the registry for build
+details, and Win32 P/Invoke (`shell32`, `iphlpapi`, `IOCTL_STORAGE_QUERY_PROPERTY`) for shell
+integration, the connections table and NVMe drive temperature. There is no cross-platform fallback.
+No elevation is required — the application runs as a standard user.
