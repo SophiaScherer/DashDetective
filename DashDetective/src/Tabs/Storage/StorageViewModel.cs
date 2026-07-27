@@ -264,6 +264,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             : volume.DriveLetter.HasValue ? "Local Disk"
             : "—",
         FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
+        Type = PartitionTypeFormatter.Format(volume.GptType, volume.DriveLetter.HasValue),
         Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
         Free = FileSizeFormatter.Format((long)volume.FreeBytes),
     };
