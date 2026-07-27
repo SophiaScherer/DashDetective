@@ -256,10 +256,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>Maps one volume to a display row: "C:"/"—" for the letter, the formatted capacity/free
-    /// (binary units, like the Dashboard), and "—" for a missing label/file system.</summary>
+    /// (binary units, like the Dashboard), and "—" for a missing file system. An unlabelled lettered volume
+    /// falls back to "Local Disk" (Explorer's convention, matching <see cref="StorageComposer"/>'s cards).</summary>
     private static PartitionRow ToPartitionRow(VolumeInfo volume) => new() {
         Vol = volume.DriveLetter is { } letter ? $"{letter}:" : "—",
-        Label = string.IsNullOrEmpty(volume.Label) ? "—" : volume.Label,
+        Label = !string.IsNullOrEmpty(volume.Label) ? volume.Label
+            : volume.DriveLetter.HasValue ? "Local Disk"
+            : "—",
         FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
         Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
         Free = FileSizeFormatter.Format((long)volume.FreeBytes),
