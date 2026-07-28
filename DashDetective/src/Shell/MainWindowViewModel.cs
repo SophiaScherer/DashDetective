@@ -6,6 +6,7 @@ using DashDetective.Services.Settings;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shell.Help;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
@@ -68,6 +69,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
     public NavigationViewModel Nav { get; } = new();
 
+    /// <summary>The Help modal. Owned here rather than by the nav bar because the overlay covers the
+    /// whole window, navigation bar included.</summary>
+    public HelpViewModel Help { get; } = new();
+
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
@@ -107,6 +112,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;
+        Nav.HelpRequested += Help.Open;
         Nav.PropertyChanged += OnNavPropertyChanged;
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
         _performance.ScopeChanged += Persist;

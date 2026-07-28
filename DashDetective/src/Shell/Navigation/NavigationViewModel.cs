@@ -51,6 +51,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// already-selected edge), so the view can dismiss the picker flyout. UI-only; carries no state.</summary>
     public event Action? PositionPicked;
 
+    /// <summary>Raised when the on-bar Help button is pressed, so the shell can open the Help modal
+    /// (the modal covers the whole window, so the shell owns it). UI-only; carries no state.</summary>
+    public event Action? HelpRequested;
+
     public NavigationViewModel() {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
@@ -163,6 +167,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Docks the bar to the given window edge.</summary>
     [RelayCommand]
     private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
+
+    /// <summary>Asks the shell to open the Help modal.</summary>
+    [RelayCommand]
+    private void ShowHelp() => HelpRequested?.Invoke();
 
     private void SelectPosition(NavPositionOption option) {
         Orientation = option.Value;

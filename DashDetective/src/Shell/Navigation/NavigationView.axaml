@@ -261,6 +261,11 @@
                           StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                           Data="{Binding CollapseIcon}"/>
                 </Button>
+                <Button Classes="navCtl" Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help">
+                    <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                          Data="{x:Static nav:Icons.Help}"/>
+                </Button>
                 <Button x:Name="PositionButton" Classes="navCtl" ToolTip.Tip="Navigation position">
                     <Path Width="18" Height="18" Stretch="None" Fill="{DynamicResource TextTertiary}"
                           Data="{x:Static nav:Icons.Kebab}"/>
