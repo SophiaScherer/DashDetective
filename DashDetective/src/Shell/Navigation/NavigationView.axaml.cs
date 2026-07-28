@@ -100,6 +100,11 @@ public partial class NavigationView : UserControl {
     private void BeginDrag() {
         _dragging = true;
 
+        // Dim the bar where it currently sits, so it reads as picked up while the drop band previews
+        // where it will land.
+        if (_viewModel is not null)
+            _viewModel.IsDragging = true;
+
         var accent = BrushRes("Accent", Colors.DodgerBlue) is ISolidColorBrush accentBrush
             ? accentBrush.Color
             : Colors.DodgerBlue;
@@ -141,7 +146,11 @@ public partial class NavigationView : UserControl {
         _overlay?.Children.Add(_dragChip);
     }
 
+    // Reached from release and from lost capture alike, so the dim can never be left stuck on.
     private void EndDrag() {
+        if (_viewModel is not null)
+            _viewModel.IsDragging = false;
+
         if (_overlay is not null) {
             if (_dropHint is not null) _overlay.Children.Remove(_dropHint);
             if (_dragChip is not null) _overlay.Children.Remove(_dragChip);
@@ -178,15 +187,14 @@ public partial class NavigationView : UserControl {
         return nearest.Edge;
     }
 
-    // Size the highlight to the band the bar will occupy on the target edge, honouring the current
-    // collapsed state so the preview matches where the bar actually lands.
+    // Size the highlight to the band the bar will occupy on the target edge. The thickness comes from
+    // the view model, which owns it, so the preview cannot drift from where the bar actually lands.
     private void UpdateHint(NavOrientation edge, Size size) {
-        if (_dropHint is null)
+        if (_dropHint is null || _viewModel is null)
             return;
 
-        var collapsed = _viewModel?.IsCollapsed ?? false;
-        double vertical = collapsed ? 64 : 236;   // rail width on a Left/Right dock
-        double horizontal = collapsed ? 54 : 64;   // bar height on a Top/Bottom dock
+        double vertical = _viewModel.RailThickness(horizontal: false);   // rail width on a Left/Right dock
+        double horizontal = _viewModel.RailThickness(horizontal: true);  // bar height on a Top/Bottom dock
 
         double left, top, width, height;
         switch (edge) {

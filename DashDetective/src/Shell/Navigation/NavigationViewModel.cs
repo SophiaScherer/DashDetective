@@ -61,6 +61,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// (the modal covers the whole window, so the shell owns it). UI-only; carries no state.</summary>
     public event Action? HelpRequested;
 
+    /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
+    /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
+    [ObservableProperty] private bool _isDragging;
+
     public NavigationViewModel() {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
@@ -121,13 +125,19 @@ public partial class NavigationViewModel : ViewModelBase {
     /// aligned (just under the brand) in a tall vertical rail.</summary>
     public VerticalAlignment ItemsVAlign => IsHorizontal ? VerticalAlignment.Center : VerticalAlignment.Top;
 
+    /// <summary>How thick the bar is when docked on the given axis, at the current collapsed state.
+    /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
+    /// can size a drop band for an edge the bar is not on yet.</summary>
+    public double RailThickness(bool horizontal) =>
+        horizontal ? (IsCollapsed ? 54 : 64) : (IsCollapsed ? 64 : 236);
+
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
-    public double RailWidth => IsHorizontal ? double.NaN : (IsCollapsed ? 64 : 236);
+    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
 
     /// <summary>Rail height. A fixed bar (full or collapsed) when horizontal; <see cref="double.NaN"/>
     /// (auto) when vertical so it stretches to the docked edge.</summary>
-    public double RailHeight => IsHorizontal ? (IsCollapsed ? 54 : 64) : double.NaN;
+    public double RailHeight => IsHorizontal ? RailThickness(horizontal: true) : double.NaN;
 
     /// <summary>The bar's separator hairline, drawn only on the edge that faces the content area.</summary>
     public Thickness HairlineThickness => Orientation switch {

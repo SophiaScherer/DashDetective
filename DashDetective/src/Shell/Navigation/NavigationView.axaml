@@ -234,6 +234,17 @@
         <Style Selector="Button.railChevron:pointerover Path.chevronGlyph">
             <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
         </Style>
+
+        <!-- Drag-to-dock: dim the bar where it still sits so it reads as picked up, while the overlay's
+             drop band previews the edge it will land on. Declared after the hover rule above so it wins
+             — Avalonia takes the last matching setter, not the most specific — which keeps the puck out
+             of the way of a moving cursor. -->
+        <Style Selector="Panel.railHost.dragging Border.rail">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Panel.railHost.dragging Button.railChevron">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
@@ -244,7 +255,7 @@
          gives the bar (it is the DockPanel's first child, so it would paint under the content area). The
          puck's negative margin keeps its desired size below the rail's, so hosting it here does not
          widen the bar. -->
-    <Panel x:Name="RailHost" Classes="railHost">
+    <Panel x:Name="RailHost" Classes="railHost" Classes.dragging="{Binding IsDragging}">
 
     <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
          inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
