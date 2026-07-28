@@ -24,7 +24,8 @@ public sealed record HardwareInfo(
 /// <summary>Processor card — <c>Name</c> is the card subtitle; the rest are the spec-row values.</summary>
 public sealed record ProcessorInfo(
     string Name = "—",
-    string CoresThreads = "—",
+    string Cores = "—",
+    string LogicalProcessors = "—",
     string BaseBoost = "—",
     string CacheL3 = "—",
     string Tdp = "—",

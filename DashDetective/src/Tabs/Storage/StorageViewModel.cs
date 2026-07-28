@@ -94,6 +94,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // 0–100 %). The samplers are shared across pages; this history is this tab's own, like the Dashboard's.
     private readonly double[] _diskHistory = new double[WindowSeconds];
 
+    /// <summary>The Disk Activity panel title, carrying the real system-drive letter rather than a
+    /// hardcoded "C:". Fixed for the process lifetime, so no change notification is needed.</summary>
+    public string DiskActivityTitle { get; } = $"Disk Activity ({SystemDrive.Letter}:)";
+
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
     [ObservableProperty] private string _diskPoints = "";
 
@@ -252,11 +256,15 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>Maps one volume to a display row: "C:"/"—" for the letter, the formatted capacity/free
-    /// (binary units, like the Dashboard), and "—" for a missing label/file system.</summary>
+    /// (binary units, like the Dashboard), and "—" for a missing file system. An unlabelled lettered volume
+    /// falls back to "Local Disk" (Explorer's convention, matching <see cref="StorageComposer"/>'s cards).</summary>
     private static PartitionRow ToPartitionRow(VolumeInfo volume) => new() {
         Vol = volume.DriveLetter is { } letter ? $"{letter}:" : "—",
-        Label = string.IsNullOrEmpty(volume.Label) ? "—" : volume.Label,
+        Label = !string.IsNullOrEmpty(volume.Label) ? volume.Label
+            : volume.DriveLetter.HasValue ? "Local Disk"
+            : "—",
         FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
+        Type = PartitionTypeFormatter.Format(volume.GptType, volume.DriveLetter.HasValue),
         Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
         Free = FileSizeFormatter.Format((long)volume.FreeBytes),
     };

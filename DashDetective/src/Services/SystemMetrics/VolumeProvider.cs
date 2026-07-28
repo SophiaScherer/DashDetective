@@ -10,9 +10,12 @@ namespace DashDetective.Services.SystemMetrics;
 /// One mounted volume: its host physical-disk number (for the drive-card rollup, <c>null</c> when it can't
 /// be resolved), drive letter (<c>null</c> for unlettered partitions like Recovery/EFI), label, file
 /// system, and total/free bytes. Sizes are raw so callers format them with <c>FileSizeFormatter</c>.
+/// <c>GptType</c> is the host partition's raw GPT type GUID (empty on MBR disks or when unresolved) —
+/// callers turn it into a display name with <c>PartitionTypeFormatter</c>.
 /// </summary>
 public readonly record struct VolumeInfo(
-    int? DiskNumber, char? DriveLetter, string Label, string FileSystem, ulong SizeBytes, ulong FreeBytes);
+    int? DiskNumber, char? DriveLetter, string Label, string FileSystem, ulong SizeBytes, ulong FreeBytes,
+    string GptType = "");
 
 /// <summary>
 /// Enumerates all mounted volumes from WMI <c>MSFT_Volume</c> (<c>root\Microsoft\Windows\Storage</c>) —
@@ -34,9 +37,9 @@ public static class VolumeProvider {
             var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
             scope.Connect();
 
-            // Access path (e.g. "C:\" or "\\?\Volume{guid}\") → host disk number, so both lettered and
-            // unlettered volumes can be traced back to a physical disk.
-            var diskByAccessPath = BuildAccessPathToDiskMap(scope);
+            // Access path (e.g. "C:\" or "\\?\Volume{guid}\") → host partition, so both lettered and
+            // unlettered volumes can be traced back to a physical disk and their GPT type.
+            var partitionByAccessPath = BuildAccessPathMap(scope);
 
             var volumes = new List<VolumeInfo>();
             var query = new ObjectQuery(
@@ -52,17 +55,19 @@ public static class VolumeProvider {
                         continue;
 
                     var path = obj["Path"] as string;
-                    int? disk = path is not null && diskByAccessPath.TryGetValue(path, out var number)
-                        ? number
-                        : null;
+                    PartitionRef? partition =
+                        path is not null && partitionByAccessPath.TryGetValue(path, out var match)
+                            ? match
+                            : null;
 
                     volumes.Add(new VolumeInfo(
-                        disk,
+                        partition?.DiskNumber,
                         DriveLetterOrNull(obj["DriveLetter"]),
                         (obj["FileSystemLabel"] as string ?? "").Trim(),
                         (obj["FileSystem"] as string ?? "").Trim(),
                         size,
-                        ToUInt64(obj["SizeRemaining"])));
+                        ToUInt64(obj["SizeRemaining"]),
+                        partition?.GptType ?? ""));
                 }
             }
 
@@ -73,27 +78,31 @@ public static class VolumeProvider {
         }
     }
 
-    /// <summary>Maps every partition access path to its disk number. A volume's <c>Path</c> appears among its
-    /// partition's <c>AccessPaths</c>, so this keys the volume→disk join. Missing/failed → empty (volumes
-    /// then simply carry a null disk number).</summary>
-    private static Dictionary<string, int> BuildAccessPathToDiskMap(ManagementScope scope) {
-        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The partition facts a volume inherits: its host disk number and raw GPT type GUID.</summary>
+    private readonly record struct PartitionRef(int DiskNumber, string GptType);
+
+    /// <summary>Maps every partition access path to its partition. A volume's <c>Path</c> appears among its
+    /// partition's <c>AccessPaths</c>, so this keys the volume→partition join. Missing/failed → empty
+    /// (volumes then simply carry a null disk number and no GPT type).</summary>
+    private static Dictionary<string, PartitionRef> BuildAccessPathMap(ManagementScope scope) {
+        var map = new Dictionary<string, PartitionRef>(StringComparer.OrdinalIgnoreCase);
         try {
-            var query = new ObjectQuery("SELECT DiskNumber, AccessPaths FROM MSFT_Partition");
+            var query = new ObjectQuery("SELECT DiskNumber, AccessPaths, GptType FROM MSFT_Partition");
             using var searcher = new ManagementObjectSearcher(scope, query);
             using var results = searcher.Get();
 
             foreach (var obj in results) {
                 using (obj) {
-                    var disk = ToInt(obj["DiskNumber"]);
+                    // GptType is null on MBR disks — an empty string just means "no type to show".
+                    var entry = new PartitionRef(ToInt(obj["DiskNumber"]), obj["GptType"] as string ?? "");
                     if (obj["AccessPaths"] is string[] paths)
                         foreach (var path in paths)
                             if (!string.IsNullOrEmpty(path))
-                                map[path] = disk;
+                                map[path] = entry;
                 }
             }
         } catch {
-            // Partition class unavailable — the volume→disk join is simply skipped.
+            // Partition class unavailable — the volume→partition join is simply skipped.
         }
         return map;
     }

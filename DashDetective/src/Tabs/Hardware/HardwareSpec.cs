@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// One key/value spec row inside a hardware card (e.g. "Cores / Threads" → "24 / 32"). The
+/// One key/value spec row inside a hardware card (e.g. "Cores" → "24"). The
 /// <see cref="Key"/> is fixed (it defines the row and is how the view model addresses it); the
 /// <see cref="Value"/> is observable so a provider can fill it in after the async WMI read — it
 /// starts as the neutral placeholder "—" and updates live once real data lands.
