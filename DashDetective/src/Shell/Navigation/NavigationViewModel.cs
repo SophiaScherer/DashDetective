@@ -18,26 +18,30 @@ namespace DashDetective.Shell.Navigation;
 /// <see cref="SelectionChanged"/> so the shell can host the selected page. Kept separate from
 /// <c>MainWindowViewModel</c> so the bar's layout state (dock edge, collapse) lives as one cohesive
 /// unit. Orientation and collapse drive the bar's layout entirely through computed properties, so no
-/// value converters are needed. All state is session-only, matching the Theming conventions.
+/// value converters are needed. Both persist via <c>SettingsStore</c>, which observes them through
+/// <c>MainWindowViewModel</c>; the purely visual flags (<see cref="IsDragging"/>) do not.
 /// </summary>
 public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty] private NavItem _selectedNav = null!;
 
-    /// <summary>Whether the bar is collapsed to an icons-only rail. Session-only, like Theming.</summary>
+    /// <summary>Whether the bar is collapsed to an icons-only rail. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
-        nameof(ShowBrandText), nameof(ShowFullFooter), nameof(CollapseIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation))]
+        nameof(ShowBrandText), nameof(ShowFullFooter),
+        nameof(ChevronPointing), nameof(ChevronIcon),
+        nameof(ControlsDock), nameof(FooterAvatarDock))]
     private bool _isCollapsed;
 
-    /// <summary>Which window edge the bar docks to. Session-only, like Theming.</summary>
+    /// <summary>Which window edge the bar docks to. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
         nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
-        nameof(ShowFullFooter), nameof(CollapseIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation),
-        nameof(PickerPlacement))]
+        nameof(ShowFullFooter), nameof(ChevronIcon),
+        nameof(ControlsDock), nameof(FooterAvatarDock),
+        nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
+        nameof(ChevronHAlign), nameof(ChevronVAlign),
+        nameof(ChevronMargin), nameof(ChevronCornerRadius))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -57,6 +61,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Raised when the on-bar Help button is pressed, so the shell can open the Help modal
     /// (the modal covers the whole window, so the shell owns it). UI-only; carries no state.</summary>
     public event Action? HelpRequested;
+
+    /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
+    /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
+    [ObservableProperty] private bool _isDragging;
 
     public NavigationViewModel() {
         Positions = new ObservableCollection<NavPositionOption> {
@@ -118,13 +126,19 @@ public partial class NavigationViewModel : ViewModelBase {
     /// aligned (just under the brand) in a tall vertical rail.</summary>
     public VerticalAlignment ItemsVAlign => IsHorizontal ? VerticalAlignment.Center : VerticalAlignment.Top;
 
+    /// <summary>How thick the bar is when docked on the given axis, at the current collapsed state.
+    /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
+    /// can size a drop band for an edge the bar is not on yet.</summary>
+    public double RailThickness(bool horizontal) =>
+        horizontal ? (IsCollapsed ? 54 : 64) : (IsCollapsed ? 64 : 236);
+
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
-    public double RailWidth => IsHorizontal ? double.NaN : (IsCollapsed ? 64 : 236);
+    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
 
     /// <summary>Rail height. A fixed bar (full or collapsed) when horizontal; <see cref="double.NaN"/>
     /// (auto) when vertical so it stretches to the docked edge.</summary>
-    public double RailHeight => IsHorizontal ? (IsCollapsed ? 54 : 64) : double.NaN;
+    public double RailHeight => IsHorizontal ? RailThickness(horizontal: true) : double.NaN;
 
     /// <summary>The bar's separator hairline, drawn only on the edge that faces the content area.</summary>
     public Thickness HairlineThickness => Orientation switch {
@@ -151,30 +165,74 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
 
-    /// <summary>Where an on-bar control cluster sits relative to what it accompanies: beneath it on a
-    /// collapsed vertical rail (64px is too narrow to fit both side by side), to its right otherwise.
-    /// Shared by the brand area's collapse toggle and the footer's Help/position pair.</summary>
+    /// <summary>Where the footer's Help button sits relative to the avatar: beneath it on a collapsed
+    /// vertical rail (64px is too narrow to fit both side by side), to its right otherwise.</summary>
     public Dock ControlsDock => IsCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
 
     /// <summary>Where the footer's avatar sits: the start of the same axis <see cref="ControlsDock"/>
     /// ends, so the two bracket the user's name when it is shown.</summary>
     public Dock FooterAvatarDock => IsCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
-    /// <summary>Which way the position picker's flyout opens. Flyouts render in the window's overlay
-    /// layer and cannot spill outside it, so a top-docked bar — whose controls sit within ~32px of the
-    /// window's top edge — has to open downward; every other edge has room above.</summary>
-    public PlacementMode PickerPlacement =>
-        Orientation == NavOrientation.Top ? PlacementMode.Bottom : PlacementMode.Top;
+    // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
 
-    /// <summary>The axis a control cluster's own buttons run along. They stack on a collapsed vertical
-    /// rail, where 64px (less the footer's padding) has room for only one 30px button per row.</summary>
-    public Orientation ControlsOrientation => IsCollapsed && !IsHorizontal
-        ? Avalonia.Layout.Orientation.Vertical
-        : Avalonia.Layout.Orientation.Horizontal;
+    /// <summary>The semi-circle's radius: how far the puck stands off the bar's edge, and half the
+    /// length of the flat side that meets it. Keeping it exactly half of <see cref="PuckLength"/> is
+    /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
+    private const double PuckRadius = 20;
 
-    /// <summary>The panel-split glyph shown on the collapse toggle, its rail indicating the way the bar
-    /// will move.</summary>
-    public Geometry CollapseIcon => Icons.PanelGlyph(Orientation, IsCollapsed);
+    /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
+    private const double PuckLength = PuckRadius * 2;
+
+    /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
+    /// will collapse), away from it when collapsed (it will expand).</summary>
+    public ChevronDirection ChevronPointing => Orientation switch {
+        NavOrientation.Left => IsCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
+        NavOrientation.Right => IsCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
+        NavOrientation.Top => IsCollapsed ? ChevronDirection.Down : ChevronDirection.Up,
+        _ => IsCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
+    };
+
+    /// <summary>The chevron glyph shown on the puck.</summary>
+    public Geometry ChevronIcon => Icons.Chevron(ChevronPointing);
+
+    /// <summary>Puck width: the stand-off axis on a vertical rail, the flat side on a horizontal bar.</summary>
+    public double ChevronWidth => IsHorizontal ? PuckLength : PuckRadius;
+
+    /// <summary>Puck height: the flat side on a vertical rail, the stand-off axis on a horizontal bar.</summary>
+    public double ChevronHeight => IsHorizontal ? PuckRadius : PuckLength;
+
+    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
+    public HorizontalAlignment ChevronHAlign => Orientation switch {
+        NavOrientation.Left => HorizontalAlignment.Right,
+        NavOrientation.Right => HorizontalAlignment.Left,
+        _ => HorizontalAlignment.Center,
+    };
+
+    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
+    public VerticalAlignment ChevronVAlign => Orientation switch {
+        NavOrientation.Top => VerticalAlignment.Bottom,
+        NavOrientation.Bottom => VerticalAlignment.Top,
+        _ => VerticalAlignment.Center,
+    };
+
+    /// <summary>Stands the puck fully clear of the bar, so only its flat side touches the edge and the
+    /// whole curve reads against the content area. Needs the view's ClipToBounds and the shell's ZIndex
+    /// to draw — see NavigationView.axaml.</summary>
+    public Thickness ChevronMargin => Orientation switch {
+        NavOrientation.Left => new Thickness(0, 0, -PuckRadius, 0),
+        NavOrientation.Right => new Thickness(-PuckRadius, 0, 0, 0),
+        NavOrientation.Top => new Thickness(0, 0, 0, -PuckRadius),
+        _ => new Thickness(0, -PuckRadius, 0, 0),
+    };
+
+    /// <summary>Rounds the two outward corners by the full radius. On a box that is one radius deep and
+    /// two long, that is exactly a half-disc — no clamping involved.</summary>
+    public CornerRadius ChevronCornerRadius => Orientation switch {
+        NavOrientation.Left => new CornerRadius(0, PuckRadius, PuckRadius, 0),
+        NavOrientation.Right => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
+        NavOrientation.Top => new CornerRadius(0, 0, PuckRadius, PuckRadius),
+        _ => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
+    };
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]

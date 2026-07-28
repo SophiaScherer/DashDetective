@@ -47,11 +47,18 @@ current one, and drives the toolbar (clock, Live pill, Refresh, Export).
 The **navigation bar** (`src/Shell/Navigation`) is a self-contained, **dockable and collapsible**
 component. Its view-model owns orientation and collapsed state and exposes *every* derived layout value
 — dock edge, rail thickness, item axis, label/brand visibility, accent-indicator orientation, scroll
-axis — as **computed properties, with no value converters**. Two entry points drive the *same* shared
-view-model: on-bar controls (a collapse chevron and a kebab menu offering the four dock positions), and
-the **Navigation** group in Settings → Appearance. The bar can also be **dragged to an edge to dock**,
-with a floating hint chip showing the target. Dock edge and collapsed state are persisted and restored
-on the next launch (see *Settings persistence* below).
+axis, collapse-puck geometry — as **computed properties, with no value converters**. The bar carries no
+permanent control chrome; four entry points drive the *same* shared view-model:
+
+- a **hover-revealed chevron puck**, a half-disc standing just off the bar's outer edge, which collapses
+  and expands it;
+- **right-clicking anywhere on the bar**, which opens a dock menu at the pointer;
+- **dragging the brand area** to a window edge, which dims the bar in place while a drop band and a
+  floating chip show the target;
+- the **Navigation** group in Settings → Appearance.
+
+Dock edge and collapsed state are persisted and restored on the next launch (see *Settings persistence*
+below).
 
 `ViewLocator` maps a `*ViewModel` to its `*View` by type name, so a tab's view and view-model must
 share a namespace.

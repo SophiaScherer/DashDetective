@@ -117,8 +117,8 @@
         </Border>
 
         <!-- ===== Navigation ===== -->
-        <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the
-             on-bar collapse chevron and orientation menu. -->
+        <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the bar's
+             hover chevron, its right-click dock menu and the drag-to-dock gesture. -->
         <Border Classes="panel" Padding="18">
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Navigation"/>

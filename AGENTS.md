@@ -250,14 +250,19 @@ currently exist.
                                  the viewport — see File Explorer)
       /Navigation
         NavigationView.axaml(.cs)   (the collapsible/dockable nav-bar component; brand + item list +
-        NavigationViewModel.cs       footer + on-bar collapse/kebab controls. The VM owns Orientation +
-                                     IsCollapsed and exposes all layout as computed properties — Dock,
-                                     Rail sizes, ItemsOrientation, Hairline edge, scroll axis — no
-                                     converters. Selection/layout visuals are styled in
-                                     NavigationView.axaml via DynamicResource so they follow theme + accent)
+        NavigationViewModel.cs       footer, with no permanent control chrome — collapse is the hover
+                                     puck, re-docking is the right-click menu or the drag gesture. The
+                                     VM owns Orientation + IsCollapsed and exposes all layout as computed
+                                     properties — Dock, Rail sizes, ItemsOrientation, Hairline edge,
+                                     scroll axis, puck geometry — no converters. Selection/layout visuals
+                                     are styled in NavigationView.axaml via DynamicResource so they
+                                     follow theme + accent)
         NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
-        NavPositionOption.cs        (selectable item VM for the position picker, like NavItem/ThemeOption)
+        ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
+                                     so the rule is testable — Geometry.Parse needs a render backend,
+                                     which the unit tests do not have, so touching Icons at all throws)
+        NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 CpuInfoProvider.cs      (static CPU info via WMI, async)
@@ -503,6 +508,11 @@ test code too, so keep usings alphabetical (`System` is **not** sorted first).
   chart/paging math) is tested directly; timer/sampler-driven types are tested through their seam with
   fakes plus the synchronous entry points (`SampleNow` / `RefreshAll` / `Flush`), not by waiting on a
   real timer.
+- **No render backend in tests.** These are plain xUnit tests with no Avalonia app, so anything reaching
+  `Geometry.Parse` throws `Unable to locate 'IPlatformRenderInterface'`. Because that runs in `Icons`'s
+  static initialiser, touching **any** `Icons` member — even a pure static method — fails. Keep glyph
+  *selection* rules out of `Icons` (as `NavigationViewModel.ChevronPointing` → `ChevronDirection` does)
+  and leave `Icons` a plain geometry lookup, so the rule stays testable and the geometry never loads.
 
 ## Working Style
 
@@ -528,16 +538,31 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
   (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
   so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
-  icons-only rail**, in any orientation. Two entry points drive the **same shared**
-  `NavigationViewModel`: on-bar controls (a collapse chevron + a three-dot **kebab** menu whose
-  `Flyout` — rendered in the window overlay layer, so it is **never clipped** by the rail — offers the
-  four dock positions), and a **Navigation** group in **Settings → Appearance** (Position + Collapse,
-  both segmented controls). Orientation/collapse and every derived layout value (dock edge, rail
-  thickness, item axis, label/brand/footer visibility, accent-indicator bar↔underline, scroll axis)
-  are **computed properties on the VM — no value converters**. `MainWindowViewModel` owns page routing
-  and delegates the bar to `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. State is
-  **session-only** (resets to Left/expanded each launch, like Theming); this is shared shell work, not
-  a tab-local change.
+  icons-only rail**, in any orientation. The bar carries **no permanent control chrome**; every entry
+  point drives the **same shared** `NavigationViewModel`:
+  - **Collapse/expand** — a **semi-circular puck** standing **entirely outside** the bar, touching its
+    content-facing edge along the flat side only, revealed while the pointer is over the bar. It is a
+    true half-disc: one radius deep, two long, both outward corners rounded by the full radius (no
+    clamping). Its chevron points the way the bar will move (at the docked edge when expanded, away from
+    it when collapsed). It is a sibling of the rail, not a child, and standing outside needs **two**
+    things: `ClipToBounds="False"` on `NavigationView` (which otherwise clips to its docked slot and the
+    puck vanishes) and **`ZIndex="1"`** on the bar in `MainWindow.axaml` (it is the `DockPanel`'s first
+    child, so it would paint under the content area).
+  - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
+    `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
+    items, the footer and any empty space all reach it.
+  - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
+    in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
+  - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
+
+  Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
+  label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
+  alignment / stand-off / rounding) are **computed properties on the VM — no value converters**. The rail
+  thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`/`RailHeight` delegate
+  to and the drop preview measures against; it takes the axis as an argument because a drag previews
+  edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
+  `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
+  *Persistence* below); this is shared shell work, not a tab-local change.
 
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
