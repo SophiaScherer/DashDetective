@@ -26,7 +26,8 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Whether the bar is collapsed to an icons-only rail. Session-only, like Theming.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
-        nameof(ShowBrandText), nameof(ShowFullFooter), nameof(CollapseIcon))]
+        nameof(ShowBrandText), nameof(ShowFullFooter), nameof(CollapseIcon),
+        nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation))]
     private bool _isCollapsed;
 
     /// <summary>Which window edge the bar docks to. Session-only, like Theming.</summary>
@@ -34,7 +35,9 @@ public partial class NavigationViewModel : ViewModelBase {
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
         nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
-        nameof(ShowFullFooter), nameof(CollapseIcon))]
+        nameof(ShowFullFooter), nameof(CollapseIcon),
+        nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation),
+        nameof(PickerPlacement))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -50,6 +53,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Raised each time a dock position is chosen from the on-bar picker (even when it is the
     /// already-selected edge), so the view can dismiss the picker flyout. UI-only; carries no state.</summary>
     public event Action? PositionPicked;
+
+    /// <summary>Raised when the on-bar Help button is pressed, so the shell can open the Help modal
+    /// (the modal covers the whole window, so the shell owns it). UI-only; carries no state.</summary>
+    public event Action? HelpRequested;
 
     public NavigationViewModel() {
         Positions = new ObservableCollection<NavPositionOption> {
@@ -144,6 +151,27 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
 
+    /// <summary>Where an on-bar control cluster sits relative to what it accompanies: beneath it on a
+    /// collapsed vertical rail (64px is too narrow to fit both side by side), to its right otherwise.
+    /// Shared by the brand area's collapse toggle and the footer's Help/position pair.</summary>
+    public Dock ControlsDock => IsCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
+
+    /// <summary>Where the footer's avatar sits: the start of the same axis <see cref="ControlsDock"/>
+    /// ends, so the two bracket the user's name when it is shown.</summary>
+    public Dock FooterAvatarDock => IsCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
+
+    /// <summary>Which way the position picker's flyout opens. Flyouts render in the window's overlay
+    /// layer and cannot spill outside it, so a top-docked bar — whose controls sit within ~32px of the
+    /// window's top edge — has to open downward; every other edge has room above.</summary>
+    public PlacementMode PickerPlacement =>
+        Orientation == NavOrientation.Top ? PlacementMode.Bottom : PlacementMode.Top;
+
+    /// <summary>The axis a control cluster's own buttons run along. They stack on a collapsed vertical
+    /// rail, where 64px (less the footer's padding) has room for only one 30px button per row.</summary>
+    public Orientation ControlsOrientation => IsCollapsed && !IsHorizontal
+        ? Avalonia.Layout.Orientation.Vertical
+        : Avalonia.Layout.Orientation.Horizontal;
+
     /// <summary>The panel-split glyph shown on the collapse toggle, its rail indicating the way the bar
     /// will move.</summary>
     public Geometry CollapseIcon => Icons.PanelGlyph(Orientation, IsCollapsed);
@@ -163,6 +191,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Docks the bar to the given window edge.</summary>
     [RelayCommand]
     private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
+
+    /// <summary>Asks the shell to open the Help modal.</summary>
+    [RelayCommand]
+    private void ShowHelp() => HelpRequested?.Invoke();
 
     private void SelectPosition(NavPositionOption option) {
         Orientation = option.Value;

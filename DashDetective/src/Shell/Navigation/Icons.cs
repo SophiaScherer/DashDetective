@@ -56,6 +56,14 @@ public static class Icons {
         "M5,10 H13 A1,1 0 0 1 14,11 V13 A1,1 0 0 1 13,14 H5 A1,1 0 0 1 4,13 V11 A1,1 0 0 1 5,10 Z " +
         "M11.8,6 h0.01 M11.8,12 h0.01");
 
+    // A circled question mark (the Help affordance): the outer ring, the hook, and the dot beneath it.
+    // The dot is a round-cap degenerate segment (as in Storage's activity dots) so it draws from the
+    // same stroke as the rest of the glyph.
+    public static readonly Geometry Help = Geometry.Parse(
+        "M9,2 A7,7 0 1 1 8.99,2 Z " +
+        "M6.8,7 A2.2,2.2 0 1 1 9.9,9 C9.2,9.5 8.9,9.8 8.9,10.6 " +
+        "M9,13 h0.01");
+
     // Panel/sidebar-split glyph (stroked) used for the collapse/expand affordance, matching the design
     // document: a rounded panel outline with a thin divider carving off a narrow rail. The divider sits
     // on the side the bar will move toward, so the glyph reads directionally per dock edge and state.

@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using System;
+using System.ComponentModel;
 
 namespace DashDetective.Shell.Navigation;
 
@@ -43,13 +44,31 @@ public partial class NavigationView : UserControl {
     // a dock position (or the current one) closes the menu, matching normal menu behaviour. Click-off
     // dismissal is already handled by the flyout's light-dismiss.
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.PositionPicked -= ClosePositionFlyout;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
 
         _viewModel = DataContext as NavigationViewModel;
 
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.PositionPicked += ClosePositionFlyout;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+
+        SyncPickerPlacement();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(NavigationViewModel.PickerPlacement))
+            SyncPickerPlacement();
+    }
+
+    // Placement lives on the Flyout itself rather than its content, and a Flyout sits outside the
+    // visual tree (so it inherits no DataContext to bind against) — hence applying it from here.
+    private void SyncPickerPlacement() {
+        if (_viewModel is not null && PositionButton.Flyout is Flyout flyout)
+            flyout.Placement = _viewModel.PickerPlacement;
     }
 
     private void ClosePositionFlyout() => PositionButton.Flyout?.Hide();
