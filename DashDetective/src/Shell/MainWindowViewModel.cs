@@ -272,6 +272,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
     /// own shortcuts, and anything left over is handled globally.
     /// </summary>
+    /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
+    /// no shortcuts of its own. Read by the window before resolving a key.</summary>
+    public ShortcutScope ActiveScope =>
+        Help.IsOpen ? ShortcutScope.Global : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
+
     public bool HandleShortcut(ShortcutId id) {
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
         // allowed to act on the page hidden behind the scrim.

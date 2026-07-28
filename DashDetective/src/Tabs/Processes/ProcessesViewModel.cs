@@ -492,6 +492,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// it answers Enter and Esc and swallows everything else — the same rule the shell applies for the
     /// Help modal, one level down.
     /// </summary>
+    public ShortcutScope Scope => ShortcutScope.Processes;
+
     public bool HandleShortcut(ShortcutId id) {
         if (ConfirmVisible) {
             switch (id) {

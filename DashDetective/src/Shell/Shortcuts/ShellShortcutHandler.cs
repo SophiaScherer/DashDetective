@@ -15,12 +15,16 @@ namespace DashDetective.Shell.Shortcuts;
 /// </summary>
 public sealed class ShellShortcutHandler : IDisposable {
     private readonly TopLevel _host;
+    private readonly Func<ShortcutScope> _activeScope;
     private readonly Func<ShortcutId, bool> _dispatch;
 
-    /// <summary>Starts listening on <paramref name="host"/>, routing resolved shortcuts to
-    /// <paramref name="dispatch"/>, which returns whether the action ran.</summary>
-    public ShellShortcutHandler(TopLevel host, Func<ShortcutId, bool> dispatch) {
+    /// <summary>Starts listening on <paramref name="host"/>. <paramref name="activeScope"/> is asked
+    /// which tab's bindings are live at press time, and <paramref name="dispatch"/> runs the resolved
+    /// action, returning whether it did anything.</summary>
+    public ShellShortcutHandler(
+        TopLevel host, Func<ShortcutScope> activeScope, Func<ShortcutId, bool> dispatch) {
         _host = host;
+        _activeScope = activeScope;
         _dispatch = dispatch;
         _host.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
@@ -29,7 +33,7 @@ public sealed class ShellShortcutHandler : IDisposable {
 
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         var textInputFocused = KeyboardFocus.IsTextInputFocused(_host);
-        if (!ShortcutCatalog.TryResolve(e.Key, e.KeyModifiers, textInputFocused, out var id))
+        if (!ShortcutCatalog.TryResolve(e.Key, e.KeyModifiers, textInputFocused, _activeScope(), out var id))
             return;
 
         // Consume only what actually ran. A shortcut that doesn't apply right now (End Task with

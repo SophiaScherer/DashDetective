@@ -40,4 +40,7 @@ public enum ShortcutId {
     EndTask,
     SortAscending,
     SortDescending,
+    NavigateBack,
+    NavigateForward,
+    NavigateUp,
 }

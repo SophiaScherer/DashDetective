@@ -76,6 +76,24 @@ public static class ShortcutCatalog {
         new(ShortcutId.SortDescending, [new KeyGesture(Key.Down, KeyModifiers.Alt)],
             "Alt+↓", "Sort the active column descending", ShortcutScope.Processes,
             AllowInTextInput: false),
+
+        // ----- File Explorer -----
+        // Back/forward and up are separate moves once there is a history trail, so they follow the
+        // Windows Explorer convention rather than doubling Alt+← up as "up".
+        new(ShortcutId.NavigateBack, [new KeyGesture(Key.Left, KeyModifiers.Alt)],
+            "Alt+←", "Go back to the previous folder", ShortcutScope.FileExplorer,
+            AllowInTextInput: false),
+
+        new(ShortcutId.NavigateForward, [new KeyGesture(Key.Right, KeyModifiers.Alt)],
+            "Alt+→", "Go forward again", ShortcutScope.FileExplorer,
+            AllowInTextInput: false),
+
+        // Alt+↑ also sorts on Processes: a gesture may mean different things on different tabs, since
+        // only one tab is ever current (see TryResolve).
+        new(ShortcutId.NavigateUp,
+            [new KeyGesture(Key.Up, KeyModifiers.Alt), new KeyGesture(Key.Back)],
+            "Backspace / Alt+↑", "Go up to the parent folder", ShortcutScope.FileExplorer,
+            AllowInTextInput: false),
     ];
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row
@@ -86,12 +104,28 @@ public static class ShortcutCatalog {
             keys, description, ShortcutScope.Global, ShowInHelp: keys.Length > 0);
 
     /// <summary>
-    /// Resolves a key press to the action it triggers. <paramref name="textInputFocused"/> suppresses
-    /// every shortcut that isn't safe to steal from a text box, so typing "/" into a search field
-    /// never fires an app action.
+    /// Resolves a key press to the action it triggers on the tab named by <paramref name="scope"/>.
+    ///
+    /// A gesture may appear in more than one scope — Alt+↑ sorts on Processes and climbs a folder on
+    /// File Explorer — because only one tab is ever current. The active tab's binding therefore wins,
+    /// and a global one is used only when that tab claims nothing.
+    ///
+    /// <paramref name="textInputFocused"/> suppresses every shortcut that isn't safe to steal from a
+    /// text box, so typing "/" into a search field never fires an app action.
     /// </summary>
-    public static bool TryResolve(Key key, KeyModifiers modifiers, bool textInputFocused, out ShortcutId id) {
+    public static bool TryResolve(
+        Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {
+        if (scope != ShortcutScope.Global && TryMatch(key, modifiers, textInputFocused, scope, out id))
+            return true;
+
+        return TryMatch(key, modifiers, textInputFocused, ShortcutScope.Global, out id);
+    }
+
+    private static bool TryMatch(
+        Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {
         foreach (var shortcut in All) {
+            if (shortcut.Scope != scope)
+                continue;
             if (textInputFocused && !shortcut.AllowInTextInput)
                 continue;
 

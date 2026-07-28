@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
 using System;
 using System.ComponentModel;
@@ -26,7 +27,9 @@ public partial class MainWindow : Window {
         Closing += OnClosing;
         DataContextChanged += OnDataContextChanged;
         _shortcuts = new ShellShortcutHandler(
-            this, id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
+            this,
+            () => (DataContext as MainWindowViewModel)?.ActiveScope ?? ShortcutScope.Global,
+            id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
         Closed += (_, _) => _shortcuts.Dispose();
     }
 

@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -15,7 +16,7 @@ namespace DashDetective.Tabs.FileExplorer;
 /// this currently drives the folder tree, file list, breadcrumb and filters; the details pane
 /// and actions are layered on in later phases.
 /// </summary>
-public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, IRefreshablePage, IDisposable {
+public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, IRefreshablePage, IShortcutTarget, IDisposable {
     /// <summary>Top-level tree nodes — one per ready drive.</summary>
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
@@ -46,7 +47,22 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public bool HasNoSelection => SelectedEntry is null;
 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
-    [ObservableProperty] private string _currentPath = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanGoUp))]
+    private string _currentPath = "";
+
+    // ----- Navigation history -----
+
+    private readonly NavigationHistory _history = new();
+
+    /// <summary>Whether Back has somewhere to return to.</summary>
+    public bool CanGoBack => _history.CanGoBack;
+
+    /// <summary>Whether Forward has a trail left to retrace.</summary>
+    public bool CanGoForward => _history.CanGoForward;
+
+    /// <summary>Whether the current folder has a parent to climb to (false at a drive root).</summary>
+    public bool CanGoUp => ParentOfCurrent() is not null;
 
     /// <summary>Whether OS hidden/system entries (e.g. AppData) are shown in the list and tree.</summary>
     [ObservableProperty] private bool _showHidden;
@@ -165,18 +181,88 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             ShellInterop.Open(entry.FullPath);
     }
 
-    private void SetCurrentFolder(string path) {
+    /// <summary>Opens a folder. <paramref name="recordHistory"/> is false only when the move *is* a
+    /// history step (Back/Forward), which must move between the stacks rather than push onto them.</summary>
+    private void SetCurrentFolder(string path, bool recordHistory = true) {
         // Navigating to a *different* folder resets the list scroll to the top; a same-path reload
         // (sort, filter, Refresh, auto-refresh) leaves the user where they were.
         var isNavigation = !string.Equals(path, CurrentPath, StringComparison.OrdinalIgnoreCase);
+
+        if (isNavigation && recordHistory)
+            _history.Record(CurrentPath);
 
         CurrentPath = path;
         RebuildCrumbs(path);
         _watcher.Watch(path);
         _ = LoadEntriesAsync(path);
 
-        if (isNavigation)
+        if (isNavigation) {
+            SyncTreeSelection(path);
             ScrollToTopRequested?.Invoke();
+        }
+
+        NotifyNavigationState();
+    }
+
+    /// <summary>Goes back to the previously open folder.</summary>
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void GoBack() {
+        if (_history.TryGoBack(CurrentPath, out var target))
+            SetCurrentFolder(target, recordHistory: false);
+    }
+
+    /// <summary>Retraces a step undone by Back.</summary>
+    [RelayCommand(CanExecute = nameof(CanGoForward))]
+    private void GoForward() {
+        if (_history.TryGoForward(CurrentPath, out var target))
+            SetCurrentFolder(target, recordHistory: false);
+    }
+
+    /// <summary>Climbs to the parent folder. Going up is an ordinary navigation, so Back returns to the
+    /// folder you climbed out of.</summary>
+    [RelayCommand(CanExecute = nameof(CanGoUp))]
+    private void GoUp() {
+        if (ParentOfCurrent() is { } parent)
+            SetCurrentFolder(parent);
+    }
+
+    /// <summary>The current folder's parent, or null at a drive root or before anything is open.
+    /// Soft-fails to null on a malformed path rather than throwing at a keystroke.</summary>
+    private string? ParentOfCurrent() {
+        if (string.IsNullOrEmpty(CurrentPath))
+            return null;
+
+        try {
+            return Directory.GetParent(CurrentPath)?.FullName;
+        } catch {
+            return null;
+        }
+    }
+
+    /// <summary>Re-evaluates what the navigation buttons can do after a move.</summary>
+    private void NotifyNavigationState() {
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(CanGoForward));
+        GoBackCommand.NotifyCanExecuteChanged();
+        GoForwardCommand.NotifyCanExecuteChanged();
+        GoUpCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Keeps the folder tree's highlight honest when the move didn't come from the tree (Back,
+    /// Up, a breadcrumb, or opening a folder from the list): selects the matching node when that branch
+    /// is already loaded, and otherwise clears the old highlight rather than leaving it pointing at a
+    /// folder the user is no longer in.</summary>
+    private void SyncTreeSelection(string path) {
+        var node = FindNode(RootNodes, path);
+        if (ReferenceEquals(node, SelectedNode))
+            return;
+
+        if (SelectedNode is { } previous)
+            previous.IsSelected = false;
+
+        SelectedNode = node;
+        if (node is not null)
+            node.IsSelected = true;
     }
 
     // Auto-refresh: the open folder changed on disk. Reload its list (keeping the current selection by
@@ -344,6 +430,36 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     }
 
     private void OnCrumbSelected(Crumb crumb) => SetCurrentFolder(crumb.FullPath);
+
+    /// <summary>
+    /// The page's keyboard shortcuts. Each returns false when it has nothing to act on — at a drive root
+    /// there is nowhere to go up to, and with no row selected there is nothing to open — so the key
+    /// falls through to the shell instead of being silently swallowed.
+    /// </summary>
+    public ShortcutScope Scope => ShortcutScope.FileExplorer;
+
+    public bool HandleShortcut(ShortcutId id) {
+        switch (id) {
+            case ShortcutId.NavigateBack when CanGoBack:
+                GoBack();
+                return true;
+
+            case ShortcutId.NavigateForward when CanGoForward:
+                GoForward();
+                return true;
+
+            case ShortcutId.NavigateUp when CanGoUp:
+                GoUp();
+                return true;
+
+            case ShortcutId.Activate when SelectedEntry is { } entry:
+                ActivateEntry(entry);
+                return true;
+
+            default:
+                return false;
+        }
+    }
 
     /// <summary>Disposes the directory watcher (its <see cref="FileSystemWatcher"/> and debounce timer)
     /// on shutdown. Safe to call more than once.</summary>
