@@ -83,8 +83,26 @@ public static class Icons {
         "M7.6,9 a1.4,1.4 0 1 0 2.8,0 a1.4,1.4 0 1 0 -2.8,0 Z " +
         "M7.6,13.5 a1.4,1.4 0 1 0 2.8,0 a1.4,1.4 0 1 0 -2.8,0 Z");
 
+    // Plain chevrons (stroked) for the edge puck that collapses/expands the bar. Authored in the same
+    // 18x18 space as the other glyphs, apexed on the centre so they read as centred at any puck size.
+    public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
+    public static readonly Geometry ChevronRight = Geometry.Parse("M7,4 L12,9 L7,14");
+    public static readonly Geometry ChevronUp = Geometry.Parse("M4,11 L9,6 L14,11");
+    public static readonly Geometry ChevronDown = Geometry.Parse("M4,7 L9,12 L14,7");
+
     /// <summary>
-    /// The panel-split glyph for the collapse toggle. The rail sits on the docked-edge side when the bar
+    /// The chevron geometry for a direction. A plain map — the rule deciding which way the puck points
+    /// lives on <c>NavigationViewModel.ChevronPointing</c>, where it is testable without a render backend.
+    /// </summary>
+    public static Geometry Chevron(ChevronDirection direction) => direction switch {
+        ChevronDirection.Left => ChevronLeft,
+        ChevronDirection.Right => ChevronRight,
+        ChevronDirection.Up => ChevronUp,
+        _ => ChevronDown,
+    };
+
+    /// <summary>
+    /// The panel-split glyph for the drag-to-dock chip. The rail sits on the docked-edge side when the bar
     /// is expanded (the direction it will collapse) and flips to the opposite side when collapsed (the
     /// direction it will expand), keeping the affordance directional.
     /// </summary>

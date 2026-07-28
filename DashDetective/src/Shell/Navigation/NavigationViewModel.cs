@@ -27,6 +27,7 @@ public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter), nameof(CollapseIcon),
+        nameof(ChevronPointing), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation))]
     private bool _isCollapsed;
 
@@ -35,9 +36,12 @@ public partial class NavigationViewModel : ViewModelBase {
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
         nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
-        nameof(ShowFullFooter), nameof(CollapseIcon),
+        nameof(ShowFullFooter), nameof(CollapseIcon), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock), nameof(ControlsOrientation),
-        nameof(PickerPlacement))]
+        nameof(PickerPlacement),
+        nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
+        nameof(ChevronHAlign), nameof(ChevronVAlign),
+        nameof(ChevronMargin), nameof(ChevronCornerRadius))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -172,9 +176,67 @@ public partial class NavigationViewModel : ViewModelBase {
         ? Avalonia.Layout.Orientation.Vertical
         : Avalonia.Layout.Orientation.Horizontal;
 
-    /// <summary>The panel-split glyph shown on the collapse toggle, its rail indicating the way the bar
-    /// will move.</summary>
+    /// <summary>The panel-split glyph shown on the brand-area collapse toggle, its rail indicating the way
+    /// the bar will move.</summary>
     public Geometry CollapseIcon => Icons.PanelGlyph(Orientation, IsCollapsed);
+
+    // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
+
+    /// <summary>Puck thickness across the bar's edge; half of it overhangs into the content area.</summary>
+    private const double PuckThickness = 18;
+
+    /// <summary>Puck length along the bar's edge.</summary>
+    private const double PuckLength = 40;
+
+    /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
+    /// will collapse), away from it when collapsed (it will expand).</summary>
+    public ChevronDirection ChevronPointing => Orientation switch {
+        NavOrientation.Left => IsCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
+        NavOrientation.Right => IsCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
+        NavOrientation.Top => IsCollapsed ? ChevronDirection.Down : ChevronDirection.Up,
+        _ => IsCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
+    };
+
+    /// <summary>The chevron glyph shown on the puck.</summary>
+    public Geometry ChevronIcon => Icons.Chevron(ChevronPointing);
+
+    /// <summary>Puck width: the thin axis on a vertical rail, the long axis on a horizontal bar.</summary>
+    public double ChevronWidth => IsHorizontal ? PuckLength : PuckThickness;
+
+    /// <summary>Puck height: the long axis on a vertical rail, the thin axis on a horizontal bar.</summary>
+    public double ChevronHeight => IsHorizontal ? PuckThickness : PuckLength;
+
+    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
+    public HorizontalAlignment ChevronHAlign => Orientation switch {
+        NavOrientation.Left => HorizontalAlignment.Right,
+        NavOrientation.Right => HorizontalAlignment.Left,
+        _ => HorizontalAlignment.Center,
+    };
+
+    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
+    public VerticalAlignment ChevronVAlign => Orientation switch {
+        NavOrientation.Top => VerticalAlignment.Bottom,
+        NavOrientation.Bottom => VerticalAlignment.Top,
+        _ => VerticalAlignment.Center,
+    };
+
+    /// <summary>Pulls the puck out by half its thickness so it straddles the edge, half over the content
+    /// area. The bar is drawn above the content (ZIndex in the shell) so the overhang is visible.</summary>
+    public Thickness ChevronMargin => Orientation switch {
+        NavOrientation.Left => new Thickness(0, 0, -PuckThickness / 2, 0),
+        NavOrientation.Right => new Thickness(-PuckThickness / 2, 0, 0, 0),
+        NavOrientation.Top => new Thickness(0, 0, 0, -PuckThickness / 2),
+        _ => new Thickness(0, -PuckThickness / 2, 0, 0),
+    };
+
+    /// <summary>Rounds only the overhanging half, so the puck reads as a semi-circle growing out of the
+    /// bar's edge. The radius is oversized and clamps to the puck's half-thickness.</summary>
+    public CornerRadius ChevronCornerRadius => Orientation switch {
+        NavOrientation.Left => new CornerRadius(0, PuckLength, PuckLength, 0),
+        NavOrientation.Right => new CornerRadius(PuckLength, 0, 0, PuckLength),
+        NavOrientation.Top => new CornerRadius(0, 0, PuckLength, PuckLength),
+        _ => new CornerRadius(PuckLength, PuckLength, 0, 0),
+    };
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
