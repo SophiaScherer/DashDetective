@@ -54,6 +54,28 @@ public static class ShortcutCatalog {
 
         new(ShortcutId.Escape, [new KeyGesture(Key.Escape)],
             "Esc", "Close Help, cancel an open dialog, or dismiss the alert banner", ShortcutScope.Global),
+
+        // Enter must reach a text box the user is typing into, so it is bound only outside one.
+        new(ShortcutId.Activate, [new KeyGesture(Key.Enter)],
+            "Enter", "Open the selected item, or confirm an open dialog", ShortcutScope.Global,
+            AllowInTextInput: false),
+
+        // ----- Processes -----
+        new(ShortcutId.FocusFilter,
+            [new KeyGesture(Key.F, KeyModifiers.Control), new KeyGesture(Key.OemQuestion)],
+            "Ctrl+F / /", "Focus the process filter", ShortcutScope.Processes),
+
+        new(ShortcutId.EndTask, [new KeyGesture(Key.Delete)],
+            "Delete", "End the selected process (asks first)", ShortcutScope.Processes,
+            AllowInTextInput: false),
+
+        new(ShortcutId.SortAscending, [new KeyGesture(Key.Up, KeyModifiers.Alt)],
+            "Alt+↑", "Sort the active column ascending", ShortcutScope.Processes,
+            AllowInTextInput: false),
+
+        new(ShortcutId.SortDescending, [new KeyGesture(Key.Down, KeyModifiers.Alt)],
+            "Alt+↓", "Sort the active column descending", ShortcutScope.Processes,
+            AllowInTextInput: false),
     ];
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row

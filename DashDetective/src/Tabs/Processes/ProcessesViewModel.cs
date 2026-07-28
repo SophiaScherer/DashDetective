@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -22,10 +23,10 @@ namespace DashDetective.Tabs.Processes;
 /// Each poll takes an off-UI-thread snapshot (<see cref="ProcessSnapshotProvider"/>), splits it into
 /// Apps and Background, orders each group, and reconciles it into the matching observable collection by
 /// PID — the keyed diff from the Network connections table, so rows are reused and the list doesn't
-/// flicker. Column sorting, the summary strip, End task and Properties arrive in later phases; this
-/// phase orders by name for a stable live list.
+/// flicker. Sorting, filtering and expand/collapse all re-project the snapshot already in hand rather
+/// than re-enumerating, so they feel instant between polls.
 /// </summary>
-public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, ISelfScrollingPage, IDisposable {
+public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, ISelfScrollingPage, IShortcutTarget, IDisposable {
     /// <summary>Poll cadence. Enumerating every process (with per-process window/responding probes) is
     /// heavier than a single counter, so it polls slower than the Dashboard's 1 Hz samplers — close to
     /// Task Manager's own refresh.</summary>
@@ -124,6 +125,22 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _actionMessage = "";
 
     partial void OnSelectedRowChanged(ProcessRow? value) => OnPropertyChanged(nameof(HasSelection));
+
+    // ----- Filtering -----
+
+    /// <summary>Narrows the three groups to processes matching a name substring or PID prefix. Applied
+    /// to the rows already in hand, so typing re-filters instantly without waiting for the next poll.</summary>
+    [ObservableProperty] private string _filterText = "";
+
+    partial void OnFilterTextChanged(string value) => RebuildVisibleRows();
+
+    /// <summary>Clears the filter (the box's × button, and Esc while the box has content).</summary>
+    [RelayCommand]
+    private void ClearFilter() => FilterText = "";
+
+    /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the box.
+    /// UI-only; carries no state — the same view/view-model seam the File Explorer uses for scrolling.</summary>
+    public event Action? FilterFocusRequested;
 
     public ProcessesViewModel(SystemMetricsService service) {
         _service = service;
@@ -247,9 +264,15 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             }
         }
 
-        var appRows = Flatten(appRoots);
-        var backgroundRows = Flatten(backgroundRoots);
-        var windowsRows = Flatten(windowsRoots);
+        // The summary strip describes the machine, so it counts every entry; the lists and their group
+        // headers describe what's on screen, so they count what survives the filter.
+        var visibleApps = ApplyFilter(appRoots);
+        var visibleBackground = ApplyFilter(backgroundRoots);
+        var visibleWindows = ApplyFilter(windowsRoots);
+
+        var appRows = Flatten(visibleApps);
+        var backgroundRows = Flatten(visibleBackground);
+        var windowsRows = Flatten(visibleWindows);
 
         Reconcile(Apps, appRows);
         Reconcile(Background, backgroundRows);
@@ -264,9 +287,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
         // Group headers and the summary count top-level entries (roots), not the expanded rows, so the
         // numbers stay put when a group is expanded.
-        AppsHeader = $"Apps · {appRoots.Count.ToString(CultureInfo.InvariantCulture)}";
-        BackgroundHeader = $"Background processes · {backgroundRoots.Count.ToString(CultureInfo.InvariantCulture)}";
-        WindowsHeader = $"Windows processes · {windowsRoots.Count.ToString(CultureInfo.InvariantCulture)}";
+        AppsHeader = $"Apps · {visibleApps.Count.ToString(CultureInfo.InvariantCulture)}";
+        BackgroundHeader = $"Background processes · {visibleBackground.Count.ToString(CultureInfo.InvariantCulture)}";
+        WindowsHeader = $"Windows processes · {visibleWindows.Count.ToString(CultureInfo.InvariantCulture)}";
 
         // Total threads span every process, not just the top-level entries.
         var totalThreads = 0;
@@ -279,6 +302,31 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
                                $"{backgroundRoots.Count.ToString(CultureInfo.InvariantCulture)} background · " +
                                $"{windowsRoots.Count.ToString(CultureInfo.InvariantCulture)} Windows";
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Keeps the roots the filter matches. A parent survives when any of its children match, so
+    /// filtering never hides an entry the match is nested inside; expanding it then reveals the hit.</summary>
+    private List<ProcessNode> ApplyFilter(List<ProcessNode> roots) {
+        if (string.IsNullOrWhiteSpace(FilterText))
+            return roots;
+
+        var kept = new List<ProcessNode>(roots.Count);
+        foreach (var root in roots)
+            if (MatchesFilter(root))
+                kept.Add(root);
+
+        return kept;
+    }
+
+    private bool MatchesFilter(ProcessNode node) {
+        if (ProcessFilter.Matches(node.Info.Name, node.Info.Pid, FilterText))
+            return true;
+
+        foreach (var child in node.Children)
+            if (MatchesFilter(child))
+                return true;
+
+        return false;
     }
 
     /// <summary>Orders the roots and flattens each expanded subtree depth-first into the visible-row
@@ -329,6 +377,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         }
         UpdateSortIndicators();
         RebuildVisibleRows();
+    }
+
+    /// <summary>Sets the direction on whichever column is already sorted, leaving the column itself
+    /// alone (Alt+↑ / Alt+↓). Asking for the direction already in effect is a no-op, but still counts as
+    /// handled so the key isn't passed on to scroll the list.</summary>
+    public bool SetSortDirection(bool ascending) {
+        if (_ascending != ascending) {
+            _ascending = ascending;
+            UpdateSortIndicators();
+            RebuildVisibleRows();
+        }
+
+        return true;
     }
 
     /// <summary>Explorer-style defaults: text columns ascending, magnitude columns busiest-first.</summary>
@@ -423,6 +484,46 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         } catch {
             // ArgumentException (already exited) or Win32Exception (access denied without elevation).
             ActionMessage = $"Couldn't end {row.Name}";
+        }
+    }
+
+    /// <summary>
+    /// The page's keyboard shortcuts. The confirmation overlay is modal for this page, so while it is up
+    /// it answers Enter and Esc and swallows everything else — the same rule the shell applies for the
+    /// Help modal, one level down.
+    /// </summary>
+    public bool HandleShortcut(ShortcutId id) {
+        if (ConfirmVisible) {
+            switch (id) {
+                case ShortcutId.Activate: ConfirmEndTask(); return true;
+                case ShortcutId.Escape: CancelEndTask(); return true;
+                default: return true;
+            }
+        }
+
+        switch (id) {
+            case ShortcutId.FocusFilter:
+                FilterFocusRequested?.Invoke();
+                return true;
+
+            // Leave Delete unconsumed with nothing selected, so it isn't silently swallowed.
+            case ShortcutId.EndTask when HasSelection:
+                RequestEndTask();
+                return true;
+
+            case ShortcutId.SortAscending:
+                return SetSortDirection(ascending: true);
+
+            case ShortcutId.SortDescending:
+                return SetSortDirection(ascending: false);
+
+            // Esc clears the filter first; with nothing to clear it falls through to the shell.
+            case ShortcutId.Escape when FilterText.Length > 0:
+                ClearFilter();
+                return true;
+
+            default:
+                return false;
         }
     }
 

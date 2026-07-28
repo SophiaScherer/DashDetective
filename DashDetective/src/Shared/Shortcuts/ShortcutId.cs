@@ -30,4 +30,14 @@ public enum ShortcutId {
     /// <summary>Context-sensitive dismissal: closes the Help modal, else cancels whatever the current
     /// page has open, else dismisses the resource-alert banner.</summary>
     Escape,
+
+    /// <summary>Context-sensitive activation: confirms an open dialog, else opens the selected item.
+    /// Each page decides what it means, the way <see cref="Escape"/> does.</summary>
+    Activate,
+
+    // ----- Page actions -----
+    FocusFilter,
+    EndTask,
+    SortAscending,
+    SortDescending,
 }
