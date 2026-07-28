@@ -37,6 +37,23 @@ public static class ShortcutCatalog {
 
         new(ShortcutId.OpenSettings, [new KeyGesture(Key.OemComma, KeyModifiers.Control)],
             "Ctrl+,", "Open Settings", ShortcutScope.Global),
+
+        // ----- Toolbar actions -----
+        new(ShortcutId.ToggleLive, [new KeyGesture(Key.P, KeyModifiers.Control)],
+            "Ctrl+P", "Pause or resume live sampling", ShortcutScope.Global),
+
+        new(ShortcutId.Refresh, [new KeyGesture(Key.F5), new KeyGesture(Key.R, KeyModifiers.Control)],
+            "F5 / Ctrl+R", "Refresh the current page", ShortcutScope.Global),
+
+        new(ShortcutId.Export, [new KeyGesture(Key.E, KeyModifiers.Control)],
+            "Ctrl+E", "Export a system report", ShortcutScope.Global),
+
+        // Ctrl+/ sits on OemQuestion, so it is layout-dependent; F1 is the binding that always works.
+        new(ShortcutId.ShowHelp, [new KeyGesture(Key.F1), new KeyGesture(Key.OemQuestion, KeyModifiers.Control)],
+            "F1 / Ctrl+/", "Open this Help window", ShortcutScope.Global),
+
+        new(ShortcutId.Escape, [new KeyGesture(Key.Escape)],
+            "Esc", "Close Help, cancel an open dialog, or dismiss the alert banner", ShortcutScope.Global),
     ];
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row

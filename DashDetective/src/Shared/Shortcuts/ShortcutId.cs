@@ -20,4 +20,14 @@ public enum ShortcutId {
     PreviousTab,
     ToggleNavCollapse,
     OpenSettings,
+
+    // ----- Toolbar actions -----
+    ToggleLive,
+    Refresh,
+    Export,
+    ShowHelp,
+
+    /// <summary>Context-sensitive dismissal: closes the Help modal, else cancels whatever the current
+    /// page has open, else dismisses the resource-alert banner.</summary>
+    Escape,
 }

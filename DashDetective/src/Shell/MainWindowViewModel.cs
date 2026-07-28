@@ -74,6 +74,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// whole window, navigation bar included.</summary>
     public HelpViewModel Help { get; } = new();
 
+    /// <summary>Raised when the Export shortcut fires, so the window can run the save dialog — it owns
+    /// that because the picker needs the window's <c>TopLevel</c>. UI-only; carries no state.</summary>
+    public event Action? ExportRequested;
+
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
@@ -269,10 +273,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// own shortcuts, and anything left over is handled globally.
     /// </summary>
     public bool HandleShortcut(ShortcutId id) {
-        // While the Help modal is up it swallows every shortcut, so a key can never act on the page
-        // hidden behind the scrim.
-        if (Help.IsOpen)
+        // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
+        // allowed to act on the page hidden behind the scrim.
+        if (Help.IsOpen) {
+            if (id == ShortcutId.Escape)
+                Help.Close();
             return true;
+        }
 
         if (CurrentPage is IShortcutTarget target && target.HandleShortcut(id))
             return true;
@@ -290,6 +297,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.PreviousTab => CycleTab(-1),
         ShortcutId.ToggleNavCollapse => Run(Nav.ToggleCollapseCommand),
         ShortcutId.OpenSettings => NavigateToPage(_settings),
+        ShortcutId.ToggleLive => Run(ToggleLiveCommand),
+        ShortcutId.Refresh => Run(RefreshCommand),
+        ShortcutId.Export => Raise(ExportRequested),
+        ShortcutId.ShowHelp => Open(Help),
+        // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is the banner.
+        ShortcutId.Escape => DismissAlertIfShowing(),
         _ => false,
     };
 
@@ -297,6 +310,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// expression.</summary>
     private static bool Run(IRelayCommand command) {
         command.Execute(null);
+        return true;
+    }
+
+    /// <summary>Opens the Help modal and reports the key as consumed.</summary>
+    private static bool Open(HelpViewModel help) {
+        help.Open();
+        return true;
+    }
+
+    /// <summary>Raises a request event, reporting the key as consumed only if something is listening
+    /// (Export does nothing without the window's file picker attached).</summary>
+    private static bool Raise(Action? request) {
+        if (request is null)
+            return false;
+
+        request();
+        return true;
+    }
+
+    /// <summary>Dismisses the resource-alert banner, or leaves Esc unconsumed when it isn't showing.</summary>
+    private bool DismissAlertIfShowing() {
+        if (!AlertBannerVisible)
+            return false;
+
+        DismissAlert();
         return true;
     }
 

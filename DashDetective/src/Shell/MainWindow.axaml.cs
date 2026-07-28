@@ -5,6 +5,7 @@ using DashDetective.Shell.Shortcuts;
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace DashDetective.Shell;
 
@@ -16,12 +17,27 @@ public partial class MainWindow : Window {
     // press time rather than captured here, because the composition root assigns it after construction.
     private readonly ShellShortcutHandler _shortcuts;
 
+    // The view model the export request is currently wired to. Tracked because the composition root
+    // assigns the DataContext after construction.
+    private MainWindowViewModel? _viewModel;
+
     public MainWindow() {
         InitializeComponent();
         Closing += OnClosing;
+        DataContextChanged += OnDataContextChanged;
         _shortcuts = new ShellShortcutHandler(
             this, id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
         Closed += (_, _) => _shortcuts.Dispose();
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e) {
+        if (_viewModel is not null)
+            _viewModel.ExportRequested -= OnExportRequested;
+
+        _viewModel = DataContext as MainWindowViewModel;
+
+        if (_viewModel is not null)
+            _viewModel.ExportRequested += OnExportRequested;
     }
 
     /// <summary>
@@ -49,11 +65,17 @@ public partial class MainWindow : Window {
         Close();
     }
 
+    /// <summary>The toolbar's Export button.</summary>
+    private async void OnExportClick(object? sender, RoutedEventArgs e) => await ExportReportAsync();
+
+    /// <summary>The Export keyboard shortcut, routed here by the view model.</summary>
+    private async void OnExportRequested() => await ExportReportAsync();
+
     /// <summary>
     /// Exports the current system snapshot as a plain-text report. Owns the file-save dialog here
     /// (rather than in the view model) because the picker needs the window's <see cref="TopLevel"/>.
     /// </summary>
-    private async void OnExportClick(object? sender, RoutedEventArgs e) {
+    private async Task ExportReportAsync() {
         if (DataContext is not MainWindowViewModel vm)
             return;
 

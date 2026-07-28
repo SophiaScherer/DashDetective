@@ -58,6 +58,29 @@ public class ShortcutCatalogTests {
     }
 
     [Fact]
+    public void TryResolve_MapsEveryAlternativeGestureToTheSameAction() {
+        // Refresh and Help each carry a function key and a Ctrl chord; both must land on one action.
+        Assert.True(ShortcutCatalog.TryResolve(Key.F5, KeyModifiers.None, false, out var functionRefresh));
+        Assert.True(ShortcutCatalog.TryResolve(Key.R, KeyModifiers.Control, false, out var chordRefresh));
+        Assert.Equal(ShortcutId.Refresh, functionRefresh);
+        Assert.Equal(ShortcutId.Refresh, chordRefresh);
+
+        Assert.True(ShortcutCatalog.TryResolve(Key.F1, KeyModifiers.None, false, out var functionHelp));
+        Assert.True(ShortcutCatalog.TryResolve(Key.OemQuestion, KeyModifiers.Control, false, out var chordHelp));
+        Assert.Equal(ShortcutId.ShowHelp, functionHelp);
+        Assert.Equal(ShortcutId.ShowHelp, chordHelp);
+    }
+
+    [Fact]
+    public void TryResolve_KeepsDismissalKeysLiveWhileTypingInATextBox() {
+        // Esc, F1 and F5 don't type a character, so they stay available inside a search box.
+        Assert.True(ShortcutCatalog.TryResolve(Key.Escape, KeyModifiers.None, textInputFocused: true, out var esc));
+        Assert.Equal(ShortcutId.Escape, esc);
+        Assert.True(ShortcutCatalog.TryResolve(Key.F5, KeyModifiers.None, textInputFocused: true, out _));
+        Assert.True(ShortcutCatalog.TryResolve(Key.F1, KeyModifiers.None, textInputFocused: true, out _));
+    }
+
+    [Fact]
     public void TryResolve_DistinguishesShiftedGestures() {
         Assert.True(ShortcutCatalog.TryResolve(Key.Tab, KeyModifiers.Control, false, out var next));
         Assert.Equal(ShortcutId.NextTab, next);
