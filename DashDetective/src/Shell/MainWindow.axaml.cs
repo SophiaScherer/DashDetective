@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using DashDetective.Shell.Shortcuts;
 using System;
 using System.ComponentModel;
 using System.IO;
@@ -11,9 +12,16 @@ public partial class MainWindow : Window {
     // Set by the tray "Exit" so a subsequent close actually exits instead of hiding to tray.
     private bool _exitRequested;
 
+    // The window-wide keyboard listener. The view model is dispatched to through the DataContext at
+    // press time rather than captured here, because the composition root assigns it after construction.
+    private readonly ShellShortcutHandler _shortcuts;
+
     public MainWindow() {
         InitializeComponent();
         Closing += OnClosing;
+        _shortcuts = new ShellShortcutHandler(
+            this, id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
+        Closed += (_, _) => _shortcuts.Dispose();
     }
 
     /// <summary>

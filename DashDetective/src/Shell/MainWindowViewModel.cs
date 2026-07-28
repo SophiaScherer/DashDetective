@@ -6,6 +6,7 @@ using DashDetective.Services.Settings;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Help;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
@@ -258,6 +259,77 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// (e.g. Settings) simply ignore it.</summary>
     [RelayCommand]
     private void Refresh() => (CurrentPage as IRefreshablePage)?.Refresh();
+
+    // ----- Keyboard shortcuts -----
+
+    /// <summary>
+    /// Runs a keyboard shortcut, returning whether it was consumed (an unconsumed key falls through to
+    /// the rest of the app). The priority chain lives here rather than in the window so it is testable
+    /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
+    /// own shortcuts, and anything left over is handled globally.
+    /// </summary>
+    public bool HandleShortcut(ShortcutId id) {
+        // While the Help modal is up it swallows every shortcut, so a key can never act on the page
+        // hidden behind the scrim.
+        if (Help.IsOpen)
+            return true;
+
+        if (CurrentPage is IShortcutTarget target && target.HandleShortcut(id))
+            return true;
+
+        return HandleGlobal(id);
+    }
+
+    /// <summary>Handles the shortcuts that work anywhere, whatever page is showing.</summary>
+    private bool HandleGlobal(ShortcutId id) => id switch {
+        // The eight tab jumps are contiguous in the enum, so the offset from the first is the nav
+        // position they select.
+        >= ShortcutId.NavigateTab1 and <= ShortcutId.NavigateTab8 =>
+            NavigateToIndex(id - ShortcutId.NavigateTab1),
+        ShortcutId.NextTab => CycleTab(1),
+        ShortcutId.PreviousTab => CycleTab(-1),
+        ShortcutId.ToggleNavCollapse => Run(Nav.ToggleCollapseCommand),
+        ShortcutId.OpenSettings => NavigateToPage(_settings),
+        _ => false,
+    };
+
+    /// <summary>Runs a command and reports it as consumed, so the switch above stays an
+    /// expression.</summary>
+    private static bool Run(IRelayCommand command) {
+        command.Execute(null);
+        return true;
+    }
+
+    /// <summary>Selects the nav item at the given position. An index past the end of the bar (Ctrl+8
+    /// on a shorter bar) is simply ignored.</summary>
+    private bool NavigateToIndex(int index) {
+        if (index < 0 || index >= Nav.NavItems.Count)
+            return false;
+
+        Nav.Navigate(Nav.NavItems[index]);
+        return true;
+    }
+
+    /// <summary>Selects the nav item hosting the given page. Resolved by page rather than by index so
+    /// it survives a reordering of the bar.</summary>
+    private bool NavigateToPage(ViewModelBase page) {
+        foreach (var item in Nav.NavItems)
+            if (item.Page == page)
+                return NavigateToIndex(Nav.NavItems.IndexOf(item));
+
+        return false;
+    }
+
+    /// <summary>Moves the selection <paramref name="delta"/> places along the bar, wrapping at both
+    /// ends so Ctrl+Tab cycles indefinitely.</summary>
+    private bool CycleTab(int delta) {
+        var count = Nav.NavItems.Count;
+        if (count == 0)
+            return false;
+
+        var next = (Nav.NavItems.IndexOf(Nav.SelectedNav) + delta + count) % count;
+        return NavigateToIndex(next);
+    }
 
     /// <summary>
     /// Builds the plain-text system report for the Export actions (toolbar Export, Settings "Export
