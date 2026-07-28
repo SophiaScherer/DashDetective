@@ -18,12 +18,13 @@ namespace DashDetective.Shell.Navigation;
 /// <see cref="SelectionChanged"/> so the shell can host the selected page. Kept separate from
 /// <c>MainWindowViewModel</c> so the bar's layout state (dock edge, collapse) lives as one cohesive
 /// unit. Orientation and collapse drive the bar's layout entirely through computed properties, so no
-/// value converters are needed. All state is session-only, matching the Theming conventions.
+/// value converters are needed. Both persist via <c>SettingsStore</c>, which observes them through
+/// <c>MainWindowViewModel</c>; the purely visual flags (<see cref="IsDragging"/>) do not.
 /// </summary>
 public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty] private NavItem _selectedNav = null!;
 
-    /// <summary>Whether the bar is collapsed to an icons-only rail. Session-only, like Theming.</summary>
+    /// <summary>Whether the bar is collapsed to an icons-only rail. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
@@ -31,7 +32,7 @@ public partial class NavigationViewModel : ViewModelBase {
         nameof(ControlsDock), nameof(FooterAvatarDock))]
     private bool _isCollapsed;
 
-    /// <summary>Which window edge the bar docks to. Session-only, like Theming.</summary>
+    /// <summary>Which window edge the bar docks to. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
         nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
