@@ -197,11 +197,11 @@
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
         </Style>
 
-        <!-- Collapse/expand puck: a semi-circle straddling the bar's content-facing edge, revealed only
-             while the pointer is over the bar. Hidden rather than faded (this app uses no transitions),
-             and shown from the host panel's :pointerover so hovering the overhanging half — which sits
-             outside the rail — keeps it visible. A chrome-less button wrapping a styled Border, the same
-             split as the picker's `pickTile`/`posTile` pair, so the puck's rounding is its own. -->
+        <!-- Collapse/expand puck: a semi-circle flush against the bar's content-facing edge, revealed
+             only while the pointer is over the bar. Hidden rather than faded (this app uses no
+             transitions), and shown from the host panel's :pointerover so the whole bar is the hover
+             target, not just the puck. A chrome-less button wrapping a styled Border, the same split as
+             the dock menu's `pickTile`/`posTile` pair, so the puck's rounding is its own. -->
         <Style Selector="Button.railChevron">
             <Setter Property="IsVisible" Value="False"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -248,13 +248,13 @@
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
-    <!-- The rail plus its edge puck. The puck is a sibling of the rail (not a child) because it straddles
-         the rail's content-facing edge: a negative margin pulls half of it into the content area. Two
-         things have to hold for that overhang to be visible — `ClipToBounds="False"` on this control (it
-         otherwise clips to its docked slot, leaving only the inner half drawn) and the ZIndex the shell
-         gives the bar (it is the DockPanel's first child, so it would paint under the content area). The
-         puck's negative margin keeps its desired size below the rail's, so hosting it here does not
-         widen the bar. -->
+    <!-- The rail plus its edge puck. The puck is a sibling of the rail, not a child, because it stands
+         entirely outside it: a negative margin the depth of the half-disc's radius lifts it clear, so only
+         its flat side touches the bar's content-facing edge. Two things have to hold for it to draw —
+         `ClipToBounds="False"` on this control (it otherwise clips to its docked slot and the puck
+         vanishes) and the ZIndex the shell gives the bar (it is the DockPanel's first child, so it would
+         paint under the content area). Its negative margin keeps its desired size at zero on that axis,
+         so hosting it here does not widen the bar. -->
     <Panel x:Name="RailHost" Classes="railHost" Classes.dragging="{Binding IsDragging}">
 
     <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the

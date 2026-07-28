@@ -50,7 +50,8 @@ component. Its view-model owns orientation and collapsed state and exposes *ever
 axis, collapse-puck geometry — as **computed properties, with no value converters**. The bar carries no
 permanent control chrome; four entry points drive the *same* shared view-model:
 
-- a **hover-revealed chevron puck** straddling the bar's outer edge, which collapses and expands it;
+- a **hover-revealed chevron puck**, a half-disc standing just off the bar's outer edge, which collapses
+  and expands it;
 - **right-clicking anywhere on the bar**, which opens a dock menu at the pointer;
 - **dragging the brand area** to a window edge, which dims the bar in place while a drop band and a
   floating chip show the target;

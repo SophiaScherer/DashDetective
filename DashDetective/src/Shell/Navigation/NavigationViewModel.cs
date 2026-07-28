@@ -175,11 +175,13 @@ public partial class NavigationViewModel : ViewModelBase {
 
     // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
 
-    /// <summary>Puck thickness across the bar's edge; half of it overhangs into the content area.</summary>
-    private const double PuckThickness = 18;
+    /// <summary>The semi-circle's radius: how far the puck stands off the bar's edge, and half the
+    /// length of the flat side that meets it. Keeping it exactly half of <see cref="PuckLength"/> is
+    /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
+    private const double PuckRadius = 20;
 
-    /// <summary>Puck length along the bar's edge.</summary>
-    private const double PuckLength = 40;
+    /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
+    private const double PuckLength = PuckRadius * 2;
 
     /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
     /// will collapse), away from it when collapsed (it will expand).</summary>
@@ -193,11 +195,11 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>The chevron glyph shown on the puck.</summary>
     public Geometry ChevronIcon => Icons.Chevron(ChevronPointing);
 
-    /// <summary>Puck width: the thin axis on a vertical rail, the long axis on a horizontal bar.</summary>
-    public double ChevronWidth => IsHorizontal ? PuckLength : PuckThickness;
+    /// <summary>Puck width: the stand-off axis on a vertical rail, the flat side on a horizontal bar.</summary>
+    public double ChevronWidth => IsHorizontal ? PuckLength : PuckRadius;
 
-    /// <summary>Puck height: the long axis on a vertical rail, the thin axis on a horizontal bar.</summary>
-    public double ChevronHeight => IsHorizontal ? PuckThickness : PuckLength;
+    /// <summary>Puck height: the flat side on a vertical rail, the stand-off axis on a horizontal bar.</summary>
+    public double ChevronHeight => IsHorizontal ? PuckRadius : PuckLength;
 
     /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
     public HorizontalAlignment ChevronHAlign => Orientation switch {
@@ -213,22 +215,23 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => VerticalAlignment.Center,
     };
 
-    /// <summary>Pulls the puck out by half its thickness so it straddles the edge, half over the content
-    /// area. The bar is drawn above the content (ZIndex in the shell) so the overhang is visible.</summary>
+    /// <summary>Stands the puck fully clear of the bar, so only its flat side touches the edge and the
+    /// whole curve reads against the content area. Needs the view's ClipToBounds and the shell's ZIndex
+    /// to draw — see NavigationView.axaml.</summary>
     public Thickness ChevronMargin => Orientation switch {
-        NavOrientation.Left => new Thickness(0, 0, -PuckThickness / 2, 0),
-        NavOrientation.Right => new Thickness(-PuckThickness / 2, 0, 0, 0),
-        NavOrientation.Top => new Thickness(0, 0, 0, -PuckThickness / 2),
-        _ => new Thickness(0, -PuckThickness / 2, 0, 0),
+        NavOrientation.Left => new Thickness(0, 0, -PuckRadius, 0),
+        NavOrientation.Right => new Thickness(-PuckRadius, 0, 0, 0),
+        NavOrientation.Top => new Thickness(0, 0, 0, -PuckRadius),
+        _ => new Thickness(0, -PuckRadius, 0, 0),
     };
 
-    /// <summary>Rounds only the overhanging half, so the puck reads as a semi-circle growing out of the
-    /// bar's edge. The radius is oversized and clamps to the puck's half-thickness.</summary>
+    /// <summary>Rounds the two outward corners by the full radius. On a box that is one radius deep and
+    /// two long, that is exactly a half-disc — no clamping involved.</summary>
     public CornerRadius ChevronCornerRadius => Orientation switch {
-        NavOrientation.Left => new CornerRadius(0, PuckLength, PuckLength, 0),
-        NavOrientation.Right => new CornerRadius(PuckLength, 0, 0, PuckLength),
-        NavOrientation.Top => new CornerRadius(0, 0, PuckLength, PuckLength),
-        _ => new CornerRadius(PuckLength, PuckLength, 0, 0),
+        NavOrientation.Left => new CornerRadius(0, PuckRadius, PuckRadius, 0),
+        NavOrientation.Right => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
+        NavOrientation.Top => new CornerRadius(0, 0, PuckRadius, PuckRadius),
+        _ => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
     };
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>

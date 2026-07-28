@@ -60,7 +60,7 @@
             <!-- The nav bar is a self-contained component; it docks to the edge it chooses and the
                  main area (the last child) fills the remaining space. ZIndex lifts it above that main
                  area: the bar is the first child (so normally painted underneath), and its collapse
-                 puck deliberately overhangs the shared edge. -->
+                 puck stands outside the bar, over the shared edge. -->
             <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}" ZIndex="1"/>
 
             <!-- ================= MAIN ================= -->
