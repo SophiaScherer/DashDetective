@@ -6,7 +6,6 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using System;
-using System.ComponentModel;
 
 namespace DashDetective.Shell.Navigation;
 
@@ -18,7 +17,7 @@ namespace DashDetective.Shell.Navigation;
 /// nearest window edge. While dragging, the target edge is highlighted and a small chip (a panel icon
 /// plus a "Dock left/top/…" hint) follows the cursor, JetBrains-style. The whole feature lives here so
 /// the shell needs no changes; on release it just asks the view model to dock, reusing the same
-/// orientation path as the picker.
+/// orientation path as the right-click dock menu.
 /// </summary>
 public partial class NavigationView : UserControl {
     private NavigationViewModel? _viewModel;
@@ -40,42 +39,20 @@ public partial class NavigationView : UserControl {
         DataContextChanged += OnDataContextChanged;
     }
 
-    // Bridge the view model's UI-only PositionPicked signal to dismissing whichever dock menu is open:
-    // selecting a dock position (or the current one) closes the menu, matching normal menu behaviour.
-    // Click-off dismissal is already handled by the flyout's light-dismiss.
+    // Bridge the view model's UI-only PositionPicked signal to dismissing the dock menu: selecting a
+    // dock position (or the current one) closes it, matching normal menu behaviour. Click-off dismissal
+    // is already handled by the flyout's light-dismiss.
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null) {
-            _viewModel.PositionPicked -= CloseDockMenus;
-            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-        }
+        if (_viewModel is not null)
+            _viewModel.PositionPicked -= CloseDockMenu;
 
         _viewModel = DataContext as NavigationViewModel;
 
-        if (_viewModel is not null) {
-            _viewModel.PositionPicked += CloseDockMenus;
-            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        }
-
-        SyncPickerPlacement();
+        if (_viewModel is not null)
+            _viewModel.PositionPicked += CloseDockMenu;
     }
 
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
-        if (e.PropertyName == nameof(NavigationViewModel.PickerPlacement))
-            SyncPickerPlacement();
-    }
-
-    // Placement lives on the Flyout itself rather than its content, and a Flyout sits outside the
-    // visual tree (so it inherits no DataContext to bind against) — hence applying it from here.
-    private void SyncPickerPlacement() {
-        if (_viewModel is not null && PositionButton.Flyout is Flyout flyout)
-            flyout.Placement = _viewModel.PickerPlacement;
-    }
-
-    // Both entry points share the signal; Hide() on an already-closed flyout is a no-op.
-    private void CloseDockMenus() {
-        PositionButton.Flyout?.Hide();
-        RailBorder.ContextFlyout?.Hide();
-    }
+    private void CloseDockMenu() => RailBorder.ContextFlyout?.Hide();
 
     // ----- Drag-to-dock -----
 

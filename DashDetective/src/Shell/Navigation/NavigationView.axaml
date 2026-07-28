@@ -77,9 +77,9 @@
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <!-- The brand area stretches so its docked collapse toggle reaches the far edge; the logo and
-             wordmark inside it stay left-aligned. -->
-        <Style Selector="Border.rail DockPanel.brand">
+        <!-- The brand area stretches so the whole strip is a drag handle; the logo and wordmark inside
+             it stay left-aligned. -->
+        <Style Selector="Border.rail Panel.brand">
             <Setter Property="Margin" Value="18,16,18,14"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
@@ -98,7 +98,7 @@
             <Setter Property="Margin" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.rail.collapsed DockPanel.brand">
+        <Style Selector="Border.rail.collapsed Panel.brand">
             <Setter Property="Margin" Value="0,16,0,14"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
@@ -115,7 +115,7 @@
             <Setter Property="Margin" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.rail.horizontal DockPanel.brand">
+        <Style Selector="Border.rail.horizontal Panel.brand">
             <Setter Property="Margin" Value="14,0,10,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -145,21 +145,21 @@
         <Style Selector="Button.navCtl:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <!-- Chrome-less wrapper for the orientation preview tiles in the flyout. -->
+        <!-- Chrome-less wrapper for the dock menu's rows. -->
         <Style Selector="Button.pickTile">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="3"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="Button.pickTile /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
+        <!-- Little "panel on this edge" preview beside each dock menu row. -->
         <Style Selector="Border.posTile">
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -167,12 +167,6 @@
         <Style Selector="Border.posTile.selected">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        </Style>
-        <!-- The same preview tile shrunk to sit beside a label in the right-click dock menu. -->
-        <Style Selector="Border.posTile.mini">
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="18"/>
-            <Setter Property="CornerRadius" Value="4"/>
         </Style>
 
         <!-- Right-click dock menu: one row per edge, the current one highlighted. Selection is declared
@@ -277,7 +271,7 @@
                                         HorizontalContentAlignment="Stretch">
                                     <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
                                         <StackPanel Orientation="Horizontal" Spacing="9">
-                                            <Border Classes="posTile mini" Classes.selected="{Binding IsSelected}">
+                                            <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
                                                 <Panel Margin="3">
                                                     <Rectangle Fill="{DynamicResource Accent}"
                                                                Width="{Binding BarWidth}" Height="{Binding BarHeight}"
@@ -300,22 +294,14 @@
         <DockPanel LastChildFill="True">
 
             <!-- Brand. Doubles as the drag handle: press and drag it to re-dock the bar to another
-                 window edge (see NavigationView.axaml.cs). A DockPanel rather than a StackPanel so the
-                 collapse toggle can sit flush right of the wordmark and drop beneath the logo on a
-                 collapsed rail from a single bound edge (BrandCtlDock), with no orientation flip. -->
-            <DockPanel x:Name="BrandArea" Classes="brand" DockPanel.Dock="{Binding BrandDock}"
-                       LastChildFill="True" VerticalAlignment="Center" Cursor="SizeAll"
-                       Background="Transparent" ToolTip.Tip="Drag to dock the navigation bar"
-                       PointerPressed="OnBrandPointerPressed" PointerMoved="OnBrandPointerMoved"
-                       PointerReleased="OnBrandPointerReleased" PointerCaptureLost="OnBrandPointerCaptureLost">
-                <Button Classes="navCtl" DockPanel.Dock="{Binding ControlsDock}"
-                        Command="{Binding ToggleCollapseCommand}" Cursor="Hand"
-                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                        ToolTip.Tip="Collapse or expand navigation">
-                    <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
-                          StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                          Data="{Binding CollapseIcon}"/>
-                </Button>
+                 window edge (see NavigationView.axaml.cs). The wrapper stretches so the whole brand strip
+                 is grabbable while the logo and wordmark inside it stay aligned to the leading edge; its
+                 transparent background is what makes the empty part of the strip hit-testable. -->
+            <Panel x:Name="BrandArea" Classes="brand" DockPanel.Dock="{Binding BrandDock}"
+                   VerticalAlignment="Center" Cursor="SizeAll"
+                   Background="Transparent" ToolTip.Tip="Drag to dock the navigation bar"
+                   PointerPressed="OnBrandPointerPressed" PointerMoved="OnBrandPointerMoved"
+                   PointerReleased="OnBrandPointerReleased" PointerCaptureLost="OnBrandPointerCaptureLost">
                 <StackPanel Classes="brandMark" Orientation="Horizontal" Spacing="11"
                             VerticalAlignment="Center">
                     <Border Width="30" Height="30" CornerRadius="7">
@@ -335,13 +321,11 @@
                         <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
-            </DockPanel>
+            </Panel>
 
-            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the control
-                 pair. One cluster serves every state — the avatar and the controls bracket the running
-                 axis, dropping into a column on a collapsed rail. The kebab opens a Flyout, which
-                 renders in the window overlay layer, so it is never clipped by the bar however narrow
-                 or short it is. -->
+            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help button.
+                 One cluster serves every state — the avatar and the button bracket the running axis,
+                 dropping into a column on a collapsed rail. -->
             <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}" Padding="14,12"
                     BorderBrush="{DynamicResource Hairline}">
                 <DockPanel LastChildFill="True" VerticalAlignment="Center">
@@ -359,50 +343,13 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
-                    <StackPanel DockPanel.Dock="{Binding ControlsDock}" Spacing="2"
-                                Orientation="{Binding ControlsOrientation}"
-                                HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Button Classes="navCtl" Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help">
-                            <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
-                                  StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                                  Data="{x:Static nav:Icons.Help}"/>
-                        </Button>
-                        <Button x:Name="PositionButton" Classes="navCtl" ToolTip.Tip="Navigation position">
-                            <Path Width="18" Height="18" Stretch="None" Fill="{DynamicResource TextTertiary}"
-                                  Data="{x:Static nav:Icons.Kebab}"/>
-                            <Button.Flyout>
-                                <Flyout Placement="Top">
-                                    <StackPanel Spacing="10" Margin="2" MinWidth="176">
-                                        <TextBlock Text="Navigation position" FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextStrong}"/>
-                                        <ItemsControl ItemsSource="{Binding Positions}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <UniformGrid Columns="4"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="nav:NavPositionOption">
-                                                    <Button Classes="pickTile" Command="{Binding SelectCommand}"
-                                                            ToolTip.Tip="{Binding Label}">
-                                                        <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
-                                                            <Panel Margin="5">
-                                                                <Rectangle Fill="{DynamicResource Accent}"
-                                                                           Width="{Binding BarWidth}" Height="{Binding BarHeight}"
-                                                                           HorizontalAlignment="{Binding BarHAlign}"
-                                                                           VerticalAlignment="{Binding BarVAlign}"
-                                                                           RadiusX="1" RadiusY="1"/>
-                                                            </Panel>
-                                                        </Border>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Flyout>
-                            </Button.Flyout>
-                        </Button>
-                    </StackPanel>
+                    <Button Classes="navCtl" DockPanel.Dock="{Binding ControlsDock}"
+                            Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                              StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                              Data="{x:Static nav:Icons.Help}"/>
+                    </Button>
 
                     <StackPanel Spacing="1" Margin="10,0" VerticalAlignment="Center"
                                 IsVisible="{Binding ShowFullFooter}">

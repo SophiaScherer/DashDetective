@@ -75,14 +75,6 @@ public static class Icons {
     public static readonly Geometry PanelRailTop = Geometry.Parse(PanelFrame + "M2.5,6.5 H15.5");
     public static readonly Geometry PanelRailBottom = Geometry.Parse(PanelFrame + "M2.5,11.5 H15.5");
 
-    // Vertical "three dots" kebab menu glyph (filled — render with Fill, not Stroke). Each dot is a full
-    // circle whose centre is stated explicitly, so the three sit on x=9 with symmetric vertical spacing
-    // about (9,9) — the glyph then centres in its 18x18 box exactly like the stroked icons (Stretch=None).
-    public static readonly Geometry Kebab = Geometry.Parse(
-        "M7.6,4.5 a1.4,1.4 0 1 0 2.8,0 a1.4,1.4 0 1 0 -2.8,0 Z " +
-        "M7.6,9 a1.4,1.4 0 1 0 2.8,0 a1.4,1.4 0 1 0 -2.8,0 Z " +
-        "M7.6,13.5 a1.4,1.4 0 1 0 2.8,0 a1.4,1.4 0 1 0 -2.8,0 Z");
-
     // Plain chevrons (stroked) for the edge puck that collapses/expands the bar. Authored in the same
     // 18x18 space as the other glyphs, apexed on the centre so they read as centred at any puck size.
     public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
