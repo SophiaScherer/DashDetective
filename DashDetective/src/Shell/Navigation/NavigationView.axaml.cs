@@ -40,19 +40,19 @@ public partial class NavigationView : UserControl {
         DataContextChanged += OnDataContextChanged;
     }
 
-    // Bridge the view model's UI-only PositionPicked signal to dismissing the picker flyout: selecting
-    // a dock position (or the current one) closes the menu, matching normal menu behaviour. Click-off
-    // dismissal is already handled by the flyout's light-dismiss.
+    // Bridge the view model's UI-only PositionPicked signal to dismissing whichever dock menu is open:
+    // selecting a dock position (or the current one) closes the menu, matching normal menu behaviour.
+    // Click-off dismissal is already handled by the flyout's light-dismiss.
     private void OnDataContextChanged(object? sender, EventArgs e) {
         if (_viewModel is not null) {
-            _viewModel.PositionPicked -= ClosePositionFlyout;
+            _viewModel.PositionPicked -= CloseDockMenus;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
         _viewModel = DataContext as NavigationViewModel;
 
         if (_viewModel is not null) {
-            _viewModel.PositionPicked += ClosePositionFlyout;
+            _viewModel.PositionPicked += CloseDockMenus;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
 
@@ -71,7 +71,11 @@ public partial class NavigationView : UserControl {
             flyout.Placement = _viewModel.PickerPlacement;
     }
 
-    private void ClosePositionFlyout() => PositionButton.Flyout?.Hide();
+    // Both entry points share the signal; Hide() on an already-closed flyout is a no-op.
+    private void CloseDockMenus() {
+        PositionButton.Flyout?.Hide();
+        RailBorder.ContextFlyout?.Hide();
+    }
 
     // ----- Drag-to-dock -----
 

@@ -168,6 +168,40 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
         </Style>
+        <!-- The same preview tile shrunk to sit beside a label in the right-click dock menu. -->
+        <Style Selector="Border.posTile.mini">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+
+        <!-- Right-click dock menu: one row per edge, the current one highlighted. Selection is declared
+             after hover so an already-docked row keeps reading as selected while the pointer is on it. -->
+        <Style Selector="TextBlock.dockMenuHeader">
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+            <Setter Property="Margin" Value="8,4,8,2"/>
+        </Style>
+        <Style Selector="Border.dockRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="CornerRadius" Value="5"/>
+        </Style>
+        <Style Selector="Button.pickTile:pointerover Border.dockRow">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.dockRow.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="Border.dockRow TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.dockRow.selected TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
 
         <!-- Collapse/expand puck: a semi-circle straddling the bar's content-facing edge, revealed only
              while the pointer is over the bar. Hidden rather than faded (this app uses no transitions),
@@ -221,10 +255,48 @@
     <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
          inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
          the middle, with the dock edges flipped for a horizontal bar. -->
-    <Border Classes="rail" Classes.collapsed="{Binding IsCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
+    <Border x:Name="RailBorder"
+            Classes="rail" Classes.collapsed="{Binding IsCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
             Width="{Binding RailWidth}" Height="{Binding RailHeight}"
             Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
+
+        <!-- Right-click anywhere on the bar to re-dock it. Declared once on the rail: ContextRequested
+             bubbles, so the brand, the items, the footer and any empty space all reach it. Opens at the
+             pointer, and reuses the same NavPositionOption list (and its preview tiles) as the Settings
+             control, so all three re-dock paths stay in sync. -->
+        <Border.ContextFlyout>
+            <Flyout Placement="Pointer">
+                <StackPanel Spacing="2" MinWidth="168" Margin="2">
+                    <TextBlock Classes="dockMenuHeader" Text="DOCK NAVIGATION"/>
+                    <ItemsControl ItemsSource="{Binding Positions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="nav:NavPositionOption">
+                                <Button Classes="pickTile" Command="{Binding SelectCommand}"
+                                        Margin="0" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
+                                        <StackPanel Orientation="Horizontal" Spacing="9">
+                                            <Border Classes="posTile mini" Classes.selected="{Binding IsSelected}">
+                                                <Panel Margin="3">
+                                                    <Rectangle Fill="{DynamicResource Accent}"
+                                                               Width="{Binding BarWidth}" Height="{Binding BarHeight}"
+                                                               HorizontalAlignment="{Binding BarHAlign}"
+                                                               VerticalAlignment="{Binding BarVAlign}"
+                                                               RadiusX="1" RadiusY="1"/>
+                                                </Panel>
+                                            </Border>
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Flyout>
+        </Border.ContextFlyout>
+
         <DockPanel LastChildFill="True">
 
             <!-- Brand. Doubles as the drag handle: press and drag it to re-dock the bar to another
