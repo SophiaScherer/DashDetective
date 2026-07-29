@@ -273,6 +273,17 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         IsOpen = false;
     }
 
+    /// <summary>
+    /// Abandons the search entirely — what clicking away from the box means. Unlike <see cref="Close"/>
+    /// the term goes too, so returning to the box starts fresh rather than resuming something the user
+    /// walked away from.
+    ///
+    /// The view pairs this with releasing keyboard focus, which matters more than it looks: while a
+    /// text box holds focus the shell suppresses every bare-key shortcut, so a caret left behind in the
+    /// search box quietly disables "/", Delete and the navigation keys across the whole app.
+    /// </summary>
+    public void Cancel() => Dismiss();
+
     // Closing and clearing together: what picking a result should leave behind. Clearing comes first,
     // because emptying the box offers the recents — closing afterwards is what puts the dropdown away.
     private void Dismiss() {

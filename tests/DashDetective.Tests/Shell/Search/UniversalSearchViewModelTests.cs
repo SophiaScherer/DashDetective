@@ -259,6 +259,44 @@ public class UniversalSearchViewModelTests {
     }
 
     [Fact]
+    public async Task Cancel_DropsTheTermAsWellAsTheDropdown() {
+        // Clicking away abandons the search outright, unlike Esc — returning to the box starts fresh
+        // rather than resuming something the user walked away from.
+        var (vm, timer, _) = Build();
+        await SearchAsync(vm, timer, "net");
+
+        vm.Cancel();
+
+        Assert.False(vm.IsOpen);
+        Assert.Equal("", vm.Text);
+        Assert.Null(vm.Completion);
+    }
+
+    [Fact]
+    public async Task Cancel_LeavesTheRecentsReadyForTheNextVisit() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, timer, _) = BuildWithRecents(recents, null, "Storage");
+        await SearchAsync(vm, timer, "sto");
+
+        vm.Cancel();
+        vm.NotifyFocused();
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Network", Assert.Single(vm.Results).Title);
+    }
+
+    [Fact]
+    public void Cancel_IsHarmlessOnAnAlreadyEmptyBox() {
+        var (vm, _, _) = Build();
+
+        vm.Cancel();
+
+        Assert.False(vm.IsOpen);
+        Assert.Equal("", vm.Text);
+    }
+
+    [Fact]
     public async Task HandleShortcut_EscapeClosesTheDropdownButKeepsTheTerm() {
         var (vm, timer, _) = Build();
         await SearchAsync(vm, timer, "net");

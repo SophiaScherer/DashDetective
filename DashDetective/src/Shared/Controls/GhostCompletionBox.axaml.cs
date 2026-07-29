@@ -75,6 +75,19 @@ public partial class GhostCompletionBox : UserControl {
             Entry.SelectAll();
         }, DispatcherPriority.Input);
 
+    /// <summary>Takes the caret out of the box without moving it into anything else. Needed because a
+    /// focused text box makes the shell suppress every bare-key shortcut, so a field abandoned with the
+    /// caret still in it disables those keys for the whole app.</summary>
+    public void ReleaseFocus() {
+        // Focusing null is Avalonia's way to clear focus outright. It normally advises moving focus to
+        // another element instead, but there is nothing to move it to here: the user clicked somewhere
+        // that takes no focus of its own, and the point is precisely to have none.
+        if (!Entry.IsFocused)
+            return;
+
+        TopLevel.GetTopLevel(this)?.FocusManager?.Focus(null);
+    }
+
     /// <summary>Fills in the ghosted suggestion and puts the caret at the end. Returns whether there was
     /// one to take.</summary>
     public bool TryAcceptCompletion() {

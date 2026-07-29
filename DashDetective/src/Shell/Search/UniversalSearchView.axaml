@@ -64,6 +64,7 @@
                 <controls:GhostCompletionBox Grid.Column="1" x:Name="SearchBox" Margin="9,0,0,0"
                                              FontSize="13" ToolTip.Tip="Search (Ctrl+F)"
                                              GotFocus="OnSearchBoxGotFocus"
+                                             LostFocus="OnSearchBoxLostFocus"
                                              PlaceholderText="Search pages, settings, processes, files…"
                                              Text="{Binding Text, Mode=TwoWay}"
                                              Completion="{Binding Completion}"
