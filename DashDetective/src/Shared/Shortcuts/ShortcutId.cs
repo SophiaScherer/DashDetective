@@ -43,4 +43,5 @@ public enum ShortcutId {
     NavigateBack,
     NavigateForward,
     NavigateUp,
+    FocusAddressBar,
 }

@@ -236,24 +236,39 @@
             <Border Grid.Column="1" Background="{DynamicResource FieldBackground}"
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6"
                     Padding="12,7" VerticalAlignment="Center" ClipToBounds="True">
-                <ItemsControl ItemsSource="{Binding Crumbs}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="fe:Crumb">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Classes="pick crumb" Command="{Binding SelectCommand}">
-                                    <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
-                                               Text="{Binding Label}"/>
-                                </Button>
-                                <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- The trail and the editable path share this field and swap places: Ctrl+L reveals
+                     the box, Enter opens what was typed, Esc or clicking away restores the trail. -->
+                <Panel>
+                    <ItemsControl ItemsSource="{Binding Crumbs}" IsVisible="{Binding ShowCrumbs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="fe:Crumb">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Classes="pick crumb" Command="{Binding SelectCommand}">
+                                        <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
+                                                   Text="{Binding Label}"/>
+                                    </Button>
+                                    <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Enter is bound here rather than through the shell: the shortcut layer
+                         deliberately leaves Enter to whatever text box has focus. -->
+                    <TextBox x:Name="PathBox" Classes="flat" IsVisible="{Binding IsPathEditing}"
+                             Text="{Binding PathText}" Padding="0" MinHeight="0" FontSize="12.5"
+                             VerticalContentAlignment="Center"
+                             LostFocus="OnPathBoxLostFocus">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding CommitPathCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                </Panel>
             </Border>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12"

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
 
@@ -26,16 +27,34 @@ public partial class FileExplorerView : UserControl {
     protected override void OnDataContextChanged(EventArgs e) {
         base.OnDataContextChanged(e);
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.ScrollToTopRequested -= OnScrollToTopRequested;
+            _boundViewModel.PathEditRequested -= OnPathEditRequested;
+        }
 
         _boundViewModel = DataContext as FileExplorerViewModel;
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.ScrollToTopRequested += OnScrollToTopRequested;
+            _boundViewModel.PathEditRequested += OnPathEditRequested;
+        }
     }
 
     private void OnScrollToTopRequested() => FileListScroll.ScrollToHome();
+
+    // Selecting the whole path means typing replaces it, while Home/End still edit in place — the
+    // behaviour of every address bar. Posted because the box only becomes focusable once the binding
+    // that reveals it has been applied.
+    private void OnPathEditRequested() =>
+        Dispatcher.UIThread.Post(() => {
+            PathBox.Focus();
+            PathBox.SelectAll();
+        }, DispatcherPriority.Input);
+
+    // Clicking away abandons the edit, matching Esc. Committing hides the box first, so the cancel
+    // that follows finds the edit already closed and does nothing.
+    private void OnPathBoxLostFocus(object? sender, RoutedEventArgs e) =>
+        (DataContext as FileExplorerViewModel)?.CancelPathEditCommand.Execute(null);
 
     private void OnOptionsPopupOpened(object? sender, EventArgs e) =>
         TopLevel.GetTopLevel(this)?.AddHandler(

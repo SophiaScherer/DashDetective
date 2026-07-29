@@ -94,6 +94,9 @@ public static class ShortcutCatalog {
             [new KeyGesture(Key.Up, KeyModifiers.Alt), new KeyGesture(Key.Back)],
             "Backspace / Alt+↑", "Go up to the parent folder", ShortcutScope.FileExplorer,
             AllowInTextInput: false),
+
+        new(ShortcutId.FocusAddressBar, [new KeyGesture(Key.L, KeyModifiers.Control)],
+            "Ctrl+L", "Edit the folder path", ShortcutScope.FileExplorer),
     ];
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row

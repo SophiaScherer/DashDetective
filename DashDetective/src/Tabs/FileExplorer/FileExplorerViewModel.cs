@@ -64,6 +64,53 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Whether the current folder has a parent to climb to (false at a drive root).</summary>
     public bool CanGoUp => ParentOfCurrent() is not null;
 
+    // ----- Address bar -----
+
+    /// <summary>Whether the breadcrumb has been swapped for an editable path box (Ctrl+L).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCrumbs))]
+    private bool _isPathEditing;
+
+    /// <summary>The path being typed. Only meaningful while <see cref="IsPathEditing"/>.</summary>
+    [ObservableProperty] private string _pathText = "";
+
+    /// <summary>Whether the breadcrumb trail is showing (it and the path box swap places).</summary>
+    public bool ShowCrumbs => !IsPathEditing;
+
+    /// <summary>Raised once the path box is showing, so the view can put the caret in it. UI-only.</summary>
+    public event Action? PathEditRequested;
+
+    /// <summary>Swaps the breadcrumb for the path box, seeded with the current folder.</summary>
+    [RelayCommand]
+    private void BeginPathEdit() {
+        PathText = CurrentPath;
+        IsPathEditing = true;
+        PathEditRequested?.Invoke();
+    }
+
+    /// <summary>Leaves the path box without navigating (Esc, or clicking away).</summary>
+    [RelayCommand]
+    private void CancelPathEdit() => IsPathEditing = false;
+
+    /// <summary>Opens the typed folder. A path that doesn't name a reachable folder simply reverts to
+    /// the breadcrumb — a typo shouldn't throw at a keystroke, matching how the rest of the page
+    /// soft-fails on file-system errors.</summary>
+    [RelayCommand]
+    private void CommitPath() {
+        var path = PathText.Trim().Trim('"');
+        IsPathEditing = false;
+
+        if (path.Length == 0)
+            return;
+
+        try {
+            if (Directory.Exists(path))
+                SetCurrentFolder(Path.GetFullPath(path));
+        } catch {
+            // Malformed path (bad characters, too long, no permission to resolve) — stay put.
+        }
+    }
+
     /// <summary>Whether OS hidden/system entries (e.g. AppData) are shown in the list and tree.</summary>
     [ObservableProperty] private bool _showHidden;
 
@@ -439,7 +486,21 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public ShortcutScope Scope => ShortcutScope.FileExplorer;
 
     public bool HandleShortcut(ShortcutId id) {
+        // The path box is modal for this page: while it's open Esc backs out of it, and the navigation
+        // keys stay out of the way of the text being typed.
+        if (IsPathEditing) {
+            if (id != ShortcutId.Escape)
+                return false;
+
+            CancelPathEdit();
+            return true;
+        }
+
         switch (id) {
+            case ShortcutId.FocusAddressBar:
+                BeginPathEdit();
+                return true;
+
             case ShortcutId.NavigateBack when CanGoBack:
                 GoBack();
                 return true;
