@@ -74,6 +74,25 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>The path being typed. Only meaningful while <see cref="IsPathEditing"/>.</summary>
     [ObservableProperty] private string _pathText = "";
 
+    /// <summary>The folder path the address bar should complete to, ghosted after the caret for Tab to
+    /// accept — type <c>C:\Us</c> and <c>ers</c> appears, as Windows Explorer's own bar does.</summary>
+    [ObservableProperty] private string? _pathCompletionText;
+
+    // Reads the typed folder's children to complete the last segment, caching them so a name typed a
+    // character at a time doesn't re-enumerate the same folder once per keystroke.
+    private readonly PathCompletion _pathCompletion = new();
+
+    partial void OnPathTextChanged(string value) => _ = UpdatePathCompletionAsync(value);
+
+    private async Task UpdatePathCompletionAsync(string typed) {
+        var completion = await _pathCompletion.CompleteAsync(typed, ShowHidden);
+
+        // The read is asynchronous, so the user may have typed on since; a suggestion for an older
+        // prefix would ghost in the wrong text.
+        if (PathText == typed)
+            PathCompletionText = completion;
+    }
+
     /// <summary>Whether the breadcrumb trail is showing (it and the path box swap places).</summary>
     public bool ShowCrumbs => !IsPathEditing;
 

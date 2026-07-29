@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:search="using:DashDetective.Shell.Search"
              mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="34"
              x:DataType="search:UniversalSearchViewModel"
@@ -56,17 +57,14 @@
                       StrokeLineCap="Round" VerticalAlignment="Center"
                       Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
 
-                <!-- Enter is bound here rather than through the shell: the shortcut layer deliberately
-                     leaves Enter to whatever text box has focus (see ShortcutCatalog). -->
-                <TextBox Grid.Column="1" x:Name="SearchBox" Classes="flat" Margin="9,0,0,0"
-                         FontSize="13" VerticalContentAlignment="Center"
-                         ToolTip.Tip="Search (Ctrl+F)"
-                         PlaceholderText="Search pages, settings, processes, files…"
-                         Text="{Binding Text}">
-                    <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding ActivateSelectedCommand}"/>
-                    </TextBox.KeyBindings>
-                </TextBox>
+                <!-- Tab fills in the best result's name; Enter is bound on the box itself because the
+                     shortcut layer deliberately leaves Enter to whatever text box has focus. -->
+                <controls:GhostCompletionBox Grid.Column="1" x:Name="SearchBox" Margin="9,0,0,0"
+                                             FontSize="13" ToolTip.Tip="Search (Ctrl+F)"
+                                             PlaceholderText="Search pages, settings, processes, files…"
+                                             Text="{Binding Text, Mode=TwoWay}"
+                                             Completion="{Binding Completion}"
+                                             EnterCommand="{Binding ActivateSelectedCommand}"/>
 
                 <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
                         Command="{Binding ClearCommand}" IsVisible="{Binding HasText}">

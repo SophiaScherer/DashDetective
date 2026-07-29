@@ -261,16 +261,14 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Enter is bound here rather than through the shell: the shortcut layer
-                         deliberately leaves Enter to whatever text box has focus. -->
-                    <TextBox x:Name="PathBox" Classes="flat" IsVisible="{Binding IsPathEditing}"
-                             Text="{Binding PathText}" Padding="0" MinHeight="0" FontSize="12.5"
-                             VerticalContentAlignment="Center"
-                             LostFocus="OnPathBoxLostFocus">
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding CommitPathCommand}"/>
-                        </TextBox.KeyBindings>
-                    </TextBox>
+                    <!-- Tab completes the folder being typed; Enter is bound on the box rather than
+                         through the shell, since the shortcut layer deliberately leaves Enter to
+                         whatever text box has focus. -->
+                    <controls:GhostCompletionBox x:Name="PathBox" IsVisible="{Binding IsPathEditing}"
+                                                 FontSize="12.5" LostFocus="OnPathBoxLostFocus"
+                                                 Text="{Binding PathText, Mode=TwoWay}"
+                                                 Completion="{Binding PathCompletionText}"
+                                                 EnterCommand="{Binding CommitPathCommand}"/>
                 </Panel>
             </Border>
 

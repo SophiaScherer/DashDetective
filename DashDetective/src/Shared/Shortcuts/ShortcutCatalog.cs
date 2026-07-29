@@ -57,10 +57,9 @@ public static class ShortcutCatalog {
         new(ShortcutId.FocusSearch, [new KeyGesture(Key.F, KeyModifiers.Control)],
             "Ctrl+F", "Search pages, settings, processes and files", ShortcutScope.Global),
 
-        // Bound globally rather than per-field: the field showing a ghosted completion claims it, and
-        // every other case leaves it unconsumed so Tab still moves focus (see TryResolve's contract).
-        new(ShortcutId.AcceptCompletion, [new KeyGesture(Key.Tab)],
-            "Tab", "Accept the suggested completion", ShortcutScope.Global),
+        // Tab is deliberately absent: accepting a ghosted completion is owned by the field showing one
+        // (see GhostCompletionBox), because only the focused control knows whether there is a
+        // suggestion to accept. Routing it through here would mean asking a view model about focus.
 
         new(ShortcutId.Escape, [new KeyGesture(Key.Escape)],
             "Esc", "Close Help, cancel an open dialog, or dismiss the alert banner", ShortcutScope.Global),

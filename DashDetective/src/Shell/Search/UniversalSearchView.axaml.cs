@@ -37,11 +37,7 @@ public partial class UniversalSearchView : UserControl {
 
     // Selecting the whole term means the next keystroke replaces it — pressing Ctrl+F again is a fresh
     // search, not an append. Posted so focus lands after any binding that reveals the box has applied.
-    private void OnFocusRequested() =>
-        Dispatcher.UIThread.Post(() => {
-            SearchBox.Focus();
-            SearchBox.SelectAll();
-        }, DispatcherPriority.Input);
+    private void OnFocusRequested() => SearchBox.FocusAndSelectAll();
 
     // The arrows move the selection without the list having focus, so it has to be scrolled by hand.
     private void OnResultsSelectionChanged(object? sender, SelectionChangedEventArgs e) {

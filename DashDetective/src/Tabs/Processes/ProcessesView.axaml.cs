@@ -36,12 +36,9 @@ public partial class ProcessesView : UserControl {
     // to the top for the selected row to be on screen. The view owns the ScrollViewer, so it listens.
     private void ScrollToTop() => ProcessListScroll.ScrollToHome();
 
-    // Focusing selects what's already typed, so a second Ctrl+F replaces the term rather than
-    // appending to it — the behaviour every browser's find bar has.
-    private void FocusFilter() {
-        FilterBox.Focus();
-        FilterBox.SelectAll();
-    }
+    // Focusing selects what's already typed, so a second "/" replaces the term rather than appending
+    // to it — the behaviour every browser's find bar has.
+    private void FocusFilter() => FilterBox.FocusAndSelectAll();
 
     // Tap selects the row (drives the highlight + End task / Properties enablement). Handled here
     // rather than in the view model because a row tap has no XAML command binding — the same pattern

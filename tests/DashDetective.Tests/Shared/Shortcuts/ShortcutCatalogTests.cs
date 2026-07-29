@@ -178,11 +178,12 @@ public class ShortcutCatalogTests {
     }
 
     [Fact]
-    public void TryResolve_OffersTabWhileTypingSoACompletionCanBeAccepted() {
-        // Bound globally: the field showing a ghost claims it, and everything else leaves Tab to the
-        // focus manager by reporting the shortcut unconsumed.
-        Assert.True(Resolve(Key.Tab, KeyModifiers.None, textInputFocused: true, out var id));
-        Assert.Equal(ShortcutId.AcceptCompletion, id);
+    public void TryResolve_LeavesBareTabToTheFocusManager() {
+        // Accepting a ghosted completion is owned by the field showing one, not by this table: only the
+        // focused control knows whether there is a suggestion to accept. Everywhere else Tab must keep
+        // moving focus, which it cannot do if the shell claims it.
+        Assert.False(Resolve(Key.Tab, KeyModifiers.None, textInputFocused: true, out _));
+        Assert.False(Resolve(Key.Tab, KeyModifiers.None, textInputFocused: false, out _));
     }
 
     [Fact]

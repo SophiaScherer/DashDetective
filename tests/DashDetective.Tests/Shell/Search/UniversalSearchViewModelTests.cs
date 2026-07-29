@@ -32,7 +32,7 @@ public class UniversalSearchViewModelTests {
             var results = new List<SearchResult>();
             foreach (var title in _titles)
                 results.Add(new SearchResult(
-                    SearchCategory.Page, title, "", 500, () => _onActivate?.Invoke()));
+                    SearchCategory.Page, title, "", 500, () => _onActivate?.Invoke(), Completion: title));
 
             return Task.FromResult<IReadOnlyList<SearchResult>>(results);
         }
@@ -141,6 +141,56 @@ public class UniversalSearchViewModelTests {
     }
 
     [Fact]
+    public async Task Text_GhostsTheBestResultThatExtendsWhatWasTyped() {
+        var (vm, timer, _) = Build(null, "Network", "Storage");
+
+        await SearchAsync(vm, timer, "net");
+
+        Assert.Equal("Network", vm.Completion);
+    }
+
+    [Fact]
+    public async Task Text_SkipsAResultWithNothingToComplete() {
+        // "report" matched in the middle of the first name, so it cannot be ghosted onto what is typed;
+        // the next result offers the suggestion instead.
+        var (vm, timer, _) = Build(null, "quarterly-report.txt", "reporting.md");
+
+        await SearchAsync(vm, timer, "report");
+
+        Assert.Equal("reporting.md", vm.Completion);
+    }
+
+    [Fact]
+    public async Task Text_KeepsTheGhostAsTypingContinuesTowardsIt() {
+        // Between queries the box must not blink the suggestion out and back.
+        var (vm, timer, _) = Build(null, "Network");
+        await SearchAsync(vm, timer, "net");
+
+        vm.Text = "netw";
+
+        Assert.Equal("Network", vm.Completion);
+    }
+
+    [Fact]
+    public async Task Text_DropsTheGhostWhenTheBoxIsCleared() {
+        var (vm, timer, _) = Build(null, "Network");
+        await SearchAsync(vm, timer, "net");
+
+        vm.Text = "";
+
+        Assert.Null(vm.Completion);
+    }
+
+    [Fact]
+    public async Task Text_GhostsNothingWhenNoResultExtendsTheTerm() {
+        var (vm, timer, _) = Build(null, "quarterly-report.txt");
+
+        await SearchAsync(vm, timer, "report");
+
+        Assert.Null(vm.Completion);
+    }
+
+    [Fact]
     public async Task MoveSelection_WrapsAtBothEnds() {
         var (vm, timer, _) = Build();
         await SearchAsync(vm, timer, "net");
@@ -221,7 +271,7 @@ public class UniversalSearchViewModelTests {
         var (vm, _, _) = Build();
 
         Assert.False(vm.HandleShortcut(ShortcutId.Refresh));
-        Assert.False(vm.HandleShortcut(ShortcutId.AcceptCompletion));
+        Assert.False(vm.HandleShortcut(ShortcutId.Export));
     }
 
     [Fact]

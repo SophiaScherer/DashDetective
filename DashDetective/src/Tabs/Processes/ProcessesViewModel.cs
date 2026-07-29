@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Completion;
 using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
@@ -137,7 +138,24 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// to the rows already in hand, so typing re-filters instantly without waiting for the next poll.</summary>
     [ObservableProperty] private string _filterText = "";
 
-    partial void OnFilterTextChanged(string value) => RebuildVisibleRows();
+    /// <summary>The running process name the filter should complete to, ghosted after the caret for Tab
+    /// to accept. Null when nothing matches, or when the candidates disagree past what is typed.</summary>
+    [ObservableProperty] private string? _filterCompletion;
+
+    partial void OnFilterTextChanged(string value) {
+        RebuildVisibleRows();
+        UpdateFilterCompletion();
+    }
+
+    // Recomputed on each keystroke and each poll, over the snapshot already in hand — a few hundred
+    // names is nothing next to the tree rebuild that runs alongside it.
+    private void UpdateFilterCompletion() {
+        var names = new List<string>(_lastSnapshot.Count);
+        foreach (var process in _lastSnapshot)
+            names.Add(process.Name);
+
+        FilterCompletion = PrefixCompleter.Complete(FilterText, names);
+    }
 
     /// <summary>Clears the filter (the box's × button, and Esc while the box has content).</summary>
     [RelayCommand]
@@ -288,6 +306,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _lastRoots = ProcessTreeBuilder.Build(processes);
         PruneExpanded(_lastRoots);
         RebuildVisibleRows();
+        UpdateFilterCompletion();
     }
 
     /// <summary>Drops expand state for PIDs that no longer name a live parent (exited or lost their

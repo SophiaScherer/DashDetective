@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Threading;
 using DashDetective.Shared;
+using DashDetective.Shared.Completion;
 using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
@@ -44,6 +45,11 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
 
     /// <summary>Which result the keyboard is on, or -1 for none.</summary>
     [ObservableProperty] private int _selectedIndex = -1;
+
+    /// <summary>What Tab should fill the box with — the best result's own name, ghosted after the caret.
+    /// Left in place as the user keeps typing: a completion still extending what is typed is still the
+    /// right suggestion, so the ghost doesn't blink out and back between queries.</summary>
+    [ObservableProperty] private string? _completion;
 
     /// <summary>Whether the dropdown is showing. Also gates <see cref="Scope"/>.</summary>
     [ObservableProperty]
@@ -97,6 +103,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         if (value.Trim().Length == 0) {
             CancelRunning();
             IsSearching = false;
+            Completion = null;
             ShowResults([]);
             IsOpen = false;
             return;
@@ -143,9 +150,23 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
             Results.Add(result);
 
         SelectedIndex = Results.Count > 0 ? 0 : -1;
+        UpdateCompletion();
         OnPropertyChanged(nameof(ShowResultList));
         OnPropertyChanged(nameof(ShowSearching));
         OnPropertyChanged(nameof(ShowNoResults));
+    }
+
+    // The best result that actually extends what is typed. Usually the first, but a result whose name
+    // the term matched in the middle ("report" finding "quarterly-report.txt") has nothing to complete,
+    // so the next one down offers the suggestion instead.
+    private void UpdateCompletion() {
+        foreach (var result in Results)
+            if (result.Completion is { } candidate && PrefixCompleter.Suffix(Text, candidate).Length > 0) {
+                Completion = candidate;
+                return;
+            }
+
+        Completion = null;
     }
 
     /// <summary>Puts the caret in the box (Ctrl+F), re-opening the dropdown if there is still a term to

@@ -38,10 +38,6 @@ public enum ShortcutId {
     /// Each page decides what it means, the way <see cref="Escape"/> does.</summary>
     Activate,
 
-    /// <summary>Fills the focused field with the completion ghosted after the caret. Bound globally and
-    /// claimed only by whichever field is actually showing one, so Tab still moves focus otherwise.</summary>
-    AcceptCompletion,
-
     // ----- Search results -----
 
     /// <summary>Moves the highlight down the universal-search result list.</summary>
