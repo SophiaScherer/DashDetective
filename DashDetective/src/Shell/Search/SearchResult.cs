@@ -23,4 +23,15 @@ public sealed record SearchResult(
     int Score,
     Action Activate,
     Geometry? Icon = null,
-    string? Completion = null);
+    string? Completion = null) {
+
+    /// <summary>How the category reads on the row's tag. Kept here rather than in a converter so the
+    /// dropdown's template stays a plain binding.</summary>
+    public string CategoryLabel => Category switch {
+        SearchCategory.Page => "Page",
+        SearchCategory.Setting => "Setting",
+        SearchCategory.Shortcut => "Shortcut",
+        SearchCategory.Process => "Process",
+        _ => "File",
+    };
+}

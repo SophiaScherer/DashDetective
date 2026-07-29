@@ -3,6 +3,7 @@
         xmlns:vm="using:DashDetective.Shell"
         xmlns:help="using:DashDetective.Shell.Help"
         xmlns:nav="using:DashDetective.Shell.Navigation"
+        xmlns:search="using:DashDetective.Shell.Search"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
@@ -77,20 +78,11 @@
                                        Foreground="{DynamicResource TextSubtle}"/>
                         </StackPanel>
 
-                        <!-- Search -->
-                        <Border Grid.Column="1" MaxWidth="420" Height="34" Margin="16,0"
-                                HorizontalAlignment="Right" Background="{DynamicResource FieldBackground}"
-                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
-                            <Grid ColumnDefinitions="Auto,*" Margin="11,0">
-                                <Path Grid.Column="0" Width="14" Height="14" Stretch="Uniform"
-                                      Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
-                                      StrokeLineCap="Round" VerticalAlignment="Center"
-                                      Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-                                <TextBox Grid.Column="1" Classes="flat" Margin="9,0,0,0"
-                                         FontSize="13" VerticalContentAlignment="Center"
-                                         PlaceholderText="Search processes, files, settings…"/>
-                            </Grid>
-                        </Border>
+                        <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the
+                             outside-click dismissal all live in the component. -->
+                        <search:UniversalSearchView Grid.Column="1" DataContext="{Binding Search}"
+                                                    MaxWidth="420" Margin="16,0"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Center"/>
 
                         <!-- Actions -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">

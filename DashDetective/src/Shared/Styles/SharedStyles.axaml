@@ -188,6 +188,22 @@
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
+    <!-- The × that empties one of those fields (the process filter, the toolbar search). Chrome-less
+         so only the glyph reads against the field it sits inside. -->
+    <Style Selector="Button.clearField">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.clearField:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
+
     <!-- ===== Scrollbars ===== -->
     <!-- Fluent's default scrollbars auto-hide: a thin line that expands on hover as an overlay ON TOP
          of content. Pin auto-hide off app-wide so a present bar stays solid and stable rather than

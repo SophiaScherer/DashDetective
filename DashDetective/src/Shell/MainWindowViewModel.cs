@@ -9,6 +9,8 @@ using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Help;
 using DashDetective.Shell.Navigation;
+using DashDetective.Shell.Search;
+using DashDetective.Shell.Search.Providers;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tabs.FileExplorer;
 using DashDetective.Tabs.Hardware;
@@ -73,6 +75,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>The Help modal. Owned here rather than by the nav bar because the overlay covers the
     /// whole window, navigation bar included.</summary>
     public HelpViewModel Help { get; } = new();
+
+    /// <summary>The toolbar's universal search. Built here because this is the one class that already
+    /// holds every page instance, so a result's "go there and reveal it" callback is a closure over the
+    /// page it targets — no routing layer, and no page needs to know about search.</summary>
+    public UniversalSearchViewModel Search { get; }
 
     /// <summary>Raised when the Export shortcut fires, so the window can run the save dialog — it owns
     /// that because the picker needs the window's <c>TopLevel</c>. UI-only; carries no state.</summary>
@@ -145,6 +152,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         });
         _currentPage = Nav.SelectedNav.Page;
         Nav.SelectionChanged += OnNavSelected;
+
+        // Built after the bar so the page provider can read the live nav items rather than a copy.
+        Search = new UniversalSearchViewModel([
+            new PageSearchProvider(Nav.NavItems, Nav.Navigate),
+            new ShortcutSearchProvider(Help.Open, Icons.Help),
+        ]);
 
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
@@ -275,7 +288,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
     /// no shortcuts of its own. Read by the window before resolving a key.</summary>
     public ShortcutScope ActiveScope =>
-        Help.IsOpen ? ShortcutScope.Global : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
+        Help.IsOpen ? ShortcutScope.Global
+        : Search.IsOpen ? Search.Scope
+        : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
 
     public bool HandleShortcut(ShortcutId id) {
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
@@ -285,6 +300,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Help.Close();
             return true;
         }
+
+        // The search dropdown sits between the modal and the page: while it is open the arrows walk the
+        // results and Esc puts it away, but unlike Help it doesn't swallow the rest — Ctrl+1 still
+        // switches tabs from a half-typed search.
+        if (Search.IsOpen && Search.HandleShortcut(id))
+            return true;
 
         if (CurrentPage is IShortcutTarget target && target.HandleShortcut(id))
             return true;
@@ -306,6 +327,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.Refresh => Run(RefreshCommand),
         ShortcutId.Export => Raise(ExportRequested),
         ShortcutId.ShowHelp => Open(Help),
+        ShortcutId.FocusSearch => FocusSearch(),
         ShortcutId.ToggleTheme => Run(_settings.ToggleThemeCommand),
         // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is the banner.
         ShortcutId.Escape => DismissAlertIfShowing(),
@@ -322,6 +344,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Opens the Help modal and reports the key as consumed.</summary>
     private static bool Open(HelpViewModel help) {
         help.Open();
+        return true;
+    }
+
+    /// <summary>Puts the caret in the toolbar search box. Always consumed: Ctrl+F is search's alone, so
+    /// leaving it unhandled would let it fall through to whatever else was listening.</summary>
+    private bool FocusSearch() {
+        Search.Focus();
         return true;
     }
 
@@ -417,6 +446,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// shutdown, flushing any pending save. Driven by the composition root.</summary>
     public void Dispose() {
         _clockTimer.Stop();
+        Search.Dispose();
         _metrics.AlertActiveChanged -= OnAlertActiveChanged;
         foreach (var item in Nav.NavItems)
             (item.Page as IDisposable)?.Dispose();
