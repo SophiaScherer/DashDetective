@@ -2,14 +2,64 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System;
 using System.IO;
+using System.Linq;
 
 namespace DashDetective.Tabs.Settings;
 
 public partial class SettingsView : UserControl {
+    /// <summary>How long a revealed row stays tinted before fading back (the fade itself is the
+    /// <c>settingRow</c> style's brush transition).</summary>
+    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(1.6);
+
+    private SettingsViewModel? _boundViewModel;
+
     public SettingsView() {
         InitializeComponent();
+    }
+
+    protected override void OnDataContextChanged(EventArgs e) {
+        base.OnDataContextChanged(e);
+
+        if (_boundViewModel is not null)
+            _boundViewModel.RevealRequested -= OnRevealRequested;
+
+        _boundViewModel = DataContext as SettingsViewModel;
+
+        if (_boundViewModel is not null)
+            _boundViewModel.RevealRequested += OnRevealRequested;
+    }
+
+    /// <summary>
+    /// Scrolls a setting into view and flashes it. Rows are found by the <c>SettingId</c> in their
+    /// <c>Tag</c> rather than by name, so a row added to the page becomes reachable by adding one
+    /// attribute — there is no switch here to keep in step.
+    ///
+    /// Posted because the reveal arrives in the same breath as the navigation that made this page
+    /// current: the rows do not exist in the visual tree until that layout pass has run.
+    /// </summary>
+    private void OnRevealRequested(SettingId id) =>
+        Dispatcher.UIThread.Post(() => {
+            if (FindRow(id) is not { } row)
+                return;
+
+            row.BringIntoView();
+            Flash(row);
+        }, DispatcherPriority.Loaded);
+
+    private Border? FindRow(SettingId id) =>
+        this.GetVisualDescendants()
+            .OfType<Border>()
+            .FirstOrDefault(border => border.Tag is SettingId tag && tag == id);
+
+    // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
+    private static void Flash(Border row) {
+        row.Classes.Remove("highlighted");
+        row.Classes.Add("highlighted");
+        DispatcherTimer.RunOnce(() => row.Classes.Remove("highlighted"), HighlightDuration);
     }
 
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>

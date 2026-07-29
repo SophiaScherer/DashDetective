@@ -41,6 +41,19 @@ public partial class SettingsViewModel : ViewModelBase {
     /// composition root can capture and save the current state.</summary>
     public event Action? Changed;
 
+    /// <summary>The name and description of every setting, which the page's labels bind to. Exposed here
+    /// so the copy on screen and the copy universal search matches against are the same strings.</summary>
+    public SettingCatalog Catalog => SettingCatalog.Instance;
+
+    /// <summary>Raised when a search result asks for a setting to be shown. UI-only — the view owns
+    /// scrolling the row into view and flashing it, the same seam the File Explorer uses for scrolling
+    /// and the Processes tab for focus.</summary>
+    public event Action<SettingId>? RevealRequested;
+
+    /// <summary>Scrolls a setting into view and flashes it, so a jump from search lands on the row the
+    /// user asked for rather than at the top of a page of toggles.</summary>
+    public void Reveal(SettingId id) => RevealRequested?.Invoke(id);
+
     /// <summary>Start DashDetective with Windows (per-user HKCU Run entry).</summary>
     [ObservableProperty] private bool _launchAtStartup;
 

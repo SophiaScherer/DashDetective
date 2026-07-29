@@ -22,6 +22,22 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
 
+        <!-- One row per setting. Each carries its SettingId as its Tag, which is how a jump from
+             universal search finds the row to scroll to (see the code-behind) without the page needing
+             a name for every control. The transition makes the flash fade out rather than blink off. -->
+        <Style Selector="Border.settingRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.settingRow.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
         <!-- Chrome-less button wrapper so a whole segment / swatch is clickable. -->
         <Style Selector="Button.pick">
             <Setter Property="Background" Value="Transparent"/>
@@ -57,10 +73,11 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Appearance"/>
 
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.Theme}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="Theme"/>
-                        <TextBlock Classes="settingDesc" Text="Choose the application color scheme"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.Theme.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.Theme.Description}"/>
                     </StackPanel>
                     <Border Grid.Column="1" Classes="segments">
                         <ItemsControl ItemsSource="{Binding ThemeOptions}">
@@ -81,11 +98,13 @@
                         </ItemsControl>
                     </Border>
                 </Grid>
+                </Border>
 
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.Accent}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="Accent color"/>
-                        <TextBlock Classes="settingDesc" Text="Applied to charts and highlights"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.Accent.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.Accent.Description}"/>
                     </StackPanel>
                     <ItemsControl Grid.Column="1" ItemsSource="{Binding AccentOptions}">
                         <ItemsControl.ItemsPanel>
@@ -113,6 +132,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </Grid>
+                </Border>
             </StackPanel>
         </Border>
 
@@ -123,10 +143,11 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Navigation"/>
 
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NavPosition}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="Position"/>
-                        <TextBlock Classes="settingDesc" Text="Which edge the navigation bar docks to"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.NavPosition.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.NavPosition.Description}"/>
                     </StackPanel>
                     <Border Grid.Column="1" Classes="segments">
                         <ItemsControl ItemsSource="{Binding Nav.Positions}">
@@ -147,12 +168,14 @@
                         </ItemsControl>
                     </Border>
                 </Grid>
+                </Border>
 
-                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NavCollapse}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="Collapse to icons"/>
-                            <TextBlock Classes="settingDesc" Text="Show only the icons in the navigation bar"/>
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.NavCollapse.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.NavCollapse.Description}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Classes="segments">
                             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -178,10 +201,11 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Monitoring"/>
 
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.RefreshInterval}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="Refresh interval"/>
-                        <TextBlock Classes="settingDesc" Text="How often live metrics update"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.RefreshInterval.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.RefreshInterval.Description}"/>
                     </StackPanel>
                     <Border Grid.Column="1" Classes="segments">
                         <ItemsControl ItemsSource="{Binding IntervalOptions}">
@@ -202,34 +226,38 @@
                         </ItemsControl>
                     </Border>
                 </Grid>
+                </Border>
 
                 <!-- Toggle rows. "Resource alerts" merges the comp's two notification toggles (there is
                      no OS toast in scope, so both described the same in-app threshold banner). -->
-                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="Resource alerts"/>
-                            <TextBlock Classes="settingDesc" Text="Show a banner when CPU or RAM exceeds 90%"/>
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.ResourceAlerts.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.ResourceAlerts.Description}"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ResourceAlerts}"/>
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ShowInTray}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="Show in system tray"/>
-                            <TextBlock Classes="settingDesc" Text="Keep console running in background"/>
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.ShowInTray.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.ShowInTray.Description}"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"/>
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.LaunchAtStartup}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="Launch at startup"/>
-                            <TextBlock Classes="settingDesc" Text="Start with Windows"/>
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.LaunchAtStartup.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.LaunchAtStartup.Description}"/>
                         </StackPanel>
                         <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding LaunchAtStartup}"/>
                     </Grid>
@@ -240,12 +268,16 @@
         <!-- ===== Export & Data ===== -->
         <Border Classes="panel" Padding="18">
             <StackPanel Spacing="14">
-                <TextBlock Classes="panelTitle" Text="Export &amp; Data"/>
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Button Classes="action primary" Content="Export report (.txt)" Click="OnExportReportClick"/>
-                    <Button Classes="action" Content="Export CSV" Click="OnExportCsvClick"/>
-                    <Button Classes="action" Content="Copy diagnostics" Click="OnCopyDiagnosticsClick"/>
-                </StackPanel>
+                <TextBlock Classes="panelTitle" Text="{Binding Catalog.ExportData.Section}"/>
+                <!-- The three actions share one search entry, so the row tag sits on the group rather
+                     than on any one button. -->
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ExportData}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="action primary" Content="Export report (.txt)" Click="OnExportReportClick"/>
+                        <Button Classes="action" Content="Export CSV" Click="OnExportCsvClick"/>
+                        <Button Classes="action" Content="Copy diagnostics" Click="OnCopyDiagnosticsClick"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
 

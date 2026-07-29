@@ -50,6 +50,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// the next poll.</summary>
     private IReadOnlyList<ProcessInfo> _lastSnapshot = Array.Empty<ProcessInfo>();
 
+    /// <summary>The processes from the last poll, for universal search to match against. Reading what
+    /// this page already has in hand means searching costs no extra enumeration; it is at most one poll
+    /// (two seconds) stale, which is the same list the user is looking at.</summary>
+    public IReadOnlyList<ProcessInfo> Snapshot => _lastSnapshot;
+
     /// <summary>The last built process tree (top-level entries with their collapsed children). Kept so
     /// the expand/collapse chevrons can re-flatten the visible rows without rebuilding the tree.</summary>
     private IReadOnlyList<ProcessNode> _lastRoots = Array.Empty<ProcessNode>();
@@ -141,6 +146,62 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the box.
     /// UI-only; carries no state — the same view/view-model seam the File Explorer uses for scrolling.</summary>
     public event Action? FilterFocusRequested;
+
+    /// <summary>Raised after <see cref="Reveal"/> narrows the list, so the view can reset the table's
+    /// scroll to the top and the revealed row is on screen. UI-only, like the focus request above.</summary>
+    public event Action? ScrollToTopRequested;
+
+    /// <summary>
+    /// Points the page at one process, for a jump from universal search: filters to its name, expands
+    /// whatever it is nested under, and selects its row.
+    ///
+    /// Filtering by name rather than by PID is deliberate — a multi-process app collapses into one entry
+    /// here, so the user sees the whole group they searched for and not a lone helper torn out of it.
+    /// </summary>
+    public void Reveal(int pid) {
+        var path = new List<ProcessNode>();
+        if (!TryFindPath(_lastRoots, pid, path))
+            return;
+
+        // Reveal the ancestors before filtering so the single rebuild below shows the finished state.
+        for (var i = 0; i < path.Count - 1; i++)
+            _expandedPids.Add(path[i].Info.Pid);
+
+        // Assigning the filter rebuilds the rows; only rebuild by hand when it was already this term.
+        var name = path[^1].Info.Name;
+        if (FilterText == name)
+            RebuildVisibleRows();
+        else
+            FilterText = name;
+
+        SelectByPid(pid);
+        ScrollToTopRequested?.Invoke();
+    }
+
+    /// <summary>Depth-first search for the node with this PID, recording the nodes walked through to
+    /// reach it (so <see cref="Reveal"/> can expand them). Internal only so it is testable without a
+    /// dispatcher — the rest of this class needs a live timer to construct.</summary>
+    internal static bool TryFindPath(IReadOnlyList<ProcessNode> nodes, int pid, List<ProcessNode> path) {
+        foreach (var node in nodes) {
+            path.Add(node);
+            if (node.Info.Pid == pid || TryFindPath(node.Children, pid, path))
+                return true;
+            path.RemoveAt(path.Count - 1);
+        }
+
+        return false;
+    }
+
+    // Selects the row for a PID across the three groups. A PID with no row (its group is filtered out,
+    // or it exited between the search and the jump) simply leaves the selection alone.
+    private void SelectByPid(int pid) {
+        foreach (var group in new[] { Apps, Background, WindowsProcesses })
+            foreach (var row in group)
+                if (row.Pid == pid) {
+                    SelectRow(row);
+                    return;
+                }
+    }
 
     public ProcessesViewModel(SystemMetricsService service) {
         _service = service;

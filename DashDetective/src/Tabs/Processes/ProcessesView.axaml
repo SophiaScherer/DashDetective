@@ -344,7 +344,8 @@
             </Border>
 
             <!-- Scrolling grouped list -->
-            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer Grid.Row="2" x:Name="ProcessListScroll"
+                          HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Apps -->

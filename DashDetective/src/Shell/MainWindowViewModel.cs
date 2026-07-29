@@ -153,10 +153,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _currentPage = Nav.SelectedNav.Page;
         Nav.SelectionChanged += OnNavSelected;
 
-        // Built after the bar so the page provider can read the live nav items rather than a copy.
+        // Built after the bar so the page provider can read the live nav items rather than a copy. Each
+        // provider's "go there" callback is a closure over the page it targets, which is why search is
+        // assembled here: this is the one class already holding every page instance.
         Search = new UniversalSearchViewModel([
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
+            new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Help.Open, Icons.Help),
+            new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
         ]);
 
         // Seed once so the clock is correct on the first frame, then tick every second.
@@ -441,6 +445,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     /// <summary>Hosts the page for whichever nav item the bar selected.</summary>
     private void OnNavSelected(NavItem item) => CurrentPage = item.Page;
+
+    // ----- Search jumps -----
+    // Each is "switch to the page, then ask it to reveal the thing". Navigating first matters: a page
+    // that isn't current has no visual tree, so it has nothing to scroll or focus yet.
+
+    /// <summary>Opens Settings with the given setting scrolled into view and flashed.</summary>
+    private void RevealSetting(SettingId id) {
+        NavigateToPage(_settings);
+        _settings.Reveal(id);
+    }
+
+    /// <summary>Opens Processes filtered to the given process, with its row selected.</summary>
+    private void RevealProcess(int pid) {
+        NavigateToPage(_processes);
+        _processes.Reveal(pid);
+    }
 
     /// <summary>Disposes the page view models, the shared metrics service and the settings store on
     /// shutdown, flushing any pending save. Driven by the composition root.</summary>

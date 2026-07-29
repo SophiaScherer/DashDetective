@@ -19,14 +19,22 @@ public partial class ProcessesView : UserControl {
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.FilterFocusRequested -= FocusFilter;
+            _viewModel.ScrollToTopRequested -= ScrollToTop;
+        }
 
         _viewModel = DataContext as ProcessesViewModel;
 
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.FilterFocusRequested += FocusFilter;
+            _viewModel.ScrollToTopRequested += ScrollToTop;
+        }
     }
+
+    // A jump from universal search narrows the list to the process asked for; the table has to go back
+    // to the top for the selected row to be on screen. The view owns the ScrollViewer, so it listens.
+    private void ScrollToTop() => ProcessListScroll.ScrollToHome();
 
     // Focusing selects what's already typed, so a second Ctrl+F replaces the term rather than
     // appending to it — the behaviour every browser's find bar has.
