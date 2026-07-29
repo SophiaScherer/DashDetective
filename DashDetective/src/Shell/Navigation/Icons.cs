@@ -21,6 +21,11 @@ public static class Icons {
     public static readonly Geometry FileExplorer = Geometry.Parse(
         "M2.5,6 L6.5,6 L8,7.5 L15.5,7.5 L15.5,14 L2.5,14 Z");
 
+    // A document sheet with a folded top-right corner. Distinguishes a file from a folder in the
+    // universal-search results, where both appear side by side.
+    public static readonly Geometry Document = Geometry.Parse(
+        "M4.5,2.5 H10.5 L14,6 V15.5 H4.5 Z M10.5,2.5 V6 H14");
+
     // A CPU/chip glyph: a rounded square die with eight pins radiating out (the Processes tab),
     // matching the design document's processes icon.
     public static readonly Geometry Processes = Geometry.Parse(

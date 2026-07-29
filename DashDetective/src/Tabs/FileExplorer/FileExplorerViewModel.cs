@@ -228,6 +228,38 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             ShellInterop.Open(entry.FullPath);
     }
 
+    /// <summary>
+    /// Opens the page at a path, for a jump from universal search: a folder is navigated into, a file
+    /// has its folder opened with the file selected.
+    ///
+    /// Selection rides the same <c>_reselectPath</c> the auto-refresh uses to keep a selection across a
+    /// reload — the folder load is asynchronous either way, so there is nothing to select until it
+    /// lands. The category chips are reset first: arriving at the folder with the file you searched for
+    /// filtered out of the list would be the one outcome worse than not jumping at all.
+    /// </summary>
+    public void Reveal(string fullPath) {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return;
+
+        try {
+            OnFilterSelected(Filters[0]);
+
+            if (Directory.Exists(fullPath)) {
+                SetCurrentFolder(Path.GetFullPath(fullPath));
+                return;
+            }
+
+            if (Path.GetDirectoryName(fullPath) is not { } folder || !Directory.Exists(folder))
+                return;
+
+            _reselectPath = fullPath;
+            SetCurrentFolder(Path.GetFullPath(folder));
+        } catch {
+            // Malformed path, or one that vanished between the search and the jump — stay put, the same
+            // way a typo in the path box does.
+        }
+    }
+
     /// <summary>Opens a folder. <paramref name="recordHistory"/> is false only when the move *is* a
     /// history step (Back/Forward), which must move between the stacks rather than push onto them.</summary>
     private void SetCurrentFolder(string path, bool recordHistory = true) {

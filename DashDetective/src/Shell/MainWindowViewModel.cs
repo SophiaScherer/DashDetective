@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Search;
 using DashDetective.Services.Settings;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
@@ -161,6 +162,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Help.Open, Icons.Help),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
+            new FileSearchProvider(
+                new WindowsSearchIndex(), new FileSystemFallbackSearch(),
+                () => _fileExplorer.CurrentPath, RevealFile,
+                Icons.Document, Icons.FileExplorer),
         ]);
 
         // Seed once so the clock is correct on the first frame, then tick every second.
@@ -460,6 +465,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void RevealProcess(int pid) {
         NavigateToPage(_processes);
         _processes.Reveal(pid);
+    }
+
+    /// <summary>Opens the File Explorer at a path: into a folder, or at a file's folder with the file
+    /// selected.</summary>
+    private void RevealFile(string path) {
+        NavigateToPage(_fileExplorer);
+        _fileExplorer.Reveal(path);
     }
 
     /// <summary>Disposes the page view models, the shared metrics service and the settings store on
