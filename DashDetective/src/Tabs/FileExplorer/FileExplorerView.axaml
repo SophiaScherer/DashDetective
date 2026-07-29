@@ -233,11 +233,14 @@
                 </Button>
             </StackPanel>
 
+            <!-- Clicking the field anywhere but on a crumb starts editing the path, as Ctrl+L does —
+                 the I-beam advertises it. The crumbs keep the hand cursor from Button.pick. -->
             <Border Grid.Column="1" Background="{DynamicResource FieldBackground}"
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6"
-                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True">
-                <!-- The trail and the editable path share this field and swap places: Ctrl+L reveals
-                     the box, Enter opens what was typed, Esc or clicking away restores the trail. -->
+                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True"
+                    Cursor="IBeam" PointerPressed="OnBreadcrumbPointerPressed">
+                <!-- The trail and the editable path share this field and swap places: Ctrl+L or a click
+                     reveals the box, Enter opens what was typed, Esc or clicking away restores the trail. -->
                 <Panel>
                     <ItemsControl ItemsSource="{Binding Crumbs}" IsVisible="{Binding ShowCrumbs}">
                         <ItemsControl.ItemsPanel>

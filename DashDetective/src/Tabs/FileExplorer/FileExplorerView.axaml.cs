@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
+using System.Linq;
 
 namespace DashDetective.Tabs.FileExplorer;
 
@@ -55,6 +56,20 @@ public partial class FileExplorerView : UserControl {
     // that follows finds the edit already closed and does nothing.
     private void OnPathBoxLostFocus(object? sender, RoutedEventArgs e) =>
         (DataContext as FileExplorerViewModel)?.CancelPathEditCommand.Execute(null);
+
+    // Clicking the breadcrumb field starts editing the path, the same gesture Windows Explorer has.
+    // A press on a crumb is left alone so it still navigates, and a press inside the box while already
+    // editing must not restart the edit and re-select everything under the caret.
+    private void OnBreadcrumbPointerPressed(object? sender, PointerPressedEventArgs e) {
+        if (DataContext is not FileExplorerViewModel { IsPathEditing: false } vm)
+            return;
+
+        if (e.Source is Visual source &&
+            source.GetSelfAndVisualAncestors().OfType<Button>().Any())
+            return;
+
+        vm.BeginPathEditCommand.Execute(null);
+    }
 
     private void OnOptionsPopupOpened(object? sender, EventArgs e) =>
         TopLevel.GetTopLevel(this)?.AddHandler(
