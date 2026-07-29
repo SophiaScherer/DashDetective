@@ -44,4 +44,9 @@ public enum ShortcutId {
     NavigateForward,
     NavigateUp,
     FocusAddressBar,
+    PreviousPage,
+    NextPage,
+
+    // ----- Appearance -----
+    ToggleTheme,
 }

@@ -35,6 +35,13 @@ public sealed class ThemeService {
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
+    /// <summary>Whether the app is actually rendering dark right now. Differs from
+    /// <see cref="CurrentTheme"/> under <see cref="AppTheme.System"/>, where the variant comes from the
+    /// OS — so a "flip the theme" action can tell which way to flip. Kept here because this service
+    /// owns the application's theme state; nothing else reads it either.</summary>
+    public bool IsDarkVariantActive =>
+        Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+
     /// <summary>Applies the current selections. Call once at startup after the app is built.</summary>
     public void ApplyDefaults() {
         ApplyTheme(CurrentTheme);

@@ -306,6 +306,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.Refresh => Run(RefreshCommand),
         ShortcutId.Export => Raise(ExportRequested),
         ShortcutId.ShowHelp => Open(Help),
+        ShortcutId.ToggleTheme => Run(_settings.ToggleThemeCommand),
         // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is the banner.
         ShortcutId.Escape => DismissAlertIfShowing(),
         _ => false,

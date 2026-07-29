@@ -60,6 +60,9 @@ public static class ShortcutCatalog {
             "Enter", "Open the selected item, or confirm an open dialog", ShortcutScope.Global,
             AllowInTextInput: false),
 
+        new(ShortcutId.ToggleTheme, [new KeyGesture(Key.T, KeyModifiers.Control | KeyModifiers.Shift)],
+            "Ctrl+Shift+T", "Switch between the light and dark theme", ShortcutScope.Global),
+
         // ----- Processes -----
         new(ShortcutId.FocusFilter,
             [new KeyGesture(Key.F, KeyModifiers.Control), new KeyGesture(Key.OemQuestion)],
@@ -97,6 +100,14 @@ public static class ShortcutCatalog {
 
         new(ShortcutId.FocusAddressBar, [new KeyGesture(Key.L, KeyModifiers.Control)],
             "Ctrl+L", "Edit the folder path", ShortcutScope.FileExplorer),
+
+        // ----- Network -----
+        // Ctrl is required so PageUp/PageDown and the bare arrows keep scrolling the connections list.
+        new(ShortcutId.PreviousPage, [new KeyGesture(Key.Left, KeyModifiers.Control)],
+            "Ctrl+←", "Previous page of connections", ShortcutScope.Network),
+
+        new(ShortcutId.NextPage, [new KeyGesture(Key.Right, KeyModifiers.Control)],
+            "Ctrl+→", "Next page of connections", ShortcutScope.Network),
     ];
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row
