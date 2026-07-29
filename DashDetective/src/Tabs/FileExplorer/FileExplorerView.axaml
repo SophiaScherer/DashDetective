@@ -183,36 +183,98 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
         </Style>
+
+        <!-- Back / forward / up, beside the breadcrumb. Disabled state dims the glyph so the
+             end of the trail (and a drive root) reads at a glance. -->
+        <Style Selector="Button.navBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.navBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- Dim the glyph rather than letting the Fluent theme paint a filled disabled box, so a
+             dead end reads as a faded arrow and the bar keeps the app's flat look. -->
+        <Style Selector="Button.navBtn:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.navBtn:disabled Path">
+            <Setter Property="Opacity" Value="0.35"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="12">
 
         <!-- ===== Breadcrumb + filters ===== -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
-            <Border Grid.Column="0" Background="{DynamicResource FieldBackground}"
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+
+            <!-- Back / forward / up. The keyboard drives the same commands (Alt+←, Alt+→,
+                 Backspace / Alt+↑); these keep the navigation discoverable for the mouse. -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <Button Classes="navBtn" ToolTip.Tip="Back (Alt+←)" Command="{Binding GoBackCommand}">
+                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                          Data="M9,2 L4,7 L9,12"/>
+                </Button>
+                <Button Classes="navBtn" ToolTip.Tip="Forward (Alt+→)" Command="{Binding GoForwardCommand}">
+                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                          Data="M5,2 L10,7 L5,12"/>
+                </Button>
+                <Button Classes="navBtn" ToolTip.Tip="Up one folder (Backspace)" Command="{Binding GoUpCommand}">
+                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                          Data="M7,12 V3 M3,7 L7,3 L11,7"/>
+                </Button>
+            </StackPanel>
+
+            <!-- Clicking the field anywhere but on a crumb starts editing the path, as Ctrl+L does —
+                 the I-beam advertises it. The crumbs keep the hand cursor from Button.pick. -->
+            <Border Grid.Column="1" Background="{DynamicResource FieldBackground}"
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6"
-                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True">
-                <ItemsControl ItemsSource="{Binding Crumbs}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="fe:Crumb">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Classes="pick crumb" Command="{Binding SelectCommand}">
-                                    <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
-                                               Text="{Binding Label}"/>
-                                </Button>
-                                <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    Padding="12,7" VerticalAlignment="Center" ClipToBounds="True"
+                    Cursor="IBeam" PointerPressed="OnBreadcrumbPointerPressed">
+                <!-- The trail and the editable path share this field and swap places: Ctrl+L or a click
+                     reveals the box, Enter opens what was typed, Esc or clicking away restores the trail. -->
+                <Panel>
+                    <ItemsControl ItemsSource="{Binding Crumbs}" IsVisible="{Binding ShowCrumbs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="fe:Crumb">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Classes="pick crumb" Command="{Binding SelectCommand}">
+                                        <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
+                                                   Text="{Binding Label}"/>
+                                    </Button>
+                                    <TextBlock Classes="crumbSep" Text="{Binding Separator}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Enter is bound here rather than through the shell: the shortcut layer
+                         deliberately leaves Enter to whatever text box has focus. -->
+                    <TextBox x:Name="PathBox" Classes="flat" IsVisible="{Binding IsPathEditing}"
+                             Text="{Binding PathText}" Padding="0" MinHeight="0" FontSize="12.5"
+                             VerticalContentAlignment="Center"
+                             LostFocus="OnPathBoxLostFocus">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding CommitPathCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                </Panel>
             </Border>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12"
                         VerticalAlignment="Center">
                 <!-- View-options dropdown: groups the checkbox toggles behind one button so the bar
                      stays uncluttered as options are added. A ToggleButton drives a plain Popup

@@ -30,9 +30,9 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the pure-logic `Charts` helpers (`ChartScale`, `SparklinePoints`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`ChartScale`, `SparklinePoints`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
 | `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
-| `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, and the dockable `Navigation` bar. |
+| `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
 
 **Rule of thumb:** anything reused by more than one tab (a control, a colour, a sampler) belongs in
@@ -83,9 +83,54 @@ behaviours by implementing small **marker interfaces** in `src/Shared`:
   routes a single toggle across every page that implements the interface, so one control governs all
   live sampling at once. Hardware is the one data tab that opts out: it reads static facts, so there is
   nothing to pause.
+- **`IShortcutTarget`** — the page handles keyboard shortcuts of its own, and names the
+  `ShortcutScope` its bindings belong to. Processes, File Explorer and Network implement it; see
+  *Keyboard shortcuts* below.
 
 This keeps the shell decoupled from any specific tab: it reasons about capabilities
 ("is the current page refreshable?"), never concrete types.
+
+## Keyboard shortcuts
+
+`src/Shared/Shortcuts` holds the whole model; `src/Shell/Shortcuts` holds the listener.
+
+**`ShortcutCatalog` is the single source of truth.** One static table maps each `ShortcutId` to its
+gestures, its scope, whether it survives a focused text box, and the copy the Help modal shows. The key
+handler resolves against it *and* the Help modal renders from it, so a live binding cannot go
+undocumented, nor a documented one go dead. It holds no control types, so it is fully unit-testable.
+
+**One listener, not `Window.KeyBindings`.** `ShellShortcutHandler` attaches a single tunneling
+`KeyDown` handler to the window — the idiom the Help overlay and File Explorer already use for
+window-wide input. Tunneling is required: it reaches the shell before Avalonia's focus manager claims
+`Ctrl+Tab` as tab-group navigation. It also lets bare keys (`Delete`, `Backspace`, `/`, `Enter`) be
+suppressed while a `TextBox` has focus, via the `AllowInTextInput` flag.
+
+**Scoped resolution.** A gesture may mean different things on different tabs, because only one tab is
+ever current — `Alt+↑` sorts on Processes and climbs a folder on File Explorer. Resolution tries the
+active page's `ShortcutScope` first and falls back to `Global`.
+
+**Dispatch is a priority chain**, and lives on `MainWindowViewModel.HandleShortcut` rather than in the
+window, so it is testable without a UI:
+
+1. **An open modal owns the keyboard.** While the Help modal is up, `Esc` closes it and every other
+   shortcut is swallowed, so a key can never act on the page behind the scrim. Pages apply the same
+   rule one level down for their own overlays (the Processes end-task confirmation, the File Explorer
+   path box).
+2. **The current page**, if it implements `IShortcutTarget`.
+3. **Global** handling.
+
+A handler returns whether it actually did something, and the listener sets `e.Handled` from that. A
+shortcut with nothing to act on — `Delete` with no selection, `Esc` with no banner showing — therefore
+falls through to the rest of the app instead of being silently eaten.
+
+**`Esc` has exactly one owner.** It is resolved through this chain, not by individual controls, so its
+context-sensitivity is decided in one readable place.
+
+Actions the view model cannot run itself are raised as events for the window to service — `Export`
+needs the window's `StorageProvider` for its file picker, so it goes out through
+`MainWindowViewModel.ExportRequested`. Routing it through the chain rather than letting the window
+short-circuit is what keeps it subject to the modal rule above. Focus requests (`Ctrl+F`, `Ctrl+L`)
+use the same view-model-event seam.
 
 ## Live data: samplers and providers
 

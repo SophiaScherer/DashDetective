@@ -86,8 +86,8 @@
                                       Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
                                       StrokeLineCap="Round" VerticalAlignment="Center"
                                       Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-                                <TextBox Grid.Column="1" Margin="9,0,0,0" BorderThickness="0"
-                                         Background="Transparent" FontSize="13" VerticalContentAlignment="Center"
+                                <TextBox Grid.Column="1" Classes="flat" Margin="9,0,0,0"
+                                         FontSize="13" VerticalContentAlignment="Center"
                                          PlaceholderText="Search processes, files, settings…"/>
                             </Grid>
                         </Border>
@@ -95,7 +95,7 @@
                         <!-- Actions -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <Button Classes="livePill" Command="{Binding ToggleLiveCommand}"
-                                    ToolTip.Tip="Pause or resume live updates">
+                                    ToolTip.Tip="Pause or resume live updates (Ctrl+P)">
                                 <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                                     <Ellipse Width="8" Height="8" Fill="{Binding LiveDotBrush}"/>
                                     <TextBlock Text="{Binding LiveLabel}" FontSize="12"
@@ -103,12 +103,12 @@
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button Classes="toolIcon" ToolTip.Tip="Refresh" Command="{Binding RefreshCommand}">
+                            <Button Classes="toolIcon" ToolTip.Tip="Refresh (F5)" Command="{Binding RefreshCommand}">
                                 <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                       Data="M13,8 a5,5 0 1 1 -1.5,-3.5 M13,2.5 V5 H10.5"/>
                             </Button>
-                            <Button Classes="toolIcon" ToolTip.Tip="Export" Click="OnExportClick">
+                            <Button Classes="toolIcon" ToolTip.Tip="Export (Ctrl+E)" Click="OnExportClick">
                                 <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                       Data="M8,2 V10 M8,10 L5,7 M8,10 L11,7 M3,12 V13.5 H13 V12"/>

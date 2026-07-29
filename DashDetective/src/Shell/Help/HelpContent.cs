@@ -5,8 +5,9 @@ namespace DashDetective.Shell.Help;
 /// <summary>
 /// The static copy shown in the Help modal: a one-paragraph description of the app plus the
 /// orientation tips a first-time user needs. Held as a static table (like <c>HardwareCatalog</c>
-/// and <c>FileTypeCatalog</c>) so the content is testable without any UI, and so the keyboard
-/// shortcuts table can be added alongside it when that feature lands.
+/// and <c>FileTypeCatalog</c>) so the content is testable without any UI. The modal's keyboard
+/// shortcuts table is not here — it is generated from <c>ShortcutCatalog</c>, which is also what the
+/// key handler resolves against, so the two cannot drift apart.
 /// </summary>
 public static class HelpContent {
     /// <summary>What the app is, in one paragraph, shown above the tips.</summary>
@@ -23,5 +24,6 @@ public static class HelpContent {
         "Performance detects every CPU, GPU and disk on the machine; the toggle above a graph breaks it down into individual cores or engines.",
         "Refresh re-reads the current page, and Export saves a full plain-text system report.",
         "Settings controls the theme, accent colour, refresh interval and navigation position — all of it is remembered between sessions.",
+        "Most of the app can be driven from the keyboard — Ctrl+1 to Ctrl+8 jump between tabs, and the full list is below.",
     ];
 }

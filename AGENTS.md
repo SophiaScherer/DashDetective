@@ -31,9 +31,33 @@ task explicitly assigns, and do not modify a live feature without an explicit sc
 **Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
 patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
-**File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, and **Storage** (live —
-drives/health view; status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio
-pass; de-duplication / composition refactor) — write-ups in the Appendix.
+**File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
+drives/health view; status below), and **Keyboard shortcuts** (status below). Two cross-cutting passes
+are also complete (repo-hygiene / portfolio pass; de-duplication / composition refactor) — write-ups in
+the Appendix.
+
+**Keyboard shortcuts — implementation status** (LIVE):
+
+- **Keyboard shortcuts** — **fully live**, built in phases (plan:
+  `C:\Users\User\.claude\plans\create-a-phased-plan-crispy-island.md`). A data-driven shortcut layer:
+  `src/Shared/Shortcuts` holds the model (`ShortcutCatalog`, `ShortcutId`, `ShortcutScope`, `Shortcut`,
+  `ShortcutGroup`, `IShortcutTarget`) and `src/Shell/Shortcuts` the listener (`ShellShortcutHandler`,
+  `KeyboardFocus`). **`ShortcutCatalog` is the single source of truth** — the key handler resolves
+  against it and the Help modal renders from it, so bindings and documentation cannot drift. Dispatch is
+  a priority chain on `MainWindowViewModel.HandleShortcut` (open modal → current page via
+  `IShortcutTarget` → global), and a handler reports whether it acted so an inapplicable key falls
+  through. Resolution is **scope-aware**: a gesture may mean different things on different tabs
+  (`Alt+↑` sorts on Processes, climbs a folder on File Explorer). **`Esc` has exactly one owner** — the
+  chain, not individual controls. See *Keyboard shortcuts* in `docs/ARCHITECTURE.md`.
+- Three features were built alongside it because the requested shortcuts had nothing to bind to: the
+  **Processes filter box** (name/PID, with `ProcessFilter` as a testable static), **File Explorer
+  back/forward history** (`NavigationHistory` plus back/forward/up buttons by the breadcrumb), and the
+  **File Explorer editable address bar** (`Ctrl+L`, breadcrumb ⇄ path box).
+- Also added: the shared **`TextBox.flat`** style (Fluent's focus state was painting a solid block and
+  an accent underline over the search/filter/path field chrome).
+- Deliberately **not** bound: `Space` for the Live pill (it activates whatever button has focus) and
+  `PageUp`/`PageDown` for Network paging (they stay as the connections list's scroll gesture); the
+  toolbar search box is still a placeholder, so `Ctrl+F` targets the Processes filter instead.
 
 **Storage — implementation status** (LIVE):
 

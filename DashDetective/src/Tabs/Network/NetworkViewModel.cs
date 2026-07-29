@@ -5,6 +5,7 @@ using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
+using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -25,7 +26,7 @@ namespace DashDetective.Tabs.Network;
 /// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
-public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
+public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IShortcutTarget, IDisposable {
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -64,6 +65,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private int _connectionsTotal;
     /// <summary>Current 1-based page.</summary>
     private int _currentPage = 1;
+
+    // How many pages the current connection list spans; kept in step by RebuildPage so the page-stepping
+    // shortcuts know where the end is.
+    private int _pageCount = 1;
 
     [ObservableProperty] private string _downText = "0";
     [ObservableProperty] private string _upText = "0";
@@ -250,6 +255,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         var available = _allConnections.Count;
         var totalPages = PagerMath.PageCount(available, PageSize);
         _currentPage = PagerMath.ClampPage(_currentPage, totalPages);
+        _pageCount = totalPages;
 
         var start = PagerMath.PageStart(_currentPage, PageSize);
         var count = PagerMath.SliceCount(available, start, PageSize);
@@ -284,6 +290,26 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         for (var p = 1; p <= totalPages; p++)
             PageLinks.Add(new PageLink(p, isCurrent: p == _currentPage, GoToPage));
+    }
+
+    public ShortcutScope Scope => ShortcutScope.Network;
+
+    /// <summary>The page-stepping shortcuts. Only the pager is driven from the keyboard here — scrolling
+    /// the list itself stays with PageUp/PageDown, where it belongs.</summary>
+    public bool HandleShortcut(ShortcutId id) => id switch {
+        ShortcutId.PreviousPage => TryGoToPage(_currentPage - 1),
+        ShortcutId.NextPage => TryGoToPage(_currentPage + 1),
+        _ => false,
+    };
+
+    /// <summary>Steps the pager, reporting a step past either end as unhandled so the key falls through
+    /// rather than being swallowed at the last page.</summary>
+    private bool TryGoToPage(int page) {
+        if (page < 1 || page > _pageCount || page == _currentPage)
+            return false;
+
+        GoToPage(page);
+        return true;
     }
 
     private void OnPingTick(object? sender, EventArgs e) => _ = RunPingAsync();

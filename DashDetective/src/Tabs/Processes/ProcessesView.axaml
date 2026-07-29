@@ -200,6 +200,21 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         </Style>
+
+        <!-- The × inside the filter field: chrome-less so only the glyph reads. -->
+        <Style Selector="Button.clearFilter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.clearFilter:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
@@ -253,7 +268,32 @@
 
         <!-- ===== Process table ===== -->
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*">
+
+            <!-- Filter bar. Narrows the three groups to matching processes; Ctrl+F or "/" puts the
+                 caret here and Esc clears it. Same field chrome as the toolbar's search box. -->
+            <Border Grid.Row="0" Padding="16,10" BorderBrush="{DynamicResource Hairline}"
+                    BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
+                <Border HorizontalAlignment="Left" Width="300" Height="30"
+                        Background="{DynamicResource FieldBackground}"
+                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,0">
+                        <Path Grid.Column="0" Width="13" Height="13" Stretch="Uniform"
+                              Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
+                              StrokeLineCap="Round" VerticalAlignment="Center"
+                              Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+                        <TextBox Grid.Column="1" x:Name="FilterBox" Classes="flat" Margin="8,0,0,0"
+                                 FontSize="12.5" VerticalContentAlignment="Center"
+                                 PlaceholderText="Filter by name or PID" Text="{Binding FilterText}"/>
+                        <Button Grid.Column="2" Classes="clearFilter" ToolTip.Tip="Clear filter"
+                                Command="{Binding ClearFilterCommand}"
+                                IsVisible="{Binding FilterText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                  StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
+                        </Button>
+                    </Grid>
+                </Border>
+            </Border>
 
             <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
                  the label; right-aligned numeric columns put it before, so it always sits inward.
@@ -262,7 +302,7 @@
                  padding (16→30) reserves that scrollbar gutter so the header's star columns compute
                  over the same width as the rows and stay aligned with them (the gutter pattern from
                  the Network table). -->
-            <Border Grid.Row="0" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
+            <Border Grid.Row="1" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
                 <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
                     <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
@@ -318,7 +358,7 @@
             </Border>
 
             <!-- Scrolling grouped list -->
-            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Apps -->

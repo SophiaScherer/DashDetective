@@ -6,6 +6,7 @@ using DashDetective.Services.Settings;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Help;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Dashboard;
@@ -72,6 +73,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>The Help modal. Owned here rather than by the nav bar because the overlay covers the
     /// whole window, navigation bar included.</summary>
     public HelpViewModel Help { get; } = new();
+
+    /// <summary>Raised when the Export shortcut fires, so the window can run the save dialog — it owns
+    /// that because the picker needs the window's <c>TopLevel</c>. UI-only; carries no state.</summary>
+    public event Action? ExportRequested;
 
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
@@ -258,6 +263,117 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// (e.g. Settings) simply ignore it.</summary>
     [RelayCommand]
     private void Refresh() => (CurrentPage as IRefreshablePage)?.Refresh();
+
+    // ----- Keyboard shortcuts -----
+
+    /// <summary>
+    /// Runs a keyboard shortcut, returning whether it was consumed (an unconsumed key falls through to
+    /// the rest of the app). The priority chain lives here rather than in the window so it is testable
+    /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
+    /// own shortcuts, and anything left over is handled globally.
+    /// </summary>
+    /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
+    /// no shortcuts of its own. Read by the window before resolving a key.</summary>
+    public ShortcutScope ActiveScope =>
+        Help.IsOpen ? ShortcutScope.Global : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
+
+    public bool HandleShortcut(ShortcutId id) {
+        // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
+        // allowed to act on the page hidden behind the scrim.
+        if (Help.IsOpen) {
+            if (id == ShortcutId.Escape)
+                Help.Close();
+            return true;
+        }
+
+        if (CurrentPage is IShortcutTarget target && target.HandleShortcut(id))
+            return true;
+
+        return HandleGlobal(id);
+    }
+
+    /// <summary>Handles the shortcuts that work anywhere, whatever page is showing.</summary>
+    private bool HandleGlobal(ShortcutId id) => id switch {
+        // The eight tab jumps are contiguous in the enum, so the offset from the first is the nav
+        // position they select.
+        >= ShortcutId.NavigateTab1 and <= ShortcutId.NavigateTab8 =>
+            NavigateToIndex(id - ShortcutId.NavigateTab1),
+        ShortcutId.NextTab => CycleTab(1),
+        ShortcutId.PreviousTab => CycleTab(-1),
+        ShortcutId.ToggleNavCollapse => Run(Nav.ToggleCollapseCommand),
+        ShortcutId.OpenSettings => NavigateToPage(_settings),
+        ShortcutId.ToggleLive => Run(ToggleLiveCommand),
+        ShortcutId.Refresh => Run(RefreshCommand),
+        ShortcutId.Export => Raise(ExportRequested),
+        ShortcutId.ShowHelp => Open(Help),
+        ShortcutId.ToggleTheme => Run(_settings.ToggleThemeCommand),
+        // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is the banner.
+        ShortcutId.Escape => DismissAlertIfShowing(),
+        _ => false,
+    };
+
+    /// <summary>Runs a command and reports it as consumed, so the switch above stays an
+    /// expression.</summary>
+    private static bool Run(IRelayCommand command) {
+        command.Execute(null);
+        return true;
+    }
+
+    /// <summary>Opens the Help modal and reports the key as consumed.</summary>
+    private static bool Open(HelpViewModel help) {
+        help.Open();
+        return true;
+    }
+
+    /// <summary>Raises a request event, reporting the key as consumed only if something is listening
+    /// (Export does nothing without the window's file picker attached).</summary>
+    private static bool Raise(Action? request) {
+        if (request is null)
+            return false;
+
+        request();
+        return true;
+    }
+
+    /// <summary>Dismisses the resource-alert banner, or leaves Esc unconsumed when it isn't showing.</summary>
+    private bool DismissAlertIfShowing() {
+        if (!AlertBannerVisible)
+            return false;
+
+        DismissAlert();
+        return true;
+    }
+
+    /// <summary>Selects the nav item at the given position. An index past the end of the bar (Ctrl+8
+    /// on a shorter bar) is simply ignored.</summary>
+    private bool NavigateToIndex(int index) {
+        if (index < 0 || index >= Nav.NavItems.Count)
+            return false;
+
+        Nav.Navigate(Nav.NavItems[index]);
+        return true;
+    }
+
+    /// <summary>Selects the nav item hosting the given page. Resolved by page rather than by index so
+    /// it survives a reordering of the bar.</summary>
+    private bool NavigateToPage(ViewModelBase page) {
+        foreach (var item in Nav.NavItems)
+            if (item.Page == page)
+                return NavigateToIndex(Nav.NavItems.IndexOf(item));
+
+        return false;
+    }
+
+    /// <summary>Moves the selection <paramref name="delta"/> places along the bar, wrapping at both
+    /// ends so Ctrl+Tab cycles indefinitely.</summary>
+    private bool CycleTab(int delta) {
+        var count = Nav.NavItems.Count;
+        if (count == 0)
+            return false;
+
+        var next = (Nav.NavItems.IndexOf(Nav.SelectedNav) + delta + count) % count;
+        return NavigateToIndex(next);
+    }
 
     /// <summary>
     /// Builds the plain-text system report for the Export actions (toolbar Export, Settings "Export

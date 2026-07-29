@@ -2,8 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
+using System.Linq;
 
 namespace DashDetective.Tabs.FileExplorer;
 
@@ -26,16 +28,48 @@ public partial class FileExplorerView : UserControl {
     protected override void OnDataContextChanged(EventArgs e) {
         base.OnDataContextChanged(e);
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.ScrollToTopRequested -= OnScrollToTopRequested;
+            _boundViewModel.PathEditRequested -= OnPathEditRequested;
+        }
 
         _boundViewModel = DataContext as FileExplorerViewModel;
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.ScrollToTopRequested += OnScrollToTopRequested;
+            _boundViewModel.PathEditRequested += OnPathEditRequested;
+        }
     }
 
     private void OnScrollToTopRequested() => FileListScroll.ScrollToHome();
+
+    // Selecting the whole path means typing replaces it, while Home/End still edit in place — the
+    // behaviour of every address bar. Posted because the box only becomes focusable once the binding
+    // that reveals it has been applied.
+    private void OnPathEditRequested() =>
+        Dispatcher.UIThread.Post(() => {
+            PathBox.Focus();
+            PathBox.SelectAll();
+        }, DispatcherPriority.Input);
+
+    // Clicking away abandons the edit, matching Esc. Committing hides the box first, so the cancel
+    // that follows finds the edit already closed and does nothing.
+    private void OnPathBoxLostFocus(object? sender, RoutedEventArgs e) =>
+        (DataContext as FileExplorerViewModel)?.CancelPathEditCommand.Execute(null);
+
+    // Clicking the breadcrumb field starts editing the path, the same gesture Windows Explorer has.
+    // A press on a crumb is left alone so it still navigates, and a press inside the box while already
+    // editing must not restart the edit and re-select everything under the caret.
+    private void OnBreadcrumbPointerPressed(object? sender, PointerPressedEventArgs e) {
+        if (DataContext is not FileExplorerViewModel { IsPathEditing: false } vm)
+            return;
+
+        if (e.Source is Visual source &&
+            source.GetSelfAndVisualAncestors().OfType<Button>().Any())
+            return;
+
+        vm.BeginPathEditCommand.Execute(null);
+    }
 
     private void OnOptionsPopupOpened(object? sender, EventArgs e) =>
         TopLevel.GetTopLevel(this)?.AddHandler(

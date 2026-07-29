@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
@@ -123,6 +124,20 @@ public partial class SettingsViewModel : ViewModelBase {
             if (option.Seconds == seconds)
                 return option;
         return IntervalOptions[1]; // default: 1 s
+    }
+
+    /// <summary>Flips between light and dark without a trip to this page (Ctrl+Shift+T). Routed through
+    /// <see cref="SelectTheme"/> so the segmented control's selection, the <c>Changed</c> event and
+    /// persistence all stay in step. Under "System" it flips to whichever explicit theme is the
+    /// opposite of what is currently rendering, so the first press always visibly changes something.</summary>
+    [RelayCommand]
+    private void ToggleTheme() {
+        var target = _theme.IsDarkVariantActive ? AppTheme.Light : AppTheme.Dark;
+        foreach (var option in ThemeOptions)
+            if (option.Value == target) {
+                SelectTheme(option);
+                return;
+            }
     }
 
     private void SelectTheme(ThemeOption option) {

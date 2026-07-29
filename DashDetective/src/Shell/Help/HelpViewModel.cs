@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System.Collections.Generic;
 
 namespace DashDetective.Shell.Help;
@@ -20,6 +21,10 @@ public partial class HelpViewModel : ViewModelBase {
 
     /// <summary>The orientation tips, in display order.</summary>
     public IReadOnlyList<string> Tips => HelpContent.Tips;
+
+    /// <summary>The keyboard shortcuts, grouped by where they apply. Read straight from the catalog the
+    /// key handler uses, so this page always describes the bindings that are actually live.</summary>
+    public IReadOnlyList<ShortcutGroup> ShortcutGroups => ShortcutCatalog.HelpGroups;
 
     /// <summary>Product name and version for the modal's subheading, read from the running assembly
     /// rather than hard-coded (same source as the Settings footer).</summary>

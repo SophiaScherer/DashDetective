@@ -9,8 +9,30 @@ using System.Linq;
 namespace DashDetective.Tabs.Processes;
 
 public partial class ProcessesView : UserControl {
+    // The view model the focus request is currently wired to. Tracked because the page's DataContext
+    // arrives after construction and is swapped as the shell hosts the page.
+    private ProcessesViewModel? _viewModel;
+
     public ProcessesView() {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e) {
+        if (_viewModel is not null)
+            _viewModel.FilterFocusRequested -= FocusFilter;
+
+        _viewModel = DataContext as ProcessesViewModel;
+
+        if (_viewModel is not null)
+            _viewModel.FilterFocusRequested += FocusFilter;
+    }
+
+    // Focusing selects what's already typed, so a second Ctrl+F replaces the term rather than
+    // appending to it — the behaviour every browser's find bar has.
+    private void FocusFilter() {
+        FilterBox.Focus();
+        FilterBox.SelectAll();
     }
 
     // Tap selects the row (drives the highlight + End task / Properties enablement). Handled here

@@ -169,6 +169,25 @@
         <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
     </Style>
 
+    <!-- ===== Search / path fields ===== -->
+    <!-- A TextBox that draws no chrome of its own, for boxes sitting inside a styled field Border
+         (the toolbar search, the process filter, the File Explorer path bar). Fluent otherwise paints
+         a solid background and an accent underline on focus, which fills the rounded field with a
+         square black block and overhangs its corners. The states are listed explicitly because the
+         theme's own :pointerover / :focus rules would otherwise win. -->
+    <Style Selector="TextBox.flat /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="TextBox.flat:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="TextBox.flat:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
     <!-- ===== Scrollbars ===== -->
     <!-- Fluent's default scrollbars auto-hide: a thin line that expands on hover as an overlay ON TOP
          of content. Pin auto-hide off app-wide so a present bar stays solid and stable rather than
