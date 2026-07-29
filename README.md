@@ -6,6 +6,9 @@ A Windows system-information console built with [Avalonia UI](https://avaloniaui
 It presents live machine metrics and hardware details across eight tabs — Dashboard, File Explorer,
 Processes, Performance, Network, Storage, Hardware and Settings — in a single themeable window.
 
+Most of it can be driven from the keyboard: `Ctrl+1`–`Ctrl+8` jump between tabs, `F5` refreshes,
+`Ctrl+P` pauses live sampling and `Ctrl+Shift+T` flips the theme. Press `F1` for the full list.
+
 ## Requirements
 
 1. [.NET 10 SDK](https://dotnet.microsoft.com/download) — both projects target `net10.0-windows`
@@ -82,10 +85,11 @@ DashDetective/
   Assets/                          application icon
   src/
     Shared/                        ViewModelBase, page marker interfaces, AppInfo,
-                                   Charts, Controls, Styles, formatters
+                                   Charts, Controls, Shortcuts, Styles, formatters
     Services/                      Theming, SystemMetrics, Network, Settings, Startup,
                                    Diagnostics, Identity, Threading
-    Shell/                         MainWindow, MainWindowViewModel, ViewLocator, Navigation
+    Shell/                         MainWindow, MainWindowViewModel, ViewLocator,
+                                   Navigation, Help, Shortcuts
     Tabs/                          Dashboard, FileExplorer, Processes, Performance,
                                    Network, Storage, Hardware, Settings
 tests/

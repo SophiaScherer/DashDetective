@@ -1,4 +1,5 @@
 using Avalonia.Input;
+using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Shared.Shortcuts;
@@ -109,6 +110,36 @@ public static class ShortcutCatalog {
         new(ShortcutId.NextPage, [new KeyGesture(Key.Right, KeyModifiers.Control)],
             "Ctrl+→", "Next page of connections", ShortcutScope.Network),
     ];
+
+    /// <summary>The listed shortcuts, grouped by where they apply, as the Help modal renders them.
+    /// Generated from <see cref="All"/> rather than hand-maintained, so documentation cannot drift away
+    /// from what the keys actually do.</summary>
+    public static IReadOnlyList<ShortcutGroup> HelpGroups { get; } = BuildHelpGroups();
+
+    private static IReadOnlyList<ShortcutGroup> BuildHelpGroups() {
+        var groups = new List<ShortcutGroup>();
+
+        // The scopes are declared general-first, which is also the order to read them in.
+        foreach (var scope in Enum.GetValues<ShortcutScope>()) {
+            var rows = new List<Shortcut>();
+            foreach (var shortcut in All)
+                if (shortcut.Scope == scope && shortcut.ShowInHelp)
+                    rows.Add(shortcut);
+
+            if (rows.Count > 0)
+                groups.Add(new ShortcutGroup(TitleOf(scope), rows));
+        }
+
+        return groups;
+    }
+
+    /// <summary>The heading a scope reads as in Help.</summary>
+    private static string TitleOf(ShortcutScope scope) => scope switch {
+        ShortcutScope.Processes => "Processes",
+        ShortcutScope.FileExplorer => "File Explorer",
+        ShortcutScope.Network => "Network",
+        _ => "General",
+    };
 
     /// <summary>Builds one of the Ctrl+digit tab jumps. Only the first carries Help copy — one row
     /// covers the run (see <see cref="Shortcut.ShowInHelp"/>).</summary>

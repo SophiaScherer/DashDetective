@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:help="using:DashDetective.Shell.Help"
+             xmlns:sc="using:DashDetective.Shared.Shortcuts"
              xmlns:sys="using:System"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -90,6 +91,55 @@
                                                        FontSize="12.5" LineHeight="19" TextWrapping="Wrap"
                                                        Foreground="{DynamicResource TextSecondary}"/>
                                         </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Keyboard shortcuts, rendered from the same catalog the key handler
+                             resolves against, so this list can never describe a binding that isn't
+                             live (or miss one that is). -->
+                        <StackPanel Spacing="12">
+                            <TextBlock Classes="helpSection" Text="KEYBOARD SHORTCUTS"/>
+                            <ItemsControl ItemsSource="{Binding ShortcutGroups}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="16"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="sc:ShortcutGroup">
+                                        <StackPanel Spacing="7">
+                                            <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextStrong}"/>
+                                            <ItemsControl ItemsSource="{Binding Shortcuts}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Spacing="6"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="sc:Shortcut">
+                                                        <Grid ColumnDefinitions="150,*">
+                                                            <Border Grid.Column="0" HorizontalAlignment="Left"
+                                                                    Background="{DynamicResource FieldBackground}"
+                                                                    BorderBrush="{DynamicResource Hairline}"
+                                                                    BorderThickness="1" CornerRadius="4"
+                                                                    Padding="7,2">
+                                                                <TextBlock Text="{Binding Keys}" FontSize="11.5"
+                                                                           Foreground="{DynamicResource TextPrimary}"/>
+                                                            </Border>
+                                                            <TextBlock Grid.Column="1" Margin="10,0,0,0"
+                                                                       Text="{Binding Description}"
+                                                                       FontSize="12.5" LineHeight="19"
+                                                                       TextWrapping="Wrap" VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource TextSecondary}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

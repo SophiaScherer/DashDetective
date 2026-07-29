@@ -56,6 +56,37 @@ public class ShortcutCatalogTests {
         }
     }
 
+    [Fact]
+    public void HelpGroups_ListEveryShortcutMarkedForHelpExactlyOnce() {
+        var listed = ShortcutCatalog.HelpGroups.SelectMany(g => g.Shortcuts).ToList();
+        var expected = ShortcutCatalog.All.Where(s => s.ShowInHelp).ToList();
+
+        Assert.Equal(expected.Count, listed.Count);
+        Assert.Equal(expected.Select(s => s.Id).OrderBy(id => id), listed.Select(s => s.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public void HelpGroups_CarryATitleAndAtLeastOneRow() {
+        Assert.NotEmpty(ShortcutCatalog.HelpGroups);
+
+        foreach (var group in ShortcutCatalog.HelpGroups) {
+            Assert.False(string.IsNullOrWhiteSpace(group.Title));
+            Assert.NotEmpty(group.Shortcuts);
+        }
+    }
+
+    [Fact]
+    public void HelpGroups_LeadWithTheGeneralShortcuts() {
+        Assert.Equal("General", ShortcutCatalog.HelpGroups[0].Title);
+    }
+
+    [Fact]
+    public void HelpGroups_KeepEachScopeToOneGroup() {
+        var titles = ShortcutCatalog.HelpGroups.Select(g => g.Title).ToList();
+
+        Assert.Equal(titles.Count, titles.Distinct().Count());
+    }
+
     [Theory]
     [InlineData(Key.D1, ShortcutId.NavigateTab1)]
     [InlineData(Key.NumPad1, ShortcutId.NavigateTab1)]
