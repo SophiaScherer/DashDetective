@@ -48,7 +48,9 @@
     </UserControl.Styles>
 
     <Panel>
-        <Border x:Name="FieldBorder" Height="34"
+        <!-- PointerPressed as well as the box's GotFocus: after picking a result the caret stays in the
+             box, so clicking it again raises no focus event and the dropdown would never come back. -->
+        <Border x:Name="FieldBorder" Height="34" PointerPressed="OnFieldPressed"
                 Background="{DynamicResource FieldBackground}"
                 BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
             <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
@@ -61,6 +63,7 @@
                      shortcut layer deliberately leaves Enter to whatever text box has focus. -->
                 <controls:GhostCompletionBox Grid.Column="1" x:Name="SearchBox" Margin="9,0,0,0"
                                              FontSize="13" ToolTip.Tip="Search (Ctrl+F)"
+                                             GotFocus="OnSearchBoxGotFocus"
                                              PlaceholderText="Search pages, settings, processes, files…"
                                              Text="{Binding Text, Mode=TwoWay}"
                                              Completion="{Binding Completion}"

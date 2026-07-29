@@ -315,6 +315,43 @@ public class UniversalSearchViewModelTests {
     }
 
     [Fact]
+    public void NotifyFocused_OffersTheRecentsWhenTheBoxIsClickedInto() {
+        // The regression this guards: recents reached only through Ctrl+F, never with the mouse.
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, _, _) = BuildWithRecents(recents);
+
+        vm.NotifyFocused();
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Network", Assert.Single(vm.Results).Title);
+    }
+
+    [Fact]
+    public void NotifyFocused_DoesNotAskForFocusItAlreadyHas() {
+        var (vm, _, _) = Build();
+        var focusRequests = 0;
+        vm.FocusRequested += () => focusRequests++;
+
+        vm.NotifyFocused();
+
+        Assert.Equal(0, focusRequests);
+    }
+
+    [Fact]
+    public async Task NotifyFocused_LeavesAnInFlightSearchAlone() {
+        // Clicking back into a box that still holds a term must not replace its results with recents.
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Recent", "", 500, () => { }));
+        var (vm, timer, _) = BuildWithRecents(recents, null, "Network");
+        await SearchAsync(vm, timer, "net");
+
+        vm.NotifyFocused();
+
+        Assert.Equal("Network", Assert.Single(vm.Results).Title);
+    }
+
+    [Fact]
     public async Task ActivateSelected_RemembersWhatWasOpened() {
         var recents = new RecentSearches();
         var (vm, timer, _) = BuildWithRecents(recents, null, "Network");

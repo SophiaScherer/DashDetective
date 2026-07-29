@@ -79,9 +79,12 @@
                         </StackPanel>
 
                         <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the
-                             outside-click dismissal all live in the component. -->
+                             outside-click dismissal all live in the component.
+                             The width is fixed rather than sized to content: the field would otherwise
+                             collapse to nothing when empty and grow as the user types. 320 clears the
+                             toolbar's other columns even at the window's minimum width. -->
                         <search:UniversalSearchView Grid.Column="1" DataContext="{Binding Search}"
-                                                    MaxWidth="420" Margin="16,0"
+                                                    Width="320" Margin="16,0"
                                                     HorizontalAlignment="Right" VerticalAlignment="Center"/>
 
                         <!-- Actions -->

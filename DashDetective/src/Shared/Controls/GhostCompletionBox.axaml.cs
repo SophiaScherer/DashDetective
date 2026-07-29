@@ -129,11 +129,12 @@ public partial class GhostCompletionBox : UserControl {
             return;
 
         Ghost.Inlines?.Add(new Run(Text) { Foreground = Brushes.Transparent });
-        Ghost.Inlines?.Add(new Run(suffix) { Foreground = GhostBrush() });
-    }
 
-    private IBrush? GhostBrush() =>
-        this.FindResource("TextFaint") as IBrush ?? Foreground;
+        // Taken from the block rather than left to inherit: the block's brush is the one the XAML's
+        // DynamicResource already resolved against the active theme, so copying it is exact and does
+        // not depend on how Avalonia propagates Foreground into inlines.
+        Ghost.Inlines?.Add(new Run(suffix) { Foreground = Ghost.Foreground });
+    }
 
     private void SetEnterBinding() {
         Entry.KeyBindings.Clear();

@@ -39,6 +39,17 @@ public partial class UniversalSearchView : UserControl {
     // search, not an append. Posted so focus lands after any binding that reveals the box has applied.
     private void OnFocusRequested() => SearchBox.FocusAndSelectAll();
 
+    // Clicking into the box opens the dropdown too, so the recents are reachable with the mouse and not
+    // only through Ctrl+F. Bubbles up from the inner text box, which is what actually takes focus.
+    private void OnSearchBoxGotFocus(object? sender, RoutedEventArgs e) =>
+        (DataContext as UniversalSearchViewModel)?.NotifyFocused();
+
+    // The same, for a click on a box that already has focus — which is the state the field is left in
+    // after a result is picked, and where GotFocus alone leaves the dropdown unreachable by mouse. The
+    // press is left unhandled so it still places the caret.
+    private void OnFieldPressed(object? sender, PointerPressedEventArgs e) =>
+        (DataContext as UniversalSearchViewModel)?.NotifyFocused();
+
     // The arrows move the selection without the list having focus, so it has to be scrolled by hand.
     private void OnResultsSelectionChanged(object? sender, SelectionChangedEventArgs e) {
         if (sender is ListBox { SelectedItem: { } selected } list)

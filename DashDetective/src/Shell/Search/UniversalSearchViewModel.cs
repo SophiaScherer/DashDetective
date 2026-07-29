@@ -172,15 +172,23 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         Completion = null;
     }
 
-    /// <summary>Puts the caret in the box (Ctrl+F). An empty box offers the recents; one that still has
-    /// a term brings its results back.</summary>
+    /// <summary>Puts the caret in the box (Ctrl+F) and opens the dropdown.</summary>
     public void Focus() {
+        OpenDropdown();
+        FocusRequested?.Invoke();
+    }
+
+    /// <summary>The box took focus by some other route — the user clicked into it. Opens the same
+    /// dropdown without asking for focus it already has. Without this the recents would only ever
+    /// appear via the shortcut, which is not how anyone reaches a search box with a mouse.</summary>
+    public void NotifyFocused() => OpenDropdown();
+
+    // An empty box offers the recents; one that still holds a term brings its results back.
+    private void OpenDropdown() {
         if (Text.Trim().Length > 0)
             IsOpen = true;
         else
             ShowRecents();
-
-        FocusRequested?.Invoke();
     }
 
     /// <summary>
