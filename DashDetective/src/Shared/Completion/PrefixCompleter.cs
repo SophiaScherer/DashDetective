@@ -42,12 +42,16 @@ public static class PrefixCompleter {
 
     /// <summary>The suffix a ghost should draw after what the user has typed, or "" for no suggestion.
     /// Convenience over <see cref="Complete"/> for the common case of rendering one.</summary>
-    public static string Suffix(string? typed, string? completion) =>
-        typed is not null && completion is not null &&
-        completion.Length > typed.Length &&
-        completion.StartsWith(typed, StringComparison.OrdinalIgnoreCase)
+    public static string Suffix(string? typed, string? completion) {
+        // An empty box ghosts nothing, matching Complete: a suggestion before the first keystroke would
+        // be a guess at what the user is about to want.
+        if (string.IsNullOrEmpty(typed) || completion is null || completion.Length <= typed.Length)
+            return "";
+
+        return completion.StartsWith(typed, StringComparison.OrdinalIgnoreCase)
             ? completion[typed.Length..]
             : "";
+    }
 
     // The longest start the two share, compared case-insensitively but returned in the first one's
     // casing (either is as good; the caller only uses the length past what was typed).

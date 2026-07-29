@@ -67,7 +67,7 @@ public sealed class FileSearchProvider : ISearchProvider {
             var path = hit.FullPath;
             results.Add(new SearchResult(
                 SearchCategory.File, hit.Name, hit.FolderPath, score,
-                () => _reveal(path), hit.IsDirectory ? _folderIcon : _fileIcon, hit.Name));
+                () => _reveal(path), hit.IsDirectory ? _folderIcon : _fileIcon, hit.Name, Key: path));
         }
 
         return results;

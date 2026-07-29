@@ -55,9 +55,15 @@ the Appendix.
   **File Explorer editable address bar** (`Ctrl+L`, breadcrumb ⇄ path box).
 - Also added: the shared **`TextBox.flat`** style (Fluent's focus state was painting a solid block and
   an accent underline over the search/filter/path field chrome).
-- Deliberately **not** bound: `Space` for the Live pill (it activates whatever button has focus) and
-  `PageUp`/`PageDown` for Network paging (they stay as the connections list's scroll gesture); the
-  toolbar search box is still a placeholder, so `Ctrl+F` targets the Processes filter instead.
+- Deliberately **not** bound: `Space` for the Live pill (it activates whatever button has focus),
+  `PageUp`/`PageDown` for Network paging (they stay as the connections list's scroll gesture), and
+  `Tab` — accepting a ghosted completion is owned by the field showing one (`GhostCompletionBox`),
+  because only the focused control knows whether there is a suggestion to accept, and Tab must go on
+  moving focus everywhere else.
+- **Superseded by universal search:** `Ctrl+F` is now the global search gesture on every tab, and `/`
+  is the tab-local one — it focuses the Processes filter and the File Explorer address bar. Both `/`
+  bindings are `AllowInTextInput: false`, which also fixed a bug where the key was consumed before
+  reaching the box it had just focused, so a `/` could never be typed into it.
 
 **Storage — implementation status** (LIVE):
 
@@ -619,8 +625,37 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   don't implement it (Settings) simply ignore it (`MainWindowViewModel.Refresh` routes via
   `CurrentPage as IRefreshablePage`) — and an **Export** button that saves a plain-text diagnostics report via the native file-save dialog
   (`DashboardViewModel.BuildDiagnosticsReport`; the dialog is owned by `MainWindow.axaml.cs` since it
-  needs the window's `TopLevel`). The toolbar **Search** box is still non-functional (deferred). Export
-  uses the in-box `Avalonia.Platform.Storage` picker — no new package.
+  needs the window's `TopLevel`). Export uses the in-box `Avalonia.Platform.Storage` picker — no new
+  package.
+
+- **Universal search** — **fully live** (plan:
+  `C:\Users\User\.claude\plans\make-a-plan-to-lexical-salamander.md`). The toolbar box (`Ctrl+F`) searches
+  five categories at once and navigates to whatever is picked, revealing it in place.
+  - **Structure** (`src/Shell/Search/`). `SearchRanker` scores a term against text in four tiers kept
+    200 apart (exact / prefix / word-start / anywhere) with a closeness bonus capped below 100, so a
+    tier can never be crossed. `SearchAggregator` fans one query out to independent `ISearchProvider`s,
+    merges and caps what comes back, and discards an answer whose term the user has already typed past.
+    A provider that throws costs its own category and nothing else.
+  - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
+    `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Processes (over the
+    Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
+    row), and Files.
+  - **Jumping.** There is **no routing layer**. Each provider takes a "go there" callback built in
+    `MainWindowViewModel` (the one class already holding every page), which navigates and then calls a
+    small public `Reveal(...)` on the page. Settings rows carry their `SettingId` as their `Tag`, so
+    the view finds the row to `BringIntoView()` and flash without a name-to-control switch.
+  - **File search** (`src/Services/Search/`). Prefers the Windows index (`Search.CollatorDSO` via
+    `System.Data.OleDb`), falling back to a capped, cancellable breadth-first scan. `IFileSearch`
+    separates *cannot answer* (null) from *found nothing* (empty) — only the former falls back. The
+    term is inlined into the SQL because the provider will not bind parameters inside `CONTAINS`, so
+    `SearchTermEscaper` owns that escaping alone and is tested apart from the query it feeds.
+  - **Completion.** `GhostCompletionBox` (`src/Shared/Controls/`) draws the rest of a suggestion after
+    the caret for `Tab` to accept, used by the search box, the address bar and the process filter.
+    `PrefixCompleter` is the shared rule: one match completes fully, several complete only as far as
+    they agree.
+  - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
+    opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
+    file or an exited process drops itself rather than promising something that no longer works.
 
 - **Settings** — **fully live** (plan: `C:\Users\User\.claude\plans\you-are-working-in-silly-planet.md`).
   - **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Accent color**

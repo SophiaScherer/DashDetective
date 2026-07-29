@@ -29,6 +29,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(200);
 
     private readonly SearchAggregator _aggregator;
+    private readonly RecentSearches _recents;
     private readonly IUiTimer _debounce;
 
     // Cancels the in-flight query when the term changes or the box closes.
@@ -83,13 +84,15 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     public event Action? FocusRequested;
 
     /// <summary>Builds the box over the given providers, on a real dispatcher timer.</summary>
-    public UniversalSearchViewModel(IReadOnlyList<ISearchProvider> providers)
-        : this(providers, new DispatcherTimerAdapter()) { }
+    public UniversalSearchViewModel(IReadOnlyList<ISearchProvider> providers, RecentSearches recents)
+        : this(providers, recents, new DispatcherTimerAdapter()) { }
 
     /// <summary>Test seam: takes the debounce timer explicitly. A real <c>DispatcherTimer</c> only fires
     /// while an Avalonia dispatcher is pumping, so headless tests inject a fake and tick it by hand.</summary>
-    internal UniversalSearchViewModel(IReadOnlyList<ISearchProvider> providers, IUiTimer debounce) {
+    internal UniversalSearchViewModel(
+        IReadOnlyList<ISearchProvider> providers, RecentSearches recents, IUiTimer debounce) {
         _aggregator = new SearchAggregator(providers);
+        _recents = recents;
         _debounce = debounce;
         _debounce.Interval = DebounceDelay;
         _debounce.Tick += OnDebounceElapsed;
@@ -104,8 +107,8 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
             CancelRunning();
             IsSearching = false;
             Completion = null;
-            ShowResults([]);
-            IsOpen = false;
+            // Emptying the box goes back to what an empty box shows — the recents, not a blank card.
+            ShowRecents();
             return;
         }
 
@@ -169,13 +172,56 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         Completion = null;
     }
 
-    /// <summary>Puts the caret in the box (Ctrl+F), re-opening the dropdown if there is still a term to
-    /// show results for.</summary>
+    /// <summary>Puts the caret in the box (Ctrl+F). An empty box offers the recents; one that still has
+    /// a term brings its results back.</summary>
     public void Focus() {
         if (Text.Trim().Length > 0)
             IsOpen = true;
+        else
+            ShowRecents();
 
         FocusRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Lists the last few things opened from here, so an empty box is a shortcut rather than a blank.
+    ///
+    /// Each is projected into an ordinary result row, which is what keeps the dropdown a single list
+    /// with a single template. Their action re-runs the search rather than replaying a stored one: an
+    /// entry pointing at a deleted file or an exited process must not still promise to open it.
+    /// </summary>
+    private void ShowRecents() {
+        var rows = new List<SearchResult>(_recents.Entries.Count);
+        foreach (var entry in _recents.Entries) {
+            var recent = entry;
+            rows.Add(new SearchResult(
+                entry.Category, entry.Title, entry.Subtitle, SearchRanker.NoMatch + 1,
+                () => _ = ReopenAsync(recent), Key: entry.Key));
+        }
+
+        ShowResults(rows);
+        IsOpen = rows.Count > 0;
+    }
+
+    // Finds the entry again by identity and opens it, or forgets it when the search no longer turns it
+    // up — the machine has moved on and the list should too.
+    private async Task ReopenAsync(RecentSearch entry) {
+        IReadOnlyList<SearchResult> results;
+        try {
+            results = await _aggregator.QueryAsync(new SearchQuery(entry.Title), CancellationToken.None);
+        } catch {
+            return;
+        }
+
+        foreach (var result in results)
+            if (result.Category == entry.Category &&
+                string.Equals(result.Identity, entry.Key, StringComparison.OrdinalIgnoreCase)) {
+                _recents.Remember(entry);
+                result.Activate();
+                return;
+            }
+
+        _recents.Forget(entry);
     }
 
     /// <summary>Moves the keyboard <paramref name="delta"/> places through the results, wrapping at both
@@ -192,16 +238,17 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// (the shortcut layer deliberately leaves Enter to whatever text box has focus).</summary>
     [RelayCommand]
     public void ActivateSelected() {
-        if (SelectedIndex < 0 || SelectedIndex >= Results.Count)
-            return;
-
-        var result = Results[SelectedIndex];
-        Dismiss();
-        result.Activate();
+        if (SelectedIndex >= 0 && SelectedIndex < Results.Count)
+            Activate(Results[SelectedIndex]);
     }
 
     /// <summary>Runs a result the user clicked, wherever it sits in the list.</summary>
     public void Activate(SearchResult result) {
+        // A recent's own row re-remembers itself once it has resolved (see ReopenAsync); remembering it
+        // here as well would promote an entry that turns out to be dead.
+        if (HasText)
+            _recents.Remember(result);
+
         Dismiss();
         result.Activate();
     }
@@ -218,10 +265,11 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         IsOpen = false;
     }
 
-    // Closing and clearing together: what picking a result should leave behind.
+    // Closing and clearing together: what picking a result should leave behind. Clearing comes first,
+    // because emptying the box offers the recents — closing afterwards is what puts the dropdown away.
     private void Dismiss() {
-        Close();
         Text = "";
+        Close();
     }
 
     // ----- Keyboard -----

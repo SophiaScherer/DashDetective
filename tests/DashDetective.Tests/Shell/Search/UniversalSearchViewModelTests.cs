@@ -39,10 +39,14 @@ public class UniversalSearchViewModelTests {
     }
 
     private static (UniversalSearchViewModel Vm, FakeUiTimer Timer, StubProvider Provider) Build(
-        Action? onActivate = null, params string[] titles) {
+        Action? onActivate = null, params string[] titles) =>
+        BuildWithRecents(new RecentSearches(), onActivate, titles);
+
+    private static (UniversalSearchViewModel Vm, FakeUiTimer Timer, StubProvider Provider) BuildWithRecents(
+        RecentSearches recents, Action? onActivate = null, params string[] titles) {
         var provider = new StubProvider(onActivate, titles.Length > 0 ? titles : ["one", "two", "three"]);
         var timer = new FakeUiTimer();
-        return (new UniversalSearchViewModel([provider], timer), timer, provider);
+        return (new UniversalSearchViewModel([provider], recents, timer), timer, provider);
     }
 
     // Types a term and lets the debounce elapse, as the dispatcher timer would.
@@ -105,7 +109,7 @@ public class UniversalSearchViewModelTests {
     public async Task Text_ReportsNothingFoundWhenTheProvidersComeBackEmpty() {
         var provider = new StubProvider(null);
         var timer = new FakeUiTimer();
-        var vm = new UniversalSearchViewModel([provider], timer);
+        var vm = new UniversalSearchViewModel([provider], new RecentSearches(), timer);
 
         await SearchAsync(vm, timer, "zzz");
 
@@ -222,7 +226,6 @@ public class UniversalSearchViewModelTests {
         Assert.Equal(1, activated);
         Assert.False(vm.IsOpen);
         Assert.Equal("", vm.Text);
-        Assert.Empty(vm.Results);
     }
 
     [Fact]
@@ -289,12 +292,66 @@ public class UniversalSearchViewModelTests {
     }
 
     [Fact]
-    public void Focus_LeavesTheDropdownShutForAnEmptyBox() {
+    public void Focus_LeavesTheDropdownShutForAnEmptyBoxWithNoHistory() {
         var (vm, _, _) = Build();
 
         vm.Focus();
 
         Assert.False(vm.IsOpen);
+    }
+
+    // ----- Recents -----
+
+    [Fact]
+    public void Focus_OffersTheRecentsForAnEmptyBox() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, _, _) = BuildWithRecents(recents);
+
+        vm.Focus();
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Network", Assert.Single(vm.Results).Title);
+    }
+
+    [Fact]
+    public async Task ActivateSelected_RemembersWhatWasOpened() {
+        var recents = new RecentSearches();
+        var (vm, timer, _) = BuildWithRecents(recents, null, "Network");
+        await SearchAsync(vm, timer, "net");
+
+        vm.ActivateSelected();
+
+        var entry = Assert.Single(recents.Entries);
+        Assert.Equal("Network", entry.Title);
+        Assert.Equal(SearchCategory.Page, entry.Category);
+    }
+
+    [Fact]
+    public async Task ActivateSelected_ReopensTheRecentsOnceTheBoxIsEmptyAgain() {
+        var recents = new RecentSearches();
+        var (vm, timer, _) = BuildWithRecents(recents, null, "Network");
+        await SearchAsync(vm, timer, "net");
+        vm.ActivateSelected();
+
+        vm.Focus();
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Network", Assert.Single(vm.Results).Title);
+    }
+
+    [Fact]
+    public async Task Recents_ForgetAnEntryTheSearchNoLongerTurnsUp() {
+        // A file deleted, or a process exited, since it was last opened.
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Process, "gone.exe", "PID 1", 500, () => { }));
+        var (vm, _, _) = BuildWithRecents(recents, null, "Network");
+
+        vm.Focus();
+        vm.ActivateSelected();
+        await Task.Yield();
+
+        Assert.Empty(recents.Entries);
     }
 
     [Fact]

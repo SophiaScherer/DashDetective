@@ -46,7 +46,7 @@ public sealed class SettingSearchProvider : ISearchProvider {
             var id = entry.Id;
             results.Add(new SearchResult(
                 SearchCategory.Setting, entry.Name, entry.Section, score,
-                () => _reveal(id), _icon, entry.Name));
+                () => _reveal(id), _icon, entry.Name, Key: id.ToString()));
         }
 
         return Task.FromResult<IReadOnlyList<SearchResult>>(results);

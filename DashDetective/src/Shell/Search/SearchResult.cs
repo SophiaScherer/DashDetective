@@ -16,6 +16,9 @@ namespace DashDetective.Shell.Search;
 /// <param name="Icon">The glyph shown beside the row, or null for the category's default.</param>
 /// <param name="Completion">What Tab should fill the search box with, when this is the top result.
 /// Null for results that aren't worth completing to (a page name the user already finished typing).</param>
+/// <param name="Key">Stable identity within the category, for recognising the same thing again in a
+/// later search — a file's full path, a setting's id, a process's image name. Falls back to the title,
+/// which is identity enough for a page or a shortcut.</param>
 public sealed record SearchResult(
     SearchCategory Category,
     string Title,
@@ -23,7 +26,12 @@ public sealed record SearchResult(
     int Score,
     Action Activate,
     Geometry? Icon = null,
-    string? Completion = null) {
+    string? Completion = null,
+    string? Key = null) {
+
+    /// <summary>What identifies this result across searches. Two results with the same category and
+    /// identity are the same thing, even if one came from a later query than the other.</summary>
+    public string Identity => Key ?? Title;
 
     /// <summary>How the category reads on the row's tag. Kept here rather than in a converter so the
     /// dropdown's template stays a plain binding.</summary>

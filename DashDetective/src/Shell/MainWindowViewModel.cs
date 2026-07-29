@@ -82,6 +82,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// page it targets — no routing layer, and no page needs to know about search.</summary>
     public UniversalSearchViewModel Search { get; }
 
+    /// <summary>What an empty search box offers. Persisted alongside the other settings.</summary>
+    private readonly RecentSearches _recents = new();
+
     /// <summary>Raised when the Export shortcut fires, so the window can run the save dialog — it owns
     /// that because the picker needs the window's <c>TopLevel</c>. UI-only; carries no state.</summary>
     public event Action? ExportRequested;
@@ -166,7 +169,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 new WindowsSearchIndex(), new FileSystemFallbackSearch(),
                 () => _fileExplorer.CurrentPath, RevealFile,
                 Icons.Document, Icons.FileExplorer),
-        ]);
+        ], _recents);
+        _recents.Changed += Persist;
 
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
@@ -192,6 +196,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
+        _recents.Load(settings.RecentSearches);
     }
 
     /// <summary>Resolves a persisted accent name to its preset, or <c>null</c> for the default look
@@ -219,6 +224,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
+        RecentSearches = _recents.Encode(),
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
