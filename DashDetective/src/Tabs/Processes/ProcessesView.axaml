@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:DashDetective.Tabs.Processes"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:ProcessesViewModel"
              x:Class="DashDetective.Tabs.Processes.ProcessesView">
@@ -201,20 +202,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         </Style>
 
-        <!-- The × inside the filter field: chrome-less so only the glyph reads. -->
-        <Style Selector="Button.clearFilter">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="20"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Button.clearFilter:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
@@ -282,10 +269,13 @@
                               Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
                               StrokeLineCap="Round" VerticalAlignment="Center"
                               Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-                        <TextBox Grid.Column="1" x:Name="FilterBox" Classes="flat" Margin="8,0,0,0"
-                                 FontSize="12.5" VerticalContentAlignment="Center"
-                                 PlaceholderText="Filter by name or PID" Text="{Binding FilterText}"/>
-                        <Button Grid.Column="2" Classes="clearFilter" ToolTip.Tip="Clear filter"
+                        <!-- Tab fills in a running process name from what has been typed. -->
+                        <controls:GhostCompletionBox Grid.Column="1" x:Name="FilterBox" Margin="8,0,0,0"
+                                                     FontSize="12.5"
+                                                     PlaceholderText="Filter by name or PID"
+                                                     Text="{Binding FilterText, Mode=TwoWay}"
+                                                     Completion="{Binding FilterCompletion}"/>
+                        <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear filter"
                                 Command="{Binding ClearFilterCommand}"
                                 IsVisible="{Binding FilterText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                             <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
@@ -358,7 +348,8 @@
             </Border>
 
             <!-- Scrolling grouped list -->
-            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+            <ScrollViewer Grid.Row="2" x:Name="ProcessListScroll"
+                          HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Apps -->

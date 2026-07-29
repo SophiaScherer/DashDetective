@@ -27,6 +27,9 @@ public enum ShortcutId {
     Export,
     ShowHelp,
 
+    /// <summary>Puts the caret in the toolbar's universal-search box, from any tab.</summary>
+    FocusSearch,
+
     /// <summary>Context-sensitive dismissal: closes the Help modal, else cancels whatever the current
     /// page has open, else dismisses the resource-alert banner.</summary>
     Escape,
@@ -34,6 +37,14 @@ public enum ShortcutId {
     /// <summary>Context-sensitive activation: confirms an open dialog, else opens the selected item.
     /// Each page decides what it means, the way <see cref="Escape"/> does.</summary>
     Activate,
+
+    // ----- Search results -----
+
+    /// <summary>Moves the highlight down the universal-search result list.</summary>
+    SelectNextResult,
+
+    /// <summary>Moves the highlight up the universal-search result list.</summary>
+    SelectPreviousResult,
 
     // ----- Page actions -----
     FocusFilter,

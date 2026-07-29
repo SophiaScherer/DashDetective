@@ -129,8 +129,18 @@ context-sensitivity is decided in one readable place.
 Actions the view model cannot run itself are raised as events for the window to service — `Export`
 needs the window's `StorageProvider` for its file picker, so it goes out through
 `MainWindowViewModel.ExportRequested`. Routing it through the chain rather than letting the window
-short-circuit is what keeps it subject to the modal rule above. Focus requests (`Ctrl+F`, `Ctrl+L`)
+short-circuit is what keeps it subject to the modal rule above. Focus requests (`Ctrl+F`, `Ctrl+L`, `/`)
 use the same view-model-event seam.
+
+The universal-search dropdown sits between the modal and the page in that chain: while it is open the
+shell reports `ShortcutScope.Search`, so the bare arrow keys walk the results without being stolen from
+every other page. Unlike Help it does not swallow the rest — `Ctrl+1` still switches tabs from a
+half-typed search.
+
+`Tab` is deliberately **not** in the catalog. Accepting a ghosted completion belongs to the field
+showing one (`GhostCompletionBox`), because whether there is a suggestion to accept is a property of the
+focused control; routing it through the chain would mean asking a view model about focus, and would
+stop `Tab` moving focus everywhere else.
 
 ## Live data: samplers and providers
 

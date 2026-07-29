@@ -19,6 +19,9 @@ public static class HelpContent {
 
     /// <summary>Short orientation tips, in display order.</summary>
     public static readonly IReadOnlyList<string> Tips = [
+        "Ctrl+F searches everything at once — pages, settings, keyboard shortcuts, running processes and your files. Pick a result and it takes you there and highlights it.",
+        "Press / to jump straight to the current tab's own field: the process filter, or the File Explorer address bar.",
+        "Where a field can guess what you are typing, the rest of the suggestion appears greyed out after the caret — press Tab to accept it.",
         "Drag the navigation bar by its logo to dock it to any window edge, or collapse it to a slim icon rail.",
         "The Live pill in the toolbar shows whether sampling is running — click it to pause updates while you read a chart.",
         "Performance detects every CPU, GPU and disk on the machine; the toggle above a graph breaks it down into individual cores or engines.",

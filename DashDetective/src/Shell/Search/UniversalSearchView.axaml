@@ -1,0 +1,137 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:search="using:DashDetective.Shell.Search"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="34"
+             x:DataType="search:UniversalSearchViewModel"
+             x:Class="DashDetective.Shell.Search.UniversalSearchView">
+
+    <UserControl.Styles>
+        <!-- Result rows. The ListBox is used (rather than the hand-rolled ItemsControl tables the data
+             pages use) because selection, keyboard traversal and scroll-into-view are exactly what a
+             dropdown needs and exactly what it already provides. Fluent's own item chrome is stripped
+             back to the app's hover/selected overlays. -->
+        <Style Selector="ListBox.results">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <!-- Listed after hover so the keyboard's position stays legible under the pointer. -->
+        <Style Selector="ListBox.results ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+        <Style Selector="ListBox.results ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
+        <!-- The category tag at the right of a row (Page / Setting / Process / File). -->
+        <Style Selector="Border.resultTag">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- PointerPressed as well as the box's GotFocus: after picking a result the caret stays in the
+             box, so clicking it again raises no focus event and the dropdown would never come back. -->
+        <Border x:Name="FieldBorder" Height="34" PointerPressed="OnFieldPressed"
+                Background="{DynamicResource FieldBackground}"
+                BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
+                <Path Grid.Column="0" Width="14" Height="14" Stretch="Uniform"
+                      Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
+                      StrokeLineCap="Round" VerticalAlignment="Center"
+                      Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+
+                <!-- Tab fills in the best result's name; Enter is bound on the box itself because the
+                     shortcut layer deliberately leaves Enter to whatever text box has focus. -->
+                <controls:GhostCompletionBox Grid.Column="1" x:Name="SearchBox" Margin="9,0,0,0"
+                                             FontSize="13" ToolTip.Tip="Search (Ctrl+F)"
+                                             GotFocus="OnSearchBoxGotFocus"
+                                             LostFocus="OnSearchBoxLostFocus"
+                                             PlaceholderText="Search pages, settings, processes, files…"
+                                             Text="{Binding Text, Mode=TwoWay}"
+                                             Completion="{Binding Completion}"
+                                             EnterCommand="{Binding ActivateSelectedCommand}"/>
+
+                <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
+                        Command="{Binding ClearCommand}" IsVisible="{Binding HasText}">
+                    <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                          StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Overlay-free so the caret stays in the box while results are showing — a light-dismiss popup
+             takes focus, which would stop the user typing. Close-on-outside-click is emulated in the
+             code-behind, the same trade the File Explorer's Options menu makes. -->
+        <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #FieldBorder}"
+               Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+               IsLightDismissEnabled="False" Focusable="False"
+               Width="{Binding #FieldBorder.Bounds.Width}"
+               IsOpen="{Binding IsOpen}">
+            <Border Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                    CornerRadius="8" Padding="6" BoxShadow="0 8 24 0 #22000000">
+                <Panel>
+                    <!-- Exactly one of these three shows at a time (see the view model): a blank card
+                         while the filesystem answers would read as "nothing found". -->
+                    <TextBlock Text="Searching…" Margin="10,12" FontSize="12.5"
+                               Foreground="{DynamicResource TextSubtle}"
+                               IsVisible="{Binding ShowSearching}"/>
+                    <TextBlock Text="No matches" Margin="10,12" FontSize="12.5"
+                               Foreground="{DynamicResource TextSubtle}"
+                               IsVisible="{Binding ShowNoResults}"/>
+
+                    <ListBox Classes="results" ItemsSource="{Binding Results}"
+                             SelectedIndex="{Binding SelectedIndex}"
+                             SelectionChanged="OnResultsSelectionChanged"
+                             MaxHeight="380" IsVisible="{Binding ShowResultList}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="search:SearchResult">
+                                <Border Background="Transparent" Padding="10,7" Tapped="OnResultTapped">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Path Grid.Column="0" Width="15" Height="15" Stretch="Uniform"
+                                              Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.3"
+                                              StrokeLineCap="Round" StrokeJoin="Round"
+                                              VerticalAlignment="Center" Data="{Binding Icon}"
+                                              IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                        <StackPanel Grid.Column="1" Margin="10,0" Spacing="1">
+                                            <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource TextPrimary}"/>
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource TextSubtle}"
+                                                       IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="resultTag">
+                                            <TextBlock Text="{Binding CategoryLabel}" FontSize="10"
+                                                       Foreground="{DynamicResource TextMuted}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Panel>
+            </Border>
+        </Popup>
+    </Panel>
+</UserControl>

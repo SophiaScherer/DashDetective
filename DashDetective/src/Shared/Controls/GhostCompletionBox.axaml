@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="240" d:DesignHeight="20"
+             x:Class="DashDetective.Shared.Controls.GhostCompletionBox">
+
+    <!-- The suggestion is drawn behind the box rather than beside it, so it needs no measuring: the
+         ghost's first run repeats what the user typed in Transparent, which reserves exactly the right
+         width for the visible suffix to start at the caret. Both share the box's font and sit at zero
+         padding, so the two strings land on the same baseline and pitch. -->
+    <Panel>
+        <!-- The suggestion's colour is set here, not in code: a DynamicResource resolves against the
+             active theme dictionary, which a code-behind FindResource does not — it returns null and
+             silently falls back to the ordinary text brush, making the ghost look like real input. -->
+        <TextBlock x:Name="Ghost" IsHitTestVisible="False"
+                   Foreground="{DynamicResource TextGhost}"
+                   VerticalAlignment="Center" TextTrimming="None" ClipToBounds="True"/>
+        <TextBox x:Name="Entry" Classes="flat" Padding="0" MinHeight="0" MinWidth="0"
+                 Background="Transparent" VerticalContentAlignment="Center"/>
+    </Panel>
+</UserControl>

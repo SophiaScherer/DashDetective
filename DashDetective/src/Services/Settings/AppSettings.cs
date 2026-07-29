@@ -46,6 +46,12 @@ public sealed record AppSettings {
     /// single overall utilization chart.</summary>
     public bool GpuDetailedView { get; init; }
 
+    /// <summary>The last few things opened from the universal search box, newest first, encoded by
+    /// <c>RecentSearches</c>. Opaque here, so this record — and the settings file — stay free of any
+    /// knowledge of what a search result is. One string rather than a list because this record's
+    /// value equality (which the round-trip relies on) compares a collection by reference.</summary>
+    public string RecentSearches { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();

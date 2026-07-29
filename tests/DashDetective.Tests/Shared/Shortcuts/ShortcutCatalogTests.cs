@@ -125,6 +125,68 @@ public class ShortcutCatalogTests {
     }
 
     [Fact]
+    public void TryResolve_ReservesControlFForUniversalSearchOnEveryTab() {
+        // Ctrl+F belongs to the toolbar search box alone — no tab may reclaim it for its own field.
+        foreach (var scope in Enum.GetValues<ShortcutScope>()) {
+            Assert.True(ShortcutCatalog.TryResolve(
+                Key.F, KeyModifiers.Control, textInputFocused: false, scope, out var id));
+            Assert.Equal(ShortcutId.FocusSearch, id);
+        }
+    }
+
+    [Fact]
+    public void TryResolve_MapsSlashToWhicheverFieldTheTabOwns() {
+        Assert.True(ShortcutCatalog.TryResolve(
+            Key.OemQuestion, KeyModifiers.None, false, ShortcutScope.Processes, out var onProcesses));
+        Assert.Equal(ShortcutId.FocusFilter, onProcesses);
+
+        Assert.True(ShortcutCatalog.TryResolve(
+            Key.OemQuestion, KeyModifiers.None, false, ShortcutScope.FileExplorer, out var onFiles));
+        Assert.Equal(ShortcutId.FocusAddressBar, onFiles);
+
+        // A tab with no field of its own leaves "/" alone.
+        Assert.False(ShortcutCatalog.TryResolve(
+            Key.OemQuestion, KeyModifiers.None, false, ShortcutScope.Network, out _));
+        Assert.False(Resolve(Key.OemQuestion, KeyModifiers.None, false, out _));
+    }
+
+    [Fact]
+    public void TryResolve_LetsSlashBeTypedIntoTheFieldItJustFocused() {
+        // The bug this guards: a text-safe "/" is consumed by the shell before reaching the focused box,
+        // so the character can never be typed into the filter or the path bar.
+        Assert.False(ShortcutCatalog.TryResolve(
+            Key.OemQuestion, KeyModifiers.None, textInputFocused: true, ShortcutScope.Processes, out _));
+        Assert.False(ShortcutCatalog.TryResolve(
+            Key.OemQuestion, KeyModifiers.None, textInputFocused: true, ShortcutScope.FileExplorer, out _));
+    }
+
+    [Fact]
+    public void TryResolve_OffersTheResultArrowsOnlyWhileTheSearchDropdownIsOpen() {
+        // Search scope is reported by the shell only while the dropdown is up; everywhere else the bare
+        // arrows must keep scrolling the page.
+        Assert.True(ShortcutCatalog.TryResolve(
+            Key.Down, KeyModifiers.None, textInputFocused: true, ShortcutScope.Search, out var next));
+        Assert.Equal(ShortcutId.SelectNextResult, next);
+
+        Assert.True(ShortcutCatalog.TryResolve(
+            Key.Up, KeyModifiers.None, textInputFocused: true, ShortcutScope.Search, out var previous));
+        Assert.Equal(ShortcutId.SelectPreviousResult, previous);
+
+        Assert.False(Resolve(Key.Down, KeyModifiers.None, false, out _));
+        Assert.False(ShortcutCatalog.TryResolve(
+            Key.Up, KeyModifiers.None, false, ShortcutScope.Processes, out _));
+    }
+
+    [Fact]
+    public void TryResolve_LeavesBareTabToTheFocusManager() {
+        // Accepting a ghosted completion is owned by the field showing one, not by this table: only the
+        // focused control knows whether there is a suggestion to accept. Everywhere else Tab must keep
+        // moving focus, which it cannot do if the shell claims it.
+        Assert.False(Resolve(Key.Tab, KeyModifiers.None, textInputFocused: true, out _));
+        Assert.False(Resolve(Key.Tab, KeyModifiers.None, textInputFocused: false, out _));
+    }
+
+    [Fact]
     public void TryResolve_FallsBackToGlobalWhenTheTabClaimsNothing() {
         Assert.True(ShortcutCatalog.TryResolve(
             Key.D1, KeyModifiers.Control, false, ShortcutScope.FileExplorer, out var id));

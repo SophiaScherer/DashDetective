@@ -19,21 +19,26 @@ public partial class ProcessesView : UserControl {
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.FilterFocusRequested -= FocusFilter;
+            _viewModel.ScrollToTopRequested -= ScrollToTop;
+        }
 
         _viewModel = DataContext as ProcessesViewModel;
 
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.FilterFocusRequested += FocusFilter;
+            _viewModel.ScrollToTopRequested += ScrollToTop;
+        }
     }
 
-    // Focusing selects what's already typed, so a second Ctrl+F replaces the term rather than
-    // appending to it — the behaviour every browser's find bar has.
-    private void FocusFilter() {
-        FilterBox.Focus();
-        FilterBox.SelectAll();
-    }
+    // A jump from universal search narrows the list to the process asked for; the table has to go back
+    // to the top for the selected row to be on screen. The view owns the ScrollViewer, so it listens.
+    private void ScrollToTop() => ProcessListScroll.ScrollToHome();
+
+    // Focusing selects what's already typed, so a second "/" replaces the term rather than appending
+    // to it — the behaviour every browser's find bar has.
+    private void FocusFilter() => FilterBox.FocusAndSelectAll();
 
     // Tap selects the row (drives the highlight + End task / Properties enablement). Handled here
     // rather than in the view model because a row tap has no XAML command binding — the same pattern

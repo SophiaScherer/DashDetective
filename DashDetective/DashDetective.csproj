@@ -45,6 +45,9 @@
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1"/>
+        <!-- Queries the Windows Search index (the Search.CollatorDSO OLE DB provider) for universal
+             search's file results. Version-aligned with System.Management above. -->
+        <PackageReference Include="System.Data.OleDb" Version="10.0.9"/>
         <PackageReference Include="System.Management" Version="10.0.9"/>
     </ItemGroup>
 </Project>

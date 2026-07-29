@@ -44,13 +44,8 @@ public partial class FileExplorerView : UserControl {
     private void OnScrollToTopRequested() => FileListScroll.ScrollToHome();
 
     // Selecting the whole path means typing replaces it, while Home/End still edit in place — the
-    // behaviour of every address bar. Posted because the box only becomes focusable once the binding
-    // that reveals it has been applied.
-    private void OnPathEditRequested() =>
-        Dispatcher.UIThread.Post(() => {
-            PathBox.Focus();
-            PathBox.SelectAll();
-        }, DispatcherPriority.Input);
+    // behaviour of every address bar.
+    private void OnPathEditRequested() => PathBox.FocusAndSelectAll();
 
     // Clicking away abandons the edit, matching Esc. Committing hides the box first, so the cancel
     // that follows finds the edit already closed and does nothing.

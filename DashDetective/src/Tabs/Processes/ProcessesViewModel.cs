@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Completion;
 using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
@@ -49,6 +50,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>The last snapshot, kept so a header click can re-sort immediately without waiting for
     /// the next poll.</summary>
     private IReadOnlyList<ProcessInfo> _lastSnapshot = Array.Empty<ProcessInfo>();
+
+    /// <summary>The processes from the last poll, for universal search to match against. Reading what
+    /// this page already has in hand means searching costs no extra enumeration; it is at most one poll
+    /// (two seconds) stale, which is the same list the user is looking at.</summary>
+    public IReadOnlyList<ProcessInfo> Snapshot => _lastSnapshot;
 
     /// <summary>The last built process tree (top-level entries with their collapsed children). Kept so
     /// the expand/collapse chevrons can re-flatten the visible rows without rebuilding the tree.</summary>
@@ -132,7 +138,24 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// to the rows already in hand, so typing re-filters instantly without waiting for the next poll.</summary>
     [ObservableProperty] private string _filterText = "";
 
-    partial void OnFilterTextChanged(string value) => RebuildVisibleRows();
+    /// <summary>The running process name the filter should complete to, ghosted after the caret for Tab
+    /// to accept. Null when nothing matches, or when the candidates disagree past what is typed.</summary>
+    [ObservableProperty] private string? _filterCompletion;
+
+    partial void OnFilterTextChanged(string value) {
+        RebuildVisibleRows();
+        UpdateFilterCompletion();
+    }
+
+    // Recomputed on each keystroke and each poll, over the snapshot already in hand — a few hundred
+    // names is nothing next to the tree rebuild that runs alongside it.
+    private void UpdateFilterCompletion() {
+        var names = new List<string>(_lastSnapshot.Count);
+        foreach (var process in _lastSnapshot)
+            names.Add(process.Name);
+
+        FilterCompletion = PrefixCompleter.Complete(FilterText, names);
+    }
 
     /// <summary>Clears the filter (the box's × button, and Esc while the box has content).</summary>
     [RelayCommand]
@@ -141,6 +164,62 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the box.
     /// UI-only; carries no state — the same view/view-model seam the File Explorer uses for scrolling.</summary>
     public event Action? FilterFocusRequested;
+
+    /// <summary>Raised after <see cref="Reveal"/> narrows the list, so the view can reset the table's
+    /// scroll to the top and the revealed row is on screen. UI-only, like the focus request above.</summary>
+    public event Action? ScrollToTopRequested;
+
+    /// <summary>
+    /// Points the page at one process, for a jump from universal search: filters to its name, expands
+    /// whatever it is nested under, and selects its row.
+    ///
+    /// Filtering by name rather than by PID is deliberate — a multi-process app collapses into one entry
+    /// here, so the user sees the whole group they searched for and not a lone helper torn out of it.
+    /// </summary>
+    public void Reveal(int pid) {
+        var path = new List<ProcessNode>();
+        if (!TryFindPath(_lastRoots, pid, path))
+            return;
+
+        // Reveal the ancestors before filtering so the single rebuild below shows the finished state.
+        for (var i = 0; i < path.Count - 1; i++)
+            _expandedPids.Add(path[i].Info.Pid);
+
+        // Assigning the filter rebuilds the rows; only rebuild by hand when it was already this term.
+        var name = path[^1].Info.Name;
+        if (FilterText == name)
+            RebuildVisibleRows();
+        else
+            FilterText = name;
+
+        SelectByPid(pid);
+        ScrollToTopRequested?.Invoke();
+    }
+
+    /// <summary>Depth-first search for the node with this PID, recording the nodes walked through to
+    /// reach it (so <see cref="Reveal"/> can expand them). Internal only so it is testable without a
+    /// dispatcher — the rest of this class needs a live timer to construct.</summary>
+    internal static bool TryFindPath(IReadOnlyList<ProcessNode> nodes, int pid, List<ProcessNode> path) {
+        foreach (var node in nodes) {
+            path.Add(node);
+            if (node.Info.Pid == pid || TryFindPath(node.Children, pid, path))
+                return true;
+            path.RemoveAt(path.Count - 1);
+        }
+
+        return false;
+    }
+
+    // Selects the row for a PID across the three groups. A PID with no row (its group is filtered out,
+    // or it exited between the search and the jump) simply leaves the selection alone.
+    private void SelectByPid(int pid) {
+        foreach (var group in new[] { Apps, Background, WindowsProcesses })
+            foreach (var row in group)
+                if (row.Pid == pid) {
+                    SelectRow(row);
+                    return;
+                }
+    }
 
     public ProcessesViewModel(SystemMetricsService service) {
         _service = service;
@@ -227,6 +306,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _lastRoots = ProcessTreeBuilder.Build(processes);
         PruneExpanded(_lastRoots);
         RebuildVisibleRows();
+        UpdateFilterCompletion();
     }
 
     /// <summary>Drops expand state for PIDs that no longer name a live parent (exited or lost their

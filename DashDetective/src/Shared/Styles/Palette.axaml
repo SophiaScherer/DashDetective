@@ -70,6 +70,9 @@
             <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF" Opacity="0.50"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF" Opacity="0.45"/>
             <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF" Opacity="0.35"/>
+            <!-- Ghosted completion text. Fainter than TextFaint on purpose: it sits directly beside
+                 what the user is typing, so it has to read as a suggestion rather than as input. -->
+            <SolidColorBrush x:Key="TextGhost" Color="#FFFFFF" Opacity="0.18"/>
         </ResourceDictionary>
 
         <!-- ===================== LIGHT ===================== -->
@@ -100,6 +103,8 @@
             <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.50"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.45"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
+            <!-- See the dark theme's note; a touch stronger, as dark-on-light reads fainter. -->
+            <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.22"/>
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

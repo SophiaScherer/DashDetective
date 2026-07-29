@@ -53,6 +53,14 @@ public static class ShortcutCatalog {
         new(ShortcutId.ShowHelp, [new KeyGesture(Key.F1), new KeyGesture(Key.OemQuestion, KeyModifiers.Control)],
             "F1 / Ctrl+/", "Open this Help window", ShortcutScope.Global),
 
+        // Ctrl+F belongs to universal search alone; a tab's own field is reached with "/" instead.
+        new(ShortcutId.FocusSearch, [new KeyGesture(Key.F, KeyModifiers.Control)],
+            "Ctrl+F", "Search pages, settings, processes and files", ShortcutScope.Global),
+
+        // Tab is deliberately absent: accepting a ghosted completion is owned by the field showing one
+        // (see GhostCompletionBox), because only the focused control knows whether there is a
+        // suggestion to accept. Routing it through here would mean asking a view model about focus.
+
         new(ShortcutId.Escape, [new KeyGesture(Key.Escape)],
             "Esc", "Close Help, cancel an open dialog, or dismiss the alert banner", ShortcutScope.Global),
 
@@ -64,10 +72,20 @@ public static class ShortcutCatalog {
         new(ShortcutId.ToggleTheme, [new KeyGesture(Key.T, KeyModifiers.Control | KeyModifiers.Shift)],
             "Ctrl+Shift+T", "Switch between the light and dark theme", ShortcutScope.Global),
 
+        // ----- Search results -----
+        // The arrows are safe to steal from a text box only because this scope is live solely while the
+        // search dropdown is open — everywhere else they still scroll the page (see ActiveScope).
+        new(ShortcutId.SelectNextResult, [new KeyGesture(Key.Down)],
+            "↓ / ↑", "Move through the search results", ShortcutScope.Search),
+
+        new(ShortcutId.SelectPreviousResult, [new KeyGesture(Key.Up)],
+            "", "", ShortcutScope.Search, ShowInHelp: false),
+
         // ----- Processes -----
-        new(ShortcutId.FocusFilter,
-            [new KeyGesture(Key.F, KeyModifiers.Control), new KeyGesture(Key.OemQuestion)],
-            "Ctrl+F / /", "Focus the process filter", ShortcutScope.Processes),
+        // "/" types a character, so it must not fire while the filter box already has focus — otherwise
+        // the key is swallowed and a "/" can never be typed into the box it just focused.
+        new(ShortcutId.FocusFilter, [new KeyGesture(Key.OemQuestion)],
+            "/", "Focus the process filter", ShortcutScope.Processes, AllowInTextInput: false),
 
         new(ShortcutId.EndTask, [new KeyGesture(Key.Delete)],
             "Delete", "End the selected process (asks first)", ShortcutScope.Processes,
@@ -99,8 +117,13 @@ public static class ShortcutCatalog {
             "Backspace / Alt+↑", "Go up to the parent folder", ShortcutScope.FileExplorer,
             AllowInTextInput: false),
 
-        new(ShortcutId.FocusAddressBar, [new KeyGesture(Key.L, KeyModifiers.Control)],
-            "Ctrl+L", "Edit the folder path", ShortcutScope.FileExplorer),
+        // "/" is the tab-local focus gesture here too — the address bar is this page's typing field.
+        // Text-unsafe for the same reason as the Processes filter, which also parks Ctrl+L while a box
+        // has focus; the only text box on this page is the path box, and it already ignores Ctrl+L.
+        new(ShortcutId.FocusAddressBar,
+            [new KeyGesture(Key.L, KeyModifiers.Control), new KeyGesture(Key.OemQuestion)],
+            "Ctrl+L or /", "Edit the folder path", ShortcutScope.FileExplorer,
+            AllowInTextInput: false),
 
         // ----- Network -----
         // Ctrl is required so PageUp/PageDown and the bare arrows keep scrolling the connections list.
@@ -135,6 +158,7 @@ public static class ShortcutCatalog {
 
     /// <summary>The heading a scope reads as in Help.</summary>
     private static string TitleOf(ShortcutScope scope) => scope switch {
+        ShortcutScope.Search => "Search",
         ShortcutScope.Processes => "Processes",
         ShortcutScope.FileExplorer => "File Explorer",
         ShortcutScope.Network => "Network",
