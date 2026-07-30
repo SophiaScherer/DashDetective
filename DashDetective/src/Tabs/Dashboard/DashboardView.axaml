@@ -44,9 +44,11 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- ===== Utilization charts ===== -->
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-            <Border Grid.Column="0" Classes="panel">
+        <!-- ===== Utilization charts: side by side while both clear 340px, stacked below that.
+             Stacking hands each chart the full width back, so its 3.2 ratio recovers instead of
+             staying pinned at the chartPanel height floor. -->
+        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
+            <Border Classes="panel" MinWidth="340">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
@@ -56,7 +58,7 @@
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
                 </StackPanel>
             </Border>
-            <Border Grid.Column="1" Classes="panel">
+            <Border Classes="panel" MinWidth="340">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
@@ -66,7 +68,7 @@
                                         YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
                 </StackPanel>
             </Border>
-        </Grid>
+        </layout:WeightedRowPanel>
 
         <!-- ===== System info + Network throughput ===== -->
         <Grid ColumnDefinitions="1.35*,*" ColumnSpacing="16">
