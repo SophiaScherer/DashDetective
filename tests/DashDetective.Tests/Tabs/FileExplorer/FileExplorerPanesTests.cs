@@ -17,14 +17,16 @@ public class FileExplorerPanesTests {
 
     [Fact]
     public void BelowDetailsThreshold_HidesDetailsButKeepsTree() {
-        Assert.True(FileExplorerPanes.ShowTree(700));
-        Assert.False(FileExplorerPanes.ShowDetails(700));
+        // The page area at a 936px window, where the details pane no longer fits.
+        Assert.True(FileExplorerPanes.ShowTree(656));
+        Assert.False(FileExplorerPanes.ShowDetails(656));
     }
 
     [Fact]
     public void BelowTreeThreshold_HidesBoth() {
-        Assert.False(FileExplorerPanes.ShowTree(480));
-        Assert.False(FileExplorerPanes.ShowDetails(480));
+        // The page area at the 640px window minimum, with the nav rail auto-collapsed to 64px.
+        Assert.False(FileExplorerPanes.ShowTree(532));
+        Assert.False(FileExplorerPanes.ShowDetails(532));
     }
 
     [Fact]
@@ -36,9 +38,16 @@ public class FileExplorerPanesTests {
     }
 
     [Fact]
-    public void Thresholds_AreTheSumOfTheMinimumsTheyCover() {
-        // Tree min + splitter + list min, then the same plus splitter + details min.
-        Assert.Equal(512, FileExplorerPanes.TreeThreshold, 6);
-        Assert.Equal(744, FileExplorerPanes.DetailsThreshold, 6);
+    public void Thresholds_CoverTheWidthsThePanesActuallyRenderAt() {
+        // Not their MinWidths: the side columns are fixed, so the grid overflows rather than
+        // shrinking them, and a threshold based on the minimums lets the page clip.
+        Assert.Equal(572, FileExplorerPanes.TreeThreshold, 6);
+        Assert.Equal(884, FileExplorerPanes.DetailsThreshold, 6);
+    }
+
+    [Fact]
+    public void DesignWidth_ClearsTheDetailsThreshold() {
+        // The three-pane layout must survive at the size the app opens at.
+        Assert.True(DesignWidth >= FileExplorerPanes.DetailsThreshold);
     }
 }

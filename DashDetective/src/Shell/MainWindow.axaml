@@ -12,9 +12,10 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="DashDetective"
         Width="1180" Height="760"
-        MinWidth="920" MinHeight="560"
+        MinWidth="640" MinHeight="480"
         Background="{DynamicResource AppBackground}"
-        TransparencyLevelHint="None">
+        TransparencyLevelHint="None"
+        SizeChanged="OnShellSizeChanged">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -70,25 +71,23 @@
                 <!-- Toolbar -->
                 <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
                         BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0">
+                    <Grid ColumnDefinitions="Auto,*" Margin="18,0">
 
+                        <!-- Trimmed rather than pushed off: at the window's minimum the subtitle no
+                             longer fits beside the search field. -->
                         <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"/>
                             <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="11"
-                                       Foreground="{DynamicResource TextSubtle}"/>
+                                       Foreground="{DynamicResource TextSubtle}"
+                                       TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
 
-                        <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the
-                             outside-click dismissal all live in the component.
-                             The width is fixed rather than sized to content: the field would otherwise
-                             collapse to nothing when empty and grow as the user types. 320 clears the
-                             toolbar's other columns even at the window's minimum width. -->
-                        <search:UniversalSearchView Grid.Column="1" DataContext="{Binding Search}"
-                                                    Width="320" Margin="16,0"
-                                                    HorizontalAlignment="Right" VerticalAlignment="Center"/>
-
-                        <!-- Actions -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <!-- Actions keep their natural width on the right; the search fills what is left,
+                             so aligning it inside that slot keeps it beside them at any window width. -->
+                        <DockPanel Grid.Column="1" LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                        VerticalAlignment="Center">
                             <Button Classes="livePill" Command="{Binding ToggleLiveCommand}"
                                     ToolTip.Tip="Pause or resume live updates (Ctrl+P)">
                                 <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
@@ -113,7 +112,18 @@
                                  ticks) reserves constant space and never reflows the toolbar. -->
                             <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{DynamicResource TextTertiary}"
                                        VerticalAlignment="Center" Width="58" TextAlignment="Center"/>
-                        </StackPanel>
+                            </StackPanel>
+
+                            <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the
+                                 outside-click dismissal all live in the component. Bounded rather than
+                                 sized to content, which would collapse it to nothing when empty and grow
+                                 it as the user types. It gives ground down to 180px on a narrow window so
+                                 the title and actions keep their room; the dropdown follows via the
+                                 popup's width binding. -->
+                            <search:UniversalSearchView DataContext="{Binding Search}"
+                                                        MinWidth="180" MaxWidth="320" Margin="16,0"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </DockPanel>
                     </Grid>
                 </Border>
 

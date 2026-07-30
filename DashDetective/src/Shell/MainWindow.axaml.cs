@@ -33,6 +33,12 @@ public partial class MainWindow : Window {
         Closed += (_, _) => _shortcuts.Dispose();
     }
 
+    // An expanded 236px rail leaves too little for the page on a narrow window, so the bar folds
+    // itself away. Reported from here because there is no converter-free path from the window's size
+    // to a view model property.
+    private void OnShellSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        _viewModel?.Nav.SetShellWidth(e.NewSize.Width);
+
     private void OnDataContextChanged(object? sender, EventArgs e) {
         if (_viewModel is not null)
             _viewModel.ExportRequested -= OnExportRequested;

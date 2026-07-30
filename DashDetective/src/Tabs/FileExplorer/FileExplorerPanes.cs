@@ -10,10 +10,12 @@ public static class FileExplorerPanes {
     internal const double TreeWidth = 240;
     internal const double DetailsWidth = 300;
     internal const double SplitterWidth = 12;
+    internal const double ListMinWidth = 320;
 
-    // Tree min + splitter + list min, and the same again plus the details min.
-    internal const double TreeThreshold = 180 + SplitterWidth + 320;
-    internal const double DetailsThreshold = TreeThreshold + SplitterWidth + 220;
+    // Measured against the widths the side panes actually render at, not their MinWidths: their
+    // columns are fixed, so the grid never shrinks them toward those minimums — it just overflows.
+    internal const double TreeThreshold = TreeWidth + SplitterWidth + ListMinWidth;
+    internal const double DetailsThreshold = TreeThreshold + SplitterWidth + DetailsWidth;
 
     /// <summary>Whether the folder tree fits alongside the file list.</summary>
     public static bool ShowTree(double pageWidth) => pageWidth >= TreeThreshold;
