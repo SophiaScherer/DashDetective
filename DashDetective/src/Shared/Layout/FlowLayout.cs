@@ -3,9 +3,9 @@ using System;
 namespace DashDetective.Shared.Layout;
 
 /// <summary>
-/// Column arithmetic for <c>UniformFlowPanel</c>: how many equal columns of a given minimum width
-/// fit a row, and how wide each one ends up. Kept separate from the panel so it is testable without
-/// a layout pass.
+/// Column arithmetic for <see cref="UniformFlowPanel"/>: how many equal columns of a given minimum
+/// width fit a row, and how wide each one ends up. Kept separate from the panel so it is testable
+/// without a layout pass.
 /// </summary>
 public static class FlowLayout {
     // Available widths arrive from layout arithmetic (padding and gutters subtracted), so an exact

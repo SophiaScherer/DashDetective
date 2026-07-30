@@ -3,28 +3,32 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Hardware"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:HardwareViewModel"
              x:Class="DashDetective.Tabs.Hardware.HardwareView">
 
-    <!-- The design comp's Hardware page: a 2-column grid of component spec cards. Data-driven —
-         each card is a HardwareCard model (icon-tile header + a list of key/value spec rows) reusing
-         the shared InfoRow control. Values are neutral placeholders ("—") until live data is wired.
-         The page scrolls as a whole like the Dashboard (not self-scrolling). The 8px card margin
-         yields a 16px gutter between cards (matching the comp) with a symmetric outer inset. -->
-    <ItemsControl ItemsSource="{Binding Cards}" Margin="-8">
+    <!-- The design comp's Hardware page: a grid of component spec cards. Data-driven — each card is
+         a HardwareCard model (icon-tile header + a list of key/value spec rows) reusing the shared
+         InfoRow control. Values are neutral placeholders ("—") until live data is wired. The page
+         scrolls as a whole like the Dashboard (not self-scrolling). Two cards per row while each
+         clears 360px; below that they wrap to one, so a spec row never gets crushed. -->
+    <ItemsControl ItemsSource="{Binding Cards}">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-                <UniformGrid Columns="2"/>
+                <layout:UniformFlowPanel MinItemWidth="360" ColumnSpacing="16" RowSpacing="16"/>
             </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
-                <Border Classes="panel" Margin="8" VerticalAlignment="Top">
+                <Border Classes="panel" VerticalAlignment="Top">
                     <StackPanel Spacing="12">
-                        <!-- Header: tinted icon tile + title / subtitle -->
-                        <StackPanel Orientation="Horizontal" Spacing="10">
+                        <!-- Header: tinted icon tile + title / subtitle. A Grid rather than a
+                             horizontal StackPanel so the text column is bounded and can ellipsize —
+                             long values (a full motherboard model) otherwise run past the card edge
+                             once the cards narrow. -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                             <Border Width="30" Height="30" CornerRadius="7"
                                     Background="{Binding IconBackground}">
                                 <Path Data="{Binding Icon}" Stroke="{Binding IconColor}"
@@ -32,13 +36,15 @@
                                       StrokeJoin="Round" Stretch="None"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <StackPanel VerticalAlignment="Center" Spacing="1">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                                 <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Subtitle}" FontSize="11"
-                                           Foreground="{DynamicResource TextSubtle}"/>
+                                           Foreground="{DynamicResource TextSubtle}"
+                                           TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                         <!-- Spec rows: reuse the shared key/value InfoRow -->
                         <ItemsControl ItemsSource="{Binding Rows}">
                             <ItemsControl.ItemTemplate>
