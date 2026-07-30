@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Dashboard"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="920"
              x:DataType="vm:DashboardViewModel"
@@ -22,18 +23,19 @@
          src/Shared/Controls. -->
     <StackPanel Spacing="16">
 
-        <!-- ===== Stat cards: one per detected device, up to five per row then wrapping, grouped by kind
-             (CPUs → Memory → GPUs → Disks → Network). The -6/+6 margins keep the row flush at the edges. -->
-        <ItemsControl ItemsSource="{Binding Cards}" Margin="-6">
+        <!-- ===== Stat cards: one per detected device, grouped by kind (CPUs → Memory → GPUs → Disks
+             → Network). As many per row as fit at 150px each — the width at which the label, value
+             and sparkline stay legible — wrapping to further rows below that. No column cap, so on a
+             wide window every device sits on one line instead of stranding the last card alone. -->
+        <ItemsControl ItemsSource="{Binding Cards}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <UniformGrid Columns="5"/>
+                    <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"/>
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DashboardCard">
-                    <controls:StatCard Margin="6"
-                                       Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
+                    <controls:StatCard Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
                                        Classes.gpu="{Binding IsGpu}" Classes.disk="{Binding IsDisk}"
                                        Classes.net="{Binding IsNetwork}"
                                        Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"

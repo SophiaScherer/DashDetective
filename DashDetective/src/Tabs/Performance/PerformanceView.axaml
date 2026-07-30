@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Performance"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
              x:DataType="vm:PerformanceViewModel"
@@ -185,22 +186,24 @@
                                         Stroke="{Binding SelectedResource.ValueBrush}"
                                         Points="{Binding SelectedResource.Points}"/>
 
-                    <!-- Detailed: one mini chart per logical processor / engine in a compact square grid
-                         (ceil(√n) columns, so 12 → 4×3). Cards stretch to fill their cell; the -8 right/bottom
-                         margin absorbs each cell's gutter so the grid stays flush. The panel sizes to its
-                         content up to MaxHeight, so a small grid shows flush while many cores scroll. -->
+                    <!-- Detailed: one mini chart per logical processor / engine in a compact square grid.
+                         DetailColumns (ceil(√n), so 12 → 4×3) is the ceiling rather than a fixed count,
+                         so the square-ish shape holds on a wide pane but wraps below it when a cell
+                         would drop under 110px. The panel sizes to its content up to MaxHeight, so a
+                         small grid shows flush while many cores scroll. -->
                     <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding SelectedResource.IsDetailed}">
-                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}" Margin="0,0,-8,-8">
+                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid x:DataType="vm:PerformanceViewModel"
-                                                 Columns="{Binding SelectedResource.DetailColumns}"/>
+                                    <layout:UniformFlowPanel x:DataType="vm:PerformanceViewModel"
+                                                             MinItemWidth="110" ColumnSpacing="8" RowSpacing="8"
+                                                             MaxColumns="{Binding SelectedResource.DetailColumns}"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SubChart">
-                                    <Border Margin="0,0,8,8" Padding="8" CornerRadius="6"
+                                    <Border Padding="8" CornerRadius="6"
                                             Background="{DynamicResource AppBackground}">
                                         <StackPanel Spacing="4">
                                             <TextBlock Text="{Binding Label}" FontSize="11"
@@ -218,17 +221,18 @@
                 </StackPanel>
             </Border>
 
-            <!-- Stat tiles: four resource-specific readouts in a 4-column grid (design comp's statMap).
-                 The -12 right margin absorbs each tile's 12px gutter so the row stays flush right. -->
-            <ItemsControl ItemsSource="{Binding SelectedResource.Stats}" Margin="0,0,-12,0">
+            <!-- Stat tiles: four resource-specific readouts (design comp's statMap), wrapping to
+                 two rows once a tile would fall under 150px. -->
+            <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <UniformGrid Columns="4"/>
+                        <layout:UniformFlowPanel MinItemWidth="150" MaxColumns="4"
+                                                 ColumnSpacing="12" RowSpacing="12"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:StatTile">
-                        <Border Classes="card statTile" Margin="0,0,12,0">
+                        <Border Classes="card statTile">
                             <StackPanel Spacing="4">
                                 <TextBlock Classes="statLabel" Text="{Binding Label}"/>
                                 <TextBlock Classes="statValue" Text="{Binding Value}"/>

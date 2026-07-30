@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Storage"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:StorageViewModel"
@@ -68,17 +69,17 @@
     <StackPanel Spacing="16">
 
         <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
-        <ItemsControl ItemsSource="{Binding Drives}" Margin="0,0,-16,0">
+        <ItemsControl ItemsSource="{Binding Drives}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <UniformGrid Columns="3"/>
+                    <!-- Wraps below 280px per card, where the used/free split and the
+                         read/write/temp row stop fitting on their lines. -->
+                    <layout:UniformFlowPanel MinItemWidth="280" ColumnSpacing="16" RowSpacing="16"/>
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DriveCard">
-                    <!-- The 16px right margin is the inter-card gutter; the panel's -16 offset keeps the row
-                         flush right (same idiom as the Performance stat strip). -->
-                    <Border Classes="panel" Margin="0,0,16,0">
+                    <Border Classes="panel">
                         <StackPanel Spacing="0">
                             <!-- Header: name + health pill. -->
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
