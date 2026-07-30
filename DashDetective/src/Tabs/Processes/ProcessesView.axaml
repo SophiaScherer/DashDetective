@@ -20,7 +20,10 @@
              is handled in code-behind (OnRowTapped). -->
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
             <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
-                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                <!-- Columns come from the page view model, not the row, so every row and the sticky
+                     header share one definition and stay aligned. -->
+                <Grid ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ColumnLayout}">
                     <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
                          inside column 0 so revealing children never shifts the other columns. The slot
                          is reserved even without a chevron so parent and child names line up. -->
@@ -36,13 +39,16 @@
                     </Grid>
                     <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                               Foreground="{Binding StatusBrush}"/>
+                               Foreground="{Binding StatusBrush}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowStatusColumn}"/>
                     <TextBlock Grid.Column="3" Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
                                Text="{Binding CpuText}"/>
                     <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
-                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"/>
+                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowDiskColumn}"/>
+                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowGpuColumn}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -298,7 +304,10 @@
                  the Network table). -->
             <Border Grid.Row="1" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                <!-- This grid's width is exactly what the columns get, so it (not the outer panel) is
+                     what the view model measures against when deciding how many still fit. -->
+                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4"
+                      SizeChanged="OnTableSizeChanged">
                     <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
                             Command="{Binding NameSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
@@ -314,6 +323,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
+                            IsVisible="{Binding ShowStatusColumn}"
                             Command="{Binding StatusSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="colHead" Classes.active="{Binding StatusSort.IsActive}" Text="STATUS"/>
@@ -335,6 +345,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="5" Classes="pick" HorizontalAlignment="Right"
+                            IsVisible="{Binding ShowDiskColumn}"
                             Command="{Binding DiskSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="sortArrow" Text="{Binding DiskSort.Arrow}"/>
@@ -342,6 +353,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="6" Classes="pick" HorizontalAlignment="Right"
+                            IsVisible="{Binding ShowGpuColumn}"
                             Command="{Binding GpuSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="sortArrow" Text="{Binding GpuSort.Arrow}"/>
