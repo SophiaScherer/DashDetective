@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -58,10 +59,17 @@ public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> GridBrushProperty =
         AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(GridBrush));
 
+    public static readonly StyledProperty<double> AspectRatioProperty =
+        AvaloniaProperty.Register<Sparkline, double>(nameof(AspectRatio), double.NaN);
+
     private List<Point> _data = new();
     private List<Point> _data2 = new();
     private bool _fixedRange;
     private double _yMin, _yMax;
+
+    static Sparkline() {
+        AffectsMeasure<Sparkline>(AspectRatioProperty);
+    }
 
     public Sparkline() {
         InitializeComponent();
@@ -137,6 +145,27 @@ public partial class Sparkline : UserControl {
     public IBrush? GridBrush {
         get => GetValue(GridBrushProperty);
         set => SetValue(GridBrushProperty, value);
+    }
+
+    /// <summary>Width ÷ height the chart holds as its slot resizes, bounded by <c>MinHeight</c> and
+    /// <c>MaxHeight</c>. NaN (the default) leaves sizing to an explicit Height.</summary>
+    public double AspectRatio {
+        get => GetValue(AspectRatioProperty);
+        set => SetValue(AspectRatioProperty, value);
+    }
+
+    /// <summary>Derives the height from the measured width when <see cref="AspectRatio"/> is set, so the
+    /// chart keeps its shape instead of flattening as its slot narrows. An explicit Height still wins:
+    /// Avalonia's MeasureCore clamps this result to [MinHeight, MaxHeight], which a set Height pins to
+    /// itself. MaxHeight is therefore also the absolute cap on how tall a wide chart grows.</summary>
+    protected override Size MeasureOverride(Size availableSize) {
+        var baseSize = base.MeasureOverride(availableSize); // applies the template
+        if (double.IsNaN(AspectRatio))
+            return baseSize;
+
+        var width = availableSize.Width;
+        var height = ChartAspect.HeightForWidth(width, AspectRatio, MinHeight, MaxHeight);
+        return new Size(double.IsFinite(width) ? width : baseSize.Width, height);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {

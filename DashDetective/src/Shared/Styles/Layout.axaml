@@ -1,0 +1,34 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DashDetective.Shared.Controls">
+    <!--
+      Responsive proportions. A Sparkline carrying one of these classes derives its height from its
+      measured width, so it keeps its shape as a panel narrows rather than flattening, and stops
+      growing at MaxHeight on a wide window. Three classes because the charts in the app cluster into
+      three shapes; the class names say which role a chart plays, so call sites don't repeat ratios.
+
+      A chart is kept from being squeezed *narrower* than its shape by its container, not by these
+      numbers: panels wrap or stack below their minimum item width (src/Shared/Layout).
+    -->
+
+    <!-- Full-width feature chart: Performance's utilization graph, Storage's disk activity. -->
+    <Style Selector="controls|Sparkline.chartHero">
+        <Setter Property="AspectRatio" Value="2.7"/>
+        <Setter Property="MinHeight" Value="140"/>
+        <Setter Property="MaxHeight" Value="320"/>
+    </Style>
+
+    <!-- Chart sharing a row with a sibling panel: the Dashboard's CPU / Memory / Network graphs. -->
+    <Style Selector="controls|Sparkline.chartPanel">
+        <Setter Property="AspectRatio" Value="3.2"/>
+        <Setter Property="MinHeight" Value="90"/>
+        <Setter Property="MaxHeight" Value="220"/>
+    </Style>
+
+    <!-- Inline trace inside a card or a grid cell: stat cards, per-core charts, throughput traces. -->
+    <Style Selector="controls|Sparkline.chartMini">
+        <Setter Property="AspectRatio" Value="4.2"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="MaxHeight" Value="72"/>
+    </Style>
+</Styles>
