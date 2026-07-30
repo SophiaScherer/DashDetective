@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Network"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:NetworkViewModel"
@@ -102,9 +103,10 @@
 
     <StackPanel Spacing="16">
 
-        <!-- ===== Row 1: Adapters · IP Configuration · Throughput ===== -->
-        <Grid ColumnDefinitions="*,*,1.1*" ColumnSpacing="16">
-            <Border Grid.Column="0" Classes="panel">
+        <!-- ===== Row 1: Adapters · IP Configuration · Throughput. Three across while each clears
+             its minimum, then stacked full width. -->
+        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
+            <Border Classes="panel" MinWidth="260">
                 <StackPanel Spacing="8">
                     <TextBlock Classes="panelTitle" Text="Adapters"/>
                     <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
@@ -142,7 +144,7 @@
                     </ScrollViewer>
                 </StackPanel>
             </Border>
-            <Border Grid.Column="1" Classes="panel">
+            <Border Classes="panel" MinWidth="260">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="IP Configuration"/>
                     <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
@@ -161,7 +163,7 @@
                     </Grid>
                 </StackPanel>
             </Border>
-            <Border Grid.Column="2" Classes="panel">
+            <Border layout:WeightedRowPanel.Weight="1.1" Classes="panel" MinWidth="280">
                 <StackPanel Spacing="10">
                     <TextBlock Classes="panelTitle" Text="Throughput"/>
                     <!-- Both charts share one Y axis (ThroughputYMax), so their heights must match too:
@@ -191,11 +193,12 @@
                                         YMin="0" YMax="100"/>
                 </StackPanel>
             </Border>
-        </Grid>
+        </layout:WeightedRowPanel>
 
-        <!-- ===== Row 2: Active Connections · (Ping + DNS) ===== -->
-        <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
-            <Border Grid.Column="0" Classes="panel">
+        <!-- ===== Row 2: Active Connections · (Ping + DNS). The connections table keeps the wider
+             share; below their minimums the two stack. -->
+        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
+            <Border layout:WeightedRowPanel.Weight="1.6" Classes="panel" MinWidth="420">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"
@@ -254,7 +257,7 @@
                     </ItemsControl>
                 </StackPanel>
             </Border>
-            <StackPanel Grid.Column="1" Spacing="12">
+            <StackPanel Spacing="12" MinWidth="260">
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="panelTitle" Text="Ping"/>
@@ -308,6 +311,6 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
-        </Grid>
+        </layout:WeightedRowPanel>
     </StackPanel>
 </UserControl>

@@ -70,10 +70,11 @@
             </Border>
         </layout:WeightedRowPanel>
 
-        <!-- ===== System info + Network throughput ===== -->
-        <Grid ColumnDefinitions="1.35*,*" ColumnSpacing="16">
+        <!-- ===== System info + Network throughput. System info keeps the wider share while both
+             panels clear their minimums; below that they stack. -->
+        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
 
-            <Border Grid.Column="0" Classes="panel">
+            <Border layout:WeightedRowPanel.Weight="1.35" Classes="panel" MinWidth="420">
                 <StackPanel Spacing="8">
                     <TextBlock Classes="panelTitle" Text="System Information"/>
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
@@ -95,7 +96,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="1" Classes="panel">
+            <Border Classes="panel" MinWidth="300">
                 <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="panelTitle" Text="Network Throughput"/>
@@ -123,6 +124,6 @@
                                         YMin="0" YMax="100"/>
                 </StackPanel>
             </Border>
-        </Grid>
+        </layout:WeightedRowPanel>
     </StackPanel>
 </UserControl>

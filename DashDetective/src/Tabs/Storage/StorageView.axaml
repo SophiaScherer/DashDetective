@@ -132,9 +132,10 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right) ===== -->
-        <Grid ColumnDefinitions="1.6*,*" ColumnSpacing="16">
-            <Border Grid.Column="0" Classes="panel">
+        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right). The table keeps the wider
+             share while both clear their minimums; below that they stack. -->
+        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
+            <Border layout:WeightedRowPanel.Weight="1.6" Classes="panel" MinWidth="440">
                 <StackPanel Spacing="0">
                     <TextBlock Classes="panelTitle" Text="Partitions" Margin="0,0,0,10"/>
                     <!-- Column header: Vol · Label · File System · Type · Capacity · Free (Free right-aligned).
@@ -179,7 +180,7 @@
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
                  area fill, like the Dashboard), over three readouts. The title carries the real system-drive
                  letter (see DiskActivityTitle); the readouts come from the shared _Total storage feed. -->
-            <Border Grid.Column="1" Classes="panel">
+            <Border Classes="panel" MinWidth="280">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="{Binding DiskActivityTitle}"/>
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
@@ -202,6 +203,6 @@
                     </Grid>
                 </StackPanel>
             </Border>
-        </Grid>
+        </layout:WeightedRowPanel>
     </StackPanel>
 </UserControl>
