@@ -181,7 +181,7 @@
             <Border Grid.Column="1" Classes="panel">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="{Binding DiskActivityTitle}"/>
-                    <controls:Sparkline Height="120" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
                     <Grid ColumnDefinitions="*,*,*">

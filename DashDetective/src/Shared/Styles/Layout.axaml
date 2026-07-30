@@ -18,11 +18,20 @@
         <Setter Property="MaxHeight" Value="320"/>
     </Style>
 
-    <!-- Chart sharing a row with a sibling panel: the Dashboard's CPU / Memory / Network graphs. -->
+    <!-- Chart sharing a row with a sibling panel: the Dashboard's CPU / Memory / Network graphs,
+         Storage's disk activity. -->
     <Style Selector="controls|Sparkline.chartPanel">
         <Setter Property="AspectRatio" Value="3.2"/>
         <Setter Property="MinHeight" Value="90"/>
         <Setter Property="MaxHeight" Value="220"/>
+    </Style>
+
+    <!-- One cell of a repeating grid: Performance's per-core / per-engine charts. Squarer than the
+         other shapes because many of them tile into a small pane. -->
+    <Style Selector="controls|Sparkline.chartCell">
+        <Setter Property="AspectRatio" Value="2.6"/>
+        <Setter Property="MinHeight" Value="40"/>
+        <Setter Property="MaxHeight" Value="88"/>
     </Style>
 
     <!-- Inline trace inside a card or a grid cell: stat cards, per-core charts, throughput traces. -->

@@ -179,7 +179,7 @@
                     </Grid>
 
                     <!-- Overall: one fixed-axis area chart tinted in the resource's colour. -->
-                    <controls:Sparkline Height="240" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                    <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         IsVisible="{Binding !SelectedResource.IsDetailed}"
                                         Stroke="{Binding SelectedResource.ValueBrush}"
@@ -206,7 +206,7 @@
                                             <TextBlock Text="{Binding Label}" FontSize="11"
                                                        Foreground="{DynamicResource TextMuted}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <controls:Sparkline Height="52" Fill="True" ShowGrid="True"
+                                            <controls:Sparkline Classes="chartCell" Fill="True" ShowGrid="True"
                                                                 GridRows="2" GridColumns="6" YMin="0" YMax="100"
                                                                 Stroke="{Binding Stroke}" Points="{Binding Points}"/>
                                         </StackPanel>
