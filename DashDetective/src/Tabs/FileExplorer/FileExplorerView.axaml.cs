@@ -23,6 +23,57 @@ public partial class FileExplorerView : UserControl {
         OptionsPopup.Closed += OnOptionsPopupClosed;
     }
 
+    // The list's own width decides which columns still fit. Reported from the view because there is
+    // no converter-free path from an element's size to a view model property. Fires on splitter drags
+    // as well as window resizes, which is exactly what's wanted here.
+    private void OnTableSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        _boundViewModel?.SetTableWidth(e.NewSize.Width);
+
+    // Remembered so a splitter-dragged width survives a collapse and restore.
+    private GridLength _treeColumnWidth = new(FileExplorerPanes.TreeWidth);
+    private GridLength _detailsColumnWidth = new(FileExplorerPanes.DetailsWidth);
+    private bool _treeShown = true;
+    private bool _detailsShown = true;
+
+    // The side panes collapse rather than clip once the page can no longer hold their minimums. Done
+    // here because it is pure view geometry: hiding a pane is not enough, its column has to be zeroed
+    // or it keeps reserving width and the grid still overflows.
+    private void OnPaneAreaSizeChanged(object? sender, SizeChangedEventArgs e) {
+        // Columns are reached by index off the sender: a ColumnDefinition is not a control, so x:Name
+        // on one generates no field. Order is tree, splitter, list, splitter, details.
+        if (sender is not Grid grid || grid.ColumnDefinitions.Count < 5)
+            return;
+
+        ApplyPane(FileExplorerPanes.ShowTree(e.NewSize.Width), TreePane, TreeSplitter,
+                  grid.ColumnDefinitions[0], grid.ColumnDefinitions[1],
+                  ref _treeShown, ref _treeColumnWidth, 180);
+        ApplyPane(FileExplorerPanes.ShowDetails(e.NewSize.Width), DetailsPane, DetailsSplitter,
+                  grid.ColumnDefinitions[4], grid.ColumnDefinitions[3],
+                  ref _detailsShown, ref _detailsColumnWidth, 220);
+    }
+
+    private static void ApplyPane(bool show, Control pane, Control splitter,
+                                  ColumnDefinition column, ColumnDefinition splitterColumn,
+                                  ref bool shown, ref GridLength remembered, double minWidth) {
+        if (show == shown)
+            return;
+        shown = show;
+
+        if (show) {
+            column.MinWidth = minWidth;
+            column.Width = remembered;
+            splitterColumn.Width = GridLength.Auto;
+        } else {
+            remembered = column.Width;
+            column.MinWidth = 0;
+            column.Width = new GridLength(0);
+            splitterColumn.Width = new GridLength(0);
+        }
+
+        pane.IsVisible = show;
+        splitter.IsVisible = show;
+    }
+
     // Scroll-to-top on folder navigation is driven from the view model (it knows when the path
     // actually changes); the view owns the ScrollViewer, so it listens for the request here.
     protected override void OnDataContextChanged(EventArgs e) {
