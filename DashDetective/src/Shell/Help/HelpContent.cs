@@ -27,6 +27,6 @@ public static class HelpContent {
         "Performance detects every CPU, GPU and disk on the machine; the toggle above a graph breaks it down into individual cores or engines.",
         "Refresh re-reads the current page, and Export saves a full plain-text system report.",
         "Settings controls the theme, accent colour, refresh interval and navigation position — all of it is remembered between sessions.",
-        "Most of the app can be driven from the keyboard — Ctrl+1 to Ctrl+8 jump between tabs, and the full list is below.",
+        "Most of the app can be driven from the keyboard — Ctrl+1 to Ctrl+9 jump between tabs, and the full list is below.",
     ];
 }

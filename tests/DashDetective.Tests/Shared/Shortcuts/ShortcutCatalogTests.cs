@@ -91,6 +91,7 @@ public class ShortcutCatalogTests {
     [InlineData(Key.D1, ShortcutId.NavigateTab1)]
     [InlineData(Key.NumPad1, ShortcutId.NavigateTab1)]
     [InlineData(Key.D8, ShortcutId.NavigateTab8)]
+    [InlineData(Key.D9, ShortcutId.NavigateTab9)]
     [InlineData(Key.B, ShortcutId.ToggleNavCollapse)]
     [InlineData(Key.OemComma, ShortcutId.OpenSettings)]
     public void TryResolve_MapsControlGesturesToTheirAction(Key key, ShortcutId expected) {

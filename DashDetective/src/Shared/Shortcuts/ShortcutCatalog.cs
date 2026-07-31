@@ -15,10 +15,10 @@ public static class ShortcutCatalog {
     /// <summary>Every shortcut, in the order Help lists them.</summary>
     public static IReadOnlyList<Shortcut> All { get; } = [
         // ----- Global navigation -----
-        // The eight tab jumps share one Help row; the numpad digits are bound too so the shortcut
+        // The nine tab jumps share one Help row; the numpad digits are bound too so the shortcut
         // works the same either side of the keyboard.
         Tab(ShortcutId.NavigateTab1, Key.D1, Key.NumPad1,
-            keys: "Ctrl+1 … Ctrl+8", description: "Jump to a tab by position (Dashboard → Settings)"),
+            keys: "Ctrl+1 … Ctrl+9", description: "Jump to a tab by position (Dashboard → Settings)"),
         Tab(ShortcutId.NavigateTab2, Key.D2, Key.NumPad2),
         Tab(ShortcutId.NavigateTab3, Key.D3, Key.NumPad3),
         Tab(ShortcutId.NavigateTab4, Key.D4, Key.NumPad4),
@@ -26,6 +26,7 @@ public static class ShortcutCatalog {
         Tab(ShortcutId.NavigateTab6, Key.D6, Key.NumPad6),
         Tab(ShortcutId.NavigateTab7, Key.D7, Key.NumPad7),
         Tab(ShortcutId.NavigateTab8, Key.D8, Key.NumPad8),
+        Tab(ShortcutId.NavigateTab9, Key.D9, Key.NumPad9),
 
         new(ShortcutId.NextTab, [new KeyGesture(Key.Tab, KeyModifiers.Control)],
             "Ctrl+Tab", "Go to the next tab", ShortcutScope.Global),

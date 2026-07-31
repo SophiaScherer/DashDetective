@@ -61,6 +61,13 @@ public static class Icons {
         "M5,10 H13 A1,1 0 0 1 14,11 V13 A1,1 0 0 1 13,14 H5 A1,1 0 0 1 4,13 V11 A1,1 0 0 1 5,10 Z " +
         "M11.8,6 h0.01 M11.8,12 h0.01");
 
+    // A terminal window (the Toolkit tab): a rounded console frame with a ">" prompt chevron and the
+    // command line beside it, matching the design document's commands icon.
+    public static readonly Geometry Toolkit = Geometry.Parse(
+        "M3.5,3.5 H14.5 A1,1 0 0 1 15.5,4.5 V13.5 A1,1 0 0 1 14.5,14.5 " +
+        "H3.5 A1,1 0 0 1 2.5,13.5 V4.5 A1,1 0 0 1 3.5,3.5 Z " +
+        "M5.5,7.5 L7.5,9.5 L5.5,11.5 M9.5,11.5 H12.5");
+
     // A circled question mark (the Help affordance): the outer ring, the hook, and the dot beneath it.
     // The dot is a round-cap degenerate segment (as in Storage's activity dots) so it draws from the
     // same stroke as the rest of the glyph.

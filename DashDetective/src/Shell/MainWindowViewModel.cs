@@ -20,6 +20,7 @@ using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
 using DashDetective.Tabs.Storage;
+using DashDetective.Tabs.Toolkit;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -43,6 +44,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly NetworkViewModel _network = new();
     private readonly StorageViewModel _storage;
     private readonly HardwareViewModel _hardware = new();
+    private readonly ToolkitViewModel _toolkit = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
 
@@ -151,6 +153,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Storage, _storage, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
                         Icons.Hardware, _hardware, Nav.Navigate),
+            new NavItem("Toolkit", "Toolkit", "Common commands & diagnostics",
+                        Icons.Toolkit, _toolkit, Nav.Navigate),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });
@@ -330,9 +334,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     /// <summary>Handles the shortcuts that work anywhere, whatever page is showing.</summary>
     private bool HandleGlobal(ShortcutId id) => id switch {
-        // The eight tab jumps are contiguous in the enum, so the offset from the first is the nav
+        // The nine tab jumps are contiguous in the enum, so the offset from the first is the nav
         // position they select.
-        >= ShortcutId.NavigateTab1 and <= ShortcutId.NavigateTab8 =>
+        >= ShortcutId.NavigateTab1 and <= ShortcutId.NavigateTab9 =>
             NavigateToIndex(id - ShortcutId.NavigateTab1),
         ShortcutId.NextTab => CycleTab(1),
         ShortcutId.PreviousTab => CycleTab(-1),

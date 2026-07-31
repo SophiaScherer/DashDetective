@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DashDetective.Tabs.Toolkit"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
+             x:DataType="vm:ToolkitViewModel"
+             x:Class="DashDetective.Tabs.Toolkit.ToolkitView">
+
+    <!-- The design comp's Commands page. Phase 1 wires the tab into the shell; the filter bar
+         (Phase 3), the grouped command list (Phase 4) and the Execution Log panel (Phase 5) fill
+         this root in turn. Surfaces/typography come from src/Shared/Styles. -->
+    <Border Classes="panel">
+        <TextBlock Text="Toolkit" Classes="panelTitle"
+                   Foreground="{DynamicResource TextPrimary}"/>
+    </Border>
+</UserControl>
