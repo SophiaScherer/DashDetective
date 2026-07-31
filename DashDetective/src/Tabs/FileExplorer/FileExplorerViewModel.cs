@@ -51,6 +51,39 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     [NotifyPropertyChangedFor(nameof(CanGoUp))]
     private string _currentPath = "";
 
+    // ----- Responsive table columns -----
+
+    // Starts unconstrained so the list shows every column on the first layout pass, before the view
+    // has reported a width.
+    private double _tableWidth = double.PositiveInfinity;
+    private int _visibleColumns = FileExplorerTableLayout.Minimums.Length;
+
+    /// <summary>The file list's ColumnDefinitions at the current width. The column header and the row
+    /// template both bind to this, so they cannot fall out of alignment.</summary>
+    public string ColumnLayout => FileExplorerTableLayout.Definitions(_tableWidth);
+
+    public bool ShowTypeColumn => FileExplorerTableLayout.ShowType(_tableWidth);
+
+    public bool ShowModifiedColumn => FileExplorerTableLayout.ShowModified(_tableWidth);
+
+    /// <summary>Reports the width the list is laid out in. This pane sits between two splitters, so it
+    /// narrows both with the window and when the user drags a pane — the same rule covers both. Only
+    /// re-notifies when the column set actually changes, so a drag doesn't churn bindings.</summary>
+    public void SetTableWidth(double width) {
+        if (!double.IsFinite(width) || width <= 0)
+            return;
+
+        _tableWidth = width;
+        var visible = FileExplorerTableLayout.VisibleCount(width);
+        if (visible == _visibleColumns)
+            return;
+
+        _visibleColumns = visible;
+        OnPropertyChanged(nameof(ColumnLayout));
+        OnPropertyChanged(nameof(ShowTypeColumn));
+        OnPropertyChanged(nameof(ShowModifiedColumn));
+    }
+
     // ----- Navigation history -----
 
     private readonly NavigationHistory _history = new();

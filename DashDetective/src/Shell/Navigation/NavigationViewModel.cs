@@ -24,13 +24,48 @@ namespace DashDetective.Shell.Navigation;
 public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty] private NavItem _selectedNav = null!;
 
-    /// <summary>Whether the bar is collapsed to an icons-only rail. Persisted.</summary>
+    /// <summary>The user's collapse preference. Persisted. Layout reads <see cref="IsRailCollapsed"/>
+    /// instead, so a narrow window can force the rail in without overwriting this.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
         nameof(ChevronPointing), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock))]
     private bool _isCollapsed;
+
+    /// <summary>Collapsed because the window is too narrow to spare 236px for an expanded rail. Not
+    /// persisted, and deliberately separate from <see cref="IsCollapsed"/> so widening the window
+    /// restores whatever the user actually chose.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+        nameof(ShowBrandText), nameof(ShowFullFooter),
+        nameof(ChevronPointing), nameof(ChevronIcon),
+        nameof(ControlsDock), nameof(FooterAvatarDock))]
+    private bool _isAutoCollapsed;
+
+    /// <summary>Whether the rail actually renders collapsed — the user's choice or the window forcing
+    /// it. Everything that lays the bar out reads this rather than either flag alone.</summary>
+    public bool IsRailCollapsed => IsCollapsed || IsAutoCollapsed;
+
+    /// <summary>Shell width below which an expanded rail leaves too little for the page.</summary>
+    internal const double AutoCollapseWidth = 820;
+
+    // Tracks the last side of the threshold so auto-collapse fires on a crossing rather than on every
+    // resize — that way an explicit toggle sticks until the window crosses back.
+    private bool _belowAutoCollapseWidth;
+
+    /// <summary>Reports the shell's width so the rail can fold itself away on a narrow window.</summary>
+    public void SetShellWidth(double width) {
+        if (!double.IsFinite(width) || width <= 0)
+            return;
+
+        var below = width < AutoCollapseWidth;
+        if (below == _belowAutoCollapseWidth)
+            return;
+
+        _belowAutoCollapseWidth = below;
+        IsAutoCollapsed = below;
+    }
 
     /// <summary>Which window edge the bar docks to. Persisted.</summary>
     [ObservableProperty]
@@ -130,7 +165,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        horizontal ? (IsCollapsed ? 54 : 64) : (IsCollapsed ? 64 : 236);
+        horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236);
 
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
@@ -155,23 +190,23 @@ public partial class NavigationViewModel : ViewModelBase {
     public ScrollBarVisibility ScrollH => IsHorizontal ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
 
     /// <summary>Whether nav-item text labels are shown (hidden when collapsed to icons-only).</summary>
-    public bool ShowLabels => !IsCollapsed;
+    public bool ShowLabels => !IsRailCollapsed;
 
     /// <summary>Whether the brand wordmark (beside the logo tile) is shown. Hidden when collapsed or
     /// when horizontal (the short bar shows the logo only).</summary>
-    public bool ShowBrandText => !IsCollapsed && !IsHorizontal;
+    public bool ShowBrandText => !IsRailCollapsed && !IsHorizontal;
 
     /// <summary>Whether the footer shows the full user card (vs. a compact avatar). Full only on an
     /// expanded vertical bar.</summary>
-    public bool ShowFullFooter => !IsCollapsed && !IsHorizontal;
+    public bool ShowFullFooter => !IsRailCollapsed && !IsHorizontal;
 
     /// <summary>Where the footer's Help button sits relative to the avatar: beneath it on a collapsed
     /// vertical rail (64px is too narrow to fit both side by side), to its right otherwise.</summary>
-    public Dock ControlsDock => IsCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
+    public Dock ControlsDock => IsRailCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
 
     /// <summary>Where the footer's avatar sits: the start of the same axis <see cref="ControlsDock"/>
     /// ends, so the two bracket the user's name when it is shown.</summary>
-    public Dock FooterAvatarDock => IsCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
+    public Dock FooterAvatarDock => IsRailCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
     // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
 
@@ -186,10 +221,10 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
     /// will collapse), away from it when collapsed (it will expand).</summary>
     public ChevronDirection ChevronPointing => Orientation switch {
-        NavOrientation.Left => IsCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
-        NavOrientation.Right => IsCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
-        NavOrientation.Top => IsCollapsed ? ChevronDirection.Down : ChevronDirection.Up,
-        _ => IsCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
+        NavOrientation.Left => IsRailCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
+        NavOrientation.Right => IsRailCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
+        NavOrientation.Top => IsRailCollapsed ? ChevronDirection.Down : ChevronDirection.Up,
+        _ => IsRailCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
     };
 
     /// <summary>The chevron glyph shown on the puck.</summary>
@@ -236,11 +271,20 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
-    private void ToggleCollapse() => IsCollapsed = !IsCollapsed;
+    private void ToggleCollapse() {
+        // An explicit toggle overrides a width-driven collapse until the window next crosses the
+        // threshold, so the control never looks like it did nothing.
+        var collapsed = IsRailCollapsed;
+        IsAutoCollapsed = false;
+        IsCollapsed = !collapsed;
+    }
 
     /// <summary>Expands the bar (used by the Settings control).</summary>
     [RelayCommand]
-    private void Expand() => IsCollapsed = false;
+    private void Expand() {
+        IsAutoCollapsed = false;
+        IsCollapsed = false;
+    }
 
     /// <summary>Collapses the bar to icons-only (used by the Settings control).</summary>
     [RelayCommand]

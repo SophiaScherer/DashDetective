@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Processes"
              xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
@@ -19,7 +20,10 @@
              is handled in code-behind (OnRowTapped). -->
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
             <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
-                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                <!-- Columns come from the page view model, not the row, so every row and the sticky
+                     header share one definition and stay aligned. -->
+                <Grid ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ColumnLayout}">
                     <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
                          inside column 0 so revealing children never shifts the other columns. The slot
                          is reserved even without a chevron so parent and child names line up. -->
@@ -35,13 +39,16 @@
                     </Grid>
                     <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                               Foreground="{Binding StatusBrush}"/>
+                               Foreground="{Binding StatusBrush}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowStatusColumn}"/>
                     <TextBlock Grid.Column="3" Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
                                Text="{Binding CpuText}"/>
                     <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
-                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"/>
+                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowDiskColumn}"/>
+                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"
+                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowGpuColumn}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -206,40 +213,11 @@
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
 
-        <!-- ===== Summary strip ===== -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*,Auto" ColumnSpacing="12">
-            <Border Grid.Column="0" Classes="card">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="cardLabel" Text="PROCESSES"/>
-                    <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
-                    <!-- Three category counts don't fit on one line, so let the breakdown wrap. -->
-                    <TextBlock Classes="cardSub" TextWrapping="Wrap"
-                               Text="{Binding ProcessBreakdownText}"/>
-                </StackPanel>
-            </Border>
-            <Border Grid.Column="1" Classes="card">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="cardLabel" Text="CPU"/>
-                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
-                               Text="{Binding CpuUsageText}"/>
-                </StackPanel>
-            </Border>
-            <Border Grid.Column="2" Classes="card">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="cardLabel" Text="MEMORY"/>
-                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
-                               Text="{Binding MemoryUsageText}"/>
-                </StackPanel>
-            </Border>
-            <Border Grid.Column="3" Classes="card">
-                <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Classes="cardLabel" Text="THREADS"/>
-                    <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
-                </StackPanel>
-            </Border>
-
+        <!-- ===== Summary strip: the action buttons keep their natural width on the right and the
+             four cards flow in whatever space is left, wrapping rather than being squeezed. -->
+        <DockPanel Grid.Row="0" LastChildFill="True">
             <!-- End task / Properties act on the selected row; disabled until one is picked. -->
-            <StackPanel Grid.Column="4" VerticalAlignment="Center" Spacing="6">
+            <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="6" Margin="12,0,0,0">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Classes="endTask" Content="End task"
                             Command="{Binding RequestEndTaskCommand}"
@@ -251,7 +229,39 @@
                            Foreground="#ff8a5c" Text="{Binding ActionMessage}"
                            IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
-        </Grid>
+
+            <layout:UniformFlowPanel MinItemWidth="130" ColumnSpacing="12" RowSpacing="12">
+            <Border Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="PROCESSES"/>
+                    <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
+                    <!-- Three category counts don't fit on one line, so let the breakdown wrap. -->
+                    <TextBlock Classes="cardSub" TextWrapping="Wrap"
+                               Text="{Binding ProcessBreakdownText}"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="CPU"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
+                               Text="{Binding CpuUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="MEMORY"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
+                               Text="{Binding MemoryUsageText}"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="card">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="cardLabel" Text="THREADS"/>
+                    <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
+                </StackPanel>
+            </Border>
+            </layout:UniformFlowPanel>
+        </DockPanel>
 
         <!-- ===== Process table ===== -->
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
@@ -294,7 +304,10 @@
                  the Network table). -->
             <Border Grid.Row="1" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <Grid ColumnDefinitions="2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*" ColumnSpacing="4">
+                <!-- This grid's width is exactly what the columns get, so it (not the outer panel) is
+                     what the view model measures against when deciding how many still fit. -->
+                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4"
+                      SizeChanged="OnTableSizeChanged">
                     <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
                             Command="{Binding NameSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
@@ -310,6 +323,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
+                            IsVisible="{Binding ShowStatusColumn}"
                             Command="{Binding StatusSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="colHead" Classes.active="{Binding StatusSort.IsActive}" Text="STATUS"/>
@@ -331,6 +345,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="5" Classes="pick" HorizontalAlignment="Right"
+                            IsVisible="{Binding ShowDiskColumn}"
                             Command="{Binding DiskSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="sortArrow" Text="{Binding DiskSort.Arrow}"/>
@@ -338,6 +353,7 @@
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="6" Classes="pick" HorizontalAlignment="Right"
+                            IsVisible="{Binding ShowGpuColumn}"
                             Command="{Binding GpuSort.SortCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Classes="sortArrow" Text="{Binding GpuSort.Arrow}"/>

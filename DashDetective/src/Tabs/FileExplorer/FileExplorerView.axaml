@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:fe="using:DashDetective.Tabs.FileExplorer"
+             xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
              x:DataType="fe:FileExplorerViewModel"
@@ -81,8 +82,11 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
+        <!-- This pane is narrow even at the design width, so a long value (a full timestamp) has to
+             ellipsize rather than be cut mid-character at the column edge. -->
         <Style Selector="Border.fileRow TextBlock.cellMeta">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style Selector="Border.fileRow TextBlock.cellSize">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
@@ -326,7 +330,10 @@
         <!-- Fixed side panels + star middle, split by draggable GridSplitters. The 12px splitter
              columns stand in for the old 12px ColumnSpacing. Widths reset each launch (no persist);
              min/max keep the file list usable at the window's 920px minimum. -->
-        <Grid Grid.Row="1">
+        <!-- The side panes collapse rather than clip once the page can no longer hold their minimums:
+             details first, then the tree (see FileExplorerPanes). The code-behind zeroes the collapsed
+             column so it stops reserving width. -->
+        <Grid Grid.Row="1" SizeChanged="OnPaneAreaSizeChanged">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" MinWidth="180" MaxWidth="420"/>  <!-- left tree -->
                 <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
@@ -336,7 +343,7 @@
             </Grid.ColumnDefinitions>
 
         <!-- ===== Folder tree ===== -->
-        <Border Grid.Column="0" Classes="panel" Padding="8">
+        <Border x:Name="TreePane" Grid.Column="0" Classes="panel" Padding="8">
             <TreeView ItemsSource="{Binding RootNodes}"
                       Background="Transparent" BorderThickness="0" Padding="0">
                 <TreeView.ItemContainerTheme>
@@ -360,7 +367,7 @@
             </TreeView>
         </Border>
 
-        <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
+        <GridSplitter x:Name="TreeSplitter" Grid.Column="1" Classes="paneSplitter"/>
 
         <!-- ===== File list ===== -->
         <Border Grid.Column="2" Classes="panel" Padding="0" ClipToBounds="True">
@@ -370,7 +377,10 @@
                      the active column tints and shows a ↑/↓ arrow (bound to the SortColumn VMs). -->
                 <Border Grid.Row="0" Padding="14,10" BorderBrush="{DynamicResource Hairline}"
                         BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="2.2*,1*,1.2*,0.9*" ColumnSpacing="8">
+                    <!-- This grid's width is exactly what the columns get, so it (not the outer panel)
+                         is what the view model measures against when deciding how many still fit. -->
+                    <Grid ColumnSpacing="8" SizeChanged="OnTableSizeChanged"
+                          layout:GridColumns.Definitions="{Binding ColumnLayout}">
                         <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
                                 Command="{Binding NameSort.SortCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
@@ -380,6 +390,7 @@
                             </StackPanel>
                         </Button>
                         <Button Grid.Column="1" Classes="pick" HorizontalAlignment="Left"
+                                IsVisible="{Binding ShowTypeColumn}"
                                 Command="{Binding TypeSort.SortCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                                 <TextBlock Classes="colHead" Classes.active="{Binding TypeSort.IsActive}"
@@ -388,6 +399,7 @@
                             </StackPanel>
                         </Button>
                         <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
+                                IsVisible="{Binding ShowModifiedColumn}"
                                 Command="{Binding ModifiedSort.SortCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                                 <TextBlock Classes="colHead" Classes.active="{Binding ModifiedSort.IsActive}"
@@ -414,7 +426,10 @@
                                 <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
                                         Background="Transparent"
                                         Tapped="OnEntryTapped" DoubleTapped="OnEntryDoubleTapped">
-                                    <Grid ColumnDefinitions="2.2*,1*,1.2*,0.9*" ColumnSpacing="8">
+                                    <!-- Columns come from the page view model, not the entry, so every
+                                         row and the header share one definition and stay aligned. -->
+                                    <Grid ColumnSpacing="8"
+                                          layout:GridColumns.Definitions="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ColumnLayout}">
                                         <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
                                             <Path Grid.Column="0" Data="{Binding Glyph}"
                                                   Stroke="{Binding IconBrush}" StrokeThickness="1.3"
@@ -426,9 +441,11 @@
                                         </Grid>
                                         <TextBlock Grid.Column="1" Classes="cellMeta"
                                                    Text="{Binding TypeName}"
-                                                   TextTrimming="CharacterEllipsis"/>
+                                                   TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowTypeColumn}"/>
                                         <TextBlock Grid.Column="2" Classes="cellMeta"
-                                                   Text="{Binding ModifiedText}"/>
+                                                   Text="{Binding ModifiedText}"
+                                                   IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowModifiedColumn}"/>
                                         <TextBlock Grid.Column="3" Classes="cellSize"
                                                    Text="{Binding SizeText}"/>
                                     </Grid>
@@ -440,10 +457,10 @@
             </Grid>
         </Border>
 
-        <GridSplitter Grid.Column="3" Classes="paneSplitter"/>
+        <GridSplitter x:Name="DetailsSplitter" Grid.Column="3" Classes="paneSplitter"/>
 
         <!-- ===== Details / preview ===== -->
-        <Border Grid.Column="4" Classes="panel">
+        <Border x:Name="DetailsPane" Grid.Column="4" Classes="panel">
             <Panel>
                 <!-- Empty state -->
                 <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"

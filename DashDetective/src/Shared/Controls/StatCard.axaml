@@ -17,7 +17,7 @@
                            VerticalAlignment="Bottom" Margin="0,0,0,4"/>
             </StackPanel>
             <TextBlock Classes="cardSub" Text="{Binding #Root.Sub}"/>
-            <controls:Sparkline Height="34" StrokeThickness="1.4"
+            <controls:Sparkline Classes="chartMini" StrokeThickness="1.4"
                                 Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"
                                 YMin="{Binding #Root.YMin}" YMax="{Binding #Root.YMax}"/>
         </StackPanel>
