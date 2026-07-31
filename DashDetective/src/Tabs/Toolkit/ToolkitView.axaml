@@ -12,8 +12,15 @@
          Phase 3 builds the filter bar; the list (Phase 4) and the log panel (Phase 5) follow. -->
     <!-- Monospace token is tab-local, as in NetworkView: commands read better in a fixed pitch.
          Promote to SharedStyles only if a third feature needs it. -->
+    <!-- ConsoleBg is a fixed dark terminal surface (kept dark in BOTH themes) so the fixed blue/green
+         console text stays readable — a light inset would wash it out. Same tokens and same reasoning
+         as NetworkView's ping/DNS consoles. -->
     <UserControl.Resources>
         <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
+        <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
+        <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
+        <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
+        <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -75,6 +82,32 @@
         <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
+
+        <!-- Chrome-less text button for the log panel's "Clear", so it reads as inline text rather
+             than a control (as SharedStyles' pathToggle does on the path row). -->
+        <Style Selector="Button.linkAction">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.linkAction /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.linkAction:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <!-- Console text: one fixed pitch and one fixed colour set on the dark inset. -->
+        <Style Selector="TextBlock.console">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
@@ -133,11 +166,13 @@
                        VerticalAlignment="Center" Margin="0,0,0,6"/>
         </Grid>
 
-        <!-- ===== Command list ===== -->
+        <!-- ===== Command list + Execution Log ===== -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,340" ColumnSpacing="16">
+
         <!-- One card per non-empty category (the filter drops the rest, header and all), each a
              rounded grouped list of command rows. The column scrolls on its own so the Execution
-             Log panel added beside it stays pinned — the page is ISelfScrollingPage. -->
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+             Log panel beside it stays pinned — the page is ISelfScrollingPage. -->
+        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
             <Panel>
                 <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasCommands}">
                     <ItemsControl.ItemsPanel>
@@ -232,5 +267,50 @@
                 </Border>
             </Panel>
         </ScrollViewer>
+
+        <!-- ===== Execution Log ===== -->
+        <!-- Pinned beside the list rather than scrolling with it: the comp's sticky panel, which
+             Avalonia has no equivalent for, so the two columns each own their scrolling. Running a
+             command and capturing its output is not part of this UI-only pass, so it stays empty. -->
+        <Border Grid.Column="1" Classes="panel" Padding="14">
+            <Grid RowDefinitions="Auto,*" RowSpacing="10">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                    <TextBlock Text="Execution Log" Classes="panelTitle" FontSize="13"
+                               Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="linkAction" Content="Clear"
+                            Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"
+                            VerticalAlignment="Center"/>
+                </Grid>
+
+                <Border Grid.Row="1" Background="{StaticResource ConsoleBg}" CornerRadius="6"
+                        Padding="10" ClipToBounds="True">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <Panel>
+                            <ItemsControl ItemsSource="{Binding Log}" IsVisible="{Binding HasLog}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ToolkitLogEntry">
+                                        <StackPanel Margin="0,0,0,9">
+                                            <TextBlock Text="{Binding Time}" Classes="console"
+                                                       Foreground="{StaticResource ConsoleMuted}"/>
+                                            <TextBlock Classes="console"
+                                                       Foreground="{StaticResource ConsoleBlue}"
+                                                       Text="{Binding Command, StringFormat='$ {0}'}"/>
+                                            <TextBlock Text="{Binding Output}" Classes="console"
+                                                       Foreground="{StaticResource ConsoleGreen}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="console" VerticalAlignment="Top"
+                                       IsVisible="{Binding !HasLog}"
+                                       Foreground="{StaticResource ConsoleMuted}"
+                                       Text="Output from commands you run will appear here."/>
+                        </Panel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+        </Grid>
     </Grid>
 </UserControl>

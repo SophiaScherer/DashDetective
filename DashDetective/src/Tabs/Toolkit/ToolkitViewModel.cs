@@ -30,6 +30,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         Categories = options;
         options[0].IsSelected = true;
+        Log.CollectionChanged += (_, _) => HasLog = Log.Count > 0;
         RebuildGroups();
     }
 
@@ -47,6 +48,12 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>Whether anything survived the filter. Drives the empty state.</summary>
     [ObservableProperty] private bool _hasCommands;
+
+    /// <summary>What has been run this session, newest first. Session-only and never persisted.</summary>
+    public ObservableCollection<ToolkitLogEntry> Log { get; } = [];
+
+    /// <summary>Whether the log has anything in it. Drives its empty state.</summary>
+    [ObservableProperty] private bool _hasLog;
 
     /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
@@ -73,6 +80,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>
     [RelayCommand]
     private void ClearSearch() => Search = "";
+
+    /// <summary>Empties the Execution Log (its "Clear" button).</summary>
+    [RelayCommand]
+    private void ClearLog() => Log.Clear();
 
     partial void OnSearchChanged(string value) => RebuildGroups();
 
