@@ -7,11 +7,80 @@
              x:DataType="vm:ToolkitViewModel"
              x:Class="DashDetective.Tabs.Toolkit.ToolkitView">
 
-    <!-- The design comp's Commands page. Phase 1 wires the tab into the shell; the filter bar
-         (Phase 3), the grouped command list (Phase 4) and the Execution Log panel (Phase 5) fill
-         this root in turn. Surfaces/typography come from src/Shared/Styles. -->
-    <Border Classes="panel">
-        <TextBlock Text="Toolkit" Classes="panelTitle"
-                   Foreground="{DynamicResource TextPrimary}"/>
-    </Border>
+    <!-- The design comp's Commands page: a filter bar over a grouped command list, with the
+         Execution Log panel alongside. Surfaces/typography come from src/Shared/Styles.
+         Phase 3 builds the filter bar; the list (Phase 4) and the log panel (Phase 5) follow. -->
+    <UserControl.Styles>
+        <!-- Chrome-less button wrapper so a whole chip is clickable, as File Explorer's Button.pick
+             and Performance's Button.resButton (each local to its own view). -->
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.chip /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="14">
+
+        <!-- ===== Filter bar ===== -->
+        <!-- Search box, category chips, and the count of what survived. "/" or Ctrl+F puts the caret
+             in the box and Esc clears it. Same field chrome as the toolbar's search box and the
+             Processes filter. -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+            <Border Grid.Column="0" Width="300" Height="34" VerticalAlignment="Center"
+                    Background="{DynamicResource FieldBackground}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
+                    <Path Grid.Column="0" Width="13" Height="13" Stretch="Uniform"
+                          Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
+                          StrokeLineCap="Round" VerticalAlignment="Center"
+                          Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+                    <TextBox Grid.Column="1" x:Name="SearchBox" Classes="flat" Margin="8,0,0,0"
+                             FontSize="12.5" VerticalContentAlignment="Center"
+                             PlaceholderText="Search commands…"
+                             Text="{Binding Search, Mode=TwoWay}"/>
+                    <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
+                            Command="{Binding ClearSearchCommand}"
+                            IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                              StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Classes="segments" VerticalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ToolkitCategoryOption">
+                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                    <TextBlock Text="{Binding Label}"/>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <TextBlock Grid.Column="2" Text="{Binding CountLabel}" Classes="cardSub"
+                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- ===== Command list + Execution Log ===== -->
+        <Border Grid.Row="1" Classes="panel">
+            <TextBlock Text="Toolkit" Classes="panelTitle"
+                       Foreground="{DynamicResource TextPrimary}"/>
+        </Border>
+    </Grid>
 </UserControl>

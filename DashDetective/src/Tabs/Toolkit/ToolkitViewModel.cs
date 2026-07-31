@@ -1,4 +1,11 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -6,6 +13,90 @@ namespace DashDetective.Tabs.Toolkit;
 /// The Toolkit tab ("Commands" in the design document): a browsable list of common commands for
 /// navigating or diagnosing the machine, with an execution log beside it. Self-scrolling — the
 /// command column and the log panel scroll independently, so the log stays pinned in view.
+///
+/// The list is narrowed by a category chip and a search box together, through
+/// <see cref="ToolkitFilter"/>. The command set is empty for now (see <see cref="ToolkitCatalog"/>),
+/// so what renders is the empty state.
 /// </summary>
-public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage {
+public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
+    private ToolkitCategory? _category;
+
+    public ToolkitViewModel() {
+        var options = new List<ToolkitCategoryOption> {
+            new("All", null, SelectCategory),
+        };
+        foreach (var category in ToolkitCatalog.Categories)
+            options.Add(new ToolkitCategoryOption(ToolkitCatalog.HeaderFor(category), category, SelectCategory));
+
+        Categories = options;
+        options[0].IsSelected = true;
+        RebuildGroups();
+    }
+
+    /// <summary>The filter chips, "All" first and then the catalog's categories in display order.</summary>
+    public IReadOnlyList<ToolkitCategoryOption> Categories { get; }
+
+    /// <summary>The command list as the filter leaves it: one section per non-empty category.</summary>
+    public ObservableCollection<ToolkitGroup> Groups { get; } = [];
+
+    /// <summary>The search box. Narrows on every keystroke, alongside the selected chip.</summary>
+    [ObservableProperty] private string _search = "";
+
+    /// <summary>How many commands the filter left, as the count beside the chips reads it.</summary>
+    [ObservableProperty] private string _countLabel = "";
+
+    /// <summary>Whether anything survived the filter. Drives the empty state.</summary>
+    [ObservableProperty] private bool _hasCommands;
+
+    /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the
+    /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
+    public event Action? SearchFocusRequested;
+
+    public ShortcutScope Scope => ShortcutScope.Toolkit;
+
+    public bool HandleShortcut(ShortcutId id) {
+        switch (id) {
+            case ShortcutId.FocusFilter:
+                SearchFocusRequested?.Invoke();
+                return true;
+
+            // Leave Esc unconsumed with an empty box, so the shell can still dismiss a banner with it.
+            case ShortcutId.Escape when Search.Length > 0:
+                ClearSearch();
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>
+    [RelayCommand]
+    private void ClearSearch() => Search = "";
+
+    partial void OnSearchChanged(string value) => RebuildGroups();
+
+    private void SelectCategory(ToolkitCategoryOption option) {
+        foreach (var candidate in Categories)
+            candidate.IsSelected = ReferenceEquals(candidate, option);
+
+        _category = option.Category;
+        RebuildGroups();
+    }
+
+    /// <summary>Re-runs the filter and replaces the sections wholesale. The list is small and only
+    /// changes on a keystroke or a chip, so there is nothing here for a keyed diff to save.</summary>
+    private void RebuildGroups() {
+        Groups.Clear();
+        var matched = 0;
+        foreach (var group in ToolkitFilter.Group(ToolkitCatalog.Entries, _category, Search)) {
+            Groups.Add(group);
+            matched += group.Items.Count;
+        }
+
+        HasCommands = matched > 0;
+        CountLabel = matched == 1
+            ? "1 command"
+            : matched.ToString(CultureInfo.InvariantCulture) + " commands";
+    }
 }

@@ -133,6 +133,12 @@ public static class ShortcutCatalog {
 
         new(ShortcutId.NextPage, [new KeyGesture(Key.Right, KeyModifiers.Control)],
             "Ctrl+→", "Next page of connections", ShortcutScope.Network),
+
+        // ----- Toolkit -----
+        // The same action as the Processes filter, on the tab that owns a different box — the shell
+        // offers a resolved id to the current page, so one id serves both. Text-guarded like that one.
+        new(ShortcutId.FocusFilter, [new KeyGesture(Key.OemQuestion)],
+            "/", "Focus the command filter", ShortcutScope.Toolkit, AllowInTextInput: false),
     ];
 
     /// <summary>The listed shortcuts, grouped by where they apply, as the Help modal renders them.
@@ -163,6 +169,7 @@ public static class ShortcutCatalog {
         ShortcutScope.Processes => "Processes",
         ShortcutScope.FileExplorer => "File Explorer",
         ShortcutScope.Network => "Network",
+        ShortcutScope.Toolkit => "Toolkit",
         _ => "General",
     };
 

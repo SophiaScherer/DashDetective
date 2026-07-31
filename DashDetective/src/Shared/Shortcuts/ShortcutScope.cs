@@ -13,4 +13,5 @@ public enum ShortcutScope {
     Processes,
     FileExplorer,
     Network,
+    Toolkit,
 }
