@@ -39,6 +39,7 @@ public sealed record SearchResult(
         SearchCategory.Page => "Page",
         SearchCategory.Setting => "Setting",
         SearchCategory.Shortcut => "Shortcut",
+        SearchCategory.Toolkit => "Command",
         SearchCategory.Process => "Process",
         _ => "File",
     };

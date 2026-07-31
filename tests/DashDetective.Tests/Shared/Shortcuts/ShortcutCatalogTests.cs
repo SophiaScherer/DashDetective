@@ -8,7 +8,7 @@ using Xunit;
 namespace DashDetective.Tests.Shared.Shortcuts;
 
 /// <summary>Covers <see cref="ShortcutCatalog"/>: the table stays complete and unambiguous (every
-/// action bound exactly once, no gesture claimed twice within a scope) and
+/// action bound, and neither a gesture nor an action claimed twice within one scope) and
 /// <see cref="ShortcutCatalog.TryResolve"/> picks the active tab's binding and honours the text-input
 /// guard, so a new binding can't silently shadow an existing one or start stealing keys from a search
 /// box.</summary>
@@ -18,11 +18,22 @@ public class ShortcutCatalogTests {
         ShortcutCatalog.TryResolve(key, modifiers, textInputFocused, ShortcutScope.Global, out id);
 
     [Fact]
-    public void All_CoversEveryShortcutIdExactlyOnce() {
-        var ids = ShortcutCatalog.All.Select(s => s.Id).ToList();
+    public void All_CoversEveryShortcutId() {
+        var ids = ShortcutCatalog.All.Select(s => s.Id).Distinct().OrderBy(id => id);
 
-        Assert.Equal(ids.Count, ids.Distinct().Count());
-        Assert.Equal(Enum.GetValues<ShortcutId>().OrderBy(id => id), ids.OrderBy(id => id));
+        Assert.Equal(Enum.GetValues<ShortcutId>().OrderBy(id => id), ids);
+    }
+
+    [Fact]
+    public void All_BindsNoActionTwiceWithinAScope() {
+        // Across scopes an action may repeat — "/" focuses the filter box on both Processes and
+        // Toolkit, and the shell offers a resolved id to whichever page is current. Within one scope
+        // a second binding for the same action would be unreachable.
+        foreach (var scope in Enum.GetValues<ShortcutScope>()) {
+            var ids = ShortcutCatalog.All.Where(s => s.Scope == scope).Select(s => s.Id).ToList();
+
+            Assert.Equal(ids.Count, ids.Distinct().Count());
+        }
     }
 
     [Fact]
@@ -91,6 +102,7 @@ public class ShortcutCatalogTests {
     [InlineData(Key.D1, ShortcutId.NavigateTab1)]
     [InlineData(Key.NumPad1, ShortcutId.NavigateTab1)]
     [InlineData(Key.D8, ShortcutId.NavigateTab8)]
+    [InlineData(Key.D9, ShortcutId.NavigateTab9)]
     [InlineData(Key.B, ShortcutId.ToggleNavCollapse)]
     [InlineData(Key.OemComma, ShortcutId.OpenSettings)]
     public void TryResolve_MapsControlGesturesToTheirAction(Key key, ShortcutId expected) {
@@ -258,6 +270,10 @@ public class ShortcutCatalogTests {
                 resolved.Add(id);
             }
 
-        Assert.Equal(ShortcutCatalog.All.Count, resolved.Distinct().Count());
+        // Distinct, not All.Count: an action may be bound in more than one scope (see
+        // All_BindsNoActionTwiceWithinAScope). Every one of them must still be reachable.
+        Assert.Equal(
+            ShortcutCatalog.All.Select(s => s.Id).Distinct().Count(),
+            resolved.Distinct().Count());
     }
 }

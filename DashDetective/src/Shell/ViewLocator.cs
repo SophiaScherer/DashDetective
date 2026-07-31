@@ -9,6 +9,7 @@ using DashDetective.Tabs.Performance;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tabs.Settings;
 using DashDetective.Tabs.Storage;
+using DashDetective.Tabs.Toolkit;
 
 namespace DashDetective.Shell;
 
@@ -25,6 +26,7 @@ public class ViewLocator : IDataTemplate {
         NetworkViewModel => new NetworkView(),
         StorageViewModel => new StorageView(),
         HardwareViewModel => new HardwareView(),
+        ToolkitViewModel => new ToolkitView(),
         SettingsViewModel => new SettingsView(),
         null => null,
         _ => new TextBlock { Text = "Not Found: " + param.GetType().FullName },

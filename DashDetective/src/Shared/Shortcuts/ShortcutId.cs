@@ -6,7 +6,7 @@ namespace DashDetective.Shared.Shortcuts;
 /// </summary>
 public enum ShortcutId {
     // ----- Global navigation -----
-    // NavigateTab1..8 must stay contiguous and in order: the shell maps them to nav positions by
+    // NavigateTab1..9 must stay contiguous and in order: the shell maps them to nav positions by
     // subtracting NavigateTab1 (see MainWindowViewModel.HandleGlobal).
     NavigateTab1,
     NavigateTab2,
@@ -16,6 +16,7 @@ public enum ShortcutId {
     NavigateTab6,
     NavigateTab7,
     NavigateTab8,
+    NavigateTab9,
     NextTab,
     PreviousTab,
     ToggleNavCollapse,
