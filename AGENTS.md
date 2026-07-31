@@ -19,6 +19,7 @@ The planned top-level features are:
 - Network
 - Storage
 - Hardware
+- Toolkit
 - Settings
 
 Not all of these exist yet. Only build what is listed below as "currently active."
@@ -32,9 +33,39 @@ task explicitly assigns, and do not modify a live feature without an explicit sc
 patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
-drives/health view; status below), and **Keyboard shortcuts** (status below). Two cross-cutting passes
-are also complete (repo-hygiene / portfolio pass; de-duplication / composition refactor) — write-ups in
-the Appendix.
+drives/health view; status below), **Toolkit** (UI only; status below) and **Keyboard shortcuts**
+(status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
+de-duplication / composition refactor) — write-ups in the Appendix.
+
+**Toolkit — implementation status** (UI ONLY):
+
+- **Toolkit** — the design document's **"Commands"** tab, shipped in the live app as **Toolkit** (nav
+  label, folder, namespace and type names; "Commands" is a design-doc-only name). Built in phases
+  (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`). It is the **ninth** tab,
+  sitting between Hardware and Settings, which is why the Ctrl+digit tab jumps now run **Ctrl+1 …
+  Ctrl+9**.
+- **Only the UI exists.** `ToolkitCatalog.Entries` is deliberately **empty** — the design document's
+  command data was inaccurate, so no entries were authored — and **nothing runs a command**. The page
+  therefore renders its empty states. `ToolkitCatalog.Entries` is the single seam to change when the
+  command set is written; the filter, grouping, search provider and every container already work off it.
+- **What is built:** a filter bar (search box + category chips + result count) over a grouped command
+  list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
+  four categories (`ToolkitCategory`) and four entry kinds (`ToolkitEntryKind`, each with a badge
+  label, colour and glyph) exist and are tested.
+- **Deliberately unbuilt** (do NOT add without an explicit task): running a command, capturing its
+  output into the log, and the per-row copy-to-clipboard. The copy button is placed but inert; Clear
+  really does empty the log and is simply disabled while it is empty. Running arbitrary commands is a
+  **security-relevant** capability — treat it as its own task with its own sign-off, not a follow-on tidy.
+- Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the
+  comp's `position:sticky` has no Avalonia equivalent. Wired to `IShortcutTarget` (`ShortcutScope.Toolkit`,
+  `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the
+  reveal gotcha in the *Universal search* write-up in the Appendix. Not `IRefreshablePage` /
+  `ILiveSamplingPage`: the page has nothing live to sample or re-read.
+- Two layout decisions were made **against** the comp, both after seeing them fail on screen at the
+  window's 920px minimum, and both should be left alone: the **filter bar wraps** (box + five chips
+  overflow the content area, and the last chip was unreachable), and the **kind badge sits in its own
+  row column** rather than inline after the command (two `Auto` columns do not shrink, so a long
+  command clipped at the card edge and shouldered the badge out of view).
 
 **Keyboard shortcuts — implementation status** (LIVE):
 
@@ -49,6 +80,15 @@ the Appendix.
   through. Resolution is **scope-aware**: a gesture may mean different things on different tabs
   (`Alt+↑` sorts on Processes, climbs a folder on File Explorer). **`Esc` has exactly one owner** — the
   chain, not individual controls. See *Keyboard shortcuts* in `docs/ARCHITECTURE.md`.
+- **One `ShortcutId` may be bound in several scopes.** `/` → `FocusFilter` serves both the Processes
+  filter and the Toolkit filter: the shell offers a resolved id to whichever page is current, so a new
+  tab reuses the existing action rather than minting a near-duplicate id per tab. The catalog invariant
+  is therefore "neither an action **nor** a gesture bound twice **within one scope**", which is what
+  `ShortcutCatalogTests` pins.
+- **The digit jumps run `Ctrl+1 … Ctrl+9`** (nine tabs). `ShortcutId.NavigateTab1..9` must stay
+  contiguous — `MainWindowViewModel.HandleGlobal` maps them to nav positions by subtracting
+  `NavigateTab1`, and its range guard names the last one, so a tenth tab means touching the enum, the
+  catalog, that guard, and the Help copy in both `ShortcutCatalog` and `HelpContent`.
 - Three features were built alongside it because the requested shortcuts had nothing to bind to: the
   **Processes filter box** (name/PID, with `ProcessFilter` as a testable static), **File Explorer
   back/forward history** (`NavigationHistory` plus back/forward/up buttons by the breadcrumb), and the
@@ -308,6 +348,34 @@ currently exist.
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
+      /Toolkit                  ToolkitView.axaml(.cs) + ToolkitViewModel.cs
+                                (UI ONLY — the design doc's "Commands" tab. Filter bar (search box +
+                                 category chips + count) over a grouped command list, beside a pinned
+                                 340px Execution Log. ISelfScrollingPage (each column scrolls itself)
+                                 + IShortcutTarget. No entries and no execution — see the Toolkit
+                                 status bullet under Current Scope. View code-behind owns the search
+                                 focus + the search-reveal flash, like ProcessesView/SettingsView)
+                                ToolkitCategory.cs      (enum: the four sections, declaration order =
+                                                         display order)
+                                ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel — what a
+                                                         command opens, driving its icon + badge)
+                                ToolkitEntry.cs         (immutable row model; its Icon/Badge* getters
+                                                         resolve through ToolkitIcons ON READ, so the
+                                                         filter/catalog tests never load geometry)
+                                ToolkitGroup.cs         (immutable category section: upper-cased header
+                                                         + the entries that survived the filter)
+                                ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)
+                                ToolkitLogEntry.cs      (record: Time / Command / Output — one console
+                                                         stanza in the Execution Log)
+                                ToolkitCatalog.cs       (static copy table + the command set. Entries is
+                                                         EMPTY and is the one seam to change when the
+                                                         commands are authored)
+                                ToolkitFilter.cs        (pure statics: Matches (chip AND term, over the
+                                                         command and its description) + Group (buckets
+                                                         into catalog order, dropping emptied sections).
+                                                         The ProcessFilter pattern)
+                                ToolkitIcons.cs         (feature-local per-kind glyphs + fixed badge
+                                                         tints, the HardwareIcons pattern)
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
                                                         (fully live: Appearance + Navigation + Monitoring
                                                          + Export & Data; view code-behind owns the
@@ -630,20 +698,29 @@ When a new feature becomes active, or an existing one is completed/paused, updat
 
 - **Universal search** — **fully live** (plan:
   `C:\Users\User\.claude\plans\make-a-plan-to-lexical-salamander.md`). The toolbar box (`Ctrl+F`) searches
-  five categories at once and navigates to whatever is picked, revealing it in place.
+  six categories at once and navigates to whatever is picked, revealing it in place.
   - **Structure** (`src/Shell/Search/`). `SearchRanker` scores a term against text in four tiers kept
     200 apart (exact / prefix / word-start / anywhere) with a closeness bonus capped below 100, so a
     tier can never be crossed. `SearchAggregator` fans one query out to independent `ISearchProvider`s,
     merges and caps what comes back, and discards an answer whose term the user has already typed past.
     A provider that throws costs its own category and nothing else.
   - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
-    `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Processes (over the
+    `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Toolkit (over
+    `ToolkitCatalog.Entries`, ranking the command text above its description), Processes (over the
     Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
     row), and Files.
   - **Jumping.** There is **no routing layer**. Each provider takes a "go there" callback built in
     `MainWindowViewModel` (the one class already holding every page), which navigates and then calls a
     small public `Reveal(...)` on the page. Settings rows carry their `SettingId` as their `Tag`, so
-    the view finds the row to `BringIntoView()` and flash without a name-to-control switch.
+    the view finds the row to `BringIntoView()` and flash without a name-to-control switch; Toolkit
+    rows do the same with the command string.
+  - **Revealing onto a page that isn't built yet (gotcha).** The shell navigates and reveals in one
+    breath, so a page hosted in the **bounded self-scrolling `ContentControl`** does not exist when
+    `Reveal(...)` is called — its child is built on the next layout pass, and an event raised there and
+    then reaches no subscriber. Settings is unaffected (it sits in the scrolling host), which is why
+    the plain event seam works there. `ToolkitViewModel` therefore **stores the pending reveal** and
+    only nudges the event; the view drains it both when it attaches and when the event fires, so
+    whichever happens first wins. Copy that shape for any future `ISelfScrollingPage` reveal.
   - **File search** (`src/Services/Search/`). Prefers the Windows index (`Search.CollatorDSO` via
     `System.Data.OleDb`), falling back to a capped, cancellable breadth-first scan. `IFileSearch`
     separates *cannot answer* (null) from *found nothing* (empty) — only the former falls back. The
