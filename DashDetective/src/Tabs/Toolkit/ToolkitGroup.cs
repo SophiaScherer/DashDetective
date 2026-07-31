@@ -15,8 +15,9 @@ public sealed class ToolkitGroup {
 
     public ToolkitCategory Category { get; }
 
-    /// <summary>The uppercase section label above the card.</summary>
-    public string Header => ToolkitCatalog.HeaderFor(Category);
+    /// <summary>The section label above the card. Upper-cased here rather than in the catalog: the
+    /// chips show the same names in title case, and Avalonia has no text-transform.</summary>
+    public string Header => ToolkitCatalog.HeaderFor(Category).ToUpperInvariant();
 
     public IReadOnlyList<ToolkitEntry> Items { get; }
 }

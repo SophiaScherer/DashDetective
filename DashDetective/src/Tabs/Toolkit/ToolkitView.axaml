@@ -10,6 +10,12 @@
     <!-- The design comp's Commands page: a filter bar over a grouped command list, with the
          Execution Log panel alongside. Surfaces/typography come from src/Shared/Styles.
          Phase 3 builds the filter bar; the list (Phase 4) and the log panel (Phase 5) follow. -->
+    <!-- Monospace token is tab-local, as in NetworkView: commands read better in a fixed pitch.
+         Promote to SharedStyles only if a third feature needs it. -->
+    <UserControl.Resources>
+        <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <!-- Chrome-less button wrapper so a whole chip is clickable, as File Explorer's Button.pick
              and Performance's Button.resButton (each local to its own view). -->
@@ -24,6 +30,51 @@
         <Style Selector="Button.chip /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
+
+        <!-- One command row. The bottom hairline separates rows inside the grouped card; the
+             transition makes the search-reveal flash fade out rather than blink off, as
+             SettingsView's settingRow does. -->
+        <Style Selector="Border.cmdRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.cmdRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.cmdRow.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
+        <!-- Uppercase section label above each category card. -->
+        <Style Selector="TextBlock.sectionHead">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+            <Setter Property="LetterSpacing" Value="0.4"/>
+        </Style>
+
+        <!-- Chrome-less 28px square for the row's copy affordance. -->
+        <Style Selector="Button.rowAction">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*" RowSpacing="14">
@@ -32,55 +83,154 @@
         <!-- Search box, category chips, and the count of what survived. "/" or Ctrl+F puts the caret
              in the box and Esc clears it. Same field chrome as the toolbar's search box and the
              Processes filter. -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-            <Border Grid.Column="0" Width="300" Height="34" VerticalAlignment="Center"
-                    Background="{DynamicResource FieldBackground}"
-                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
-                    <Path Grid.Column="0" Width="13" Height="13" Stretch="Uniform"
-                          Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
-                          StrokeLineCap="Round" VerticalAlignment="Center"
-                          Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-                    <TextBox Grid.Column="1" x:Name="SearchBox" Classes="flat" Margin="8,0,0,0"
-                             FontSize="12.5" VerticalContentAlignment="Center"
-                             PlaceholderText="Search commands…"
-                             Text="{Binding Search, Mode=TwoWay}"/>
-                    <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
-                            Command="{Binding ClearSearchCommand}"
-                            IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                        <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
-                              StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
-                    </Button>
-                </Grid>
-            </Border>
+        <!-- The box and the chips wrap onto a second line rather than clipping: side by side they
+             need more than the content area has at the window's minimum width, and a chip that
+             cannot be reached is worse than a taller bar. -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <WrapPanel Grid.Column="0">
+                <Border Width="300" Height="34" Margin="0,0,10,6" VerticalAlignment="Center"
+                        Background="{DynamicResource FieldBackground}"
+                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
+                        <Path Grid.Column="0" Width="13" Height="13" Stretch="Uniform"
+                              Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
+                              StrokeLineCap="Round" VerticalAlignment="Center"
+                              Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+                        <TextBox Grid.Column="1" x:Name="SearchBox" Classes="flat" Margin="8,0,0,0"
+                                 FontSize="12.5" VerticalContentAlignment="Center"
+                                 PlaceholderText="Search commands…"
+                                 Text="{Binding Search, Mode=TwoWay}"/>
+                        <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
+                                Command="{Binding ClearSearchCommand}"
+                                IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                  StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
+                        </Button>
+                    </Grid>
+                </Border>
 
-            <Border Grid.Column="1" Classes="segments" VerticalAlignment="Center">
-                <ItemsControl ItemsSource="{Binding Categories}">
+                <Border Classes="segments" Margin="0,0,0,6" VerticalAlignment="Center">
+                    <ItemsControl ItemsSource="{Binding Categories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="6"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ToolkitCategoryOption">
+                                <Button Classes="chip" Command="{Binding SelectCommand}">
+                                    <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                        <TextBlock Text="{Binding Label}"/>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </WrapPanel>
+
+            <TextBlock Grid.Column="1" Text="{Binding CountLabel}" Classes="cardSub"
+                       VerticalAlignment="Center" Margin="0,0,0,6"/>
+        </Grid>
+
+        <!-- ===== Command list ===== -->
+        <!-- One card per non-empty category (the filter drops the rest, header and all), each a
+             rounded grouped list of command rows. The column scrolls on its own so the Execution
+             Log panel added beside it stays pinned — the page is ISelfScrollingPage. -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+            <Panel>
+                <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasCommands}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                            <StackPanel Spacing="16"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ToolkitCategoryOption">
-                            <Button Classes="chip" Command="{Binding SelectCommand}">
-                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                    <TextBlock Text="{Binding Label}"/>
+                        <DataTemplate x:DataType="vm:ToolkitGroup">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding Header}" Classes="sectionHead"/>
+                                <Border Classes="panel" Padding="0" ClipToBounds="True">
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ToolkitEntry">
+                                                <Border Classes="cmdRow" Tag="{Binding Command}"
+                                                        Classes.highlighted="{Binding IsHighlighted}">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                                        <Border Grid.Column="0" Width="28" Height="28"
+                                                                CornerRadius="7"
+                                                                Background="{Binding BadgeBackground}">
+                                                            <Path Data="{Binding Icon}"
+                                                                  Stroke="{Binding BadgeForeground}"
+                                                                  StrokeThickness="1.4" StrokeLineCap="Round"
+                                                                  StrokeJoin="Round" Stretch="None"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"/>
+                                                        </Border>
+
+                                                        <!-- Command over its description, both
+                                                             ellipsizing. This is the only flexible
+                                                             column, so a long command trims here
+                                                             instead of shouldering the badge out of
+                                                             the card. -->
+                                                        <StackPanel Grid.Column="1" Spacing="2"
+                                                                    VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Command}"
+                                                                       FontFamily="{StaticResource MonoFont}"
+                                                                       FontSize="13" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource TextStrong}"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Description}"
+                                                                       FontSize="11.5"
+                                                                       Foreground="{DynamicResource TextSubtle}"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+
+                                                        <!-- The kind badge gets its own fixed column
+                                                             so it stays legible at any width, and the
+                                                             badges line up down the card. -->
+                                                        <Border Grid.Column="2" CornerRadius="10"
+                                                                Padding="7,2" VerticalAlignment="Center"
+                                                                Background="{Binding BadgeBackground}">
+                                                            <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
+                                                                       Foreground="{Binding BadgeForeground}"/>
+                                                        </Border>
+
+                                                        <!-- Copy affordance. Placed with the row it
+                                                             belongs to; wiring the clipboard is not
+                                                             part of this UI-only pass. -->
+                                                        <Button Grid.Column="3" Classes="rowAction"
+                                                                ToolTip.Tip="Copy command">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M4.5,1.5 H11 V8 H4.5 Z M1.5,4.5 H8 V11 H1.5 Z"/>
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </Border>
-                            </Button>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </Border>
 
-            <TextBlock Grid.Column="2" Text="{Binding CountLabel}" Classes="cardSub"
-                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
-        </Grid>
-
-        <!-- ===== Command list + Execution Log ===== -->
-        <Border Grid.Row="1" Classes="panel">
-            <TextBlock Text="Toolkit" Classes="panelTitle"
-                       Foreground="{DynamicResource TextPrimary}"/>
-        </Border>
+                <!-- Empty state. Covers both "no commands authored yet" and "the filter matched
+                     nothing", which read the same to the user: an empty list. -->
+                <Border Classes="panel" VerticalAlignment="Top" Padding="16,40"
+                        IsVisible="{Binding !HasCommands}">
+                    <StackPanel Spacing="6" HorizontalAlignment="Center">
+                        <TextBlock Text="No commands to show" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="Commands will appear here, grouped by category."
+                                   FontSize="11.5" Foreground="{DynamicResource TextSubtle}"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Panel>
+        </ScrollViewer>
     </Grid>
 </UserControl>
