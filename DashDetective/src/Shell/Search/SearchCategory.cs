@@ -9,6 +9,7 @@ public enum SearchCategory {
     Page,
     Setting,
     Shortcut,
+    Toolkit,
     Process,
     File,
 }

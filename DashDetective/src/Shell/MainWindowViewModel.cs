@@ -168,6 +168,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Help.Open, Icons.Help),
+            new ToolkitSearchProvider(() => ToolkitCatalog.Entries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
                 new WindowsSearchIndex(), new FileSystemFallbackSearch(),
@@ -469,6 +470,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void RevealSetting(SettingId id) {
         NavigateToPage(_settings);
         _settings.Reveal(id);
+    }
+
+    /// <summary>Opens the Toolkit with the given command scrolled into view and flashed.</summary>
+    private void RevealToolkit(string command) {
+        NavigateToPage(_toolkit);
+        _toolkit.Reveal(command);
     }
 
     /// <summary>Opens Processes filtered to the given process, with its row selected.</summary>

@@ -20,6 +20,7 @@ namespace DashDetective.Tabs.Toolkit;
 /// </summary>
 public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
     private ToolkitCategory? _category;
+    private string? _pendingReveal;
 
     public ToolkitViewModel() {
         var options = new List<ToolkitCategoryOption> {
@@ -58,6 +59,34 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
     public event Action? SearchFocusRequested;
+
+    /// <summary>Nudges the view to reveal the pending command. Carries nothing: the command lives in
+    /// <see cref="TakePendingReveal"/>, so a reveal that arrives before the view exists is not lost.</summary>
+    public event Action? RevealRequested;
+
+    /// <summary>Brings a command into view after universal search navigated here. The filter is reset
+    /// first: a chip or a half-typed search from earlier could otherwise have hidden the very row the
+    /// user just picked.</summary>
+    public void Reveal(string command) {
+        SelectCategory(Categories[0]);
+        Search = "";
+
+        // Held rather than passed to the event, because on the first jump to this tab the view has not
+        // been built yet and so is not listening — the shell navigates and reveals in one breath, but
+        // the page's visual tree only appears on the next layout pass. The view drains this when it
+        // attaches, and the event covers the case where it was already attached.
+        _pendingReveal = command;
+        RevealRequested?.Invoke();
+    }
+
+    /// <summary>Takes the command waiting to be revealed, if any, clearing it. Called by the view both
+    /// when it attaches and when <see cref="RevealRequested"/> fires, so whichever comes first wins and
+    /// the other finds nothing.</summary>
+    internal string? TakePendingReveal() {
+        var pending = _pendingReveal;
+        _pendingReveal = null;
+        return pending;
+    }
 
     public ShortcutScope Scope => ShortcutScope.Toolkit;
 

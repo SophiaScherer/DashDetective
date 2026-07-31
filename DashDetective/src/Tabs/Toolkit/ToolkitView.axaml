@@ -188,8 +188,7 @@
                                     <ItemsControl ItemsSource="{Binding Items}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
-                                                <Border Classes="cmdRow" Tag="{Binding Command}"
-                                                        Classes.highlighted="{Binding IsHighlighted}">
+                                                <Border Classes="cmdRow" Tag="{Binding Command}">
                                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
                                                         <Border Grid.Column="0" Width="28" Height="28"
                                                                 CornerRadius="7"

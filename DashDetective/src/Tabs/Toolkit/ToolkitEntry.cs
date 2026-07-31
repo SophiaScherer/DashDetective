@@ -1,14 +1,16 @@
 using Avalonia.Media;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
 /// One command row: what it is (command text, description, category, kind) plus the presentation its
-/// kind implies. The visual getters resolve through <see cref="ToolkitIcons"/> **on read**, so an
-/// entry can be built and filtered in a headless test without loading any geometry.
+/// kind implies. Immutable — nothing about a command changes at runtime, and the search-reveal flash
+/// is owned by the view (see <c>ToolkitView.OnRevealRequested</c>), as it is on the Settings page.
+///
+/// The visual getters resolve through <see cref="ToolkitIcons"/> **on read**, so an entry can be
+/// built and filtered in a headless test without loading any geometry.
 /// </summary>
-public partial class ToolkitEntry : ObservableObject {
+public sealed class ToolkitEntry {
     public ToolkitEntry(string command, string description, ToolkitCategory category, ToolkitEntryKind kind) {
         Command = command;
         Description = description;
@@ -29,7 +31,4 @@ public partial class ToolkitEntry : ObservableObject {
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);
     public IBrush BadgeForeground => ToolkitIcons.ForegroundFor(Kind);
     public IBrush BadgeBackground => ToolkitIcons.BackgroundFor(Kind);
-
-    /// <summary>Set while universal search flashes this row after jumping to it.</summary>
-    [ObservableProperty] private bool _isHighlighted;
 }
