@@ -11,8 +11,8 @@ namespace DashDetective.Tabs.Performance;
 /// redistributable, no admin. An adapter whose vendor has no reader simply reports nothing, which is how the
 /// AMD and Intel tiles stay "—" until those readers exist.
 ///
-/// Page-local to the Performance tab, following the feature-local P/Invoke precedent of
-/// <see cref="SystemCacheProvider"/>, File Explorer's <c>ShellInterop</c> and the Network tab's
+/// Page-local to the Performance tab, following the feature-local P/Invoke precedent of File Explorer's
+/// <c>ShellInterop</c> and the Network tab's
 /// <c>ConnectionsInterop</c>. Never throws: a reader that faults is logged once and dropped for the rest of
 /// the session, so a persistent fault can't flood the log at the sampling cadence.
 /// </summary>

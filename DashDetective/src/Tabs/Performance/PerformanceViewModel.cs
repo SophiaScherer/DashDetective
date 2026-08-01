@@ -424,7 +424,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Cached is not a field of the sample: GlobalMemoryStatusEx doesn't report it, and the sampler
         // behind this feed is shared with Dashboard/Processes. It's a separate absolute psapi read taken
         // on the same tick, so it re-times, pauses and refreshes with its neighbours.
-        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemCacheProvider.ReadCachedBytes());
+        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemPerformanceProvider.Read()?.CachedBytes);
     }
 
     private async Task LoadMemoryInfoAsync() {
