@@ -78,8 +78,9 @@ public static class VolumeProvider {
         }
     }
 
-    /// <summary>The partition facts a volume inherits: its host disk number and raw GPT type GUID.</summary>
-    private readonly record struct PartitionRef(int DiskNumber, string GptType);
+    /// <summary>The partition facts a volume inherits: its host disk number (<c>null</c> when the machine
+    /// doesn't report one) and raw GPT type GUID.</summary>
+    private readonly record struct PartitionRef(int? DiskNumber, string GptType);
 
     /// <summary>Maps every partition access path to its partition. A volume's <c>Path</c> appears among its
     /// partition's <c>AccessPaths</c>, so this keys the volume→partition join. Missing/failed → empty
@@ -94,7 +95,7 @@ public static class VolumeProvider {
             foreach (var obj in results) {
                 using (obj) {
                     // GptType is null on MBR disks — an empty string just means "no type to show".
-                    var entry = new PartitionRef(ToInt(obj["DiskNumber"]), obj["GptType"] as string ?? "");
+                    var entry = new PartitionRef(ToDiskNumber(obj["DiskNumber"]), obj["GptType"] as string ?? "");
                     if (obj["AccessPaths"] is string[] paths)
                         foreach (var path in paths)
                             if (!string.IsNullOrEmpty(path))
@@ -122,11 +123,16 @@ public static class VolumeProvider {
         return char.IsLetter(c) ? char.ToUpperInvariant(c) : null;
     }
 
-    private static int ToInt(object? value) {
+    /// <summary>Reads a partition's disk number, or <c>null</c> when the machine doesn't report one.
+    /// Deliberately not 0-on-failure: 0 is a real disk number, so an unresolved partition would be filed
+    /// onto the first drive and inflate its used/free rollup.</summary>
+    private static int? ToDiskNumber(object? value) {
+        if (value is null)
+            return null;
         try {
-            return value is null ? 0 : Convert.ToInt32(value);
+            return Convert.ToInt32(value);
         } catch {
-            return 0;
+            return null;
         }
     }
 

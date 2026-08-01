@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using DashDetective.Tabs.Hardware.Catalog;
 using System;
 using System.Collections.Generic;
@@ -114,9 +115,10 @@ public static class HardwareInfoProvider {
                         var bytes = ToUInt64(obj["Capacity"]);
                         totalBytes += bytes;
                         moduleGbs.Add(bytes / (double)(1L << 30));
-                        // ConfiguredClockSpeed is the actual running speed (what Task Manager shows);
-                        // fall back to the rated Speed. Take the highest across modules.
-                        speed = Math.Max(speed, Math.Max(ToInt(obj["ConfiguredClockSpeed"]), ToInt(obj["Speed"])));
+                        // The shared MemorySpeed rule prefers the running speed over the rated one, so this
+                        // reads the same as the Dashboard's RAM line. Take the highest across modules.
+                        speed = Math.Max(speed,
+                            MemorySpeed.Running(ToInt(obj["ConfiguredClockSpeed"]), ToInt(obj["Speed"])));
                         if (memoryType == 0)
                             memoryType = ToInt(obj["SMBIOSMemoryType"]);
                         if (voltageMv == 0)
@@ -339,43 +341,46 @@ public static class HardwareInfoProvider {
     }
 
     /// <summary>
-    /// Graphics facts from <c>Win32_VideoController</c> — the first physical adapter's name (subtitle)
-    /// and Windows driver version. Filtered to PCI-bus adapters (skipping virtual/software ones) the
-    /// same way as <c>GpuInfoProvider</c>. VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
+    /// Graphics facts from <c>Win32_VideoController</c> — <b>every</b> physical adapter's name and Windows
+    /// driver version, since a machine can have a discrete GPU alongside an integrated one and the Dashboard
+    /// and Performance tabs already show both. Filtered to PCI-bus adapters (skipping virtual/software ones)
+    /// the same way as <c>GpuInfoProvider</c>. VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
     /// memory type, CUDA-core count, boost clock and bus width have no reliable WMI source → "—".
     /// </summary>
     [SupportedOSPlatform("windows")]
     private static GraphicsInfo ReadGraphics() {
         try {
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT Name, PNPDeviceID, DriverVersion FROM Win32_VideoController");
-            using var results = searcher.Get();
+            var adapters = new List<GraphicsAdapterInfo>();
 
-            foreach (var obj in results) {
-                using (obj) {
-                    // Physical GPUs sit on the PCI bus; virtual/software adapters are ROOT\/SWD\.
-                    var pnp = obj["PNPDeviceID"] as string;
-                    if (pnp is null || !pnp.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase))
-                        continue;
+            using (var searcher = new ManagementObjectSearcher(
+                "SELECT Name, PNPDeviceID, DriverVersion FROM Win32_VideoController"))
+            using (var results = searcher.Get()) {
+                foreach (var obj in results) {
+                    using (obj) {
+                        // Physical GPUs sit on the PCI bus; virtual/software adapters are ROOT\/SWD\.
+                        var pnp = obj["PNPDeviceID"] as string;
+                        if (pnp is null || !pnp.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase))
+                            continue;
 
-                    var name = obj["Name"] as string;
-                    if (string.IsNullOrWhiteSpace(name))
-                        continue;
+                        var name = obj["Name"] as string;
+                        if (string.IsNullOrWhiteSpace(name))
+                            continue;
 
-                    var driver = obj["DriverVersion"] as string;
-                    // Memory/CUDA/boost/bus aren't in WMI — fill them from the spec catalog by model.
-                    var spec = HardwareCatalog.LookupGpu(name);
-                    return new GraphicsInfo(
-                        Name: name.Trim(),
-                        Memory: spec?.Memory ?? "—",
-                        CudaCores: spec?.CudaCores ?? "—",
-                        BoostClock: spec?.BoostClock ?? "—",
-                        Driver: string.IsNullOrWhiteSpace(driver) ? "—" : driver.Trim(),
-                        Bus: spec?.Bus ?? "—");
+                        var driver = obj["DriverVersion"] as string;
+                        // Memory/CUDA/boost/bus aren't in WMI — fill them from the spec catalog by model.
+                        var spec = HardwareCatalog.LookupGpu(name);
+                        adapters.Add(new GraphicsAdapterInfo(
+                            Name: name.Trim(),
+                            Memory: spec?.Memory ?? "—",
+                            CudaCores: spec?.CudaCores ?? "—",
+                            BoostClock: spec?.BoostClock ?? "—",
+                            Driver: string.IsNullOrWhiteSpace(driver) ? "—" : driver.Trim(),
+                            Bus: spec?.Bus ?? "—"));
+                    }
                 }
             }
 
-            return GraphicsInfo.Unknown;
+            return adapters.Count == 0 ? GraphicsInfo.Unknown : new GraphicsInfo(adapters);
         } catch {
             return GraphicsInfo.Unknown;
         }

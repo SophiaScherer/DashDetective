@@ -380,7 +380,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             }
         }
 
-        // The summary strip describes the machine, so it counts every entry; the lists and their group
+        // The summary strip describes the machine, so it counts every process; the lists and their group
         // headers describe what's on screen, so they count what survives the filter.
         var visibleApps = ApplyFilter(appRoots);
         var visibleBackground = ApplyFilter(backgroundRoots);
@@ -412,12 +412,42 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         foreach (var info in _lastSnapshot)
             totalThreads += info.ThreadCount;
 
-        var entries = appRoots.Count + backgroundRoots.Count + windowsRoots.Count;
-        TotalProcessesText = entries.ToString(CultureInfo.InvariantCulture);
-        ProcessBreakdownText = $"{appRoots.Count.ToString(CultureInfo.InvariantCulture)} apps · " +
-                               $"{backgroundRoots.Count.ToString(CultureInfo.InvariantCulture)} background · " +
-                               $"{windowsRoots.Count.ToString(CultureInfo.InvariantCulture)} Windows";
+        var (apps, background, windows) = CountByGroup(_lastSnapshot, _lastRoots);
+        TotalProcessesText = _lastSnapshot.Count.ToString(CultureInfo.InvariantCulture);
+        ProcessBreakdownText = $"{apps.ToString(CultureInfo.InvariantCulture)} apps · " +
+                               $"{background.ToString(CultureInfo.InvariantCulture)} background · " +
+                               $"{windows.ToString(CultureInfo.InvariantCulture)} Windows";
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Splits every live process across the three groups for the summary breakdown. A collapsed
+    /// app's helpers are counted in the group their root is displayed under (so Edge's helpers land in Apps
+    /// with Edge, not in Background on their own), and a process the tree somehow didn't reach falls back to
+    /// its own category — so the three counts always sum to <paramref name="processes"/>. Internal only so
+    /// it is testable without a dispatcher, like <see cref="TryFindPath"/>.</summary>
+    internal static (int Apps, int Background, int Windows) CountByGroup(
+        IReadOnlyList<ProcessInfo> processes, IReadOnlyList<ProcessNode> roots) {
+        var groupOf = new Dictionary<int, ProcessCategory>(processes.Count);
+        foreach (var root in roots)
+            MapToGroup(root, root.Aggregate.Category, groupOf);
+
+        int apps = 0, background = 0, windows = 0;
+        foreach (var info in processes) {
+            switch (groupOf.TryGetValue(info.Pid, out var group) ? group : info.Category) {
+                case ProcessCategory.App: apps++; break;
+                case ProcessCategory.Windows: windows++; break;
+                default: background++; break;
+            }
+        }
+
+        return (apps, background, windows);
+    }
+
+    /// <summary>Records a group root and all its collapsed descendants under the root's category.</summary>
+    private static void MapToGroup(ProcessNode node, ProcessCategory category, Dictionary<int, ProcessCategory> into) {
+        into[node.Info.Pid] = category;
+        foreach (var child in node.Children)
+            MapToGroup(child, category, into);
     }
 
     /// <summary>Keeps the roots the filter matches. A parent survives when any of its children match, so

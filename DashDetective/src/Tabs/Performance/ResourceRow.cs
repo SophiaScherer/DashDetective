@@ -64,6 +64,23 @@ public partial class ResourceRow : ObservableObject {
     /// sampling tick.</summary>
     [ObservableProperty] private string _points;
 
+    /// <summary>Optional second series on the same axis, for a resource whose headline is one of a pair
+    /// (the adapter row's upload beside its download). Empty for single-series resources, which then draw
+    /// nothing for it.</summary>
+    [ObservableProperty] private string _points2 = "";
+
+    /// <summary>Tint for <see cref="Points2"/>. Null for single-series resources. A fixed legend colour,
+    /// like <see cref="ValueBrush"/>.</summary>
+    public IBrush? ValueBrush2 { get; init; }
+
+    /// <summary>What the chart plots, e.g. "% Utilization" or "Receive and send" — the caption's fixed half,
+    /// so it never claims a scale the chart isn't drawn on.</summary>
+    public string ChartSubject { get; init; } = "% Utilization";
+
+    /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
+    /// Observable because the window changes with the Settings refresh interval.</summary>
+    [ObservableProperty] private string _chartCaption = "";
+
     /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
     /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>
     public IReadOnlyList<StatTile> Stats { get; }

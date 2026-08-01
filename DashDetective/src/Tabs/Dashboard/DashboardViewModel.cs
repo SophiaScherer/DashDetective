@@ -62,6 +62,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
     private readonly DispatcherTimer _throughputTimer;
 
+    /// <summary>Physical disk hosting Windows, resolved with the drive cards; −1 until then. The report and
+    /// CSV describe this one disk rather than the <c>_Total</c> instance, which averages idle time across
+    /// every disk on the machine.</summary>
+    private int _systemDiskNumber = -1;
+
     // Per-GPU cards + rolling utilisation histories keyed by adapter LUID, driven by a page-local per-adapter
     // sampler on the same throughput timer (the shared GPU feed reports only one combined figure). One card per
     // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
@@ -88,9 +93,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _gpuValueText = "0";
     [ObservableProperty] private string _gpuModelText = "";
 
+    // The system drive's activity + capacity. Not shown on a card of its own (the per-disk cards cover the
+    // visible surface); these feed the text report and the CSV export's disk column.
     [ObservableProperty] private string _storageValueText = "0";
     [ObservableProperty] private string _storageSubText = "";
-    [ObservableProperty] private string _storagePoints = "";
 
     [ObservableProperty] private string _networkDownText = "0";
     [ObservableProperty] private string _networkUpText = "0";
@@ -125,7 +131,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _subscriptions = new[] {
             service.SubscribeCpu(OnCpu, OnCpuFailed),
             service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeStorage(OnStorage, OnStorageFailed),
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
@@ -142,10 +147,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _uptimeTimer.Tick += OnUptimeTick;
         _uptimeTimer.Start();
 
-        // Drive the per-disk card sparklines from the page-local throughput sampler on their own 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // Drive the per-disk and per-GPU card sparklines from the page-local samplers, at the same cadence as
+        // the shared feeds so every sparkline on the page covers the same span of time.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -170,6 +177,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _ = LoadSystemInfoAsync();
         _ = LoadDisksAsync();
         UpdateGpuAdapters();
+        UpdateDiskThroughput();
     }
 
     /// <summary>Toolbar Refresh for the Dashboard: an immediate re-sample of every metric.</summary>
@@ -412,26 +420,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         GpuValueText = Math.Round(overall).ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Storage subscription callback: append active-time to the history, then refresh.</summary>
-    private void OnStorage(StorageSample sample) {
-        MetricChannel.PushHistory(_storageHistory, sample.ActivePercent);
-        UpdateStorage(sample.ActivePercent);
-    }
-
-    /// <summary>Sampler-failure handler for the Storage metric: shows a neutral placeholder.</summary>
-    private void OnStorageFailed() {
-        StorageValueText = "—";
-        StorageSubText = "";
-    }
-
     /// <summary>
-    /// Updates the storage card from the latest activity reading: the headline shows Task Manager's
-    /// disk "Active time" (0–100 %), the sparkline shows its 60-second history, and the caption shows
-    /// system-drive capacity.
+    /// Updates the system drive's activity figures — the headline shows Task Manager's disk "Active time"
+    /// (0–100 %) for that one disk and the caption its capacity. These reach the text report and the CSV
+    /// export rather than a card of their own; the visible per-disk cards are driven separately above.
     /// </summary>
-    private void UpdateStorage(double value) {
-        StorageValueText = Math.Round(value).ToString(CultureInfo.InvariantCulture);
-        StoragePoints = SparklinePoints.Build(_storageHistory, 100);
+    private void UpdateSystemDiskActivity(double activePercent) {
+        MetricChannel.PushHistory(_storageHistory, activePercent);
+        StorageValueText = Math.Round(activePercent).ToString(CultureInfo.InvariantCulture);
         UpdateStorageCapacity();
     }
 
@@ -516,10 +512,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Updates the throughput readouts and both sparkline series, which share one auto-fitted
     /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable.</summary>
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
-        (NetworkDownText, NetworkDownUnit) = DataRateFormatter.Split(sample.DownMbps);
-        (NetworkUpText, NetworkUpUnit) = DataRateFormatter.Split(sample.UpMbps);
-        NetworkSubText = $"↑ {NetworkUpText} {NetworkUpUnit}";
+        // Both readouts share one unit, taken from the larger of the two, so they can be compared against
+        // each other and against the shared chart axis below.
+        var (down, up, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
+        NetworkDownText = down;
+        NetworkUpText = up;
+        NetworkDownUnit = unit;
+        NetworkUpUnit = unit;
+        NetworkSubText = $"↑ {up} {unit}";
 
         NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
         NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);
@@ -540,11 +540,18 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var disksTask = PhysicalDiskProvider.GetAsync();
             var volumesTask = VolumeProvider.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
+            _systemDiskNumber = FindSystemDisk(volumesTask.Result);
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
         } catch {
             // Leave the existing disk cards in place on a transient failure.
         }
     }
+
+    /// <summary>The physical disk hosting Windows, or −1 when the system volume can't be traced to one (its
+    /// activity figures then stay at their last value rather than reporting another drive's).</summary>
+    private static int FindSystemDisk(IReadOnlyList<VolumeInfo> volumes) =>
+        volumes.FirstOrDefault(v => v.DriveLetter == SystemDrive.Letter && v.DiskNumber.HasValue)
+               .DiskNumber ?? -1;
 
     /// <summary>Reconciles the disk cards to the current drive set: drops the old disk cards, then inserts one
     /// per drive just before the Network card (keeping the CPU→Memory→GPU→Disks→Network grouping). A disk
@@ -570,15 +577,23 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         UpdateDiskThroughput();
     }
 
+    /// <summary>Follows the Settings refresh interval so the page-local sparklines keep pace with the shared
+    /// feeds' and cover the same span of time.</summary>
+    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
+
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDiskThroughput();
         UpdateGpuAdapters();
     }
 
     /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
-    /// Manager's disk "Active time", 0–100 %). Disks without a current reading are left unchanged.</summary>
+    /// Manager's disk "Active time", 0–100 %), and feeds the system drive's own reading to the report/CSV
+    /// surfaces. Disks without a current reading are left unchanged.</summary>
     private void UpdateDiskThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
+            if (sample.DiskNumber == _systemDiskNumber)
+                UpdateSystemDiskActivity(sample.ActivePercent);
+
             if (!_diskHistories.TryGetValue(sample.DiskNumber, out var history)
                 || !_diskCards.TryGetValue(sample.DiskNumber, out var card))
                 continue;
@@ -594,6 +609,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
+        _service.IntervalChanged -= OnIntervalChanged;
         _uptimeTimer.Stop();
         _uptimeTimer.Tick -= OnUptimeTick;
         _throughputTimer.Stop();
