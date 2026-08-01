@@ -5,9 +5,10 @@ using Xunit;
 namespace DashDetective.Tests.Tabs.Hardware;
 
 /// <summary>Covers <see cref="HardwareCatalog"/>: the <c>Normalize</c> stripping rules and the
-/// <c>Match</c> resolution order (exact, then bidirectional-substring with longest-key-wins, else
-/// null). The <c>Match</c> algorithm is exercised with synthetic normalized tables so the assertions
-/// don't depend on the shipped catalog data; a couple of real <c>Lookup</c> calls smoke-test the wiring.</summary>
+/// <c>Match</c> resolution order (exact, then a token-aligned key inside the name with longest-key-wins,
+/// else null), including the guards that stop a near-miss inheriting another part's datasheet. The
+/// <c>Match</c> algorithm is exercised with synthetic normalized tables so the assertions don't depend on
+/// the shipped catalog data; a couple of real <c>Lookup</c> calls smoke-test the wiring.</summary>
 public class HardwareCatalogTests {
     // --- Normalize ---
 
@@ -65,10 +66,45 @@ public class HardwareCatalogTests {
         Assert.Equal("base", HardwareCatalog.Match(table, "AMD Ryzen 5 7600"));
     }
 
+    /// <summary>A name SHORTER than the key must not select it: a board reporting a bare "B650" would
+    /// otherwise inherit a "B650E …" entry's form factor and M.2 count, and a truncated memory part number
+    /// another kit's timings. The name has to identify the part, not merely resemble it.</summary>
     [Fact]
-    public void Match_ShortRawInsideLongKey_MatchesEitherDirection() {
-        var table = new Dictionary<string, string> { ["RTX 4070 TI"] = "v" };
-        Assert.Equal("v", HardwareCatalog.Match(table, "4070 Ti"));
+    public void Match_NameShorterThanKey_ReturnsNull() {
+        var boards = new Dictionary<string, string> { ["B650E AORUS MASTER"] = "spec" };
+        Assert.Null(HardwareCatalog.Match(boards, "B650"));
+
+        var memory = new Dictionary<string, string> { ["F5 6000J3636F16G"] = "timings" };
+        Assert.Null(HardwareCatalog.Match(memory, "F5 6000"));
+    }
+
+    /// <summary>A key must align to token boundaries, so it can't match inside a longer model token.</summary>
+    [Fact]
+    public void Match_KeyInsideALongerToken_DoesNotMatch() {
+        var table = new Dictionary<string, string> { ["RTX 4060"] = "v" };
+        Assert.Null(HardwareCatalog.Match(table, "NVIDIA GeForce RTX 40600"));
+        Assert.Equal("v", HardwareCatalog.Match(table, "NVIDIA GeForce RTX 4060"));
+    }
+
+    /// <summary>A mobile part shares the desktop card's model number but has its own memory, clocks and
+    /// core counts, so it must fall through to "—" rather than borrow the desktop datasheet.</summary>
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 4060 Laptop GPU")]
+    [InlineData("NVIDIA GeForce RTX 4060 Mobile")]
+    [InlineData("NVIDIA GeForce RTX 4060 Max-Q")]
+    public void Match_MobileVariant_DoesNotInheritTheDesktopSpec(string name) {
+        var table = new Dictionary<string, string> { ["RTX 4060"] = "desktop" };
+        Assert.Null(HardwareCatalog.Match(table, name));
+    }
+
+    /// <summary>A catalog entry for the mobile part itself still resolves.</summary>
+    [Fact]
+    public void Match_MobileVariant_ResolvesItsOwnEntry() {
+        var table = new Dictionary<string, string> {
+            ["RTX 4060"] = "desktop",
+            ["RTX 4060 LAPTOP"] = "mobile",
+        };
+        Assert.Equal("mobile", HardwareCatalog.Match(table, "NVIDIA GeForce RTX 4060 Laptop GPU"));
     }
 
     [Fact]
