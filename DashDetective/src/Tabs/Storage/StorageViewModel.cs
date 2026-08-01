@@ -96,9 +96,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Width of the Disk Activity history, matching the app's charts (60 samples = one per second).
     private const int WindowSeconds = 60;
 
-    /// <summary>The Disk Activity panel title, naming the drive it is actually showing. Follows the
-    /// selection.</summary>
-    [ObservableProperty] private string _diskActivityTitle = "Disk Activity";
+    /// <summary>Whether the drive picker's dropdown is open. Two-way bound to the toggle and the popup, and
+    /// cleared by <see cref="SelectDrive"/> so choosing a drive closes it.</summary>
+    [ObservableProperty] private bool _drivePickerOpen;
+
+    /// <summary>Whether the machine has more than one drive to switch between. On a single-drive machine the
+    /// panel just names the drive — a picker offering one choice is a dead end.</summary>
+    [ObservableProperty] private bool _hasMultipleDrives;
 
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
     [ObservableProperty] private string _diskPoints = "";
@@ -114,8 +118,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Points the Disk Activity panel at a drive (single-select, like the Performance rail's
     /// <c>ResourceRow</c>) and redraws it at once from that disk's kept history, so the panel doesn't sit
-    /// blank until the next tick.</summary>
+    /// blank until the next tick. Closes the picker either way, so re-choosing the current drive still
+    /// dismisses the dropdown.</summary>
     private void SelectDrive(DriveCard card) {
+        DrivePickerOpen = false;
         if (ReferenceEquals(card, SelectedDrive))
             return;
 
@@ -124,7 +130,6 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         SelectedDrive = card;
         card.IsSelected = true;
         _selectedDisk = card.DiskNumber;
-        DiskActivityTitle = $"Disk Activity — {card.Name}";
         UpdateActivity();
     }
 
@@ -216,6 +221,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                          .ThenBy(v => v.DriveLetter))
                 Partitions.Add(ToPartitionRow(volume));
 
+            HasMultipleDrives = Drives.Count > 1;
             SelectDefaultDrive(volumes, previousDisk);
 
             // Seed the new cards' Read/Write once so they don't sit on "—" until the next timer tick.
@@ -226,6 +232,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _temperatureDiskNumbers.Clear();
             Partitions.Clear();
             SelectedDrive = null;
+            HasMultipleDrives = false;
             _selectedDisk = -1;
             UpdateActivity();
         }
