@@ -15,8 +15,9 @@ public readonly record struct DiskThroughputSample(
 /// <summary>
 /// Samples per-disk read/write throughput, active time, response time and queue length from the Windows PDH
 /// <c>\PhysicalDisk(*)\*</c>
-/// counters. Unlike the shared <see cref="StorageUsageSampler"/> (which reads only the aggregate <c>_Total</c>
-/// instance), this reads every disk instance at once via <c>PdhGetFormattedCounterArray</c> and keys each
+/// counters. It deliberately avoids the aggregate <c>_Total</c> instance, whose <c>% Idle Time</c> is a mean
+/// across every disk — one busy drive would read diluted. Instead it reads every disk instance at once via
+/// <c>PdhGetFormattedCounterArray</c> and keys each
 /// reading by the disk number parsed from the instance name (e.g. "0 C:" → 0), so the Storage tab's per-disk
 /// cards and its Disk Activity panel can show one real drive rather than an average across every disk on the
 /// machine. Active time is
@@ -35,8 +36,8 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
 
     private const string ReadPath = @"\PhysicalDisk(*)\Disk Read Bytes/sec";
     private const string WritePath = @"\PhysicalDisk(*)\Disk Write Bytes/sec";
-    // Active time is derived from idle time (the % Disk Time counter can read above 100% under load), matching
-    // StorageUsageSampler's aggregate reading.
+    // Active time is derived from idle time (the % Disk Time counter can read above 100% under load), which is
+    // what Task Manager shows.
     private const string IdlePath = @"\PhysicalDisk(*)\% Idle Time";
     private const string ResponsePath = @"\PhysicalDisk(*)\Avg. Disk sec/Transfer";
     private const string QueuePath = @"\PhysicalDisk(*)\Avg. Disk Queue Length";
@@ -94,7 +95,7 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
         }
 
         // Seed one collect so the first Sample() reflects a real interval (these are rate counters needing
-        // two data points), mirroring StorageUsageSampler priming its query.
+        // two data points), mirroring the other PDH samplers priming their queries.
         PdhCollectQueryData(_query);
         _ready = true;
     }

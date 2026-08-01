@@ -11,22 +11,21 @@ namespace DashDetective.Tests.Services.SystemMetrics;
 /// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe, per-metric fault isolation, and
 /// the sustained-breach alert watcher.</summary>
 public class SystemMetricsServiceTests {
-    // Feeds are constructed in this order, so the captured timers line up by index. Storage is the
+    // Feeds are constructed in this order, so the captured timers line up by index. Network is the
     // no-auto-subscriber exemplar (CPU + Memory auto-subscribe for the alert watcher).
-    private const int Cpu = 0, Memory = 1, Storage = 2, Network = 3;
+    private const int Cpu = 0, Memory = 1, Network = 2;
 
     /// <summary>Mutable fake sampler values; the bundle closes over these so a test can change a reading
     /// between refreshes (or make the network sampler throw).</summary>
     private sealed class FakeSamplers {
         public double Cpu = 50;
         public MemorySample Memory = new(10, 0, 0, 0, 0);
-        public StorageSample Storage = new(0, 0, 0, 0, 0);
         public NetworkSample Network = new(0, 0);
         public bool NetworkThrows;
         public string AdapterName = "TestNIC";
 
         public MetricSamplers Bundle() => new(
-            () => Cpu, () => Memory, () => Storage,
+            () => Cpu, () => Memory,
             () => NetworkThrows ? throw new InvalidOperationException("nic gone") : Network,
             () => AdapterName);
     }
@@ -44,16 +43,16 @@ public class SystemMetricsServiceTests {
     [Fact]
     public void Subscribe_FirstStartsChannel_LastUnsubscribeStops() {
         var (service, timers) = Create(new FakeSamplers());
-        var storageTimer = timers[Storage];
-        Assert.Equal(0, storageTimer.StartCount);   // Storage has no auto-subscriber
+        var networkTimer = timers[Network];
+        Assert.Equal(0, networkTimer.StartCount);   // Network has no auto-subscriber
 
-        var token = service.SubscribeStorage(_ => { }, () => { });
-        Assert.True(storageTimer.IsRunning);
-        Assert.Equal(1, storageTimer.StartCount);
+        var token = service.SubscribeNetwork(_ => { }, () => { });
+        Assert.True(networkTimer.IsRunning);
+        Assert.Equal(1, networkTimer.StartCount);
 
         token.Dispose();
-        Assert.False(storageTimer.IsRunning);
-        Assert.True(storageTimer.StopCount >= 1);
+        Assert.False(networkTimer.IsRunning);
+        Assert.True(networkTimer.StopCount >= 1);
     }
 
     [Fact]
@@ -61,13 +60,13 @@ public class SystemMetricsServiceTests {
         var (_, timers) = Create(new FakeSamplers());
         Assert.True(timers[Cpu].IsRunning);
         Assert.True(timers[Memory].IsRunning);
-        Assert.False(timers[Storage].IsRunning);
+        Assert.False(timers[Network].IsRunning);
     }
 
     [Fact]
     public void PauseThenResume_StopsAllThenRestartsOnlySubscribed() {
         var (service, timers) = Create(new FakeSamplers());
-        service.SubscribeStorage(_ => { }, () => { });   // Storage now has a subscriber
+        var token = service.SubscribeNetwork(_ => { }, () => { });   // Network now has a subscriber
 
         service.Pause();
         Assert.All(timers, t => Assert.False(t.IsRunning));
@@ -75,32 +74,40 @@ public class SystemMetricsServiceTests {
         service.Resume();
         Assert.True(timers[Cpu].IsRunning);       // alert subscriber
         Assert.True(timers[Memory].IsRunning);    // alert subscriber
-        Assert.True(timers[Storage].IsRunning);   // our subscriber
-        Assert.False(timers[Network].IsRunning);  // no subscriber
+        Assert.True(timers[Network].IsRunning);   // our subscriber
+
+        // With its only subscriber gone, Network stays stopped across a Pause/Resume while the
+        // alert-subscribed feeds come back.
+        token.Dispose();
+        service.Pause();
+        service.Resume();
+        Assert.True(timers[Cpu].IsRunning);
+        Assert.True(timers[Memory].IsRunning);
+        Assert.False(timers[Network].IsRunning);
     }
 
     [Fact]
     public void RefreshAll_FansLatestSampleToSubscribers() {
         var fakes = new FakeSamplers();
         var (service, _) = Create(fakes);
-        StorageSample? received = null;
-        service.SubscribeStorage(v => received = v, () => { });
+        NetworkSample? received = null;
+        service.SubscribeNetwork(v => received = v, () => { });
 
-        fakes.Storage = new StorageSample(77, 0, 0, 0, 0);
+        fakes.Network = new NetworkSample(77, 0);
         service.RefreshAll();
 
-        Assert.Equal(77, received?.ActivePercent);
+        Assert.Equal(77, received?.DownMbps);
     }
 
     [Fact]
     public void Subscribe_SeedsWithCachedLatest() {
-        var fakes = new FakeSamplers { Storage = new StorageSample(42, 0, 0, 0, 0) };   // primed into the cache
+        var fakes = new FakeSamplers { Network = new NetworkSample(42, 0) };   // primed into the cache
         var (service, _) = Create(fakes);
 
-        StorageSample? seeded = null;
-        service.SubscribeStorage(v => seeded = v, () => { });
+        NetworkSample? seeded = null;
+        service.SubscribeNetwork(v => seeded = v, () => { });
 
-        Assert.Equal(42, seeded?.ActivePercent);
+        Assert.Equal(42, seeded?.DownMbps);
     }
 
     [Fact]
