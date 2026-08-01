@@ -13,9 +13,11 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// view-model → runner → launcher chain runs for real without anything being started.
 /// </summary>
 public class ToolkitViewModelTests {
-    private static ToolkitEntry MissingTool(string command = "not-a-real-tool-xyz") =>
+    // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
+    // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
+    private static ToolkitEntry MissingTool(string command = "not-a-real-tool-xyz.exe") =>
         new(command, "Fails on purpose", ToolkitCategory.SystemTools, ToolkitEntryKind.App,
-            ToolkitAction.Launch("not-a-real-tool-xyz.exe"));
+            ToolkitAction.Launch(command));
 
     [Fact]
     public void Constructor_ShowsTheAuthoredCommandsWithAllSelected() {
@@ -136,6 +138,83 @@ public class ToolkitViewModelTests {
         await running;
 
         Assert.True(vm.RunCommand.CanExecute(MissingTool()));
+    }
+
+    // ----- Parameterised rows -----
+
+    private static ToolkitEntry Parameterised(string typed) {
+        var parameter = new ToolkitParameter("host or IP") { Value = typed };
+        return new ToolkitEntry(
+            "ping <host>", "Pings a host", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture("not-a-real-tool-xyz.exe"), parameter);
+    }
+
+    /// <summary>A refused host must not reach the runner at all — the row reports why and stops.</summary>
+    [Theory]
+    [InlineData("-t")]
+    [InlineData("example.com && calc")]
+    [InlineData("")]
+    public async Task Run_ParameterisedRowWithARefusedHost_LogsWhyAndRunsNothing(string typed) {
+        var vm = new ToolkitViewModel();
+
+        await vm.RunCommand.ExecuteAsync(Parameterised(typed));
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Equal(ToolkitOutputFormatter.InvalidHost(typed), logged.Output);
+        Assert.NotEqual(ToolkitOutputFormatter.Running, logged.Output);
+    }
+
+    /// <summary>The "$" line shows what actually ran, not the row's placeholder label — otherwise the
+    /// transcript would read "ping &lt;host&gt;" and never say which host.</summary>
+    [Fact]
+    public async Task Run_ParameterisedRow_LogsTheResolvedCommandLineNotTheLabel() {
+        var vm = new ToolkitViewModel();
+
+        await vm.RunCommand.ExecuteAsync(Parameterised("example.com"));
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Equal("not-a-real-tool-xyz.exe example.com", logged.Command);
+        Assert.DoesNotContain("<host>", logged.Command, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>For a row that carries no flags and no placeholder, the resolved line is just the row's
+    /// own text — the log does not start paraphrasing ordinary commands.</summary>
+    [Fact]
+    public async Task Run_PlainRow_LogsTheRowsOwnText() {
+        var vm = new ToolkitViewModel();
+
+        await vm.RunCommand.ExecuteAsync(MissingTool("regedit-not-real"));
+
+        Assert.Equal("regedit-not-real", vm.Log[0].Command);
+    }
+
+    [Fact]
+    public async Task Run_ParameterisedRow_TrimsTheTypedHostBeforePassingItOn() {
+        var vm = new ToolkitViewModel();
+
+        await vm.RunCommand.ExecuteAsync(Parameterised("  example.com  "));
+
+        Assert.EndsWith(" example.com", vm.Log[0].Command, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>The gateway suggestion arrives after the page is built and must never overwrite a host
+    /// the user is part-way through typing.</summary>
+    [Fact]
+    public void Parameter_SeedIfEmpty_DoesNotOverwriteWhatWasTyped() {
+        var parameter = new ToolkitParameter("host or IP") { Value = "mine.example" };
+
+        parameter.SeedIfEmpty("192.168.1.1");
+
+        Assert.Equal("mine.example", parameter.Value);
+    }
+
+    [Fact]
+    public void Parameter_SeedIfEmpty_FillsAnEmptyBox() {
+        var parameter = new ToolkitParameter("host or IP");
+
+        parameter.SeedIfEmpty("192.168.1.1");
+
+        Assert.Equal("192.168.1.1", parameter.Value);
     }
 
     /// <summary>The stanza keeps the time the command <b>started</b>: for a long capture, stamping it on

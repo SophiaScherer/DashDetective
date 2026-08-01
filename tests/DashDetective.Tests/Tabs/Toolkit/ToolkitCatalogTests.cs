@@ -74,6 +74,23 @@ public class ToolkitCatalogTests {
                    entry => Assert.Equal(ToolkitEntryKind.Command, entry.Kind));
     }
 
+    /// <summary>A row whose label carries a placeholder must have a box to fill it from, and a row with
+    /// a box must say so in its label. Either half alone is a row the user cannot use correctly.</summary>
+    [Fact]
+    public void Entries_PlaceholderInTheLabelMatchesHavingAParameter() {
+        Assert.All(ToolkitCatalog.Entries, entry => Assert.Equal(
+            entry.Command.Contains('<', StringComparison.Ordinal),
+            entry.Parameter is not null));
+    }
+
+    /// <summary>The typed value is appended as the last argument, so a parameterised row has to be one
+    /// whose command takes its target last — which in practice means a captured console command.</summary>
+    [Fact]
+    public void Entries_OnlyCapturedCommandsTakeAParameter() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.Parameter is not null),
+                   entry => Assert.True(entry.Action.CapturesOutput));
+    }
+
     /// <summary>Nothing outside Docs &amp; Links opens a browser, and nothing inside it does anything
     /// else — a mis-filed link would send the user to the web from a row that reads as a local tool.</summary>
     [Fact]

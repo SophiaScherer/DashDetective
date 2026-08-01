@@ -59,6 +59,19 @@ public static class ToolkitCatalog {
         // network stack — so it gets its own limit rather than being reported as a timeout.
         Diagnostic("systeminfo", "Full OS, hardware and hotfix summary",
                    ToolkitAction.Capture("systeminfo").WithTimeout(TimeSpan.FromSeconds(90))),
+
+        // The only two rows that take input. The host is validated before it is appended and reaches
+        // the OS as its own argument, so it can never become a flag — see ToolkitHostValidator.
+        Diagnostic("ping <host>", "Sends four echo requests and reports the round trip",
+                   ToolkitAction.Capture("ping").WithTimeout(TimeSpan.FromSeconds(30)),
+                   new ToolkitParameter("host or IP")),
+
+        // Hops are capped: an uncapped tracert probes 30 hops × 3 packets and can sit there for
+        // minutes with the page disabled behind it. The log's "$" line shows the flag, so what ran is
+        // never a surprise even though the label leaves it out.
+        Diagnostic("tracert <host>", "Traces the route to a host, up to 20 hops",
+                   ToolkitAction.Capture("tracert", "-h", "20").WithTimeout(TimeSpan.FromSeconds(120)),
+                   new ToolkitParameter("host or IP")),
     ];
 
     /// <summary>A row that opens a folder in Explorer — the shape every Folders entry takes.</summary>
@@ -82,8 +95,10 @@ public static class ToolkitCatalog {
     /// <summary>A console command whose output is captured into the Execution Log. The action is passed
     /// in rather than derived from the label: the row reads as one command line, but the runner needs it
     /// already split into a file name and separate arguments.</summary>
-    private static ToolkitEntry Diagnostic(string command, string description, ToolkitAction action) =>
-        new(command, description, ToolkitCategory.Diagnostics, ToolkitEntryKind.Command, action);
+    private static ToolkitEntry Diagnostic(
+        string command, string description, ToolkitAction action, ToolkitParameter? parameter = null) =>
+        new(command, description, ToolkitCategory.Diagnostics, ToolkitEntryKind.Command, action,
+            parameter);
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [

@@ -36,6 +36,20 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         options[0].IsSelected = true;
         Log.CollectionChanged += (_, _) => HasLog = Log.Count > 0;
         RebuildGroups();
+
+        // Not awaited: the page must be usable immediately, and this only fills in a suggestion. Started
+        // on the UI thread, so the continuation that writes the boxes comes back to it.
+        _ = SeedParameterDefaultsAsync();
+    }
+
+    /// <summary>Suggests the machine's default gateway in the parameterised rows' boxes — the
+    /// convenience the design asks for, and nothing more: the box stays editable, and a value the user
+    /// has already typed is never overwritten. Adapter enumeration is slow enough to keep off the UI
+    /// thread.</summary>
+    private static async Task SeedParameterDefaultsAsync() {
+        var gateway = await Task.Run(ToolkitDefaults.PrimaryGateway).ConfigureAwait(true);
+        foreach (var entry in ToolkitCatalog.Entries)
+            entry.Parameter?.SeedIfEmpty(gateway);
     }
 
     /// <summary>The filter chips, "All" first and then the catalog's categories in display order.</summary>
@@ -131,16 +145,32 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         // Stamped once, so the stanza keeps the time the command was *started* rather than jumping to
         // the time it finished — which for a 90 s systeminfo would be a minute and a half out.
         var time = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        var pending = new ToolkitLogEntry(time, entry.Command, ToolkitOutputFormatter.Running);
+
+        // A parameterised row is rejected before anything starts if what was typed is not a host. The
+        // rejection is logged rather than shown inline, so the answer is where every other answer is.
+        if (entry.Parameter is { } parameter && !ToolkitHostValidator.IsValid(parameter.Value)) {
+            Log.Insert(0, new ToolkitLogEntry(
+                time, entry.Command, ToolkitOutputFormatter.InvalidHost(parameter.Value)));
+            return;
+        }
+
+        var action = entry.Parameter is { } bound
+            ? entry.Action.WithArgument(ToolkitHostValidator.Normalize(bound.Value))
+            : entry.Action;
+
+        // The "$" line shows the resolved command line, not the row's label: a parameterised label is a
+        // placeholder ("ping <host>"), and a row may carry flags it does not spell out.
+        var line = action.CommandLine;
+        var pending = new ToolkitLogEntry(time, line, ToolkitOutputFormatter.Running);
         Log.Insert(0, pending);
 
-        var result = await _runner.RunAsync(entry.Action);
+        var result = await _runner.RunAsync(action);
 
         // Reference equality, not the record's value equality: if the user cleared the log while the
         // command was in flight, the placeholder is gone and the result goes with it — they asked for an
         // empty log, so putting a stanza back would be ignoring them.
         if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
-            Log[0] = new ToolkitLogEntry(time, entry.Command, result.Output);
+            Log[0] = new ToolkitLogEntry(time, line, result.Output);
     }
 
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>

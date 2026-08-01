@@ -56,10 +56,18 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** Folders, System Tools and Diagnostics authored. Parameterised ping/tracert,
-  elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row copy-to-clipboard,
-  pinned favourites and log export. Take these on **one phase at a time** per the plan above — running
-  commands is a **security-relevant** capability, not a follow-on tidy.
+- **Catalog progress:** Folders, System Tools and Diagnostics (including parameterised ping/tracert)
+  authored. Elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row
+  copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
+  above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- **`ping`/`tracert` carry the only user input in the app**, and `ToolkitHostValidator` is the only place
+  it is checked. Injection is already impossible (the value becomes one `ArgumentList` element), so the
+  validator's real job is that **an accepted value cannot be a flag** — a DNS label may not begin with a
+  hyphen, so `-t` and friends are refused. The box is seeded with the primary adapter's gateway via
+  `ToolkitDefaults` (reusing `NetworkUsageSampler.SelectPrimary`), off the UI thread and **never over a
+  value already typed**. The log's `$` line shows `ToolkitAction.CommandLine` — the resolved target plus
+  arguments — not the row's label, so a placeholder (`ping <host>`) and any flags the label omits
+  (`tracert -h 20`) are both visible in the transcript.
 - **The page has no separate busy flag, on purpose.** Refusing concurrent runs makes the generated
   command report `CanExecute` false while one is in flight, which disables every row's button by itself.
   The stanza is written to the log *before* the command runs and replaced **in place** on completion

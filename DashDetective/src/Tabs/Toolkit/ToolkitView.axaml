@@ -217,7 +217,7 @@
                                                          affordance, which stays a sibling: nesting a
                                                          button inside a button would make the copy
                                                          click run the command too. -->
-                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                                                         <Button Grid.Column="0" Classes="rowRun"
                                                                 ToolTip.Tip="{Binding Description}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
@@ -264,10 +264,40 @@
                                                             </Grid>
                                                         </Button>
 
+                                                        <!-- The editable slot on a parameterised row
+                                                             (ping/tracert), and nothing at all on the
+                                                             rest. A sibling of the run button rather
+                                                             than inside it: a TextBox nested in a
+                                                             Button would run the command on every
+                                                             click into the field. Enter in the box
+                                                             runs the row, which the shortcut layer
+                                                             allows through because Activate is
+                                                             AllowInTextInput: false. -->
+                                                        <Border Grid.Column="1" Width="132" Height="28"
+                                                                VerticalAlignment="Center"
+                                                                Background="{DynamicResource FieldBackground}"
+                                                                BorderBrush="{DynamicResource Hairline}"
+                                                                BorderThickness="1" CornerRadius="6"
+                                                                IsVisible="{Binding Parameter,
+                                                                    Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                            <TextBox Classes="flat" Margin="8,0"
+                                                                     FontSize="11.5"
+                                                                     FontFamily="{StaticResource MonoFont}"
+                                                                     VerticalContentAlignment="Center"
+                                                                     PlaceholderText="{Binding Parameter.Prompt}"
+                                                                     Text="{Binding Parameter.Value, Mode=TwoWay}">
+                                                                <TextBox.KeyBindings>
+                                                                    <KeyBinding Gesture="Enter"
+                                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                </TextBox.KeyBindings>
+                                                            </TextBox>
+                                                        </Border>
+
                                                         <!-- Copy affordance. Placed with the row it
                                                              belongs to; wiring the clipboard comes in
                                                              its own phase. -->
-                                                        <Button Grid.Column="1" Classes="rowAction"
+                                                        <Button Grid.Column="2" Classes="rowAction"
                                                                 ToolTip.Tip="Copy command">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
                                                                   Stroke="{DynamicResource TextTertiary}"

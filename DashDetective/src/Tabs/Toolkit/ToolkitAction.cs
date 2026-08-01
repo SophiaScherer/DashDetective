@@ -39,6 +39,16 @@ public sealed record ToolkitAction {
     /// <summary>The cap on a captured run. Ignored by every other kind.</summary>
     public TimeSpan Timeout { get; }
 
+    /// <summary>
+    /// What actually ran, for the Execution Log's "$" line. Built from the target and arguments rather
+    /// than from the row's label, so the log is honest about two things the label hides: the value a
+    /// parameterised row's placeholder stood for, and any flags the row does not spell out.
+    ///
+    /// Display only — nothing is ever executed from this string.
+    /// </summary>
+    public string CommandLine =>
+        Arguments.Count == 0 ? Target : Target + " " + string.Join(' ', Arguments);
+
     /// <summary>Whether this action's output is redirected into the Execution Log.</summary>
     public bool CapturesOutput => Kind == ToolkitActionKind.Capture;
 

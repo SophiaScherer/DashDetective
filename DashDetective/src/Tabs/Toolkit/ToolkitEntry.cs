@@ -14,12 +14,13 @@ namespace DashDetective.Tabs.Toolkit;
 public sealed class ToolkitEntry {
     public ToolkitEntry(
         string command, string description, ToolkitCategory category, ToolkitEntryKind kind,
-        ToolkitAction action) {
+        ToolkitAction action, ToolkitParameter? parameter = null) {
         Command = command;
         Description = description;
         Category = category;
         Kind = kind;
         Action = action;
+        Parameter = parameter;
     }
 
     /// <summary>The command itself — the row's primary label, and its identity for search reveal.</summary>
@@ -34,6 +35,10 @@ public sealed class ToolkitEntry {
     /// <summary>What running this row does. Authored in <see cref="ToolkitCatalog"/> and carried out by
     /// <see cref="ToolkitRunner"/> — the row itself never touches a process.</summary>
     public ToolkitAction Action { get; }
+
+    /// <summary>The row's editable slot, or null for the rows that take no input (nearly all of them).
+    /// The one mutable thing on an otherwise immutable entry, because the text box binds to it.</summary>
+    public ToolkitParameter? Parameter { get; }
 
     public string BadgeLabel => ToolkitCatalog.LabelFor(Kind);
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);

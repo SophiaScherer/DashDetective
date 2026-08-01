@@ -83,6 +83,13 @@ public static class ToolkitOutputFormatter {
     public static string BlockedUrl(string target) =>
         $"Refused: only https:// links are opened ({target}).";
 
+    /// <summary>The body for a target the host validator turned down. Says what was expected rather
+    /// than just refusing, since the box is the one place the user types anything.</summary>
+    public static string InvalidHost(string? host) =>
+        string.IsNullOrWhiteSpace(host)
+            ? "Enter a host name or IP address first."
+            : $"Not a valid host name or IP address: {host.Trim()}";
+
     /// <summary>The body for a run the timeout killed, carrying whatever it managed to print.</summary>
     public static string TimedOut(TimeSpan timeout, string captured) {
         var seconds = ((int)timeout.TotalSeconds).ToString(CultureInfo.InvariantCulture);
