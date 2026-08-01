@@ -41,24 +41,34 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
-        <!-- One command row. The bottom hairline separates rows inside the grouped card; the
-             transition makes the search-reveal flash fade out rather than blink off, as
-             SettingsView's settingRow does. -->
+        <!-- One command row. The bottom hairline separates rows inside the grouped card.
+             Hover is instant and untransitioned, matching File Explorer's fileRow and Performance's
+             resCard: a brush transition here would animate the hover itself, so scrolling the list
+             under a stationary pointer smears the highlight across every row it passes. The
+             search-reveal fade lives on revealFlash below instead — the two used to share this
+             element, which is what made the drag. -->
         <Style Selector="Border.cmdRow">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="Padding" Value="14,12"/>
+        </Style>
+        <Style Selector="Border.cmdRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+
+        <!-- The search-reveal tint, on its own layer behind the row's content. It carries the
+             transition — and has no hover rule of its own — so the flash still fades out rather than
+             blinking off, exactly as SettingsView's settingRow does. -->
+        <Style Selector="Border.revealFlash">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <BrushTransition Property="Background" Duration="0:0:0.4"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="Border.cmdRow:pointerover">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-        </Style>
-        <Style Selector="Border.cmdRow.highlighted">
+        <Style Selector="Border.cmdRow.highlighted Border.revealFlash">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
 
@@ -228,11 +238,19 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
                                                 <Border Classes="cmdRow" Tag="{Binding Command}">
+                                                  <Panel>
+                                                    <!-- Reveal tint, behind the content and spanning
+                                                         the whole row — which is why the row's inset
+                                                         is a Margin on the grid below rather than
+                                                         Padding up here. -->
+                                                    <Border Classes="revealFlash"/>
+
                                                     <!-- The run button covers everything but the copy
                                                          affordance, which stays a sibling: nesting a
                                                          button inside a button would make the copy
                                                          click run the command too. -->
-                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10"
+                                                          Margin="14,12">
                                                         <Button Grid.Column="0" Classes="rowRun"
                                                                 ToolTip.Tip="{Binding Description}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
@@ -361,6 +379,7 @@
                                                                   Data="M4.5,1.5 H11 V8 H4.5 Z M1.5,4.5 H8 V11 H1.5 Z"/>
                                                         </Button>
                                                     </Grid>
+                                                  </Panel>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

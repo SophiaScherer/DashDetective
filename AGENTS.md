@@ -114,6 +114,13 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the
   reveal gotcha in the *Universal search* write-up in the Appendix. Not `IRefreshablePage` /
   `ILiveSamplingPage`: the page has nothing live to sample or re-read.
+- **Row hover carries no brush transition** — instant, like File Explorer's `fileRow` and Performance's
+  `resCard`. A transition on the hover-bearing element animates the hover itself, so scrolling the list
+  under a stationary pointer smears the highlight across every row it passes. The search-reveal fade
+  therefore lives on its own `revealFlash` layer behind the row content, which owns the transition and
+  has no `:pointerover` rule — the same split `SettingsView.settingRow` gets for free by having no hover
+  state at all. That is also why the row's inset is a `Margin` on the inner grid rather than `Padding` on
+  the row border: the tint has to span the whole row. **Do not merge the two back together.**
 - Two layout decisions were made **against** the comp, both after seeing them fail on screen at the
   window's 920px minimum, and both should be left alone: the **filter bar wraps** (box + five chips
   overflow the content area, and the last chip was unreachable), and the **kind badge sits in its own
