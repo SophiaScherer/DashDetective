@@ -54,6 +54,19 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
+        <!-- The drive cards double as the Disk Activity panel's selector, so the selected one takes the
+             accent border/fill used by the Performance rail's cards. The chrome-less click wrapper is the
+             shared Button.bare. -->
+        <Style Selector="Border.panel.driveCard">
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.panel.driveCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.panel.driveCard.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
         <!-- Disk Activity stat blocks: a muted label over a larger value. -->
         <Style Selector="TextBlock.diskStatLabel">
             <Setter Property="FontSize" Value="12"/>
@@ -79,7 +92,9 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DriveCard">
-                    <Border Classes="panel">
+                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <Border Classes="panel driveCard" Classes.selected="{Binding IsSelected}">
                         <StackPanel Spacing="0">
                             <!-- Header: name + health pill. -->
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
@@ -128,6 +143,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -178,8 +194,8 @@
             </Border>
 
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
-                 area fill, like the Dashboard), over three readouts. The title carries the real system-drive
-                 letter (see DiskActivityTitle); the readouts come from the shared _Total storage feed. -->
+                 area fill, like the Dashboard), over three readouts. Chart, title and readouts all describe
+                 the drive card selected above — one real physical disk, not the _Total average. -->
             <Border Classes="panel" MinWidth="280">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="{Binding DiskActivityTitle}"/>
