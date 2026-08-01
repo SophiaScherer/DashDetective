@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Shared;
 using System;
 using System.Management;
 using System.Threading.Tasks;
@@ -25,16 +26,18 @@ public static class MemoryInfoProvider {
             var found = false;
 
             using var searcher = new ManagementObjectSearcher(
-                "SELECT Capacity, Speed, SMBIOSMemoryType FROM Win32_PhysicalMemory");
+                "SELECT Capacity, Speed, ConfiguredClockSpeed, SMBIOSMemoryType FROM Win32_PhysicalMemory");
             using var results = searcher.Get();
 
-            // Sum capacity across every installed module; take the highest reported speed.
+            // Sum capacity across every installed module; take the highest reported speed. Speed comes
+            // through the shared MemorySpeed rule so this reads the same as the Hardware tab's Speed row.
             foreach (var obj in results) {
                 using (obj) {
                     found = true;
                     modules++;
                     totalBytes += ToUInt64(obj["Capacity"]);
-                    speed = Math.Max(speed, ToInt(obj["Speed"]));
+                    speed = Math.Max(speed,
+                        MemorySpeed.Running(ToInt(obj["ConfiguredClockSpeed"]), ToInt(obj["Speed"])));
                     if (memoryType == 0)
                         memoryType = ToInt(obj["SMBIOSMemoryType"]);
                 }
