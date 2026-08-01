@@ -66,13 +66,19 @@ public sealed record MotherboardInfo(
     public static MotherboardInfo Unknown { get; } = new();
 }
 
-/// <summary>Graphics card — <c>Name</c> is the card subtitle (adapter name).</summary>
-public sealed record GraphicsInfo(
+/// <summary>One graphics adapter — <c>Name</c> is its card subtitle; the rest are the spec-row values.</summary>
+public sealed record GraphicsAdapterInfo(
     string Name = "—",
     string Memory = "—",
     string CudaCores = "—",
     string BoostClock = "—",
     string Driver = "—",
     string Bus = "—") {
-    public static GraphicsInfo Unknown { get; } = new();
+    public static GraphicsAdapterInfo Unknown { get; } = new();
+}
+
+/// <summary>Graphics — every physical adapter the machine has. A discrete GPU alongside an integrated one
+/// gets a full card each, so neither is hidden behind the other.</summary>
+public sealed record GraphicsInfo(IReadOnlyList<GraphicsAdapterInfo> Adapters) {
+    public static GraphicsInfo Unknown { get; } = new(new List<GraphicsAdapterInfo>());
 }

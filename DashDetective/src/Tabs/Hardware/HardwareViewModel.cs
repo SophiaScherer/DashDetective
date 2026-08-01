@@ -1,5 +1,6 @@
 using DashDetective.Shared;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Hardware;
@@ -25,8 +26,14 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     private readonly HardwareCard _storage;
     private readonly HardwareCard _sensors;
 
-    /// <summary>The six component cards, in comp order, bound by the view's 2-column grid.</summary>
-    public IReadOnlyList<HardwareCard> Cards { get; }
+    /// <summary>Every Graphics card, in adapter order — a machine with a discrete GPU and an integrated one
+    /// gets a full card each. Always holds at least the first card, which shows placeholders until the read
+    /// lands.</summary>
+    private readonly List<HardwareCard> _graphicsCards = new();
+
+    /// <summary>The component cards, in comp order, bound by the view's 2-column grid. Observable because a
+    /// multi-GPU machine gains a Graphics card per extra adapter once the async read completes.</summary>
+    public ObservableCollection<HardwareCard> Cards { get; }
 
     public HardwareViewModel() {
         _processor = new HardwareCard("Processor", "—", HardwareIcons.Chip,
@@ -38,14 +45,8 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
                 new HardwareSpec("TDP"),
                 new HardwareSpec("Socket"),
             });
-        _graphics = new HardwareCard("Graphics", "—", HardwareIcons.Graph,
-            HardwareIcons.Green, HardwareIcons.GreenBg, new[] {
-                new HardwareSpec("Memory"),
-                new HardwareSpec("CUDA Cores"),
-                new HardwareSpec("Boost Clock"),
-                new HardwareSpec("Driver"),
-                new HardwareSpec("Bus"),
-            });
+        _graphics = NewGraphicsCard();
+        _graphicsCards.Add(_graphics);
         _motherboard = new HardwareCard("Motherboard", "—", HardwareIcons.Grid,
             HardwareIcons.Purple, HardwareIcons.PurpleBg, new[] {
                 new HardwareSpec("Chipset"),
@@ -78,10 +79,23 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
                 new HardwareSpec("VCore"),
             });
 
-        Cards = new[] { _processor, _graphics, _motherboard, _memory, _storage, _sensors };
+        Cards = new ObservableCollection<HardwareCard> {
+            _processor, _graphics, _motherboard, _memory, _storage, _sensors,
+        };
 
         _ = LoadAsync();
     }
+
+    /// <summary>Builds a Graphics card with the standard spec rows. One per physical adapter, so every GPU
+    /// keeps its own Memory / CUDA Cores / Boost Clock / Driver / Bus rather than being reduced to a line.</summary>
+    private static HardwareCard NewGraphicsCard() =>
+        new("Graphics", "—", HardwareIcons.Graph, HardwareIcons.Green, HardwareIcons.GreenBg, new[] {
+            new HardwareSpec("Memory"),
+            new HardwareSpec("CUDA Cores"),
+            new HardwareSpec("Boost Clock"),
+            new HardwareSpec("Driver"),
+            new HardwareSpec("Bus"),
+        });
 
     /// <summary>Toolbar Refresh: re-read the machine (specs can change, e.g. a BIOS update or a drive
     /// swap). Fire-and-forget like the startup load; failures leave the current values in place.</summary>
@@ -159,12 +173,35 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
         _motherboard.SetRow("M.2 Slots", b.M2Slots);
     }
 
+    /// <summary>Fills one Graphics card per physical adapter, each with the full spec rows. Cards are added
+    /// or dropped to match the adapter count (they sit together, right after the first), so a second GPU
+    /// appears in its own card rather than displacing the first one's detail. A failed read leaves the
+    /// existing cards and their placeholders alone.</summary>
     private void ApplyGraphics(GraphicsInfo g) {
-        _graphics.Subtitle = g.Name;
-        _graphics.SetRow("Memory", g.Memory);
-        _graphics.SetRow("CUDA Cores", g.CudaCores);
-        _graphics.SetRow("Boost Clock", g.BoostClock);
-        _graphics.SetRow("Driver", g.Driver);
-        _graphics.SetRow("Bus", g.Bus);
+        if (g.Adapters.Count == 0)
+            return;
+
+        var firstAt = Cards.IndexOf(_graphicsCards[0]);
+        for (var i = _graphicsCards.Count; i < g.Adapters.Count; i++) {
+            var card = NewGraphicsCard();
+            _graphicsCards.Add(card);
+            Cards.Insert(firstAt + i, card);
+        }
+        for (var i = _graphicsCards.Count - 1; i >= g.Adapters.Count; i--) {
+            Cards.Remove(_graphicsCards[i]);
+            _graphicsCards.RemoveAt(i);
+        }
+
+        for (var i = 0; i < g.Adapters.Count; i++)
+            ApplyAdapter(_graphicsCards[i], g.Adapters[i]);
+    }
+
+    private static void ApplyAdapter(HardwareCard card, GraphicsAdapterInfo a) {
+        card.Subtitle = a.Name;
+        card.SetRow("Memory", a.Memory);
+        card.SetRow("CUDA Cores", a.CudaCores);
+        card.SetRow("Boost Clock", a.BoostClock);
+        card.SetRow("Driver", a.Driver);
+        card.SetRow("Bus", a.Bus);
     }
 }
