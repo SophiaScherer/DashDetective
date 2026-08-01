@@ -33,13 +33,13 @@ namespace DashDetective.Tabs.Storage;
 /// rather than restarting the chart.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
-    // Interval of the page-local per-disk throughput timer. Like the Network tab's own coarse timers, this
-    // is deliberately NOT retimed by the Settings refresh interval (which scales only the shared feeds).
-    private static readonly TimeSpan ThroughputInterval = TimeSpan.FromSeconds(1);
-
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
-    // (≈ every 15 s) rather than every second.
+    // (≈ every 15 s at the default cadence) rather than every tick.
     private const int TemperatureRefreshTicks = 15;
+
+    // Held only to follow the Settings refresh interval: the tab reads no shared feed, but its Disk Activity
+    // chart has to advance at the same rate as the charts on other pages to cover the same span of time.
+    private readonly SystemMetricsService _service;
 
     // Page-local per-disk sampler + its timer, and the disk-number → card / history / latest-sample maps the
     // tick updates. Histories are kept for every disk (not just the selected one) so switching drives shows
@@ -57,15 +57,21 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly List<int> _temperatureDiskNumbers = new();
     private int _temperatureTickCounter;
 
-    public StorageViewModel() {
+    public StorageViewModel(SystemMetricsService service) {
+        _service = service;
+
         // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
         _ = LoadStorageAsync();
 
-        // Drive the per-disk readouts and the Disk Activity surface from the page-local sampler on a 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = ThroughputInterval };
+        // Drive the per-disk readouts and the Disk Activity surface from the page-local sampler, at the
+        // Settings cadence so this chart covers the same span as the other pages'.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
     }
+
+    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
     // soft (~0.16 alpha) tint of the same hue for the pill fill.
@@ -343,6 +349,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Tears down the page-local throughput timer + sampler. Safe to call more than once.</summary>
     public void Dispose() {
+        _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _throughputSampler.Dispose();

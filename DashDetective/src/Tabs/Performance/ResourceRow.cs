@@ -73,10 +73,13 @@ public partial class ResourceRow : ObservableObject {
     /// like <see cref="ValueBrush"/>.</summary>
     public IBrush? ValueBrush2 { get; init; }
 
-    /// <summary>Caption under the chart header. Percentage resources keep the default; a resource plotted in
-    /// other units (the adapter row's throughput) overrides it, so the caption never claims a scale the
-    /// chart isn't drawn on.</summary>
-    public string ChartCaption { get; init; } = "% Utilization over 60 seconds";
+    /// <summary>What the chart plots, e.g. "% Utilization" or "Receive and send" — the caption's fixed half,
+    /// so it never claims a scale the chart isn't drawn on.</summary>
+    public string ChartSubject { get; init; } = "% Utilization";
+
+    /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
+    /// Observable because the window changes with the Settings refresh interval.</summary>
+    [ObservableProperty] private string _chartCaption = "";
 
     /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
     /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>

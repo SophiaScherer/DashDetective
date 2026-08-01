@@ -101,15 +101,31 @@ public sealed class SystemMetricsService : IDisposable {
     /// <summary>Subscribes to network throughput snapshots. Returns a token; dispose it to unsubscribe.</summary>
     public IDisposable SubscribeNetwork(Action<NetworkSample> onSample, Action onFailed) => _network.Subscribe(onSample, onFailed);
 
+    /// <summary>The cadence the metric channels are running at — the Settings refresh interval. Pages that
+    /// drive their own per-device samplers read this so their charts advance in step with the shared ones,
+    /// and size their time-window captions from it.</summary>
+    public TimeSpan Interval { get; private set; } = DefaultInterval;
+
+    /// <summary>Raised when <see cref="SetInterval"/> changes the cadence, so a page can retime its own
+    /// samplers. Not raised when the interval is unchanged.</summary>
+    public event Action<TimeSpan>? IntervalChanged;
+
     /// <summary>
-    /// Retimes the 1 Hz metric channels to the Settings refresh interval (0.5 / 1 / 2 / 5 s). Only the
-    /// five per-metric channels here scale; the coarse timers deliberately stay coarse and are NOT
-    /// retimed (the Dashboard's 30 s uptime tick, the Network tab's 5 s adapter / 2.5 s connections /
-    /// 2 s ping timers). Applies even while paused, so a later Resume runs at the new cadence.
+    /// Retimes the metric channels to the Settings refresh interval (0.5 / 1 / 2 / 5 s) and announces the
+    /// change so page-local per-device samplers follow: a chart advancing at 1 Hz beside one advancing at
+    /// 5 s covers a different span of time while being drawn the same width. The genuinely coarse timers
+    /// stay coarse and do NOT follow (the Dashboard's 30 s uptime tick, the Network tab's 5 s adapter /
+    /// 2.5 s connections / 2 s ping timers) — none of them feeds a chart. Applies even while paused, so a
+    /// later Resume runs at the new cadence.
     /// </summary>
     public void SetInterval(TimeSpan interval) {
+        if (interval == Interval)
+            return;
+
+        Interval = interval;
         foreach (var feed in _feeds)
             feed.SetInterval(interval);
+        IntervalChanged?.Invoke(interval);
     }
 
     /// <summary>Updates the CPU breach streak and re-evaluates the alert state.</summary>

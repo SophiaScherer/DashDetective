@@ -118,7 +118,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
         _performance = new PerformanceViewModel(metrics);
-        _storage = new StorageViewModel();
+        _storage = new StorageViewModel(metrics);
 
         // Apply the persisted appearance + layout through the seams that own them, before wiring the
         // controls that observe them. ThemeService stays the only code that writes to the application.

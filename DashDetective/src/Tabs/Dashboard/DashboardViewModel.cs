@@ -147,10 +147,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _uptimeTimer.Tick += OnUptimeTick;
         _uptimeTimer.Start();
 
-        // Drive the per-disk card sparklines from the page-local throughput sampler on their own 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // Drive the per-disk and per-GPU card sparklines from the page-local samplers, at the same cadence as
+        // the shared feeds so every sparkline on the page covers the same span of time.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -575,6 +577,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         UpdateDiskThroughput();
     }
 
+    /// <summary>Follows the Settings refresh interval so the page-local sparklines keep pace with the shared
+    /// feeds' and cover the same span of time.</summary>
+    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
+
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDiskThroughput();
         UpdateGpuAdapters();
@@ -603,6 +609,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
+        _service.IntervalChanged -= OnIntervalChanged;
         _uptimeTimer.Stop();
         _uptimeTimer.Tick -= OnUptimeTick;
         _throughputTimer.Stop();

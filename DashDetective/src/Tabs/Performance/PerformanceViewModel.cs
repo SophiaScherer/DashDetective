@@ -199,7 +199,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       }, Select) {
             ValueBrush2 = Brush("#ff8a5c"),
             Points2 = SparklinePoints.Build(_upHistory, MinNetworkScaleMbps),
-            ChartCaption = "Receive and send over 60 seconds",
+            ChartSubject = "Receive and send",
         };
 
         // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
@@ -220,10 +220,12 @@ public partial class PerformanceViewModel : ViewModelBase,
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
-        // Drive the per-disk rows from the page-local throughput sampler on its own 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // Drive the per-disk / per-GPU / per-core rows from the page-local samplers, at the same cadence as
+        // the shared feeds so every chart on the page covers the same span of time.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
 
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready. The device
         // inventory enumerates the physical disks into their own rows.
@@ -254,6 +256,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         else if (_gpus.Count > 0)
             Resources.Add(_gpus[0].Row);
         Resources.Add(_networkRow);
+
+        // Rows built after construction (disks, GPUs) inherit the current window here.
+        ApplyChartWindow();
 
         Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
     }
@@ -542,6 +547,21 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// GPU reads "128 MB" rather than "0.1 GB".</summary>
     private static string FormatVram(ulong? bytes) =>
         bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
+
+    /// <summary>Follows the Settings refresh interval: retimes the page-local samplers so their charts stay
+    /// in step with the shared feeds', and restates the window every caption claims.</summary>
+    private void OnIntervalChanged(TimeSpan interval) {
+        _throughputTimer.Interval = interval;
+        ApplyChartWindow();
+    }
+
+    /// <summary>Rewrites every row's caption for the current window. Called at construction, whenever the
+    /// interval changes, and after new rows are built (they inherit the current window).</summary>
+    private void ApplyChartWindow() {
+        var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
+        foreach (var row in Resources)
+            row.ChartCaption = $"{row.ChartSubject} over {window}";
+    }
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
@@ -855,6 +875,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
+        _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _cpuRow.PropertyChanged -= OnResourceDetailChanged;
