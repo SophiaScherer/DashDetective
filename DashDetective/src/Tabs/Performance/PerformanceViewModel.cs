@@ -133,7 +133,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
+    // Both directions are kept: they share one auto-fitted axis and are drawn as two series on the row's
+    // chart, so the adapter's headline surface shows its whole throughput rather than receive alone.
     private readonly double[] _downHistory = new double[WindowSeconds];
+    private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
@@ -187,12 +190,17 @@ public partial class PerformanceViewModel : ViewModelBase,
         // read once at construction (it rarely changes).
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
+        // Receive takes the download tint and send the upload tint, matching the Dashboard's throughput chart.
         _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
                                       SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
-                                      }, Select);
+                                      }, Select) {
+            ValueBrush2 = Brush("#ff8a5c"),
+            Points2 = SparklinePoints.Build(_upHistory, MinNetworkScaleMbps),
+            ChartCaption = "Receive and send over 60 seconds",
+        };
 
         // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
         // to DetailChanged (the shell subscribes after seeding, so the seed doesn't trigger a save); the GPU
@@ -749,9 +757,10 @@ public partial class PerformanceViewModel : ViewModelBase,
         return $"{value} MB/s";
     }
 
-    /// <summary>Network subscription callback: append the download rate to the history, then refresh.</summary>
+    /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
     private void OnNetwork(NetworkSample sample) {
         MetricChannel.PushHistory(_downHistory, sample.DownMbps);
+        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
         UpdateNetwork(sample);
     }
 
@@ -763,18 +772,21 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its own value so a small flow shows kbps beside a large one — the
-        // rail value + unit and the Receive/Send tiles all read through the shared DataRateFormatter.
-        var (downValue, downUnit) = DataRateFormatter.Split(sample.DownMbps);
+        // Receive and Send share one unit, taken from the larger of the two, so the pair is directly
+        // comparable — the rule DataRateFormatter prescribes for values on a shared axis.
+        var (downValue, upValue, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
         _networkRow.ValueText = downValue;
-        _networkRow.Unit = downUnit;
-        _netReceiveTile.Value = $"{downValue} {downUnit}";
-        _netSendTile.Value = DataRateFormatter.Format(sample.UpMbps);
+        _networkRow.Unit = unit;
+        _netReceiveTile.Value = $"{downValue} {unit}";
+        _netSendTile.Value = $"{upValue} {unit}";
 
-        // The chart has no natural 0–100 axis, so normalise against the rolling receive peak (with
-        // headroom and a floor, like the Dashboard) so the filled area still spans the fixed axis.
-        _networkRow.Points = SparklinePoints.Build(
-            _downHistory, ChartScale.FitAxis(_downHistory, floor: MinNetworkScaleMbps));
+        // The chart has no natural 0–100 axis, so normalise against the rolling peak of BOTH directions
+        // (with headroom and a floor, like the Dashboard) and draw them on that one axis — Task Manager's
+        // adapter pane shows send and receive together, and a receive-only chart under the adapter's name
+        // reads as its whole throughput.
+        var axis = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
+        _networkRow.Points = SparklinePoints.Build(_downHistory, axis);
+        _networkRow.Points2 = SparklinePoints.Build(_upHistory, axis);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }

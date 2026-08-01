@@ -149,7 +149,7 @@
                          supports it: CPU logical processors / GPU engines). -->
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
-                                   Text="% Utilization over 60 seconds"/>
+                                   Text="{Binding SelectedResource.ChartCaption}"/>
                         <Border Grid.Column="1" Classes="segments"
                                 IsVisible="{Binding SelectedResource.SupportsDetail}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -167,12 +167,15 @@
                         </Border>
                     </Grid>
 
-                    <!-- Overall: one fixed-axis area chart tinted in the resource's colour. -->
+                    <!-- Overall: one fixed-axis area chart tinted in the resource's colour, plus an optional
+                         second series on the same axis (the adapter row's upload beside its download). -->
                     <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         IsVisible="{Binding !SelectedResource.IsDetailed}"
                                         Stroke="{Binding SelectedResource.ValueBrush}"
-                                        Points="{Binding SelectedResource.Points}"/>
+                                        Points="{Binding SelectedResource.Points}"
+                                        Stroke2="{Binding SelectedResource.ValueBrush2}"
+                                        Points2="{Binding SelectedResource.Points2}"/>
 
                     <!-- Detailed: one mini chart per logical processor / engine in a compact square grid.
                          DetailColumns is the ceiling rather than a fixed count,

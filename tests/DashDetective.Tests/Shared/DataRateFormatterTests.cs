@@ -68,4 +68,23 @@ public class DataRateFormatterTests {
         Assert.Equal("1.5 Gbps", DataRateFormatter.Format(1500));
         Assert.Equal("500 kbps", DataRateFormatter.Format(0.5));
     }
+
+    /// <summary>A download/upload pair must read in ONE unit — scaling each side on its own would put
+    /// "45 Mbps" next to "800 kbps", where the smaller rate shows the bigger number.</summary>
+    [Fact]
+    public void SplitPair_ScalesBothToTheLargersUnit() {
+        Assert.Equal(("45", "0.8", "Mbps"), DataRateFormatter.SplitPair(45, 0.8));
+        // ...and the same however the pair is ordered.
+        Assert.Equal(("0.8", "45", "Mbps"), DataRateFormatter.SplitPair(0.8, 45));
+    }
+
+    [Fact]
+    public void SplitPair_BothSmall_UsesKbpsForBoth() {
+        Assert.Equal(("500", "120", "kbps"), DataRateFormatter.SplitPair(0.5, 0.12));
+    }
+
+    [Fact]
+    public void SplitPair_PromotesBothOnceEitherReachesGbps() {
+        Assert.Equal(("1.2", "0.0", "Gbps"), DataRateFormatter.SplitPair(1200, 0));
+    }
 }

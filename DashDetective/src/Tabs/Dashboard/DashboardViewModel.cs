@@ -510,10 +510,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Updates the throughput readouts and both sparkline series, which share one auto-fitted
     /// vertical scale (<see cref="NetworkYMax"/>) so their heights are directly comparable.</summary>
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its own value, so a small flow shows kbps beside a large one.
-        (NetworkDownText, NetworkDownUnit) = DataRateFormatter.Split(sample.DownMbps);
-        (NetworkUpText, NetworkUpUnit) = DataRateFormatter.Split(sample.UpMbps);
-        NetworkSubText = $"↑ {NetworkUpText} {NetworkUpUnit}";
+        // Both readouts share one unit, taken from the larger of the two, so they can be compared against
+        // each other and against the shared chart axis below.
+        var (down, up, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
+        NetworkDownText = down;
+        NetworkUpText = up;
+        NetworkDownUnit = unit;
+        NetworkUpUnit = unit;
+        NetworkSubText = $"↑ {up} {unit}";
 
         NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
         NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);

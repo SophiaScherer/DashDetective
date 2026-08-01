@@ -73,4 +73,13 @@ public static class DataRateFormatter {
         var unit = UnitFor(mbps);
         return (FormatValue(Convert(mbps, unit)), Label(unit));
     }
+
+    /// <summary>Auto-scales a related PAIR (download + upload) to one shared unit, taken from the larger of
+    /// the two — the rule this class's summary prescribes for values on a shared axis. Scaling each side
+    /// independently would let "45 Mbps" sit beside "800 kbps", where the smaller number is drawn taller;
+    /// Task Manager never mixes units within one panel either.</summary>
+    public static (string First, string Second, string Unit) SplitPair(double firstMbps, double secondMbps) {
+        var unit = UnitFor(Math.Max(firstMbps, secondMbps));
+        return (FormatValue(Convert(firstMbps, unit)), FormatValue(Convert(secondMbps, unit)), Label(unit));
+    }
 }
