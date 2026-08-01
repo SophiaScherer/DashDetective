@@ -91,6 +91,32 @@ public class ToolkitCatalogTests {
                    entry => Assert.True(entry.Action.CapturesOutput));
     }
 
+    /// <summary>Elevation is the app's one privileged act, so the set of rows that ask for it is pinned
+    /// by name: adding another must be a deliberate edit here, not something that slips in.</summary>
+    [Fact]
+    public void Entries_ExactlyOneRowAsksForAdministrator() {
+        var elevated = ToolkitCatalog.Entries.Where(e => e.RequiresElevation).ToList();
+
+        Assert.Equal(["sfc /scannow"], elevated.Select(e => e.Command));
+    }
+
+    /// <summary>An elevated row must never claim to capture: Windows refuses to redirect a <c>runas</c>
+    /// process's streams, so a captured-and-elevated row would show an empty body forever.</summary>
+    [Fact]
+    public void Entries_ElevatedRowsDoNotCaptureOutput() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.RequiresElevation),
+                   entry => Assert.False(entry.Action.CapturesOutput));
+    }
+
+    /// <summary>A row that raises a UAC prompt has to say so in its own text — the shield is a marker,
+    /// not the explanation, and it is invisible to anyone reading the row through search.</summary>
+    [Fact]
+    public void Entries_ElevatedRowsSaySoInTheirDescription() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.RequiresElevation),
+                   entry => Assert.Contains("administrator", entry.Description,
+                                            StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>Nothing outside Docs &amp; Links opens a browser, and nothing inside it does anything
     /// else — a mis-filed link would send the user to the web from a row that reads as a local tool.</summary>
     [Fact]

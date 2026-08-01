@@ -21,6 +21,9 @@
         <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
         <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
         <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
+        <!-- The elevation shield. Fixed rather than themed, like the kind badges and the status dots:
+             "this raises a UAC prompt" must read the same under every accent. -->
+        <SolidColorBrush x:Key="ShieldAmber" Color="#ffcf4d"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -222,7 +225,7 @@
                                                                 ToolTip.Tip="{Binding Description}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
                                                                 CommandParameter="{Binding}">
-                                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
                                                                 <Border Grid.Column="0" Width="28" Height="28"
                                                                         CornerRadius="7"
                                                                         Background="{Binding BadgeBackground}">
@@ -252,10 +255,24 @@
                                                                                TextTrimming="CharacterEllipsis"/>
                                                                 </StackPanel>
 
+                                                                <!-- Elevation shield, on the one row that
+                                                                     raises a UAC prompt. Shown before the
+                                                                     click rather than after, so consent is
+                                                                     never a surprise. -->
+                                                                <Path Grid.Column="2" Width="12" Height="13"
+                                                                      Stretch="Uniform" VerticalAlignment="Center"
+                                                                      Stroke="{StaticResource ShieldAmber}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      ToolTip.Tip="Asks for administrator approval"
+                                                                      IsVisible="{Binding RequiresElevation}"
+                                                                      Data="M6,0.5 L11.5,2.5 V6.5
+                                                                            C11.5,9.3 9.2,11.4 6,12.5
+                                                                            C2.8,11.4 0.5,9.3 0.5,6.5 V2.5 Z"/>
+
                                                                 <!-- The kind badge gets its own fixed column
                                                                      so it stays legible at any width, and the
                                                                      badges line up down the card. -->
-                                                                <Border Grid.Column="2" CornerRadius="10"
+                                                                <Border Grid.Column="3" CornerRadius="10"
                                                                         Padding="7,2" VerticalAlignment="Center"
                                                                         Background="{Binding BadgeBackground}">
                                                                     <TextBlock Text="{Binding BadgeLabel}" FontSize="10"

@@ -56,10 +56,16 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** Folders, System Tools and Diagnostics (including parameterised ping/tracert)
-  authored. Elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row
+- **Catalog progress:** Folders, System Tools and Diagnostics (parameterised ping/tracert and the
+  elevated `sfc /scannow`) authored. Docs & Links is still to come, as are the per-row
   copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
   above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- **`sfc /scannow` is the only row that elevates**, and `ToolkitCatalogTests` pins that set **by name** —
+  adding another must be a deliberate edit to that test, not something that slips in. It is `Elevated`
+  rather than `Capture` for two independent reasons: Windows will not redirect a `runas` process's
+  streams, and sfc runs for many minutes, which a captured command's timeout would cut short. The row
+  carries an amber shield (fixed colour, like the kind badges) **and** says "needs administrator" in its
+  description, because the shield is invisible to anyone reaching the row through universal search.
 - **`ping`/`tracert` carry the only user input in the app**, and `ToolkitHostValidator` is the only place
   it is checked. Injection is already impossible (the value becomes one `ArgumentList` element), so the
   validator's real job is that **an accepted value cannot be a flag** — a DNS label may not begin with a

@@ -72,6 +72,12 @@ public static class ToolkitCatalog {
         Diagnostic("tracert <host>", "Traces the route to a host, up to 20 hops",
                    ToolkitAction.Capture("tracert", "-h", "20").WithTimeout(TimeSpan.FromSeconds(120)),
                    new ToolkitParameter("host or IP")),
+
+        // The one entry that needs admin. Elevated rather than captured because Windows refuses to
+        // redirect a runas process's streams — it runs in its own console window, and the log says so.
+        // It also runs for many minutes, which a captured command's timeout would cut short.
+        Diagnostic("sfc /scannow", "Scans and repairs protected system files — needs administrator",
+                   ToolkitAction.Elevated("sfc", "/scannow")),
     ];
 
     /// <summary>A row that opens a folder in Explorer — the shape every Folders entry takes.</summary>

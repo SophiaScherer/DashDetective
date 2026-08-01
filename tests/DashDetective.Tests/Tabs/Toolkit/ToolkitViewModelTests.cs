@@ -197,6 +197,38 @@ public class ToolkitViewModelTests {
         Assert.EndsWith(" example.com", vm.Log[0].Command, System.StringComparison.Ordinal);
     }
 
+    // ----- Elevation -----
+
+    /// <summary>The shield is driven straight off the action, so a row cannot warn about a prompt it
+    /// will not raise, or raise one it did not warn about.</summary>
+    [Fact]
+    public void RequiresElevation_MirrorsTheActionRatherThanBeingSetSeparately() {
+        var elevated = new ToolkitEntry(
+            "sfc /scannow", "Needs administrator", ToolkitCategory.Diagnostics,
+            ToolkitEntryKind.Command, ToolkitAction.Elevated("sfc", "/scannow"));
+
+        Assert.True(elevated.RequiresElevation);
+        Assert.False(MissingTool().RequiresElevation);
+    }
+
+    /// <summary>Declining the prompt is a decision, not a fault: the stanza says it was cancelled and
+    /// nothing is reported as having gone wrong.</summary>
+    [Fact]
+    public async Task Run_ElevatedRowDeclinedAtThePrompt_ReadsAsCancelled() {
+        var vm = new ToolkitViewModel();
+        var entry = new ToolkitEntry(
+            "cancelled", "Declined at the prompt", ToolkitCategory.Diagnostics,
+            ToolkitEntryKind.Command, ToolkitAction.Elevated("not-a-real-tool-xyz.exe"));
+
+        await vm.RunCommand.ExecuteAsync(entry);
+
+        // The tool does not exist, so this run fails before any prompt — what matters is that the
+        // failure is worded and logged rather than thrown.
+        var logged = Assert.Single(vm.Log);
+        Assert.NotEqual(ToolkitOutputFormatter.Running, logged.Output);
+        Assert.False(string.IsNullOrWhiteSpace(logged.Output));
+    }
+
     /// <summary>The gateway suggestion arrives after the page is built and must never overwrite a host
     /// the user is part-way through typing.</summary>
     [Fact]

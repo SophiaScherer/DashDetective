@@ -40,6 +40,10 @@ public sealed class ToolkitEntry {
     /// The one mutable thing on an otherwise immutable entry, because the text box binds to it.</summary>
     public ToolkitParameter? Parameter { get; }
 
+    /// <summary>Whether running this raises a UAC prompt, so the row can warn before it is clicked
+    /// rather than surprising the user with a consent dialog.</summary>
+    public bool RequiresElevation => Action.RequiresElevation;
+
     public string BadgeLabel => ToolkitCatalog.LabelFor(Kind);
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);
     public IBrush BadgeForeground => ToolkitIcons.ForegroundFor(Kind);
