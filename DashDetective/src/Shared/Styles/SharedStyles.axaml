@@ -102,6 +102,22 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
     </Style>
 
+    <!-- ===== Bare button ===== -->
+    <!-- Strips a Button back to a click target with no chrome of its own, so the content inside it (a
+         segment, a selectable card) carries the whole appearance. The partner of the selectable-card and
+         segmented-selector styles below. -->
+    <Style Selector="Button.bare">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.bare /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>

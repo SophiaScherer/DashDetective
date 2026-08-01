@@ -19,33 +19,39 @@ namespace DashDetective.Tabs.Storage;
 /// a Partitions table and a Disk Activity chart. Page-scrolls as a whole like the Dashboard/Network (not
 /// <see cref="ISelfScrollingPage"/>).
 ///
-/// The live technical pass is landing feature-by-feature: this view model takes the shared
-/// <see cref="SystemMetricsService"/> and opts into the shell's <see cref="IRefreshablePage"/> /
-/// <see cref="ILiveSamplingPage"/> routing. Live now: the Disk Activity chart + readouts (shared storage
-/// feed), the Partitions table (<see cref="VolumeProvider"/>) and the drive summary cards
-/// (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), each card's Read/Write from the
-/// page-local <see cref="PhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
+/// Everything on the page is live and per-drive: the Partitions table (<see cref="VolumeProvider"/>), the
+/// drive summary cards (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), each card's
+/// Read/Write and the Disk Activity chart + readouts from the page-local
+/// <see cref="PhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
 /// <see cref="DiskTemperatureProvider"/> (refreshed on a slow sub-cadence of the throughput timer). Non-NVMe
 /// drives show "—" for Temp (no readable SMART temperature without admin).
+///
+/// The drive cards double as the page's drive selector: the Disk Activity panel shows the <b>selected</b>
+/// physical disk, not the <c>PhysicalDisk(_Total)</c> aggregate — that instance averages idle time across
+/// every disk, so on a multi-disk machine one busy drive would read diluted under a title naming a single
+/// drive. Every disk's history is kept warm, so switching drives shows that drive's real recent activity
+/// rather than restarting the chart.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
-    // The shared metric hub (CPU/Memory/GPU/Storage/Network). The Disk Activity surface subscribes to its
-    // storage feed in a later phase; held here now so the ctor injection and shell routing are in place.
-    // Interval of the page-local per-disk throughput timer. Like the Network tab's own coarse timers, this
-    // is deliberately NOT retimed by the Settings refresh interval (which scales only the shared feeds).
-    private static readonly TimeSpan ThroughputInterval = TimeSpan.FromSeconds(1);
-
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
-    // (≈ every 15 s) rather than every second.
+    // (≈ every 15 s at the default cadence) rather than every tick.
     private const int TemperatureRefreshTicks = 15;
 
+    // Held only to follow the Settings refresh interval: the tab reads no shared feed, but its Disk Activity
+    // chart has to advance at the same rate as the charts on other pages to cover the same span of time.
     private readonly SystemMetricsService _service;
-    private readonly IDisposable _storageSubscription;
 
-    // Page-local per-disk read/write sampler + its timer, and the disk-number → card map the tick updates.
+    // Page-local per-disk sampler + its timer, and the disk-number → card / history / latest-sample maps the
+    // tick updates. Histories are kept for every disk (not just the selected one) so switching drives shows
+    // that drive's real last minute.
     private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
     private readonly DispatcherTimer _throughputTimer;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
+    private readonly Dictionary<int, double[]> _historiesByDisk = new();
+    private readonly Dictionary<int, DiskThroughputSample> _latestByDisk = new();
+
+    /// <summary>Physical disk number the Disk Activity panel is showing, or −1 before the drives load.</summary>
+    private int _selectedDisk = -1;
 
     // Disk numbers that reported a temperature at load (NVMe drives) — the ones the slow poll re-reads.
     private readonly List<int> _temperatureDiskNumbers = new();
@@ -54,18 +60,18 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     public StorageViewModel(SystemMetricsService service) {
         _service = service;
 
-        // Feed the Disk Activity surface from the shared storage feed. The subscription immediately replays
-        // the latest cached sample, seeding the chart with real data on the first frame.
-        _storageSubscription = service.SubscribeStorage(OnStorage, OnStorageFailed);
-
         // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
         _ = LoadStorageAsync();
 
-        // Drive the per-disk Read/Write readouts from the page-local sampler on their own 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = ThroughputInterval };
+        // Drive the per-disk readouts and the Disk Activity surface from the page-local sampler, at the
+        // Settings cadence so this chart covers the same span as the other pages'.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
     }
+
+    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
     // soft (~0.16 alpha) tint of the same hue for the pill fill.
@@ -90,13 +96,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Width of the Disk Activity history, matching the app's charts (60 samples = one per second).
     private const int WindowSeconds = 60;
 
-    // The rolling active-time history the Disk Activity chart draws (Task Manager's disk "Active time",
-    // 0–100 %). The samplers are shared across pages; this history is this tab's own, like the Dashboard's.
-    private readonly double[] _diskHistory = new double[WindowSeconds];
+    /// <summary>Whether the drive picker's dropdown is open. Two-way bound to the toggle and the popup, and
+    /// cleared by <see cref="SelectDrive"/> so choosing a drive closes it.</summary>
+    [ObservableProperty] private bool _drivePickerOpen;
 
-    /// <summary>The Disk Activity panel title, carrying the real system-drive letter rather than a
-    /// hardcoded "C:". Fixed for the process lifetime, so no change notification is needed.</summary>
-    public string DiskActivityTitle { get; } = $"Disk Activity ({SystemDrive.Letter}:)";
+    /// <summary>Whether the machine has more than one drive to switch between. On a single-drive machine the
+    /// panel just names the drive — a picker offering one choice is a dead end.</summary>
+    [ObservableProperty] private bool _hasMultipleDrives;
 
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
     [ObservableProperty] private string _diskPoints = "";
@@ -110,21 +116,49 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The "Queue" readout — the average disk queue length / outstanding requests (e.g. "0.03").</summary>
     [ObservableProperty] private string _diskQueue = "0.00";
 
-    /// <summary>Storage subscription callback: append the active time to the history, then refresh the
-    /// Disk Activity surface (chart, Active time, Avg response and Queue readouts).</summary>
-    private void OnStorage(StorageSample sample) {
-        MetricChannel.PushHistory(_diskHistory, sample.ActivePercent);
+    /// <summary>Points the Disk Activity panel at a drive (single-select, like the Performance rail's
+    /// <c>ResourceRow</c>) and redraws it at once from that disk's kept history, so the panel doesn't sit
+    /// blank until the next tick. Closes the picker either way, so re-choosing the current drive still
+    /// dismisses the dropdown.</summary>
+    private void SelectDrive(DriveCard card) {
+        DrivePickerOpen = false;
+        if (ReferenceEquals(card, SelectedDrive))
+            return;
+
+        if (SelectedDrive is not null)
+            SelectedDrive.IsSelected = false;
+        SelectedDrive = card;
+        card.IsSelected = true;
+        _selectedDisk = card.DiskNumber;
+        UpdateActivity();
+    }
+
+    /// <summary>The drive card whose disk the Disk Activity panel is showing, or null before the load.</summary>
+    [ObservableProperty] private DriveCard? _selectedDrive;
+
+    /// <summary>Redraws the Disk Activity surface (chart, Active time, Avg response, Queue) from the selected
+    /// disk's latest sample and kept history. Shows neutral placeholders when that disk has no reading —
+    /// a drive the PDH counters don't report, or before the first tick.</summary>
+    private void UpdateActivity() {
+        if (!_historiesByDisk.TryGetValue(_selectedDisk, out var history)) {
+            DiskPoints = "";
+            DiskActive = "—";
+            DiskResponse = "—";
+            DiskQueue = "—";
+            return;
+        }
+
+        DiskPoints = SparklinePoints.Build(history, 100);
+        if (!_latestByDisk.TryGetValue(_selectedDisk, out var sample)) {
+            DiskActive = "—";
+            DiskResponse = "—";
+            DiskQueue = "—";
+            return;
+        }
+
         DiskActive = Math.Round(sample.ActivePercent).ToString("0", CultureInfo.InvariantCulture) + "%";
         DiskResponse = FormatResponse(sample.ResponseSeconds);
         DiskQueue = sample.QueueLength.ToString("0.00", CultureInfo.InvariantCulture);
-        DiskPoints = SparklinePoints.Build(_diskHistory, 100);
-    }
-
-    /// <summary>Sampler-failure handler for the Disk Activity surface: shows neutral placeholders.</summary>
-    private void OnStorageFailed() {
-        DiskActive = "—";
-        DiskResponse = "—";
-        DiskQueue = "—";
     }
 
     /// <summary>Formats the average transfer time (seconds) as milliseconds, e.g. "0.4 ms".</summary>
@@ -142,12 +176,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>
-    /// Toolbar Refresh for the Storage tab: forces an immediate re-sample of the shared metrics (so the
-    /// Disk Activity surface updates once even while paused) and re-reads the drive + volume info. Drives
-    /// the shell's Refresh action.
+    /// Toolbar Refresh for the Storage tab: an immediate re-sample of the per-disk counters (so the readouts
+    /// and Disk Activity surface update once even while paused) plus a re-read of the drive + volume info.
+    /// Drives the shell's Refresh action.
     /// </summary>
     public void Refresh() {
-        _service.RefreshAll();
+        UpdateThroughput();
+        UpdateTemperatures();
         _ = LoadStorageAsync();
     }
 
@@ -165,11 +200,15 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             var disks = disksTask.Result;
             var volumes = volumesTask.Result;
 
+            // A reload rebuilds every card, so remember which disk was on show and re-select it below.
+            var previousDisk = _selectedDisk;
+
             Drives.Clear();
             _cardsByDisk.Clear();
             _temperatureDiskNumbers.Clear();
+            SelectedDrive = null;
             foreach (var data in StorageComposer.Compose(disks, volumes)) {
-                var card = ToDriveCard(data);
+                var card = ToDriveCard(data, SelectDrive);
                 Drives.Add(card);
                 _cardsByDisk[data.DiskNumber] = card;
                 if (data.TemperatureCelsius.HasValue)
@@ -182,6 +221,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                          .ThenBy(v => v.DriveLetter))
                 Partitions.Add(ToPartitionRow(volume));
 
+            HasMultipleDrives = Drives.Count > 1;
+            SelectDefaultDrive(volumes, previousDisk);
+
             // Seed the new cards' Read/Write once so they don't sit on "—" until the next timer tick.
             UpdateThroughput();
         } catch {
@@ -189,7 +231,31 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _cardsByDisk.Clear();
             _temperatureDiskNumbers.Clear();
             Partitions.Clear();
+            SelectedDrive = null;
+            HasMultipleDrives = false;
+            _selectedDisk = -1;
+            UpdateActivity();
         }
+    }
+
+    /// <summary>Selects the drive the Disk Activity panel shows after a (re)load: whatever the user had
+    /// chosen if that disk is still present — a toolbar Refresh rebuilds the cards, and must not silently
+    /// move the panel off the drive being watched — else the one hosting Windows, since that is the drive the
+    /// page previously named in its title. Falls back to the first card when neither resolves.</summary>
+    private void SelectDefaultDrive(IReadOnlyList<VolumeInfo> volumes, int previousDisk) {
+        if (Drives.Count == 0)
+            return;
+
+        if (_cardsByDisk.TryGetValue(previousDisk, out var previous)) {
+            SelectDrive(previous);
+            return;
+        }
+
+        var systemDisk = volumes
+            .FirstOrDefault(v => v.DriveLetter == SystemDrive.Letter && v.DiskNumber.HasValue)
+            .DiskNumber;
+
+        SelectDrive(systemDisk is { } disk && _cardsByDisk.TryGetValue(disk, out var card) ? card : Drives[0]);
     }
 
     private void OnThroughputTick(object? sender, EventArgs e) {
@@ -210,15 +276,24 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                 card.Temp = DriveTemperatureFormatter.Format(celsius);
     }
 
-    /// <summary>Samples per-disk throughput and updates each card's Read/Write readouts in place (bytes/sec
-    /// formatted like "48 MB/s"). Disks without a current reading are left unchanged.</summary>
+    /// <summary>Samples every disk once and updates each card's Read/Write readouts in place (bytes/sec
+    /// formatted like "48 MB/s"), appending each disk's active time to its own rolling history so any drive
+    /// the user switches to already has a minute behind it. Ends by redrawing the Disk Activity surface for
+    /// the selected disk. Disks without a current reading are left unchanged.</summary>
     private void UpdateThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_cardsByDisk.TryGetValue(sample.DiskNumber, out var card))
                 continue;
             card.Read = FormatRate(sample.ReadBytesPerSec);
             card.Write = FormatRate(sample.WriteBytesPerSec);
+
+            if (!_historiesByDisk.TryGetValue(sample.DiskNumber, out var history))
+                _historiesByDisk[sample.DiskNumber] = history = new double[WindowSeconds];
+            MetricChannel.PushHistory(history, sample.ActivePercent);
+            _latestByDisk[sample.DiskNumber] = sample;
         }
+
+        UpdateActivity();
     }
 
     /// <summary>Formats a byte-per-second rate as "&lt;size&gt;/s" (e.g. "48 MB/s"), reusing the shared
@@ -228,10 +303,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Maps composed drive data to a summary card: the health pill + usage-bar brushes are the
     /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are
-    /// seeded by the throughput sampler; Temp shows the NVMe reading or "—" when none is available.</summary>
-    private static DriveCard ToDriveCard(DriveCardData data) {
+    /// seeded by the throughput sampler; Temp shows the NVMe reading or "—" when none is available. The card
+    /// carries its disk number and a select command, so it also acts as the Disk Activity panel's selector.</summary>
+    private static DriveCard ToDriveCard(DriveCardData data, Action<DriveCard> onSelected) {
         var healthy = data.Health == DriveHealth.Healthy;
-        return new DriveCard {
+        return new DriveCard(data.DiskNumber, onSelected) {
             Name = data.Name,
             Model = data.Model,
             Health = healthy ? "Healthy" : "Caution",
@@ -269,11 +345,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         Free = FileSizeFormatter.Format((long)volume.FreeBytes),
     };
 
-    /// <summary>
-    /// Pauses/resumes the tab's own per-disk throughput timer for the shell's Live pill. The shared metric
-    /// feed (the Disk Activity surface) is paused separately by the shell via
-    /// <see cref="SystemMetricsService.Pause"/>.
-    /// </summary>
+    /// <summary>Pauses/resumes the tab's per-disk throughput timer for the shell's Live pill. That timer now
+    /// drives every live surface on the page, so this is the whole of the tab's live sampling.</summary>
     public void SetLive(bool live) {
         if (live)
             _throughputTimer.Start();
@@ -281,10 +354,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _throughputTimer.Stop();
     }
 
-    /// <summary>Unsubscribes from the shared storage feed and tears down the page-local throughput timer +
-    /// sampler (the shared feed's samplers are owned/disposed by the service). Safe to call more than once.</summary>
+    /// <summary>Tears down the page-local throughput timer + sampler. Safe to call more than once.</summary>
     public void Dispose() {
-        _storageSubscription.Dispose();
+        _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _throughputSampler.Dispose();

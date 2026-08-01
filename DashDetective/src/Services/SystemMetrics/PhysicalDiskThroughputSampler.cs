@@ -6,17 +6,21 @@ using System.Runtime.InteropServices;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>Per-disk snapshot, keyed by disk number: read/write throughput (bytes per second), Task Manager's
-/// disk "Active time" as a percentage (0–100, <c>100 − % Idle Time</c>), and the average transfer response
-/// time in seconds.</summary>
+/// disk "Active time" as a percentage (0–100, <c>100 − % Idle Time</c>), the average transfer response
+/// time in seconds, and the average disk queue length (outstanding requests).</summary>
 public readonly record struct DiskThroughputSample(
-    int DiskNumber, double ReadBytesPerSec, double WriteBytesPerSec, double ActivePercent, double ResponseSeconds);
+    int DiskNumber, double ReadBytesPerSec, double WriteBytesPerSec, double ActivePercent, double ResponseSeconds,
+    double QueueLength);
 
 /// <summary>
-/// Samples per-disk read/write throughput and active time from the Windows PDH <c>\PhysicalDisk(*)\*</c>
-/// counters. Unlike the shared <see cref="StorageUsageSampler"/> (which reads only the aggregate <c>_Total</c>
-/// instance), this reads every disk instance at once via <c>PdhGetFormattedCounterArray</c> and keys each
+/// Samples per-disk read/write throughput, active time, response time and queue length from the Windows PDH
+/// <c>\PhysicalDisk(*)\*</c>
+/// counters. It deliberately avoids the aggregate <c>_Total</c> instance, whose <c>% Idle Time</c> is a mean
+/// across every disk — one busy drive would read diluted. Instead it reads every disk instance at once via
+/// <c>PdhGetFormattedCounterArray</c> and keys each
 /// reading by the disk number parsed from the instance name (e.g. "0 C:" → 0), so the Storage tab's per-disk
-/// cards can show their own rates and the Dashboard's per-disk cards their own active time. Active time is
+/// cards and its Disk Activity panel can show one real drive rather than an average across every disk on the
+/// machine. Active time is
 /// reported as <c>100 − % Idle Time</c> clamped 0–100, matching Task Manager (the same source as the aggregate
 /// sampler). Page-local to the tab that owns it and driven by its own timer. A failure to stand up the query
 /// leaves it inert, returning an empty set forever — the same soft-fail contract as the other samplers. No
@@ -32,10 +36,11 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
 
     private const string ReadPath = @"\PhysicalDisk(*)\Disk Read Bytes/sec";
     private const string WritePath = @"\PhysicalDisk(*)\Disk Write Bytes/sec";
-    // Active time is derived from idle time (the % Disk Time counter can read above 100% under load), matching
-    // StorageUsageSampler's aggregate reading.
+    // Active time is derived from idle time (the % Disk Time counter can read above 100% under load), which is
+    // what Task Manager shows.
     private const string IdlePath = @"\PhysicalDisk(*)\% Idle Time";
     private const string ResponsePath = @"\PhysicalDisk(*)\Avg. Disk sec/Transfer";
+    private const string QueuePath = @"\PhysicalDisk(*)\Avg. Disk Queue Length";
 
     /// <summary>
     /// One item of a formatted counter array — a <c>PDH_FMT_COUNTERVALUE_ITEM</c>: the instance name pointer
@@ -71,6 +76,7 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
     private readonly IntPtr _writeCounter;
     private readonly IntPtr _idleCounter;
     private readonly IntPtr _responseCounter;
+    private readonly IntPtr _queueCounter;
     private readonly bool _ready;
 
     public PhysicalDiskThroughputSampler() {
@@ -81,14 +87,15 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
         if (PdhAddEnglishCounter(_query, ReadPath, IntPtr.Zero, out _readCounter) != ErrorSuccess
             || PdhAddEnglishCounter(_query, WritePath, IntPtr.Zero, out _writeCounter) != ErrorSuccess
             || PdhAddEnglishCounter(_query, IdlePath, IntPtr.Zero, out _idleCounter) != ErrorSuccess
-            || PdhAddEnglishCounter(_query, ResponsePath, IntPtr.Zero, out _responseCounter) != ErrorSuccess) {
+            || PdhAddEnglishCounter(_query, ResponsePath, IntPtr.Zero, out _responseCounter) != ErrorSuccess
+            || PdhAddEnglishCounter(_query, QueuePath, IntPtr.Zero, out _queueCounter) != ErrorSuccess) {
             PdhCloseQuery(_query);
             _query = IntPtr.Zero;
             return;
         }
 
         // Seed one collect so the first Sample() reflects a real interval (these are rate counters needing
-        // two data points), mirroring StorageUsageSampler priming its query.
+        // two data points), mirroring the other PDH samplers priming their queries.
         PdhCollectQueryData(_query);
         _ready = true;
     }
@@ -103,15 +110,17 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
         var writes = ReadArray(_writeCounter);
         var idles = ReadArray(_idleCounter);
         var responses = ReadArray(_responseCounter);
+        var queues = ReadArray(_queueCounter);
 
         var samples = new List<DiskThroughputSample>(reads.Count);
         foreach (var (disk, read) in reads) {
             writes.TryGetValue(disk, out var write);
             responses.TryGetValue(disk, out var response);
+            queues.TryGetValue(disk, out var queue);
             // Only report active time when idle time was actually read; a missing reading would otherwise
             // masquerade as 100% active (100 − 0).
             var active = idles.TryGetValue(disk, out var idle) ? Math.Clamp(100 - idle, 0, 100) : 0;
-            samples.Add(new DiskThroughputSample(disk, read, write, active, response));
+            samples.Add(new DiskThroughputSample(disk, read, write, active, response, queue));
         }
         return samples;
     }

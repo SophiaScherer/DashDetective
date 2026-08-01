@@ -1,5 +1,8 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System;
+using System.Windows.Input;
 
 namespace DashDetective.Tabs.Storage;
 
@@ -7,11 +10,23 @@ namespace DashDetective.Tabs.Storage;
 /// One drive summary card in the Storage tab's top row: name + health pill, model subtitle, a usage bar,
 /// the used/free split, and Read / Write / Temp readouts (matching the design comp).
 ///
-/// Identity (<see cref="Name"/>, <see cref="Model"/>) is fixed; the health, usage and rate members are
-/// observable so the later live pass can update them in place. The pill and usage-bar brushes are fixed
-/// semantic colours (green = healthy, amber = caution) seeded with the card by the owning view model.
+/// Identity (<see cref="Name"/>, <see cref="Model"/>, <see cref="DiskNumber"/>) is fixed; the health, usage
+/// and rate members are observable so the live pass updates them in place. The pill and usage-bar brushes are
+/// fixed semantic colours (green = healthy, amber = caution) seeded with the card by the owning view model.
+///
+/// The card is also the tab's drive selector: it carries the same <see cref="IsSelected"/> +
+/// <see cref="SelectCommand"/> shape as <c>Performance.ResourceRow</c> / <c>NavItem</c>, and picking one
+/// points the Disk Activity panel below at that physical disk.
 /// </summary>
 public sealed partial class DriveCard : ObservableObject {
+    public DriveCard(int diskNumber, Action<DriveCard> onSelected) {
+        DiskNumber = diskNumber;
+        SelectCommand = new RelayCommand(() => onSelected(this));
+    }
+
+    /// <summary>Physical disk number this card describes — the key the throughput sampler reports under.</summary>
+    public int DiskNumber { get; }
+
     /// <summary>Drive display name, e.g. "Local Disk (C:)".</summary>
     public string Name { get; init; } = "";
 
@@ -47,4 +62,11 @@ public sealed partial class DriveCard : ObservableObject {
 
     /// <summary>Current drive temperature (e.g. "41°C").</summary>
     [ObservableProperty] private string _temp = "";
+
+    /// <summary>Whether this drive is the one the Disk Activity panel is showing.</summary>
+    [ObservableProperty] private bool _isSelected;
+
+    /// <summary>Points the Disk Activity panel at this drive, routing back to the owning view model for
+    /// single-selection.</summary>
+    public ICommand SelectCommand { get; }
 }

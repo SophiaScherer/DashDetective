@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -86,6 +85,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _cpuUtilTile;
     private readonly StatTile _cpuSpeedTile;
     private readonly StatTile _cpuProcessesTile;
+    private readonly StatTile _cpuThreadsTile;
+    private readonly StatTile _cpuHandlesTile;
     private readonly StatTile _cpuUptimeTile;
 
     // CPU current clock: a page-local sampler reads the % Processor Performance ratio (the shared CPU feed
@@ -132,7 +133,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
+    // Both directions are kept: they share one auto-fitted axis and are drawn as two series on the row's
+    // chart, so the adapter's headline surface shows its whole throughput rather than receive alone.
     private readonly double[] _downHistory = new double[WindowSeconds];
+    private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
@@ -145,12 +149,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Build the stat tiles first, then the resource rows (their initial charts come from the all-zero
         // histories), then subscribe to the shared metrics.
 
-        // CPU — live. Every tile updates: Utilization / Processes / Up time on the shared CPU tick, Speed
-        // on the throughput timer from the page-local frequency sampler (base clock × the % Processor
-        // Performance ratio, like Task Manager). Speed starts at "—" until the first reading.
+        // CPU — live. Every tile updates: Utilization / Processes / Threads / Handles / Up time on the
+        // shared CPU tick, Speed on the throughput timer from the page-local frequency sampler (base clock ×
+        // the % Processor Performance ratio, like Task Manager). Speed starts at "—" until the first reading.
         _cpuUtilTile = new StatTile("Utilization", "0 %");
         _cpuSpeedTile = new StatTile("Speed", "—");
         _cpuProcessesTile = new StatTile("Processes", "0");
+        _cpuThreadsTile = new StatTile("Threads", "0");
+        _cpuHandlesTile = new StatTile("Handles", "0");
         _cpuUptimeTile = new StatTile("Up time", "0m");
 
         // Memory — live. All four tiles update every tick: In use / Available / Committed come from the
@@ -169,8 +175,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
                                   SparklinePoints.Build(_cpuHistory, 100),
                                   new[] {
-                                      _cpuUtilTile, _cpuSpeedTile,
-                                      _cpuProcessesTile, _cpuUptimeTile,
+                                      _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
+                                      _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select);
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
@@ -184,12 +190,17 @@ public partial class PerformanceViewModel : ViewModelBase,
         // read once at construction (it rarely changes).
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
+        // Receive takes the download tint and send the upload tint, matching the Dashboard's throughput chart.
         _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
                                       SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
-                                      }, Select);
+                                      }, Select) {
+            ValueBrush2 = Brush("#ff8a5c"),
+            Points2 = SparklinePoints.Build(_upHistory, MinNetworkScaleMbps),
+            ChartSubject = "Receive and send",
+        };
 
         // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
         // to DetailChanged (the shell subscribes after seeding, so the seed doesn't trigger a save); the GPU
@@ -209,10 +220,12 @@ public partial class PerformanceViewModel : ViewModelBase,
             service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
         };
 
-        // Drive the per-disk rows from the page-local throughput sampler on its own 1 Hz timer.
-        _throughputTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // Drive the per-disk / per-GPU / per-core rows from the page-local samplers, at the same cadence as
+        // the shared feeds so every chart on the page covers the same span of time.
+        _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         _throughputTimer.Start();
+        service.IntervalChanged += OnIntervalChanged;
 
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready. The device
         // inventory enumerates the physical disks into their own rows.
@@ -243,6 +256,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         else if (_gpus.Count > 0)
             Resources.Add(_gpus[0].Row);
         Resources.Add(_networkRow);
+
+        // Rows built after construction (disks, GPUs) inherit the current window here.
+        ApplyChartWindow();
 
         Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
     }
@@ -317,11 +333,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
-    /// plus the live process count and uptime tiles (all keyed off the CPU tick).</summary>
+    /// plus the live process/thread/handle counts and uptime tiles (all keyed off the CPU tick).</summary>
     private void OnCpu(double value) {
         MetricChannel.PushHistory(_cpuHistory, value);
         UpdateCpu(value);
-        UpdateCpuProcesses();
+        UpdateCpuCounts();
         UpdateCpuUptime();
     }
 
@@ -338,18 +354,20 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.Points = SparklinePoints.Build(_cpuHistory, 100);
     }
 
-    /// <summary>Updates the live process count. <see cref="Process.GetProcesses"/> returns disposable
-    /// handles, so they're released immediately after counting.</summary>
-    private void UpdateCpuProcesses() {
-        try {
-            var processes = Process.GetProcesses();
-            _cpuProcessesTile.Value = processes.Length.ToString(CultureInfo.InvariantCulture);
-            foreach (var process in processes)
-                process.Dispose();
-        } catch {
-            _cpuProcessesTile.Value = "—";
-        }
+    /// <summary>Refreshes the live process / thread / handle counts — Task Manager's CPU-pane figures — from
+    /// one <see cref="SystemPerformanceProvider"/> read. A separate read from the Memory tick's (the two feeds
+    /// tick independently), but a single syscall each, against enumerating every process per second.</summary>
+    private void UpdateCpuCounts() {
+        var sample = SystemPerformanceProvider.Read();
+        _cpuProcessesTile.Value = FormatCount(sample?.ProcessCount);
+        _cpuThreadsTile.Value = FormatCount(sample?.ThreadCount);
+        _cpuHandlesTile.Value = FormatCount(sample?.HandleCount);
     }
+
+    /// <summary>Formats a system counter with thousands separators (handles run into six figures), or "—"
+    /// when the provider had no reading.</summary>
+    private static string FormatCount(int? count) =>
+        count is { } value ? value.ToString("N0", CultureInfo.InvariantCulture) : "—";
 
     /// <summary>Refreshes the uptime readout from the system tick count. <see cref="Environment.TickCount64"/>
     /// is milliseconds since boot and, unlike the 32-bit <c>TickCount</c>, does not wrap.</summary>
@@ -424,7 +442,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Cached is not a field of the sample: GlobalMemoryStatusEx doesn't report it, and the sampler
         // behind this feed is shared with Dashboard/Processes. It's a separate absolute psapi read taken
         // on the same tick, so it re-times, pauses and refreshes with its neighbours.
-        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemCacheProvider.ReadCachedBytes());
+        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemPerformanceProvider.Read()?.CachedBytes);
     }
 
     private async Task LoadMemoryInfoAsync() {
@@ -529,6 +547,21 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// GPU reads "128 MB" rather than "0.1 GB".</summary>
     private static string FormatVram(ulong? bytes) =>
         bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
+
+    /// <summary>Follows the Settings refresh interval: retimes the page-local samplers so their charts stay
+    /// in step with the shared feeds', and restates the window every caption claims.</summary>
+    private void OnIntervalChanged(TimeSpan interval) {
+        _throughputTimer.Interval = interval;
+        ApplyChartWindow();
+    }
+
+    /// <summary>Rewrites every row's caption for the current window. Called at construction, whenever the
+    /// interval changes, and after new rows are built (they inherit the current window).</summary>
+    private void ApplyChartWindow() {
+        var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
+        foreach (var row in Resources)
+            row.ChartCaption = $"{row.ChartSubject} over {window}";
+    }
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
@@ -744,9 +777,10 @@ public partial class PerformanceViewModel : ViewModelBase,
         return $"{value} MB/s";
     }
 
-    /// <summary>Network subscription callback: append the download rate to the history, then refresh.</summary>
+    /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
     private void OnNetwork(NetworkSample sample) {
         MetricChannel.PushHistory(_downHistory, sample.DownMbps);
+        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
         UpdateNetwork(sample);
     }
 
@@ -758,18 +792,21 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     private void UpdateNetwork(NetworkSample sample) {
-        // Each readout auto-scales to its own value so a small flow shows kbps beside a large one — the
-        // rail value + unit and the Receive/Send tiles all read through the shared DataRateFormatter.
-        var (downValue, downUnit) = DataRateFormatter.Split(sample.DownMbps);
+        // Receive and Send share one unit, taken from the larger of the two, so the pair is directly
+        // comparable — the rule DataRateFormatter prescribes for values on a shared axis.
+        var (downValue, upValue, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
         _networkRow.ValueText = downValue;
-        _networkRow.Unit = downUnit;
-        _netReceiveTile.Value = $"{downValue} {downUnit}";
-        _netSendTile.Value = DataRateFormatter.Format(sample.UpMbps);
+        _networkRow.Unit = unit;
+        _netReceiveTile.Value = $"{downValue} {unit}";
+        _netSendTile.Value = $"{upValue} {unit}";
 
-        // The chart has no natural 0–100 axis, so normalise against the rolling receive peak (with
-        // headroom and a floor, like the Dashboard) so the filled area still spans the fixed axis.
-        _networkRow.Points = SparklinePoints.Build(
-            _downHistory, ChartScale.FitAxis(_downHistory, floor: MinNetworkScaleMbps));
+        // The chart has no natural 0–100 axis, so normalise against the rolling peak of BOTH directions
+        // (with headroom and a floor, like the Dashboard) and draw them on that one axis — Task Manager's
+        // adapter pane shows send and receive together, and a receive-only chart under the adapter's name
+        // reads as its whole throughput.
+        var axis = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
+        _networkRow.Points = SparklinePoints.Build(_downHistory, axis);
+        _networkRow.Points2 = SparklinePoints.Build(_upHistory, axis);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }
@@ -838,6 +875,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     public void Dispose() {
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
+        _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;
         _cpuRow.PropertyChanged -= OnResourceDetailChanged;

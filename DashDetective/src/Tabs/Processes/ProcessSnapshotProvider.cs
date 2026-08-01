@@ -39,6 +39,10 @@ public static class ProcessSnapshotProvider {
         // Per-process GPU% for this interval (PID → %), read once off the same PDH query.
         var gpuByPid = ProcessGpuSampler.Sample();
 
+        // Per-process private working set (PID → bytes) — Task Manager's Memory column. Read once for the
+        // whole snapshot; see ProcessMemorySampler for why the managed Process properties can't supply it.
+        var memoryByPid = ProcessMemorySampler.Sample();
+
         // Parent PIDs + App/Background/Windows categories for this instant (window ownership + session),
         // captured once so each process below is just a lookup. See ProcessClassifier.
         var classification = ProcessClassifier.Capture();
@@ -59,7 +63,12 @@ public static class ProcessSnapshotProvider {
                     nextCpuTime[pid] = cpuTime;
 
                     var cpuPercent = ComputeCpuPercent(pid, cpuTime, wallSeconds);
-                    var memory = SafeWorkingSet(process);
+                    // Fall back to the total working set only when PDH didn't report this process (it
+                    // started between the two reads, or the counters are unavailable). That reads high —
+                    // it counts shared pages — but it beats blanking the cell.
+                    var memory = memoryByPid.TryGetValue(pid, out var privateBytes)
+                        ? privateBytes
+                        : SafeWorkingSet(process);
                     var threads = SafeThreadCount(process);
                     var status = SafeResponding(process) ? "Running" : "Not responding";
                     var category = classification.CategoryOf(pid);

@@ -54,6 +54,46 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
+        <!-- ===== Drive picker (Disk Activity header) ===== -->
+        <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
+             deliberately light — it sits inside a panel header, so it reads as part of the title rather
+             than as a form control. Mirrors File Explorer's Options toggle. -->
+        <Style Selector="ToggleButton.drivePick">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="ToggleButton.drivePick /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ToggleButton.drivePick:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="ToggleButton.drivePick:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="ToggleButton.drivePick TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <!-- One drive in the dropdown; the current one is marked rather than highlighted. -->
+        <Style Selector="Border.driveOption">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.driveOption:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Border.driveOption TextBlock">
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+        <Style Selector="Border.driveOption.selected TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+        </Style>
         <!-- Disk Activity stat blocks: a muted label over a larger value. -->
         <Style Selector="TextBlock.diskStatLabel">
             <Setter Property="FontSize" Value="12"/>
@@ -178,11 +218,61 @@
             </Border>
 
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
-                 area fill, like the Dashboard), over three readouts. The title carries the real system-drive
-                 letter (see DiskActivityTitle); the readouts come from the shared _Total storage feed. -->
+                 area fill, like the Dashboard), over three readouts. Chart, title and readouts all describe
+                 the drive card selected above — one real physical disk, not the _Total average. -->
             <Border Classes="panel" MinWidth="280">
                 <StackPanel Spacing="12">
-                    <TextBlock Classes="panelTitle" Text="{Binding DiskActivityTitle}"/>
+                    <!-- Title + the drive on show. With several drives the name becomes a chevron toggle
+                         that lists the others; with one there is nothing to switch to, so it stays text. -->
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <TextBlock Classes="panelTitle" Text="Disk Activity" VerticalAlignment="Center"/>
+                        <TextBlock Classes="panelTitle" Text="—" Margin="6,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextMuted}"/>
+                        <TextBlock Classes="panelTitle" VerticalAlignment="Center"
+                                   IsVisible="{Binding !HasMultipleDrives}"
+                                   Text="{Binding SelectedDrive.Name}"/>
+                        <Panel IsVisible="{Binding HasMultipleDrives}">
+                            <ToggleButton x:Name="DriveButton" Classes="drivePick"
+                                          IsChecked="{Binding DrivePickerOpen, Mode=TwoWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding SelectedDrive.Name}"/>
+                                    <TextBlock Text="▾"/>
+                                </StackPanel>
+                            </ToggleButton>
+                            <!-- Light dismiss closes it on an outside click; picking a drive closes it
+                                 through DrivePickerOpen, which SelectDrive clears. -->
+                            <Popup PlacementTarget="{Binding #DriveButton}"
+                                   Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+                                   IsLightDismissEnabled="True"
+                                   IsOpen="{Binding DrivePickerOpen, Mode=TwoWay}">
+                                <Border Background="{DynamicResource CardBackground}"
+                                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                        CornerRadius="8" Padding="6" MinWidth="200"
+                                        BoxShadow="0 8 24 0 #22000000">
+                                    <ItemsControl ItemsSource="{Binding Drives}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:DriveCard">
+                                                <Button Classes="bare" Command="{Binding SelectCommand}"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Stretch">
+                                                    <Border Classes="driveOption"
+                                                            Classes.selected="{Binding IsSelected}">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
+                                                                       IsVisible="{Binding IsSelected}"
+                                                                       Foreground="{DynamicResource Accent}"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                            </Popup>
+                        </Panel>
+                    </StackPanel>
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
