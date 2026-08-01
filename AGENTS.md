@@ -56,10 +56,16 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** Folders, System Tools and Diagnostics (parameterised ping/tracert and the
-  elevated `sfc /scannow`) authored. Docs & Links is still to come, as are the per-row
+- **Catalog progress:** all four categories authored — Folders, System Tools, Diagnostics (parameterised
+  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Still to come: the per-row
   copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
   above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- **Docs & Links rows are labelled by title, not URL** (a Learn URL ellipsizes to nothing in the row's
+  mono label); the URL still reaches the Execution Log through `ToolkitAction.CommandLine`, so what was
+  opened is on the record. Every URL was **fetched and confirmed live** when authored — one candidate
+  (`troubleshoot/.../use-system-file-checker-tool`) was a 404 and was replaced by the
+  `windows-commands/sfc` reference. A test pins that every link is `https://`, since the runner refuses
+  anything else and a non-https row could only ever be a dead button.
 - **`sfc /scannow` is the only row that elevates**, and `ToolkitCatalogTests` pins that set **by name** —
   adding another must be a deliberate edit to that test, not something that slips in. It is `Elevated`
   rather than `Capture` for two independent reasons: Windows will not redirect a `runas` process's

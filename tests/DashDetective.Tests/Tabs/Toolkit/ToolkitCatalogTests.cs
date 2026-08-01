@@ -119,6 +119,25 @@ public class ToolkitCatalogTests {
 
     /// <summary>Nothing outside Docs &amp; Links opens a browser, and nothing inside it does anything
     /// else — a mis-filed link would send the user to the web from a row that reads as a local tool.</summary>
+    /// <summary>The runner refuses anything that is not https, so a catalog link that is not https is a
+    /// row that can only ever fail. Catching it here means it never ships as a dead button.</summary>
+    [Fact]
+    public void Entries_EveryDocumentationLinkIsHttps() {
+        var links = ToolkitCatalog.Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl).ToList();
+
+        Assert.NotEmpty(links);
+        Assert.All(links, entry => Assert.StartsWith(
+            "https://", entry.Action.Target, StringComparison.Ordinal));
+    }
+
+    /// <summary>A link row is labelled by title, so the URL would otherwise be invisible on the page.
+    /// It reaches the log through the action's command line, which is what puts it on the record.</summary>
+    [Fact]
+    public void Entries_DocumentationLinksCarryTheUrlOnTheirCommandLine() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl),
+                   entry => Assert.Equal(entry.Action.Target, entry.Action.CommandLine));
+    }
+
     [Fact]
     public void Entries_OpenUrlIsUsedOnlyByDocumentationLinks() {
         Assert.All(ToolkitCatalog.Entries, entry => Assert.Equal(

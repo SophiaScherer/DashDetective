@@ -78,6 +78,22 @@ public static class ToolkitCatalog {
         // It also runs for many minutes, which a captured command's timeout would cut short.
         Diagnostic("sfc /scannow", "Scans and repairs protected system files — needs administrator",
                    ToolkitAction.Elevated("sfc", "/scannow")),
+
+        // ----- Docs & Links -----
+        // Each one backs a row above it, so the tab explains as well as runs. Every URL was checked to
+        // resolve when it was authored; the runner refuses anything that is not https:// regardless.
+        Doc("Windows commands A–Z", "Reference for every built-in console command",
+            "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/windows-commands"),
+        Doc("ipconfig reference", "Every ipconfig switch, including /all and /flushdns",
+            "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ipconfig"),
+        Doc("sfc reference", "What System File Checker scans, and the repair options it takes",
+            "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sfc"),
+        Doc("Device Manager error codes", "What each yellow-exclamation code on a device means",
+            "https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-manager-error-messages"),
+        Doc("Known folder reference", "What AppData, Roaming, Local and the rest are actually for",
+            "https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid"),
+        Doc("wevtutil reference", "Query, export and clear the event logs from the command line",
+            "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil"),
     ];
 
     /// <summary>A row that opens a folder in Explorer — the shape every Folders entry takes.</summary>
@@ -105,6 +121,13 @@ public static class ToolkitCatalog {
         string command, string description, ToolkitAction action, ToolkitParameter? parameter = null) =>
         new(command, description, ToolkitCategory.Diagnostics, ToolkitEntryKind.Command, action,
             parameter);
+
+    /// <summary>A documentation link. Labelled by title rather than URL — a Learn URL would ellipsize
+    /// to nothing in the row's mono label. The URL still shows in the Execution Log's "$" line, so what
+    /// was opened is on the record.</summary>
+    private static ToolkitEntry Doc(string title, string description, string url) =>
+        new(title, description, ToolkitCategory.DocsAndLinks, ToolkitEntryKind.Link,
+            ToolkitAction.OpenUrl(url));
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [
