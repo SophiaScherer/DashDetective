@@ -221,8 +221,8 @@
                 </StackPanel>
             </Border>
 
-            <!-- Stat tiles: four resource-specific readouts (design comp's statMap), wrapping to
-                 two rows once a tile would fall under 150px. -->
+            <!-- Stat tiles: the selected resource's readouts (design comp's statMap) — four for most,
+                 six for CPU — wrapping to further rows once a tile would fall under 150px. -->
             <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

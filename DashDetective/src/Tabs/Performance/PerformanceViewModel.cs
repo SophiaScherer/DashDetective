@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -86,6 +85,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _cpuUtilTile;
     private readonly StatTile _cpuSpeedTile;
     private readonly StatTile _cpuProcessesTile;
+    private readonly StatTile _cpuThreadsTile;
+    private readonly StatTile _cpuHandlesTile;
     private readonly StatTile _cpuUptimeTile;
 
     // CPU current clock: a page-local sampler reads the % Processor Performance ratio (the shared CPU feed
@@ -145,12 +146,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Build the stat tiles first, then the resource rows (their initial charts come from the all-zero
         // histories), then subscribe to the shared metrics.
 
-        // CPU — live. Every tile updates: Utilization / Processes / Up time on the shared CPU tick, Speed
-        // on the throughput timer from the page-local frequency sampler (base clock × the % Processor
-        // Performance ratio, like Task Manager). Speed starts at "—" until the first reading.
+        // CPU — live. Every tile updates: Utilization / Processes / Threads / Handles / Up time on the
+        // shared CPU tick, Speed on the throughput timer from the page-local frequency sampler (base clock ×
+        // the % Processor Performance ratio, like Task Manager). Speed starts at "—" until the first reading.
         _cpuUtilTile = new StatTile("Utilization", "0 %");
         _cpuSpeedTile = new StatTile("Speed", "—");
         _cpuProcessesTile = new StatTile("Processes", "0");
+        _cpuThreadsTile = new StatTile("Threads", "0");
+        _cpuHandlesTile = new StatTile("Handles", "0");
         _cpuUptimeTile = new StatTile("Up time", "0m");
 
         // Memory — live. All four tiles update every tick: In use / Available / Committed come from the
@@ -169,8 +172,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
                                   SparklinePoints.Build(_cpuHistory, 100),
                                   new[] {
-                                      _cpuUtilTile, _cpuSpeedTile,
-                                      _cpuProcessesTile, _cpuUptimeTile,
+                                      _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
+                                      _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select);
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
@@ -317,11 +320,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
-    /// plus the live process count and uptime tiles (all keyed off the CPU tick).</summary>
+    /// plus the live process/thread/handle counts and uptime tiles (all keyed off the CPU tick).</summary>
     private void OnCpu(double value) {
         MetricChannel.PushHistory(_cpuHistory, value);
         UpdateCpu(value);
-        UpdateCpuProcesses();
+        UpdateCpuCounts();
         UpdateCpuUptime();
     }
 
@@ -338,18 +341,20 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.Points = SparklinePoints.Build(_cpuHistory, 100);
     }
 
-    /// <summary>Updates the live process count. <see cref="Process.GetProcesses"/> returns disposable
-    /// handles, so they're released immediately after counting.</summary>
-    private void UpdateCpuProcesses() {
-        try {
-            var processes = Process.GetProcesses();
-            _cpuProcessesTile.Value = processes.Length.ToString(CultureInfo.InvariantCulture);
-            foreach (var process in processes)
-                process.Dispose();
-        } catch {
-            _cpuProcessesTile.Value = "—";
-        }
+    /// <summary>Refreshes the live process / thread / handle counts — Task Manager's CPU-pane figures — from
+    /// one <see cref="SystemPerformanceProvider"/> read. A separate read from the Memory tick's (the two feeds
+    /// tick independently), but a single syscall each, against enumerating every process per second.</summary>
+    private void UpdateCpuCounts() {
+        var sample = SystemPerformanceProvider.Read();
+        _cpuProcessesTile.Value = FormatCount(sample?.ProcessCount);
+        _cpuThreadsTile.Value = FormatCount(sample?.ThreadCount);
+        _cpuHandlesTile.Value = FormatCount(sample?.HandleCount);
     }
+
+    /// <summary>Formats a system counter with thousands separators (handles run into six figures), or "—"
+    /// when the provider had no reading.</summary>
+    private static string FormatCount(int? count) =>
+        count is { } value ? value.ToString("N0", CultureInfo.InvariantCulture) : "—";
 
     /// <summary>Refreshes the uptime readout from the system tick count. <see cref="Environment.TickCount64"/>
     /// is milliseconds since boot and, unlike the 32-bit <c>TickCount</c>, does not wrap.</summary>
