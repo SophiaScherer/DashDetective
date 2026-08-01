@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -15,10 +16,12 @@ namespace DashDetective.Tabs.Toolkit;
 /// command column and the log panel scroll independently, so the log stays pinned in view.
 ///
 /// The list is narrowed by a category chip and a search box together, through
-/// <see cref="ToolkitFilter"/>. The command set is empty for now (see <see cref="ToolkitCatalog"/>),
-/// so what renders is the empty state.
+/// <see cref="ToolkitFilter"/>. Picking a row runs its <see cref="ToolkitEntry.Action"/> through
+/// <see cref="ToolkitRunner"/> and prepends what happened to the log; the view model never touches a
+/// process itself, and only ever runs actions authored in <see cref="ToolkitCatalog"/>.
 /// </summary>
 public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
+    private readonly ToolkitRunner _runner = new();
     private ToolkitCategory? _category;
     private string? _pendingReveal;
 
@@ -104,6 +107,26 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Runs a command row and records the outcome in the Execution Log, newest first. Concurrent runs
+    /// are refused rather than queued: a second click while one is in flight would interleave two
+    /// stanzas, and the log reads as a transcript.
+    ///
+    /// Nothing here interprets the command — <see cref="ToolkitRunner"/> already returns display-ready
+    /// text for every outcome, including the failures.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task Run(ToolkitEntry? entry) {
+        if (entry is null)
+            return;
+
+        var result = await _runner.RunAsync(entry.Action);
+        Log.Insert(0, new ToolkitLogEntry(
+            DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
+            entry.Command,
+            result.Output));
     }
 
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>

@@ -30,10 +30,46 @@ public class ToolkitCatalogTests {
         Assert.Equal(labels.Count, labels.Distinct().Count());
     }
 
-    /// <summary>The tab ships as UI only — the command set is authored later, and this is the seam
-    /// that changes when it is.</summary>
+    /// <summary>Every row must say what it is and what it does — a blank description leaves the row
+    /// half-drawn and, because the search provider matches on it, unreachable by intent.</summary>
     [Fact]
-    public void Entries_AreEmptyUntilTheCommandSetIsAuthored() {
-        Assert.Empty(ToolkitCatalog.Entries);
+    public void Entries_AllCarryACommandAndADescription() {
+        Assert.NotEmpty(ToolkitCatalog.Entries);
+        Assert.All(ToolkitCatalog.Entries, entry => {
+            Assert.False(string.IsNullOrWhiteSpace(entry.Command));
+            Assert.False(string.IsNullOrWhiteSpace(entry.Description));
+        });
+    }
+
+    /// <summary>The command text is a row's identity: universal search reveals by it, and
+    /// <c>ToolkitView.FindRow</c> matches the first row whose Tag equals it. A duplicate would make one
+    /// of the pair permanently unreachable.</summary>
+    [Fact]
+    public void Entries_HaveDistinctCommands() {
+        var commands = ToolkitCatalog.Entries.Select(entry => entry.Command).ToList();
+
+        Assert.Equal(commands.Count, commands.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
+    public void Entries_AllCarryAnActionWithATarget() {
+        Assert.All(ToolkitCatalog.Entries,
+                   entry => Assert.False(string.IsNullOrWhiteSpace(entry.Action.Target)));
+    }
+
+    /// <summary>Every category the entries claim must be one the list actually renders, or the rows
+    /// filed under it would be dropped by <see cref="ToolkitFilter.Group"/> and never appear.</summary>
+    [Fact]
+    public void Entries_OnlyUseCategoriesTheListRenders() {
+        Assert.All(ToolkitCatalog.Entries,
+                   entry => Assert.Contains(entry.Category, ToolkitCatalog.Categories));
+    }
+
+    /// <summary>Elevation is opt-in per entry, so an accidental one is worth catching: only commands
+    /// explicitly expected to need admin may ask for it.</summary>
+    [Fact]
+    public void Entries_DoNotRequireElevationUnlessTheyOpenAFolder() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.Kind == ToolkitEntryKind.Folder),
+                   entry => Assert.False(entry.Action.RequiresElevation));
     }
 }

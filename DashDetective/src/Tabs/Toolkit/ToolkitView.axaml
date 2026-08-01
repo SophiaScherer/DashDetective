@@ -46,7 +46,6 @@
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="Padding" Value="14,12"/>
-            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <BrushTransition Property="Background" Duration="0:0:0.4"/>
@@ -58,6 +57,30 @@
         </Style>
         <Style Selector="Border.cmdRow.highlighted">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
+        <!-- The run affordance: a chrome-less button filling the row, so the whole thing is clickable
+             AND reachable by Tab. Being a real Button is what makes Enter work on a focused row — the
+             shortcut layer leaves Enter unconsumed (Activate falls through MainWindowViewModel's global
+             switch), so it arrives here natively and no IShortcutTarget case is needed. -->
+        <Style Selector="Button.rowRun">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.rowRun /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- A run in flight disables every row; dim only the one the pointer is not on, so the page
+             doesn't grey out wholesale. -->
+        <Style Selector="Button.rowRun:disabled">
+            <Setter Property="Opacity" Value="0.55"/>
         </Style>
 
         <!-- Uppercase section label above each category card. -->
@@ -189,50 +212,61 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
                                                 <Border Classes="cmdRow" Tag="{Binding Command}">
-                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                                                        <Border Grid.Column="0" Width="28" Height="28"
-                                                                CornerRadius="7"
-                                                                Background="{Binding BadgeBackground}">
-                                                            <Path Data="{Binding Icon}"
-                                                                  Stroke="{Binding BadgeForeground}"
-                                                                  StrokeThickness="1.4" StrokeLineCap="Round"
-                                                                  StrokeJoin="Round" Stretch="None"
-                                                                  HorizontalAlignment="Center"
-                                                                  VerticalAlignment="Center"/>
-                                                        </Border>
+                                                    <!-- The run button covers everything but the copy
+                                                         affordance, which stays a sibling: nesting a
+                                                         button inside a button would make the copy
+                                                         click run the command too. -->
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                        <Button Grid.Column="0" Classes="rowRun"
+                                                                ToolTip.Tip="{Binding Description}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                                                <Border Grid.Column="0" Width="28" Height="28"
+                                                                        CornerRadius="7"
+                                                                        Background="{Binding BadgeBackground}">
+                                                                    <Path Data="{Binding Icon}"
+                                                                          Stroke="{Binding BadgeForeground}"
+                                                                          StrokeThickness="1.4" StrokeLineCap="Round"
+                                                                          StrokeJoin="Round" Stretch="None"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                                </Border>
 
-                                                        <!-- Command over its description, both
-                                                             ellipsizing. This is the only flexible
-                                                             column, so a long command trims here
-                                                             instead of shouldering the badge out of
-                                                             the card. -->
-                                                        <StackPanel Grid.Column="1" Spacing="2"
-                                                                    VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Command}"
-                                                                       FontFamily="{StaticResource MonoFont}"
-                                                                       FontSize="13" FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource TextStrong}"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{Binding Description}"
-                                                                       FontSize="11.5"
-                                                                       Foreground="{DynamicResource TextSubtle}"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                        </StackPanel>
+                                                                <!-- Command over its description, both
+                                                                     ellipsizing. This is the only flexible
+                                                                     column, so a long command trims here
+                                                                     instead of shouldering the badge out of
+                                                                     the card. -->
+                                                                <StackPanel Grid.Column="1" Spacing="2"
+                                                                            VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Command}"
+                                                                               FontFamily="{StaticResource MonoFont}"
+                                                                               FontSize="13" FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource TextStrong}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Text="{Binding Description}"
+                                                                               FontSize="11.5"
+                                                                               Foreground="{DynamicResource TextSubtle}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                </StackPanel>
 
-                                                        <!-- The kind badge gets its own fixed column
-                                                             so it stays legible at any width, and the
-                                                             badges line up down the card. -->
-                                                        <Border Grid.Column="2" CornerRadius="10"
-                                                                Padding="7,2" VerticalAlignment="Center"
-                                                                Background="{Binding BadgeBackground}">
-                                                            <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
-                                                                       Foreground="{Binding BadgeForeground}"/>
-                                                        </Border>
+                                                                <!-- The kind badge gets its own fixed column
+                                                                     so it stays legible at any width, and the
+                                                                     badges line up down the card. -->
+                                                                <Border Grid.Column="2" CornerRadius="10"
+                                                                        Padding="7,2" VerticalAlignment="Center"
+                                                                        Background="{Binding BadgeBackground}">
+                                                                    <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
+                                                                               Foreground="{Binding BadgeForeground}"/>
+                                                                </Border>
+                                                            </Grid>
+                                                        </Button>
 
                                                         <!-- Copy affordance. Placed with the row it
-                                                             belongs to; wiring the clipboard is not
-                                                             part of this UI-only pass. -->
-                                                        <Button Grid.Column="3" Classes="rowAction"
+                                                             belongs to; wiring the clipboard comes in
+                                                             its own phase. -->
+                                                        <Button Grid.Column="1" Classes="rowAction"
                                                                 ToolTip.Tip="Copy command">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
                                                                   Stroke="{DynamicResource TextTertiary}"
@@ -250,15 +284,15 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Empty state. Covers both "no commands authored yet" and "the filter matched
-                     nothing", which read the same to the user: an empty list. -->
+                <!-- Empty state. Covers both a search that matched nothing and a category with no
+                     commands in it, which read the same to the user: an empty list. -->
                 <Border Classes="panel" VerticalAlignment="Top" Padding="16,40"
                         IsVisible="{Binding !HasCommands}">
                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                         <TextBlock Text="No commands to show" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Commands will appear here, grouped by category."
+                        <TextBlock Text="Try a different search term or category."
                                    FontSize="11.5" Foreground="{DynamicResource TextSubtle}"
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    HorizontalAlignment="Center"/>

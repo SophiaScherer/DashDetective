@@ -33,29 +33,35 @@ task explicitly assigns, and do not modify a live feature without an explicit sc
 patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
-drives/health view; status below), **Toolkit** (UI only; status below) and **Keyboard shortcuts**
+drives/health view; status below), **Toolkit** (in progress; status below) and **Keyboard shortcuts**
 (status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
 de-duplication / composition refactor) — write-ups in the Appendix.
 
-**Toolkit — implementation status** (UI ONLY):
+**Toolkit — implementation status** (IN PROGRESS — execution is live; the catalog is being authored):
 
 - **Toolkit** — the design document's **"Commands"** tab, shipped in the live app as **Toolkit** (nav
-  label, folder, namespace and type names; "Commands" is a design-doc-only name). Built in phases
-  (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`). It is the **ninth** tab,
+  label, folder, namespace and type names; "Commands" is a design-doc-only name). The UI was built in
+  phases (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`); execution and the
+  command set are being built in phases now (plan:
+  `C:\Users\User\.claude\plans\develop-a-phased-plan-sunny-crystal.md`). It is the **ninth** tab,
   sitting between Hardware and Settings, which is why the Ctrl+digit tab jumps now run **Ctrl+1 …
   Ctrl+9**.
-- **Only the UI exists.** `ToolkitCatalog.Entries` is deliberately **empty** — the design document's
-  command data was inaccurate, so no entries were authored — and **nothing runs a command**. The page
-  therefore renders its empty states. `ToolkitCatalog.Entries` is the single seam to change when the
-  command set is written; the filter, grouping, search provider and every container already work off it.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
   four categories (`ToolkitCategory` — Folders / System Tools / Diagnostics / Docs & Links) and five
   entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
-- **Deliberately unbuilt** (do NOT add without an explicit task): running a command, capturing its
-  output into the log, and the per-row copy-to-clipboard. The copy button is placed but inert; Clear
-  really does empty the log and is simply disabled while it is empty. Running arbitrary commands is a
-  **security-relevant** capability — treat it as its own task with its own sign-off, not a follow-on tidy.
+- **Execution is live.** Clicking a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
+  stanza to the Execution Log. **`ToolkitCatalog.Entries` is the app's allow-list**: the runner only ever
+  runs an action authored there, arguments reach the OS through `ProcessStartInfo.ArgumentList` rather
+  than a joined command line, and there is **no free-form command box anywhere — do not add one**.
+  Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
+  process's streams, so "elevated *and* captured" is not expressible.
+- **Catalog progress:** Folders authored. System Tools, Diagnostics (the capture path), parameterised
+  ping/tracert, elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row
+  copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
+  above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- The per-row copy button is still **placed but inert**; Clear really does empty the log and is simply
+  disabled while it is empty.
 - Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the
   comp's `position:sticky` has no Avalonia equivalent. Wired to `IShortcutTarget` (`ShortcutScope.Toolkit`,
   `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the
@@ -349,12 +355,16 @@ currently exist.
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Toolkit                  ToolkitView.axaml(.cs) + ToolkitViewModel.cs
-                                (UI ONLY — the design doc's "Commands" tab. Filter bar (search box +
-                                 category chips + count) over a grouped command list, beside a pinned
-                                 340px Execution Log. ISelfScrollingPage (each column scrolls itself)
-                                 + IShortcutTarget. No entries and no execution — see the Toolkit
-                                 status bullet under Current Scope. View code-behind owns the search
-                                 focus + the search-reveal flash, like ProcessesView/SettingsView)
+                                (the design doc's "Commands" tab. Filter bar (search box + category
+                                 chips + count) over a grouped command list, beside a pinned 340px
+                                 Execution Log. ISelfScrollingPage (each column scrolls itself) +
+                                 IShortcutTarget. Running a row is an async RelayCommand that refuses
+                                 concurrent runs and prepends one stanza to the log. View code-behind
+                                 owns the search focus + the search-reveal flash, like
+                                 ProcessesView/SettingsView. The row is a chrome-less Button so Enter
+                                 works on a focused row natively — ShortcutId.Activate falls through
+                                 MainWindowViewModel's global switch unconsumed, so no IShortcutTarget
+                                 case is needed. The copy button is a SIBLING of it, not nested)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
                                 ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —
@@ -368,8 +378,33 @@ currently exist.
                                 ToolkitLogEntry.cs      (record: Time / Command / Output — one console
                                                          stanza in the Execution Log)
                                 ToolkitCatalog.cs       (static copy table + the command set. Entries is
-                                                         EMPTY and is the one seam to change when the
-                                                         commands are authored)
+                                                         also the app's ALLOW-LIST — the runner only ever
+                                                         runs an action authored here)
+                                ToolkitActionKind.cs    (enum: OpenPath / OpenUrl / Launch / Capture /
+                                                         Elevated — how a row is carried out. An enum,
+                                                         not flags, so "elevated AND captured" cannot be
+                                                         expressed: Windows forbids redirecting a runas
+                                                         process's streams)
+                                ToolkitAction.cs        (immutable: target + argument LIST + timeout,
+                                                         built only via static factories. WithArgument
+                                                         appends exactly one element, so a parameterised
+                                                         entry's value can never split into a flag)
+                                ToolkitRunner.cs        (THE single entry point for running a row. Never
+                                                         throws — a missing tool, non-zero exit, timeout
+                                                         or declined UAC prompt all become worded
+                                                         failures. Expands env vars in the TARGET only;
+                                                         refuses any OpenUrl that isn't https://)
+                                ToolkitRunResult.cs     (record: Success / Output / ExitCode)
+                                ToolkitOutputFormatter.cs (pure statics: stream merge, CRLF normalising,
+                                                         console sign-off trim, 200-line / 16 KB caps with
+                                                         the trim announced, plus the outcome wording)
+                                IProcessLauncher.cs +   (the process seam + its real implementation — the
+                                SystemProcessLauncher.cs only place in the app that starts a process.
+                                                         Arguments go via ProcessStartInfo.ArgumentList,
+                                                         never the joined string. Both output streams are
+                                                         drained CONCURRENTLY and WITHOUT the timeout
+                                                         token, or a command that floods its pipe
+                                                         deadlocks and a killed one loses what it printed)
                                 ToolkitFilter.cs        (pure statics: Matches (chip AND term, over the
                                                          command and its description) + Group (buckets
                                                          into catalog order, dropping emptied sections).

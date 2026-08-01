@@ -12,7 +12,7 @@ public class ToolkitFilterTests {
         string command, string description = "",
         ToolkitCategory category = ToolkitCategory.SystemTools,
         ToolkitEntryKind kind = ToolkitEntryKind.Command) =>
-        new(command, description, category, kind);
+        new(command, description, category, kind, ToolkitAction.Launch(command));
 
     [Fact]
     public void Matches_BlankTermAndNoCategory_KeepsEverything() {
@@ -81,6 +81,6 @@ public class ToolkitFilterTests {
 
     [Fact]
     public void Group_NoEntries_ReturnsNoSections() {
-        Assert.Empty(ToolkitFilter.Group(ToolkitCatalog.Entries, null, null));
+        Assert.Empty(ToolkitFilter.Group([], null, null));
     }
 }
