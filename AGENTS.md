@@ -56,10 +56,15 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** Folders authored. System Tools, Diagnostics (the capture path), parameterised
+- **Catalog progress:** Folders and System Tools authored. Diagnostics (the capture path), parameterised
   ping/tracert, elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row
   copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
   above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
+  resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly
+  as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so
+  ShellExecute takes the first — `cplopen` → `control.exe` — which is why the launch must **not** set a
+  Verb unless it is deliberately elevating.
 - The per-row copy button is still **placed but inert**; Clear really does empty the log and is simply
   disabled while it is empty.
 - Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the

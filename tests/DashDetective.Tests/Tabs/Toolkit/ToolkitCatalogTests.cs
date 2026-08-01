@@ -65,11 +65,21 @@ public class ToolkitCatalogTests {
                    entry => Assert.Contains(entry.Category, ToolkitCatalog.Categories));
     }
 
-    /// <summary>Elevation is opt-in per entry, so an accidental one is worth catching: only commands
-    /// explicitly expected to need admin may ask for it.</summary>
+    /// <summary>Elevation is opt-in per entry and raises a UAC prompt, so an accidental one is worth
+    /// catching. Opening a folder, a link or a tool window never needs admin — only a console command
+    /// can legitimately ask for it.</summary>
     [Fact]
-    public void Entries_DoNotRequireElevationUnlessTheyOpenAFolder() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.Kind == ToolkitEntryKind.Folder),
-                   entry => Assert.False(entry.Action.RequiresElevation));
+    public void Entries_OnlyConsoleCommandsEverRequireElevation() {
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.Action.RequiresElevation),
+                   entry => Assert.Equal(ToolkitEntryKind.Command, entry.Kind));
+    }
+
+    /// <summary>Nothing outside Docs &amp; Links opens a browser, and nothing inside it does anything
+    /// else — a mis-filed link would send the user to the web from a row that reads as a local tool.</summary>
+    [Fact]
+    public void Entries_OpenUrlIsUsedOnlyByDocumentationLinks() {
+        Assert.All(ToolkitCatalog.Entries, entry => Assert.Equal(
+            entry.Action.Kind == ToolkitActionKind.OpenUrl,
+            entry.Category == ToolkitCategory.DocsAndLinks));
     }
 }

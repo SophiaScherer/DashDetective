@@ -28,12 +28,42 @@ public static class ToolkitCatalog {
         // The folder, not the file: hosts has no default association, so opening the file itself would
         // either fail or raise the "how do you want to open this?" picker.
         Folder(@"%windir%\System32\drivers\etc", "The folder holding the hosts file"),
+
+        // ----- System Tools -----
+        // Each is named by the command you would type in Run, with the friendly name in the description
+        // — the filter and universal search both match on the description, so "task scheduler" still
+        // finds taskschd.msc without the user knowing what it is called.
+        Tool("taskschd.msc", "Task Scheduler — create and inspect scheduled tasks"),
+        Tool("services.msc", "Services — start, stop and configure Windows services"),
+        Tool("devmgmt.msc", "Device Manager — installed hardware and driver status"),
+        Tool("eventvwr.msc", "Event Viewer — system, application and security logs"),
+        Tool("regedit", "Registry Editor — browse and edit the Windows registry"),
+        Tool("cleanmgr", "Disk Cleanup — reclaim space from temporary and system files"),
+        Tool("resmon", "Resource Monitor — live CPU, memory, disk and network detail"),
+        Tool("msconfig", "System Configuration — boot options and startup services"),
+        Tool("dxdiag", "DirectX Diagnostic — graphics, sound and input diagnostics"),
+
+        Panel("ncpa.cpl", "Network Connections — adapters and their properties"),
+        Panel("appwiz.cpl", "Programs and Features — installed programs"),
     ];
 
     /// <summary>A row that opens a folder in Explorer — the shape every Folders entry takes.</summary>
     private static ToolkitEntry Folder(string path, string description) =>
         new(path, description, ToolkitCategory.Folders, ToolkitEntryKind.Folder,
             ToolkitAction.OpenPath(path));
+
+    /// <summary>A standalone tool or MMC console. Launched through the shell rather than resolved to a
+    /// full path, so the <c>.msc</c> association picks up <c>mmc</c> and the bare names resolve off
+    /// <c>System32</c> on the PATH — the same way typing them into Run does.</summary>
+    private static ToolkitEntry Tool(string command, string description) =>
+        new(command, description, ToolkitCategory.SystemTools, ToolkitEntryKind.App,
+            ToolkitAction.Launch(command));
+
+    /// <summary>A Control Panel applet. Same launch path as <see cref="Tool"/>; the separate kind is
+    /// what gives it its own badge and colour.</summary>
+    private static ToolkitEntry Panel(string command, string description) =>
+        new(command, description, ToolkitCategory.SystemTools, ToolkitEntryKind.Panel,
+            ToolkitAction.Launch(command));
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [
