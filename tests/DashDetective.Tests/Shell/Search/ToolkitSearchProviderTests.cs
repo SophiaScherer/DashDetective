@@ -17,11 +17,11 @@ namespace DashDetective.Tests.Shell.Search;
 public class ToolkitSearchProviderTests {
     private static readonly IReadOnlyList<ToolkitEntry> Sample = [
         new("ipconfig /flushdns", "Clears the DNS resolver cache",
-            ToolkitCategory.Terminal, ToolkitEntryKind.Command),
+            ToolkitCategory.Diagnostics, ToolkitEntryKind.Command),
         new("ncpa.cpl", "Opens the network adapter list",
             ToolkitCategory.SystemTools, ToolkitEntryKind.Panel),
         new("shell:startup", "Opens the folder ipconfig knows nothing about",
-            ToolkitCategory.FileLocations, ToolkitEntryKind.Folder),
+            ToolkitCategory.Folders, ToolkitEntryKind.Folder),
     ];
 
     private static Task<IReadOnlyList<SearchResult>> Query(

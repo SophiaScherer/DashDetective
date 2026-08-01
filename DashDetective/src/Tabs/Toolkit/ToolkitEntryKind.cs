@@ -9,4 +9,5 @@ public enum ToolkitEntryKind {
     App,
     Command,
     Panel,
+    Link,
 }

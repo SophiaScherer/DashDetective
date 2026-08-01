@@ -16,18 +16,18 @@ public static class ToolkitCatalog {
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [
-        ToolkitCategory.FileLocations,
+        ToolkitCategory.Folders,
         ToolkitCategory.SystemTools,
-        ToolkitCategory.Terminal,
-        ToolkitCategory.Maintenance,
+        ToolkitCategory.Diagnostics,
+        ToolkitCategory.DocsAndLinks,
     ];
 
     /// <summary>The label a category reads as, on its section header and its filter chip.</summary>
     public static string HeaderFor(ToolkitCategory category) => category switch {
-        ToolkitCategory.FileLocations => "File Locations",
+        ToolkitCategory.Folders => "Folders",
         ToolkitCategory.SystemTools => "System Tools",
-        ToolkitCategory.Terminal => "Terminal",
-        _ => "Maintenance",
+        ToolkitCategory.Diagnostics => "Diagnostics",
+        _ => "Docs & Links",
     };
 
     /// <summary>The badge a kind reads as, on the row beside the command.</summary>
@@ -35,6 +35,7 @@ public static class ToolkitCatalog {
         ToolkitEntryKind.Folder => "Folder",
         ToolkitEntryKind.App => "App",
         ToolkitEntryKind.Panel => "Panel",
+        ToolkitEntryKind.Link => "Link",
         _ => "Command",
     };
 }

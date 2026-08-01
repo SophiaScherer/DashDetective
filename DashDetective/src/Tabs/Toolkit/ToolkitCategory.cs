@@ -5,8 +5,8 @@ namespace DashDetective.Tabs.Toolkit;
 /// section per value, in this order, and the filter chips follow it.
 /// </summary>
 public enum ToolkitCategory {
-    FileLocations,
+    Folders,
     SystemTools,
-    Terminal,
-    Maintenance,
+    Diagnostics,
+    DocsAndLinks,
 }

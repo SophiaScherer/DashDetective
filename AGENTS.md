@@ -50,8 +50,8 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   command set is written; the filter, grouping, search provider and every container already work off it.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
-  four categories (`ToolkitCategory`) and four entry kinds (`ToolkitEntryKind`, each with a badge
-  label, colour and glyph) exist and are tested.
+  four categories (`ToolkitCategory` — Folders / System Tools / Diagnostics / Docs & Links) and five
+  entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
 - **Deliberately unbuilt** (do NOT add without an explicit task): running a command, capturing its
   output into the log, and the per-row copy-to-clipboard. The copy button is placed but inert; Clear
   really does empty the log and is simply disabled while it is empty. Running arbitrary commands is a
@@ -357,8 +357,8 @@ currently exist.
                                  focus + the search-reveal flash, like ProcessesView/SettingsView)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
-                                ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel — what a
-                                                         command opens, driving its icon + badge)
+                                ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —
+                                                         what a command opens, driving its icon + badge)
                                 ToolkitEntry.cs         (immutable row model; its Icon/Badge* getters
                                                          resolve through ToolkitIcons ON READ, so the
                                                          filter/catalog tests never load geometry)

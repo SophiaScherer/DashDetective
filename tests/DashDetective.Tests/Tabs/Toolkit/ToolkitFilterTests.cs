@@ -36,38 +36,38 @@ public class ToolkitFilterTests {
 
     [Fact]
     public void Matches_CategoryAndTerm_MustBothHold() {
-        var entry = Entry("cleanup", category: ToolkitCategory.Maintenance);
+        var entry = Entry("cleanup", category: ToolkitCategory.DocsAndLinks);
 
-        Assert.True(ToolkitFilter.Matches(entry, ToolkitCategory.Maintenance, "clean"));
-        Assert.False(ToolkitFilter.Matches(entry, ToolkitCategory.Terminal, "clean"));
-        Assert.False(ToolkitFilter.Matches(entry, ToolkitCategory.Maintenance, "nothing"));
+        Assert.True(ToolkitFilter.Matches(entry, ToolkitCategory.DocsAndLinks, "clean"));
+        Assert.False(ToolkitFilter.Matches(entry, ToolkitCategory.Diagnostics, "clean"));
+        Assert.False(ToolkitFilter.Matches(entry, ToolkitCategory.DocsAndLinks, "nothing"));
     }
 
     [Fact]
     public void Group_OrdersSectionsByTheCatalogNotTheEntryList() {
         var entries = new[] {
-            Entry("c", category: ToolkitCategory.Maintenance),
-            Entry("a", category: ToolkitCategory.FileLocations),
-            Entry("b", category: ToolkitCategory.Terminal),
+            Entry("c", category: ToolkitCategory.DocsAndLinks),
+            Entry("a", category: ToolkitCategory.Folders),
+            Entry("b", category: ToolkitCategory.Diagnostics),
         };
 
         var groups = ToolkitFilter.Group(entries, null, null);
 
         Assert.Equal(
-            [ToolkitCategory.FileLocations, ToolkitCategory.Terminal, ToolkitCategory.Maintenance],
+            [ToolkitCategory.Folders, ToolkitCategory.Diagnostics, ToolkitCategory.DocsAndLinks],
             groups.Select(g => g.Category));
     }
 
     [Fact]
     public void Group_DropsASectionTheFilterEmptied() {
         var entries = new[] {
-            Entry("keep", category: ToolkitCategory.Terminal),
-            Entry("drop", category: ToolkitCategory.Maintenance),
+            Entry("keep", category: ToolkitCategory.Diagnostics),
+            Entry("drop", category: ToolkitCategory.DocsAndLinks),
         };
 
         var groups = ToolkitFilter.Group(entries, null, "keep");
 
-        Assert.Equal(ToolkitCategory.Terminal, Assert.Single(groups).Category);
+        Assert.Equal(ToolkitCategory.Diagnostics, Assert.Single(groups).Category);
     }
 
     [Fact]
