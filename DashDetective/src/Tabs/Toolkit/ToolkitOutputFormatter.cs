@@ -28,6 +28,11 @@ public static class ToolkitOutputFormatter {
     /// on some builds) — still a success, and the log must not look broken.</summary>
     public const string NoOutput = "Completed with no output.";
 
+    /// <summary>Shown in a stanza while its command is still running. A captured command can take
+    /// seconds (<c>systeminfo</c> queries the hotfix list), and a log that stayed empty until it
+    /// finished would read as a dead button.</summary>
+    public const string Running = "Running…";
+
     /// <summary>A folder or location handed to Explorer.</summary>
     public const string Opened = "Opened.";
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -45,6 +46,19 @@ public static class ToolkitCatalog {
 
         Panel("ncpa.cpl", "Network Connections — adapters and their properties"),
         Panel("appwiz.cpl", "Programs and Features — installed programs"),
+
+        // ----- Diagnostics -----
+        // The first rows whose output lands in the Execution Log. All run as the current user — none of
+        // these needs admin, which is why they can be captured at all (an elevated run cannot be).
+        Diagnostic("ipconfig /all", "Full IP configuration for every adapter",
+                   ToolkitAction.Capture("ipconfig", "/all")),
+        Diagnostic("ipconfig /flushdns", "Clears the DNS resolver cache",
+                   ToolkitAction.Capture("ipconfig", "/flushdns")),
+
+        // A cold systeminfo routinely runs past the default 20s — it queries the hotfix list and the
+        // network stack — so it gets its own limit rather than being reported as a timeout.
+        Diagnostic("systeminfo", "Full OS, hardware and hotfix summary",
+                   ToolkitAction.Capture("systeminfo").WithTimeout(TimeSpan.FromSeconds(90))),
     ];
 
     /// <summary>A row that opens a folder in Explorer — the shape every Folders entry takes.</summary>
@@ -64,6 +78,12 @@ public static class ToolkitCatalog {
     private static ToolkitEntry Panel(string command, string description) =>
         new(command, description, ToolkitCategory.SystemTools, ToolkitEntryKind.Panel,
             ToolkitAction.Launch(command));
+
+    /// <summary>A console command whose output is captured into the Execution Log. The action is passed
+    /// in rather than derived from the label: the row reads as one command line, but the runner needs it
+    /// already split into a file name and separate arguments.</summary>
+    private static ToolkitEntry Diagnostic(string command, string description, ToolkitAction action) =>
+        new(command, description, ToolkitCategory.Diagnostics, ToolkitEntryKind.Command, action);
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [

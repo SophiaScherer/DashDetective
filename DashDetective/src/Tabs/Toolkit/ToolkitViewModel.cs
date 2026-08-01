@@ -112,7 +112,13 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>
     /// Runs a command row and records the outcome in the Execution Log, newest first. Concurrent runs
     /// are refused rather than queued: a second click while one is in flight would interleave two
-    /// stanzas, and the log reads as a transcript.
+    /// stanzas, and the log reads as a transcript. Refusing them also disables every row's button for
+    /// the duration (the generated command reports <c>CanExecute</c> false while it runs), which is the
+    /// page's whole busy state — no separate flag to keep in step.
+    ///
+    /// The stanza is written **before** the command runs and replaced in place when it finishes, so a
+    /// slow capture reads as in-flight rather than as a dead button. That is how a terminal transcript
+    /// behaves anyway, which is why this needs no spinner of its own.
     ///
     /// Nothing here interprets the command — <see cref="ToolkitRunner"/> already returns display-ready
     /// text for every outcome, including the failures.
@@ -122,11 +128,19 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         if (entry is null)
             return;
 
+        // Stamped once, so the stanza keeps the time the command was *started* rather than jumping to
+        // the time it finished — which for a 90 s systeminfo would be a minute and a half out.
+        var time = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        var pending = new ToolkitLogEntry(time, entry.Command, ToolkitOutputFormatter.Running);
+        Log.Insert(0, pending);
+
         var result = await _runner.RunAsync(entry.Action);
-        Log.Insert(0, new ToolkitLogEntry(
-            DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
-            entry.Command,
-            result.Output));
+
+        // Reference equality, not the record's value equality: if the user cleared the log while the
+        // command was in flight, the placeholder is gone and the result goes with it — they asked for an
+        // empty log, so putting a stanza back would be ignoring them.
+        if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
+            Log[0] = new ToolkitLogEntry(time, entry.Command, result.Output);
     }
 
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>

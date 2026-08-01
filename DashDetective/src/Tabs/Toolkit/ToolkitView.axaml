@@ -77,10 +77,11 @@
         <Style Selector="Button.rowRun /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
-        <!-- A run in flight disables every row; dim only the one the pointer is not on, so the page
-             doesn't grey out wholesale. -->
+        <!-- Concurrent runs are refused, so a run in flight disables every row at once. Dimmed only
+             lightly: this is a second-or-two state for most commands, and greying the whole list hard
+             would read as the page having broken rather than as it being busy. -->
         <Style Selector="Button.rowRun:disabled">
-            <Setter Property="Opacity" Value="0.55"/>
+            <Setter Property="Opacity" Value="0.65"/>
         </Style>
 
         <!-- Uppercase section label above each category card. -->

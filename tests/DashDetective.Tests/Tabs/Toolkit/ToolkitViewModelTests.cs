@@ -89,6 +89,68 @@ public class ToolkitViewModelTests {
         Assert.Empty(vm.Log);
     }
 
+    /// <summary>The stanza appears before the command runs, so a slow capture reads as in-flight, and
+    /// the result replaces it rather than adding a second stanza.</summary>
+    [Fact]
+    public async Task Run_ShowsAPendingStanzaThenReplacesItInPlace() {
+        var vm = new ToolkitViewModel();
+        var entry = MissingTool();
+
+        var running = vm.RunCommand.ExecuteAsync(entry);
+
+        // The placeholder is written synchronously, before the first await inside the runner yields.
+        var pending = Assert.Single(vm.Log);
+        Assert.Equal(ToolkitOutputFormatter.Running, pending.Output);
+
+        await running;
+
+        var finished = Assert.Single(vm.Log);
+        Assert.NotEqual(ToolkitOutputFormatter.Running, finished.Output);
+        Assert.Equal(pending.Time, finished.Time);
+        Assert.Equal(entry.Command, finished.Command);
+    }
+
+    /// <summary>Clearing the log mid-run is an instruction, not a race: the result must not reappear in
+    /// a log the user just emptied.</summary>
+    [Fact]
+    public async Task Run_LogClearedWhileInFlight_DropsTheResult() {
+        var vm = new ToolkitViewModel();
+
+        var running = vm.RunCommand.ExecuteAsync(MissingTool());
+        vm.ClearLogCommand.Execute(null);
+        await running;
+
+        Assert.Empty(vm.Log);
+        Assert.False(vm.HasLog);
+    }
+
+    /// <summary>Refusing concurrent runs is the page's busy state: every row's button reports
+    /// CanExecute false for the duration, so there is no separate flag to drift out of step.</summary>
+    [Fact]
+    public async Task Run_WhileOneIsInFlight_TheRowsReportThemselvesUnavailable() {
+        var vm = new ToolkitViewModel();
+
+        var running = vm.RunCommand.ExecuteAsync(MissingTool());
+        Assert.False(vm.RunCommand.CanExecute(MissingTool()));
+
+        await running;
+
+        Assert.True(vm.RunCommand.CanExecute(MissingTool()));
+    }
+
+    /// <summary>The stanza keeps the time the command <b>started</b>: for a long capture, stamping it on
+    /// completion would put a time in the log that is well after the click that caused it.</summary>
+    [Fact]
+    public async Task Run_TimestampsTheStartNotTheFinish() {
+        var vm = new ToolkitViewModel();
+
+        var running = vm.RunCommand.ExecuteAsync(MissingTool());
+        var startedAt = vm.Log[0].Time;
+        await running;
+
+        Assert.Equal(startedAt, vm.Log[0].Time);
+    }
+
     [Fact]
     public async Task ClearLog_EmptiesItAndDisablesItsButton() {
         var vm = new ToolkitViewModel();

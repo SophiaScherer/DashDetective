@@ -56,10 +56,16 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** Folders and System Tools authored. Diagnostics (the capture path), parameterised
-  ping/tracert, elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row
-  copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
-  above — running commands is a **security-relevant** capability, not a follow-on tidy.
+- **Catalog progress:** Folders, System Tools and Diagnostics authored. Parameterised ping/tracert,
+  elevated `sfc /scannow` and Docs & Links are still to come, as are the per-row copy-to-clipboard,
+  pinned favourites and log export. Take these on **one phase at a time** per the plan above — running
+  commands is a **security-relevant** capability, not a follow-on tidy.
+- **The page has no separate busy flag, on purpose.** Refusing concurrent runs makes the generated
+  command report `CanExecute` false while one is in flight, which disables every row's button by itself.
+  The stanza is written to the log *before* the command runs and replaced **in place** on completion
+  (reference equality, so a log cleared mid-run drops the result rather than resurrecting it), and it
+  keeps the time the command **started** — stamping it on completion would put a 90 s `systeminfo` a
+  minute and a half away from the click that caused it.
 - System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
   resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly
   as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so
