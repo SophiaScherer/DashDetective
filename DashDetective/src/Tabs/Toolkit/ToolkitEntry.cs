@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -11,7 +12,7 @@ namespace DashDetective.Tabs.Toolkit;
 /// The visual getters resolve through <see cref="ToolkitIcons"/> **on read**, so an entry can be
 /// built and filtered in a headless test without loading any geometry.
 /// </summary>
-public sealed class ToolkitEntry {
+public sealed partial class ToolkitEntry : ObservableObject {
     public ToolkitEntry(
         string command, string description, ToolkitCategory category, ToolkitEntryKind kind,
         ToolkitAction action, ToolkitParameter? parameter = null) {
@@ -37,8 +38,13 @@ public sealed class ToolkitEntry {
     public ToolkitAction Action { get; }
 
     /// <summary>The row's editable slot, or null for the rows that take no input (nearly all of them).
-    /// The one mutable thing on an otherwise immutable entry, because the text box binds to it.</summary>
+    /// The text box binds to it, so it is mutable where the rest of the entry is not.</summary>
     public ToolkitParameter? Parameter { get; }
+
+    /// <summary>Whether the user has pinned this command to the top of the list. Observable so the star
+    /// redraws on the row that was clicked, without the whole list having to be rebuilt to show it.
+    /// Persisted by command text — see <see cref="ToolkitPins"/>.</summary>
+    [ObservableProperty] private bool _isPinned;
 
     /// <summary>Whether running this raises a UAC prompt, so the row can warn before it is clicked
     /// rather than surprising the user with a consent dialog.</summary>

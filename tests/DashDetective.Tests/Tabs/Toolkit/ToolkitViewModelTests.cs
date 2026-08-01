@@ -197,6 +197,93 @@ public class ToolkitViewModelTests {
         Assert.EndsWith(" example.com", vm.Log[0].Command, System.StringComparison.Ordinal);
     }
 
+    // ----- Pins -----
+    //
+    // Pin state lives on the catalog's shared entries (one Toolkit page exists, so they are its rows).
+    // These tests therefore start from a known state rather than assuming one, so they do not depend on
+    // the order they run in.
+
+    private static ToolkitViewModel Unpinned() {
+        var vm = new ToolkitViewModel();
+        vm.LoadPins("");
+        return vm;
+    }
+
+    private static ToolkitEntry Row(string command) =>
+        ToolkitCatalog.Entries.First(e => e.Command == command);
+
+    /// <summary>Pins are applied by command text, so a persisted pin still finds its row.</summary>
+    [Fact]
+    public void LoadPins_MarksTheNamedCommandsAndClearsTheRest() {
+        var vm = Unpinned();
+
+        vm.LoadPins(ToolkitPins.Encode(["%temp%"]));
+
+        Assert.True(Row("%temp%").IsPinned);
+        Assert.False(Row("%appdata%").IsPinned);
+
+        vm.LoadPins("");
+        Assert.All(ToolkitCatalog.Entries, entry => Assert.False(entry.IsPinned));
+    }
+
+    /// <summary>A settings file naming a command the catalog no longer carries must not fault the page
+    /// — the point of storing pins by text rather than by index.</summary>
+    [Fact]
+    public void LoadPins_NamingACommandThatNoLongerExists_IsIgnored() {
+        var vm = Unpinned();
+
+        vm.LoadPins(ToolkitPins.Encode(["a command that was removed", "%temp%"]));
+
+        Assert.True(Row("%temp%").IsPinned);
+        vm.LoadPins("");
+    }
+
+    [Fact]
+    public void TogglePin_PutsTheRowInThePinnedSectionAndBackAgain() {
+        var vm = Unpinned();
+        var entry = Row("%temp%");
+
+        vm.TogglePinCommand.Execute(entry);
+        Assert.True(entry.IsPinned);
+        Assert.Equal(ToolkitGroup.PinnedHeader, vm.Groups[0].Header);
+
+        vm.TogglePinCommand.Execute(entry);
+        Assert.False(entry.IsPinned);
+        Assert.NotEqual(ToolkitGroup.PinnedHeader, vm.Groups[0].Header);
+    }
+
+    /// <summary>Every pin change has to reach the settings store, or a pin survives only until the app
+    /// closes.</summary>
+    [Fact]
+    public void TogglePin_AnnouncesTheChangeSoItCanBePersisted() {
+        var vm = Unpinned();
+        var entry = Row("%temp%");
+        var announced = 0;
+        vm.PinsChanged += () => announced++;
+
+        vm.TogglePinCommand.Execute(entry);
+        var encoded = vm.EncodePins();
+        vm.TogglePinCommand.Execute(entry);
+
+        Assert.Equal(2, announced);
+        Assert.Equal(["%temp%"], ToolkitPins.Decode(encoded));
+        Assert.Equal("", vm.EncodePins());
+    }
+
+    [Fact]
+    public void EncodePins_RoundTripsThroughLoadPins() {
+        var vm = Unpinned();
+        vm.LoadPins(ToolkitPins.Encode(["%temp%", "regedit"]));
+
+        var encoded = vm.EncodePins();
+        vm.LoadPins("");
+        vm.LoadPins(encoded);
+
+        Assert.Equal(["%temp%", "regedit"],
+                     ToolkitCatalog.Entries.Where(e => e.IsPinned).Select(e => e.Command));
+        vm.LoadPins("");
+    }
+
     // ----- Copy -----
 
     /// <summary>What is copied is what would have run, so a paste into a terminal behaves the same as

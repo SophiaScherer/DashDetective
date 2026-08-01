@@ -176,6 +176,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Icons.Document, Icons.FileExplorer),
         ], _recents);
         _recents.Changed += Persist;
+        _toolkit.PinsChanged += Persist;
 
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
@@ -198,6 +199,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
         _fileExplorer.ShowHidden = settings.ShowHiddenFiles;
+        _toolkit.LoadPins(settings.PinnedCommands);
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
@@ -223,6 +225,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavCollapsed = Nav.IsCollapsed,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
+        PinnedCommands = _toolkit.EncodePins(),
         LaunchAtStartup = _settings.LaunchAtStartup,
         ShowInTray = _settings.ShowInTray,
         ResourceAlerts = _settings.ResourceAlerts,

@@ -57,9 +57,16 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
 - **Catalog progress:** all four categories authored — Folders, System Tools, Diagnostics (parameterised
-  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Still to come: the per-row
-  copy-to-clipboard, pinned favourites and log export. Take these on **one phase at a time** per the plan
-  above — running commands is a **security-relevant** capability, not a follow-on tidy.
+  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Only the **Execution Log export**
+  remains from the plan above.
+- **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
+  opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
+  text, not by index**, so a catalog that gains or loses a row between sessions cannot silently
+  re-point them; a pin naming a command that no longer exists is dropped when applied. A pinned row is
+  **lifted** into the Pinned section, not copied there — two rows carrying one command would break the
+  search reveal, which flashes the first row it matches. The chip and search term still apply to pinned
+  rows. Note `IsPinned` lives on the shared `ToolkitCatalog` entries (there is exactly one Toolkit page,
+  so they *are* its rows) — tests that touch pins must reset them rather than assume a clean slate.
 - **Docs & Links rows are labelled by title, not URL** (a Learn URL ellipsizes to nothing in the row's
   mono label); the URL still reaches the Execution Log through `ToolkitAction.CommandLine`, so what was
   opened is on the record. Every URL was **fetched and confirmed live** when authored — one candidate

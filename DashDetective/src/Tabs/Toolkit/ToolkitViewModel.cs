@@ -189,6 +189,43 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         return host.Length == 0 ? entry.Action : entry.Action.WithArgument(host);
     }
 
+    /// <summary>Raised when a pin is added or removed, so the composition root can persist it. Carries
+    /// nothing — the encoding is <see cref="EncodePins"/>'s to produce.</summary>
+    public event Action? PinsChanged;
+
+    /// <summary>Pins or unpins a command, lifting it into (or dropping it back out of) the Pinned
+    /// section. The list is rebuilt because the row physically moves between sections.</summary>
+    [RelayCommand]
+    private void TogglePin(ToolkitEntry? entry) {
+        if (entry is null)
+            return;
+
+        entry.IsPinned = !entry.IsPinned;
+        RebuildGroups();
+        PinsChanged?.Invoke();
+    }
+
+    /// <summary>The pinned commands as one persistable string, in catalog order.</summary>
+    public string EncodePins() {
+        var commands = new List<string>();
+        foreach (var entry in ToolkitCatalog.Entries)
+            if (entry.IsPinned)
+                commands.Add(entry.Command);
+
+        return ToolkitPins.Encode(commands);
+    }
+
+    /// <summary>Applies persisted pins at startup. A pin naming a command the catalog no longer carries
+    /// is simply dropped — pins are stored by command text precisely so a changed catalog cannot
+    /// re-point them at something else.</summary>
+    public void LoadPins(string? encoded) {
+        var pinned = new HashSet<string>(ToolkitPins.Decode(encoded), StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in ToolkitCatalog.Entries)
+            entry.IsPinned = pinned.Contains(entry.Command);
+
+        RebuildGroups();
+    }
+
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>
     [RelayCommand]
     private void ClearSearch() => Search = "";

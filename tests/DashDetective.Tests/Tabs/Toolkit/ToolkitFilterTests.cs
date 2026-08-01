@@ -53,7 +53,7 @@ public class ToolkitFilterTests {
 
         var groups = ToolkitFilter.Group(entries, null, null);
 
-        Assert.Equal(
+        Assert.Equal<ToolkitCategory?>(
             [ToolkitCategory.Folders, ToolkitCategory.Diagnostics, ToolkitCategory.DocsAndLinks],
             groups.Select(g => g.Category));
     }
@@ -67,7 +67,69 @@ public class ToolkitFilterTests {
 
         var groups = ToolkitFilter.Group(entries, null, "keep");
 
-        Assert.Equal(ToolkitCategory.Diagnostics, Assert.Single(groups).Category);
+        Assert.Equal(ToolkitCategory.Diagnostics, Assert.Single(groups).Category!.Value);
+    }
+
+    // ----- Pinned section -----
+
+    private static ToolkitEntry Pinned(
+        string command, ToolkitCategory category = ToolkitCategory.SystemTools) {
+        var entry = Entry(command, category: category);
+        entry.IsPinned = true;
+        return entry;
+    }
+
+    [Fact]
+    public void Group_NothingPinned_HasNoPinnedSection() {
+        var groups = ToolkitFilter.Group([Entry("a"), Entry("b")], null, null);
+
+        Assert.DoesNotContain(groups, g => g.Header == ToolkitGroup.PinnedHeader);
+    }
+
+    [Fact]
+    public void Group_PinnedEntries_LeadTheListInTheirOwnSection() {
+        var groups = ToolkitFilter.Group([Entry("plain"), Pinned("starred")], null, null);
+
+        Assert.Equal(ToolkitGroup.PinnedHeader, groups[0].Header);
+        Assert.Null(groups[0].Category);
+        Assert.Equal(["starred"], groups[0].Items.Select(e => e.Command));
+    }
+
+    /// <summary>Lifted, not copied: the same command must not appear in two sections, or the search
+    /// reveal — which flashes the first row carrying it — could only ever find one of them.</summary>
+    [Fact]
+    public void Group_APinnedEntry_LeavesItsCategorySectionRatherThanAppearingTwice() {
+        var groups = ToolkitFilter.Group(
+            [Pinned("starred", ToolkitCategory.Folders), Entry("plain", category: ToolkitCategory.Folders)],
+            null, null);
+
+        var everything = groups.SelectMany(g => g.Items).Select(e => e.Command).ToList();
+
+        Assert.Equal(["starred", "plain"], everything);
+        Assert.Single(everything, c => c == "starred");
+    }
+
+    [Fact]
+    public void Group_EveryEntryInACategoryPinned_DropsThatCategorySection() {
+        var groups = ToolkitFilter.Group([Pinned("only", ToolkitCategory.Folders)], null, null);
+
+        Assert.Equal(ToolkitGroup.PinnedHeader, Assert.Single(groups).Header);
+    }
+
+    /// <summary>The chip and the search box still apply to pinned rows, so narrowing to one category
+    /// does not drag unrelated pins onto the page with it.</summary>
+    [Fact]
+    public void Group_PinnedEntries_AreStillSubjectToTheChipAndTheTerm() {
+        ToolkitEntry[] entries = [
+            Pinned("folder-pin", ToolkitCategory.Folders),
+            Pinned("tool-pin", ToolkitCategory.SystemTools),
+        ];
+
+        var byChip = ToolkitFilter.Group(entries, ToolkitCategory.Folders, null);
+        Assert.Equal(["folder-pin"], byChip[0].Items.Select(e => e.Command));
+
+        var byTerm = ToolkitFilter.Group(entries, null, "tool");
+        Assert.Equal(["tool-pin"], byTerm[0].Items.Select(e => e.Command));
     }
 
     [Fact]
