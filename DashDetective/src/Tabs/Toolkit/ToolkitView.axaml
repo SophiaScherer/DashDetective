@@ -109,6 +109,18 @@
         <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
+        <!-- Copy confirmation. The glyph goes accent for a moment and fades back, so the click is not
+             silent — the same "flash then fade" the search reveal uses on a row. -->
+        <Style Selector="Button.rowAction Path">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Stroke" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.rowAction.copied Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
+        </Style>
 
         <!-- Chrome-less text button for the log panel's "Clear", so it reads as inline text rather
              than a control (as SharedStyles' pathToggle does on the path row). -->
@@ -315,7 +327,8 @@
                                                              belongs to; wiring the clipboard comes in
                                                              its own phase. -->
                                                         <Button Grid.Column="2" Classes="rowAction"
-                                                                ToolTip.Tip="Copy command">
+                                                                ToolTip.Tip="Copy command"
+                                                                Click="OnCopyClick">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
                                                                   Stroke="{DynamicResource TextTertiary}"
                                                                   StrokeThickness="1.3" StrokeJoin="Round"

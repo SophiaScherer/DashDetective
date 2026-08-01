@@ -91,8 +91,13 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so
   ShellExecute takes the first — `cplopen` → `control.exe` — which is why the launch must **not** set a
   Verb unless it is deliberately elevating.
-- The per-row copy button is still **placed but inert**; Clear really does empty the log and is simply
-  disabled while it is empty.
+- The per-row **copy button is live**: it copies `ToolkitViewModel.CopyTextFor` — the same resolved
+  command line the log would record — so a paste into a terminal does what clicking the row does, and a
+  documentation row yields its URL rather than its title. A refused or half-filled host box is left off
+  altogether rather than pasted as a dangling argument. It lives in the view code-behind because the
+  clipboard is reached through the window's `TopLevel`, as `SettingsView.OnCopyDiagnosticsClick` is;
+  `SetTextAsync` needs `using Avalonia.Input.Platform`. Success flashes the glyph accent for a second
+  (the click needs an answer, and the log is for what *ran*).
 - Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the
   comp's `position:sticky` has no Avalonia equivalent. Wired to `IShortcutTarget` (`ShortcutScope.Toolkit`,
   `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the

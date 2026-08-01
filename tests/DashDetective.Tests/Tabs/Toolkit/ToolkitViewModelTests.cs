@@ -197,6 +197,50 @@ public class ToolkitViewModelTests {
         Assert.EndsWith(" example.com", vm.Log[0].Command, System.StringComparison.Ordinal);
     }
 
+    // ----- Copy -----
+
+    /// <summary>What is copied is what would have run, so a paste into a terminal behaves the same as
+    /// clicking the row.</summary>
+    [Fact]
+    public void CopyTextFor_PlainRow_IsTheCommandItself() {
+        var vm = new ToolkitViewModel();
+
+        Assert.Equal("regedit-not-real", vm.CopyTextFor(MissingTool("regedit-not-real")));
+    }
+
+    [Fact]
+    public void CopyTextFor_ParameterisedRow_IncludesTheTypedHost() {
+        var vm = new ToolkitViewModel();
+
+        Assert.Equal("not-a-real-tool-xyz.exe example.com",
+                     vm.CopyTextFor(Parameterised("example.com")));
+    }
+
+    /// <summary>A half-filled or refused box leaves the argument off entirely rather than pasting a
+    /// command with a dangling blank on the end.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("-t")]
+    public void CopyTextFor_ParameterisedRowWithNothingUsable_OmitsTheArgument(string typed) {
+        var vm = new ToolkitViewModel();
+
+        Assert.Equal("not-a-real-tool-xyz.exe", vm.CopyTextFor(Parameterised(typed)));
+    }
+
+    /// <summary>A documentation row is labelled by title, so copying it must give the URL — copying
+    /// "sfc reference" would be useless in a browser.</summary>
+    [Fact]
+    public void CopyTextFor_DocumentationRow_IsTheUrlNotTheTitle() {
+        var vm = new ToolkitViewModel();
+        var doc = ToolkitCatalog.Entries.First(e => e.Kind == ToolkitEntryKind.Link);
+
+        var copied = vm.CopyTextFor(doc);
+
+        Assert.StartsWith("https://", copied, System.StringComparison.Ordinal);
+        Assert.NotEqual(doc.Command, copied);
+    }
+
     // ----- Elevation -----
 
     /// <summary>The shield is driven straight off the action, so a row cannot warn about a prompt it

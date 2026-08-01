@@ -154,9 +154,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             return;
         }
 
-        var action = entry.Parameter is { } bound
-            ? entry.Action.WithArgument(ToolkitHostValidator.Normalize(bound.Value))
-            : entry.Action;
+        var action = Bind(entry);
 
         // The "$" line shows the resolved command line, not the row's label: a parameterised label is a
         // placeholder ("ping <host>"), and a row may carry flags it does not spell out.
@@ -171,6 +169,24 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         // empty log, so putting a stanza back would be ignoring them.
         if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
             Log[0] = new ToolkitLogEntry(time, line, result.Output);
+    }
+
+    /// <summary>
+    /// What the row's copy button puts on the clipboard: the same resolved command line the Execution
+    /// Log would record, so what is pasted is what would have run — not the row's placeholder label, and
+    /// for a documentation row the URL rather than its title.
+    /// </summary>
+    public string CopyTextFor(ToolkitEntry entry) => Bind(entry).CommandLine;
+
+    /// <summary>Binds a parameterised row's typed value onto its action. An unusable value is left off
+    /// altogether rather than appended blank, so copying a half-filled row gives a clean command line
+    /// instead of one with a dangling argument.</summary>
+    private static ToolkitAction Bind(ToolkitEntry entry) {
+        if (entry.Parameter is not { } parameter)
+            return entry.Action;
+
+        var host = ToolkitHostValidator.Normalize(parameter.Value);
+        return host.Length == 0 ? entry.Action : entry.Action.WithArgument(host);
     }
 
     /// <summary>Empties the search box (its × button, and Esc while it has content).</summary>
