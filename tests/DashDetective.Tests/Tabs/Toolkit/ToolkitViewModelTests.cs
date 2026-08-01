@@ -197,6 +197,45 @@ public class ToolkitViewModelTests {
         Assert.EndsWith(" example.com", vm.Log[0].Command, System.StringComparison.Ordinal);
     }
 
+    // ----- Log export -----
+
+    [Fact]
+    public async Task BuildLogText_CarriesEveryStanzaWithItsTimeAndOutput() {
+        var vm = new ToolkitViewModel();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+        await vm.RunCommand.ExecuteAsync(MissingTool("second-command"));
+
+        var text = vm.BuildLogText();
+
+        Assert.Contains("first-command", text, System.StringComparison.Ordinal);
+        Assert.Contains("second-command", text, System.StringComparison.Ordinal);
+        Assert.Contains($"[{vm.Log[0].Time}] $ second-command", text, System.StringComparison.Ordinal);
+        Assert.Contains(vm.Log[0].Output, text, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>The file reads as what was on screen — newest first — rather than quietly reversing it
+    /// on the way out.</summary>
+    [Fact]
+    public async Task BuildLogText_KeepsTheOrderTheLogIsShownIn() {
+        var vm = new ToolkitViewModel();
+        await vm.RunCommand.ExecuteAsync(MissingTool("older"));
+        await vm.RunCommand.ExecuteAsync(MissingTool("newer"));
+
+        var text = vm.BuildLogText();
+
+        Assert.True(text.IndexOf("newer", System.StringComparison.Ordinal) <
+                    text.IndexOf("older", System.StringComparison.Ordinal),
+                    "export order does not match the panel");
+    }
+
+    [Fact]
+    public void BuildLogText_EmptyLog_IsStillAWellFormedHeader() {
+        var text = new ToolkitViewModel().BuildLogText();
+
+        Assert.Contains("DashDetective", text, System.StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(text));
+    }
+
     // ----- Pins -----
     //
     // Pin state lives on the catalog's shared entries (one Toolkit page exists, so they are its rows).

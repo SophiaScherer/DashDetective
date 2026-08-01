@@ -394,10 +394,16 @@
              command and capturing its output is not part of this UI-only pass, so it stays empty. -->
         <Border Grid.Column="1" Classes="panel" Padding="14">
             <Grid RowDefinitions="Auto,*" RowSpacing="10">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <!-- Both actions are disabled while the log is empty: there is nothing to clear and
+                     nothing to save, and a picker over an empty log would only waste a click. -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                     <TextBlock Text="Execution Log" Classes="panelTitle" FontSize="13"
                                Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="linkAction" Content="Clear"
+                    <Button Grid.Column="1" Classes="linkAction" Content="Export"
+                            Click="OnExportLogClick" IsEnabled="{Binding HasLog}"
+                            ToolTip.Tip="Save the log to a text file"
+                            VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Classes="linkAction" Content="Clear"
                             Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"
                             VerticalAlignment="Center"/>
                 </Grid>

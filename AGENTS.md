@@ -33,11 +33,11 @@ task explicitly assigns, and do not modify a live feature without an explicit sc
 patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
-drives/health view; status below), **Toolkit** (in progress; status below) and **Keyboard shortcuts**
+drives/health view; status below), **Toolkit** (live; status below) and **Keyboard shortcuts**
 (status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
 de-duplication / composition refactor) — write-ups in the Appendix.
 
-**Toolkit — implementation status** (IN PROGRESS — execution is live; the catalog is being authored):
+**Toolkit — implementation status** (LIVE):
 
 - **Toolkit** — the design document's **"Commands"** tab, shipped in the live app as **Toolkit** (nav
   label, folder, namespace and type names; "Commands" is a design-doc-only name). The UI was built in
@@ -56,9 +56,13 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   than a joined command line, and there is **no free-form command box anywhere — do not add one**.
   Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
   process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog progress:** all four categories authored — Folders, System Tools, Diagnostics (parameterised
-  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Only the **Execution Log export**
-  remains from the plan above.
+- **Catalog:** all four categories authored — Folders, System Tools, Diagnostics (parameterised
+  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Adding a row means editing
+  `ToolkitCatalog.Entries` and nothing else; the filter, grouping, search provider, runner and every
+  container already work off it.
+- The Execution Log **exports** to a text file (`BuildLogText` + a save picker in the view code-behind,
+  the `SettingsView.SaveAsync` flow). Stanzas keep the order they are shown in — newest first — so the
+  file reads as what was on screen.
 - **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
   opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
   text, not by index**, so a catalog that gains or loses a row between sessions cannot silently

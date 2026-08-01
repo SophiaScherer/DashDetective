@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -233,6 +234,29 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>Empties the Execution Log (its "Clear" button).</summary>
     [RelayCommand]
     private void ClearLog() => Log.Clear();
+
+    /// <summary>
+    /// The Execution Log as plain text, for the "Export" button. Stanzas keep the order they are shown
+    /// in — newest first — so the file reads as what was on screen rather than quietly reversing it; the
+    /// timestamps make the direction unambiguous either way.
+    ///
+    /// Built here and written by the view code-behind, which owns the save dialog (it needs the
+    /// <c>TopLevel</c>), exactly as the Settings exports are.
+    /// </summary>
+    public string BuildLogText() {
+        var sb = new StringBuilder();
+        sb.AppendLine("DashDetective — Toolkit execution log");
+        sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+        sb.AppendLine();
+
+        foreach (var entry in Log) {
+            sb.AppendLine($"[{entry.Time}] $ {entry.Command}");
+            sb.AppendLine(entry.Output);
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
 
     partial void OnSearchChanged(string value) => RebuildGroups();
 

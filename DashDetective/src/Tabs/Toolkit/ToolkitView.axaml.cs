@@ -1,9 +1,11 @@
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
+using System.IO;
 using System.Linq;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -113,5 +115,38 @@ public partial class ToolkitView : UserControl {
         button.Classes.Remove("copied");
         button.Classes.Add("copied");
         DispatcherTimer.RunOnce(() => button.Classes.Remove("copied"), CopiedDuration);
+    }
+
+    /// <summary>
+    /// Saves the Execution Log to a text file. Follows <c>SettingsView.SaveAsync</c>: pick a
+    /// destination through the native dialog (which needs the window's <c>TopLevel</c>), then write. The
+    /// text is built only after a destination is chosen, and the whole thing soft-fails.
+    /// </summary>
+    private async void OnExportLogClick(object? sender, RoutedEventArgs e) {
+        if (DataContext is not ToolkitViewModel vm)
+            return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage is null)
+            return;
+
+        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions {
+            Title = "Export execution log",
+            SuggestedFileName = $"DashDetective-toolkit-log-{DateTime.Now:yyyyMMdd-HHmmss}",
+            DefaultExtension = "txt",
+            FileTypeChoices = [new FilePickerFileType("Text log") { Patterns = ["*.txt"] }],
+        });
+
+        if (file is null)
+            return; // user cancelled
+
+        try {
+            await using var stream = await file.OpenWriteAsync();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(vm.BuildLogText());
+        } catch (Exception) {
+            // Disk full, permission denied, drive removed mid-write — swallow so a failed export can't
+            // take the app down; the file simply isn't written.
+        }
     }
 }
