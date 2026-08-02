@@ -449,6 +449,124 @@ public class ToolkitViewModelTests {
         vm.LoadPins("");
     }
 
+    [Fact]
+    public void RemoveCommand_TakesTheRowOffThePageAndAnnouncesIt() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine());
+        var announced = 0;
+        vm.CommandsChanged += () => announced++;
+
+        vm.DeleteCustomCommand.Execute(vm.Custom[0]);
+
+        Assert.Empty(vm.Custom);
+        Assert.Equal("", vm.EncodeCommands());
+        Assert.Equal(1, announced);
+    }
+
+    /// <summary>A labelled command owns two rows; deleting it must take both, not leave an orphan in the
+    /// section it was filed under.</summary>
+    [Fact]
+    public void RemoveCommand_ALabelledCommand_LeavesBothOfItsSections() {
+        var vm = new ToolkitViewModel { Search = "zzz-my-own" };
+        vm.AddCommand(new ToolkitCommand(
+            "zzz-my-own", "", ToolkitCommandType.Launch, "thing.exe", "", ToolkitCategory.Folders));
+        Assert.Equal(2, vm.Groups.Count);
+
+        vm.DeleteCustomCommand.Execute(vm.Custom[0]);
+
+        Assert.Empty(vm.Groups);
+        Assert.False(vm.HasCommands);
+    }
+
+    /// <summary>A catalog row is not the user's to delete, so asking anyway must do nothing rather than
+    /// quietly succeeding somewhere else.</summary>
+    [Fact]
+    public void DeleteCustom_ACatalogRow_DoesNothing() {
+        var vm = new ToolkitViewModel();
+        var announced = 0;
+        vm.CommandsChanged += () => announced++;
+
+        vm.DeleteCustomCommand.Execute(Row("%temp%"));
+
+        Assert.Equal(0, announced);
+        Assert.Contains(vm.AllEntries, e => e.Command == "%temp%");
+    }
+
+    [Fact]
+    public void UpdateCommand_ReplacesTheRowInPlaceAndAnnouncesIt() {
+        var vm = new ToolkitViewModel();
+        var original = Mine("Before");
+        vm.AddCommand(original);
+        vm.AddCommand(Mine("After it"));
+        var announced = 0;
+        vm.CommandsChanged += () => announced++;
+
+        vm.UpdateCommand(original, original with { Title = "Renamed", Payload = @"C:\elsewhere" });
+
+        Assert.Equal(["Renamed", "After it"], vm.Custom.Select(e => e.Command));
+        Assert.Equal(@"C:\elsewhere", vm.Custom[0].Action.Target);
+        Assert.Equal(1, announced);
+    }
+
+    /// <summary>Pins are re-encoded from live state, so a rename carries its pin rather than dropping it
+    /// — which is why no separate identity field is needed for a custom command.</summary>
+    [Fact]
+    public void UpdateCommand_RenamingAPinnedRow_KeepsThePinUnderTheNewTitle() {
+        var vm = new ToolkitViewModel();
+        vm.LoadPins("");
+        var original = Mine("Before");
+        vm.AddCommand(original);
+        vm.TogglePinCommand.Execute(vm.Custom[0]);
+
+        vm.UpdateCommand(original, original with { Title = "After" });
+
+        Assert.True(vm.Custom[0].IsPinned);
+        Assert.Equal(["After"], ToolkitPins.Decode(vm.EncodePins()));
+        vm.LoadPins("");
+    }
+
+    /// <summary>The row's edit affordance opens the form on what the user originally typed — the reason a
+    /// ToolkitCommand is what gets persisted rather than the action derived from it.</summary>
+    [Fact]
+    public void EditCustom_OpensTheFormOnThatCommand() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(new ToolkitCommand(
+            "Ports", "Listening sockets", ToolkitCommandType.Capture, "netstat", "-an"));
+
+        vm.EditCustomCommand.Execute(vm.Custom[0]);
+
+        Assert.True(vm.Form.IsOpen);
+        Assert.True(vm.Form.IsEditing);
+        Assert.Equal("Ports", vm.Form.Title);
+        Assert.Equal("-an", vm.Form.Arguments);
+    }
+
+    [Fact]
+    public void EditCustom_ACatalogRow_DoesNotOpenTheForm() {
+        var vm = new ToolkitViewModel();
+
+        vm.EditCustomCommand.Execute(Row("%temp%"));
+
+        Assert.False(vm.Form.IsOpen);
+    }
+
+    /// <summary>The whole round trip the user sees: edit a row, and the change is what gets saved.</summary>
+    [Fact]
+    public void EditThenSave_ReplacesTheCommandAndPersistsTheNewVersion() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine("Before"));
+
+        vm.EditCustomCommand.Execute(vm.Custom[0]);
+        vm.Form.Title = "After";
+        vm.Form.SaveCommand.Execute(null);
+
+        Assert.Equal("After", Assert.Single(vm.Custom).Command);
+
+        var restored = new ToolkitViewModel();
+        restored.LoadCommands(vm.EncodeCommands());
+        Assert.Equal("After", Assert.Single(restored.Custom).Command);
+    }
+
     /// <summary>A labelled custom command is on screen twice on purpose, but it is still one command —
     /// the count beside the chips is of commands, not of places to click one.</summary>
     [Fact]

@@ -35,7 +35,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         Categories = options;
         options[0].IsSelected = true;
-        Form = new ToolkitCommandFormViewModel(() => AllEntries, AddCommand);
+        Form = new ToolkitCommandFormViewModel(() => AllEntries, ApplyFromForm);
         Log.CollectionChanged += (_, _) => HasLog = Log.Count > 0;
         RebuildGroups();
 
@@ -296,6 +296,57 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         Custom.Add(ToolkitCommandFactory.ToEntry(command));
         RebuildGroups();
         CommandsChanged?.Invoke();
+    }
+
+    /// <summary>Replaces one of the user's commands with an edited version, in place. The row keeps its
+    /// position and its pin: a rename is still the same command as far as the user is concerned, and
+    /// re-encoding the pins afterwards writes the new title, because <see cref="EncodePins"/> reads live
+    /// state rather than a stored key.</summary>
+    public void UpdateCommand(ToolkitCommand original, ToolkitCommand edited) {
+        for (var i = 0; i < Custom.Count; i++) {
+            if (!ReferenceEquals(Custom[i].Source, original))
+                continue;
+
+            var replacement = ToolkitCommandFactory.ToEntry(edited);
+            replacement.IsPinned = Custom[i].IsPinned;
+            Custom[i] = replacement;
+            RebuildGroups();
+            CommandsChanged?.Invoke();
+            return;
+        }
+    }
+
+    /// <summary>Removes one of the user's commands. Its pin, if it had one, goes with it on the next
+    /// encode — the same way a catalog row that disappears drops its pin.</summary>
+    public void RemoveCommand(ToolkitEntry entry) {
+        if (!Custom.Remove(entry))
+            return;
+
+        RebuildGroups();
+        CommandsChanged?.Invoke();
+    }
+
+    /// <summary>Opens the form on one of the user's commands. Only their own rows offer this — a catalog
+    /// row has no <see cref="ToolkitEntry.Source"/> to fill the fields from.</summary>
+    [RelayCommand]
+    private void EditCustom(ToolkitEntry? entry) {
+        if (entry?.Source is { } source)
+            Form.Edit(source);
+    }
+
+    /// <summary>Deletes one of the user's commands from its row.</summary>
+    [RelayCommand]
+    private void DeleteCustom(ToolkitEntry? entry) {
+        if (entry is { IsCustom: true })
+            RemoveCommand(entry);
+    }
+
+    // Where the form's Save lands: an append, or a replacement of the command being edited.
+    private void ApplyFromForm(ToolkitCommand command, ToolkitCommand? replacing) {
+        if (replacing is null)
+            AddCommand(command);
+        else
+            UpdateCommand(replacing, command);
     }
 
     /// <summary>The user's own commands as one persistable string.</summary>

@@ -17,14 +17,20 @@ namespace DashDetective.Tabs.Toolkit;
 /// </summary>
 public partial class ToolkitCommandFormViewModel : ObservableObject {
     private readonly Func<IReadOnlyList<ToolkitEntry>> _existing;
-    private readonly Action<ToolkitCommand> _save;
+    private readonly Action<ToolkitCommand, ToolkitCommand?> _submit;
+
+    /// <summary>The command being edited, or null when the form is adding a new one. Held rather than
+    /// inferred from the fields: a rename changes every one of them, so there would be nothing left to
+    /// recognise the original by.</summary>
+    private ToolkitCommand? _editing;
 
     /// <param name="existing">Every row already on the page, for the duplicate-title check.</param>
-    /// <param name="save">Takes a validated command and puts it on the page.</param>
+    /// <param name="submit">Takes a validated command and the one it replaces, if any, and puts it on
+    /// the page.</param>
     public ToolkitCommandFormViewModel(
-        Func<IReadOnlyList<ToolkitEntry>> existing, Action<ToolkitCommand> save) {
+        Func<IReadOnlyList<ToolkitEntry>> existing, Action<ToolkitCommand, ToolkitCommand?> submit) {
         _existing = existing;
-        _save = save;
+        _submit = submit;
 
         var types = new List<ToolkitCommandTypeOption>();
         foreach (var type in Enum.GetValues<ToolkitCommandType>())
@@ -47,6 +53,18 @@ public partial class ToolkitCommandFormViewModel : ObservableObject {
 
     /// <summary>Whether the form is showing. Closed, the page offers a single "+ Add command" button.</summary>
     [ObservableProperty] private bool _isOpen;
+
+    /// <summary>Whether the form is changing a command rather than making one. Only the wording differs
+    /// — the fields, the rules and the chips are the same either way.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Heading), nameof(SubmitLabel))]
+    private bool _isEditing;
+
+    /// <summary>The panel's title.</summary>
+    public string Heading => IsEditing ? "Edit command" : "New command";
+
+    /// <summary>What the confirming button reads.</summary>
+    public string SubmitLabel => IsEditing ? "Save changes" : "Add command";
 
     /// <summary>The row's label, and its identity for pins and search reveal.</summary>
     [ObservableProperty] private string _title = "";
@@ -116,20 +134,41 @@ public partial class ToolkitCommandFormViewModel : ObservableObject {
         IsOpen = false;
     }
 
+    /// <summary>Opens the form on an existing command, ready to be changed. The fields are filled from
+    /// what the user originally typed rather than from the action derived from it, which is why
+    /// <see cref="ToolkitCommand"/> is what gets persisted.</summary>
+    public void Edit(ToolkitCommand command) {
+        Reset();
+
+        Title = command.Title;
+        Description = command.Description;
+        Payload = command.Payload;
+        Arguments = command.Arguments;
+        SelectType(FindType(command.Type));
+        SelectCategory(FindCategory(command.Category));
+
+        // Set after the fields, because filling them clears the error and would clear this too if the
+        // order were reversed.
+        _editing = command;
+        IsEditing = true;
+        IsOpen = true;
+    }
+
     /// <summary>Validates what was typed and, if it holds up, puts it on the page. A refusal leaves every
     /// field where it is: the user is one correction away, not one re-type away.</summary>
     [RelayCommand]
     private void Save() {
         var command = ToolkitCommandValidator.Normalize(Current());
 
-        if (ToolkitCommandValidator.Validate(command, _existing()) is { } refusal) {
+        if (ToolkitCommandValidator.Validate(command, _existing(), _editing) is { } refusal) {
             Error = refusal;
             return;
         }
 
-        _save(command);
+        var replacing = _editing;
         Reset();
         IsOpen = false;
+        _submit(command, replacing);
     }
 
     /// <summary>What has been typed, as a command. Not yet normalized or checked.</summary>
@@ -143,8 +182,27 @@ public partial class ToolkitCommandFormViewModel : ObservableObject {
         Payload = "";
         Arguments = "";
         Error = "";
+        _editing = null;
+        IsEditing = false;
         SelectType(Types[0]);
         SelectCategory(Categories[0]);
+    }
+
+    private ToolkitCommandTypeOption FindType(ToolkitCommandType type) {
+        foreach (var option in Types)
+            if (option.Type == type)
+                return option;
+
+        return Types[0];
+    }
+
+    private ToolkitCategoryOption FindCategory(ToolkitCategory? category) {
+        foreach (var option in Categories)
+            if (option.Category == category)
+                return option;
+
+        // A category this build no longer offers degrades to "None" rather than losing the edit.
+        return Categories[0];
     }
 
     private void SelectType(ToolkitCommandTypeOption option) {

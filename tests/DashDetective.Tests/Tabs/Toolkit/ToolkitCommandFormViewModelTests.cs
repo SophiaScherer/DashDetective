@@ -11,10 +11,14 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// </summary>
 public class ToolkitCommandFormViewModelTests {
     private readonly List<ToolkitCommand> _saved = [];
+    private readonly List<ToolkitCommand?> _replaced = [];
     private readonly List<ToolkitEntry> _existing = [];
 
     private ToolkitCommandFormViewModel Form() =>
-        new(() => _existing, _saved.Add);
+        new(() => _existing, (command, replacing) => {
+            _saved.Add(command);
+            _replaced.Add(replacing);
+        });
 
     private static ToolkitCommandFormViewModel Filled(
         ToolkitCommandFormViewModel form, ToolkitCommandType type, string title, string payload) {
@@ -249,6 +253,124 @@ public class ToolkitCommandFormViewModelTests {
         Assert.Null(form.SelectedCategory);
         Assert.True(form.Types[0].IsSelected);
         Assert.True(form.Categories[0].IsSelected);
+    }
+
+    // ----- Editing -----
+
+    private static ToolkitCommand Existing() =>
+        new("Ports", "Listening sockets", ToolkitCommandType.Capture, "netstat", "-an",
+            ToolkitCategory.Diagnostics);
+
+    [Fact]
+    public void Edit_OpensPreFilledWithWhatTheUserOriginallyTyped() {
+        var form = Form();
+
+        form.Edit(Existing());
+
+        Assert.True(form.IsOpen);
+        Assert.True(form.IsEditing);
+        Assert.Equal("Ports", form.Title);
+        Assert.Equal("Listening sockets", form.Description);
+        Assert.Equal("netstat", form.Payload);
+        Assert.Equal("-an", form.Arguments);
+        Assert.Equal(ToolkitCommandType.Capture, form.SelectedType);
+        Assert.Equal(ToolkitCategory.Diagnostics, form.SelectedCategory);
+        Assert.False(form.HasError);
+    }
+
+    [Fact]
+    public void Edit_SelectsTheMatchingChips() {
+        var form = Form();
+
+        form.Edit(Existing());
+
+        Assert.Equal(ToolkitCommandType.Capture, form.Types.Single(t => t.IsSelected).Type);
+        Assert.Equal(ToolkitCategory.Diagnostics, form.Categories.Single(c => c.IsSelected).Category);
+    }
+
+    [Fact]
+    public void IsEditing_ChangesOnlyTheWording() {
+        var form = Form();
+        var adding = (form.Heading, form.SubmitLabel);
+
+        form.Edit(Existing());
+
+        Assert.NotEqual(adding, (form.Heading, form.SubmitLabel));
+        Assert.False(string.IsNullOrWhiteSpace(form.Heading));
+        Assert.False(string.IsNullOrWhiteSpace(form.SubmitLabel));
+    }
+
+    [Fact]
+    public void Save_WhileEditing_ReportsWhatItReplaces() {
+        var original = Existing();
+        var form = Form();
+        form.Edit(original);
+        form.Title = "Open ports";
+
+        form.SaveCommand.Execute(null);
+
+        Assert.Equal("Open ports", Assert.Single(_saved).Title);
+        Assert.Same(original, Assert.Single(_replaced));
+    }
+
+    /// <summary>Editing a row without renaming it is not a clash with itself — the commonest edit of all
+    /// would otherwise be impossible.</summary>
+    [Fact]
+    public void Save_EditingWithoutRenaming_IsAccepted() {
+        var original = Existing();
+        _existing.Add(ToolkitCommandFactory.ToEntry(original));
+        var form = Form();
+        form.Edit(original);
+        form.Payload = "netstat.exe";
+
+        form.SaveCommand.Execute(null);
+
+        Assert.Equal("netstat.exe", Assert.Single(_saved).Payload);
+        Assert.False(form.HasError);
+    }
+
+    [Fact]
+    public void Save_RenamingOntoAnotherRowsTitle_IsRefused() {
+        var original = Existing();
+        _existing.Add(ToolkitCommandFactory.ToEntry(original));
+        _existing.Add(ToolkitCommandFactory.ToEntry(
+            new ToolkitCommand("Taken", "", ToolkitCommandType.Launch, "thing.exe")));
+        var form = Form();
+        form.Edit(original);
+        form.Title = "Taken";
+
+        form.SaveCommand.Execute(null);
+
+        Assert.Empty(_saved);
+        Assert.Equal(ToolkitCommandValidator.TitleTaken, form.Error);
+        Assert.True(form.IsEditing);
+    }
+
+    /// <summary>Cancelling an edit and then opening the form must not leave it still pointed at the row
+    /// that was being changed.</summary>
+    [Fact]
+    public void Cancel_AfterAnEdit_LeavesTheFormAddingAgain() {
+        var form = Form();
+        form.Edit(Existing());
+
+        form.CancelCommand.Execute(null);
+        form.OpenCommand.Execute(null);
+        Filled(form, ToolkitCommandType.Launch, "Fresh", "thing.exe");
+        form.SaveCommand.Execute(null);
+
+        Assert.False(form.IsEditing);
+        Assert.Null(Assert.Single(_replaced));
+    }
+
+    [Fact]
+    public void Save_AfterAnEdit_LeavesTheFormAddingAgain() {
+        var form = Form();
+        form.Edit(Existing());
+        form.SaveCommand.Execute(null);
+
+        Assert.False(form.IsEditing);
+        Assert.False(form.IsOpen);
+        Assert.Equal("", form.Title);
     }
 
     // ----- Wired to the page -----

@@ -262,7 +262,7 @@
                 <Border Classes="panel" IsVisible="{Binding Form.IsOpen}">
                     <StackPanel Spacing="12" DataContext="{Binding Form}"
                                 x:DataType="vm:ToolkitCommandFormViewModel">
-                        <TextBlock Classes="panelTitle" Text="New command"/>
+                        <TextBlock Classes="panelTitle" Text="{Binding Heading}"/>
 
                         <!-- Type first: it decides what the payload field below is even called, so
                              picking it last would mean re-reading the form. Chips rather than a
@@ -369,7 +369,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                             <Button Classes="action" Content="Cancel"
                                     Command="{Binding CancelCommand}"/>
-                            <Button Classes="action primary" Content="Save"
+                            <Button Classes="action primary" Content="{Binding SubmitLabel}"
                                     Command="{Binding SaveCommand}"/>
                         </StackPanel>
                     </StackPanel>
@@ -402,7 +402,7 @@
                                                          own affordances, which stay siblings: nesting a
                                                          button inside a button would make those clicks
                                                          run the command too. -->
-                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto"
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                                                           ColumnSpacing="10" Margin="14,12">
                                                         <Button Grid.Column="0" Classes="rowRun"
                                                                 ToolTip.Tip="{Binding Description}"
@@ -533,11 +533,39 @@
                                                                         A0.5,0.5 0 0 1 2,4 H5.5"/>
                                                         </Button>
 
+                                                        <!-- Edit and delete, on the user's own rows only:
+                                                             a catalog row has no Source to fill the form
+                                                             from, and is not the user's to remove. -->
+                                                        <Button Grid.Column="4" Classes="rowAction"
+                                                                ToolTip.Tip="Edit this command"
+                                                                IsVisible="{Binding IsCustom}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).EditCustomCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M1.5,11.5 V9 L9,1.5 L11.5,4
+                                                                        L4,11.5 Z M7.5,3 L10,5.5"/>
+                                                        </Button>
+
+                                                        <Button Grid.Column="5" Classes="rowAction"
+                                                                ToolTip.Tip="Delete this command"
+                                                                IsVisible="{Binding IsCustom}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).DeleteCustomCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M2,3.5 H11 M5,3.5 V2 H8 V3.5
+                                                                        M3,3.5 L3.6,11.5 H9.4 L10,3.5
+                                                                        M5.5,5.5 V9.5 M7.5,5.5 V9.5"/>
+                                                        </Button>
+
                                                         <!-- Pin toggle. Two glyphs rather than one with
                                                              a bound Fill, because a bool-to-brush step
                                                              would mean a value converter — which this
                                                              codebase does without everywhere else. -->
-                                                        <Button Grid.Column="4" Classes="rowAction"
+                                                        <Button Grid.Column="6" Classes="rowAction"
                                                                 ToolTip.Tip="Pin to the top of the list"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).TogglePinCommand}"
                                                                 CommandParameter="{Binding}">
@@ -562,7 +590,7 @@
 
                                                         <!-- Copy affordance. Placed with the row it
                                                              belongs to. -->
-                                                        <Button Grid.Column="5" Classes="rowAction"
+                                                        <Button Grid.Column="7" Classes="rowAction"
                                                                 ToolTip.Tip="Copy command"
                                                                 Click="OnCopyClick">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
