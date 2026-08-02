@@ -15,13 +15,14 @@ namespace DashDetective.Tabs.Toolkit;
 public sealed partial class ToolkitEntry : ObservableObject {
     public ToolkitEntry(
         string command, string description, ToolkitCategory category, ToolkitEntryKind kind,
-        ToolkitAction action, ToolkitParameter? parameter = null) {
+        ToolkitAction action, ToolkitParameter? parameter = null, ToolkitCommand? source = null) {
         Command = command;
         Description = description;
         Category = category;
         Kind = kind;
         Action = action;
         Parameter = parameter;
+        Source = source;
     }
 
     /// <summary>The command itself — the row's primary label, and its identity for search reveal.</summary>
@@ -40,6 +41,19 @@ public sealed partial class ToolkitEntry : ObservableObject {
     /// <summary>The row's editable slot, or null for the rows that take no input (nearly all of them).
     /// The text box binds to it, so it is mutable where the rest of the entry is not.</summary>
     public ToolkitParameter? Parameter { get; }
+
+    /// <summary>What the user typed to author this row, or null for a catalog row. Carried rather than
+    /// reconstructed so the edit form can be re-filled with their own words — see
+    /// <see cref="ToolkitCommandFactory"/>.</summary>
+    public ToolkitCommand? Source { get; }
+
+    /// <summary>Whether the user authored this row. Drives its edit and delete affordances, and the
+    /// filter's placement rule.</summary>
+    public bool IsCustom => Source is not null;
+
+    /// <summary>The category a custom row asked to *also* appear under, or null. A catalog row has none
+    /// — its one <see cref="Category"/> is the whole story.</summary>
+    public ToolkitCategory? SecondaryCategory => Source?.Category;
 
     /// <summary>Whether the user has pinned this command to the top of the list. Observable so the star
     /// redraws on the row that was clicked, without the whole list having to be rebuilt to show it.

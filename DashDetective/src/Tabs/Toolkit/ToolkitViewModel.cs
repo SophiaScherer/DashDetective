@@ -59,6 +59,22 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>The command list as the filter leaves it: one section per non-empty category.</summary>
     public ObservableCollection<ToolkitGroup> Groups { get; } = [];
 
+    /// <summary>The rows the user authored, in the order they were added.</summary>
+    public ObservableCollection<ToolkitEntry> Custom { get; } = [];
+
+    /// <summary>Every row the page knows about — the catalog's, then the user's. This, not
+    /// <see cref="ToolkitCatalog.Entries"/>, is what the filter, the pins and universal search work
+    /// off. Rebuilt on read: the list is small, and a cached copy would be one more thing to keep in
+    /// step with <see cref="Custom"/>.</summary>
+    public IReadOnlyList<ToolkitEntry> AllEntries {
+        get {
+            var all = new List<ToolkitEntry>(ToolkitCatalog.Entries.Count + Custom.Count);
+            all.AddRange(ToolkitCatalog.Entries);
+            all.AddRange(Custom);
+            return all;
+        }
+    }
+
     /// <summary>The search box. Narrows on every keystroke, alongside the selected chip.</summary>
     [ObservableProperty] private string _search = "";
 
@@ -243,23 +259,56 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         PinsChanged?.Invoke();
     }
 
-    /// <summary>The pinned commands as one persistable string, in catalog order.</summary>
+    /// <summary>The pinned commands as one persistable string, in list order.</summary>
     public string EncodePins() {
         var commands = new List<string>();
-        foreach (var entry in ToolkitCatalog.Entries)
+        foreach (var entry in AllEntries)
             if (entry.IsPinned)
                 commands.Add(entry.Command);
 
         return ToolkitPins.Encode(commands);
     }
 
-    /// <summary>Applies persisted pins at startup. A pin naming a command the catalog no longer carries
-    /// is simply dropped — pins are stored by command text precisely so a changed catalog cannot
-    /// re-point them at something else.</summary>
+    /// <summary>Applies persisted pins at startup. A pin naming a command that no longer exists is simply
+    /// dropped — pins are stored by command text precisely so a changed list cannot re-point them at
+    /// something else. Custom commands must be loaded first, or a pin naming one finds nothing.</summary>
     public void LoadPins(string? encoded) {
         var pinned = new HashSet<string>(ToolkitPins.Decode(encoded), StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in ToolkitCatalog.Entries)
+        foreach (var entry in AllEntries)
             entry.IsPinned = pinned.Contains(entry.Command);
+
+        RebuildGroups();
+    }
+
+    /// <summary>Raised when the user adds, edits or removes one of their own commands, so the composition
+    /// root can persist it. Carries nothing — the encoding is <see cref="EncodeCommands"/>'s to
+    /// produce, exactly as with <see cref="PinsChanged"/>.</summary>
+    public event Action? CommandsChanged;
+
+    /// <summary>Adds a command the user authored and announces it for persistence. The caller has already
+    /// put it past <see cref="ToolkitCommandValidator"/>.</summary>
+    public void AddCommand(ToolkitCommand command) {
+        Custom.Add(ToolkitCommandFactory.ToEntry(command));
+        RebuildGroups();
+        CommandsChanged?.Invoke();
+    }
+
+    /// <summary>The user's own commands as one persistable string.</summary>
+    public string EncodeCommands() {
+        var commands = new List<ToolkitCommand>();
+        foreach (var entry in Custom)
+            if (entry.Source is { } source)
+                commands.Add(source);
+
+        return ToolkitCommandCodec.Encode(commands);
+    }
+
+    /// <summary>Applies persisted commands at startup, replacing whatever is there. Announces nothing:
+    /// restoring what was saved is not a change to save back.</summary>
+    public void LoadCommands(string? encoded) {
+        Custom.Clear();
+        foreach (var command in ToolkitCommandCodec.Decode(encoded))
+            Custom.Add(ToolkitCommandFactory.ToEntry(command));
 
         RebuildGroups();
     }
@@ -310,7 +359,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     private void RebuildGroups() {
         Groups.Clear();
         var matched = 0;
-        foreach (var group in ToolkitFilter.Group(ToolkitCatalog.Entries, _category, Search)) {
+        foreach (var group in ToolkitFilter.Group(AllEntries, _category, Search)) {
             Groups.Add(group);
             matched += group.Items.Count;
         }

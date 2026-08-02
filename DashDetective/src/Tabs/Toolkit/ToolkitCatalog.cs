@@ -131,6 +131,7 @@ public static class ToolkitCatalog {
 
     /// <summary>The categories in display order, matching the enum's declaration order.</summary>
     public static IReadOnlyList<ToolkitCategory> Categories { get; } = [
+        ToolkitCategory.Custom,
         ToolkitCategory.Folders,
         ToolkitCategory.SystemTools,
         ToolkitCategory.Diagnostics,
@@ -139,6 +140,7 @@ public static class ToolkitCatalog {
 
     /// <summary>The label a category reads as, on its section header and its filter chip.</summary>
     public static string HeaderFor(ToolkitCategory category) => category switch {
+        ToolkitCategory.Custom => "My Commands",
         ToolkitCategory.Folders => "Folders",
         ToolkitCategory.SystemTools => "System Tools",
         ToolkitCategory.Diagnostics => "Diagnostics",

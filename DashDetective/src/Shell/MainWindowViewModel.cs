@@ -177,6 +177,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ], _recents);
         _recents.Changed += Persist;
         _toolkit.PinsChanged += Persist;
+        _toolkit.CommandsChanged += Persist;
 
         // A Toolkit folder row opening in the app's own File Explorer is the same jump universal search
         // makes, so it reuses it rather than teaching the page about another tab.
@@ -203,6 +204,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
         _fileExplorer.ShowHidden = settings.ShowHiddenFiles;
+
+        // Commands before pins: a pin naming one of the user's own commands has nothing to find until
+        // that command is on the page.
+        _toolkit.LoadCommands(settings.CustomCommands);
         _toolkit.LoadPins(settings.PinnedCommands);
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
@@ -230,6 +235,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),
+        CustomCommands = _toolkit.EncodeCommands(),
         LaunchAtStartup = _settings.LaunchAtStartup,
         ShowInTray = _settings.ShowInTray,
         ResourceAlerts = _settings.ResourceAlerts,

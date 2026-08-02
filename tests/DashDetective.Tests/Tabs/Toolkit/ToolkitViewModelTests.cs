@@ -324,6 +324,146 @@ public class ToolkitViewModelTests {
         vm.LoadPins("");
     }
 
+    // ----- The user's own commands -----
+
+    private static ToolkitCommand Mine(string title = "My folder") =>
+        new(title, "Somewhere I go often", ToolkitCommandType.FolderPath, @"C:\work");
+
+    [Fact]
+    public void AddCommand_PutsTheRowOnThePageAndAnnouncesIt() {
+        var vm = new ToolkitViewModel();
+        var announced = 0;
+        vm.CommandsChanged += () => announced++;
+
+        vm.AddCommand(Mine());
+
+        var added = Assert.Single(vm.Custom);
+        Assert.Equal("My folder", added.Command);
+        Assert.True(added.IsCustom);
+        Assert.Equal(1, announced);
+    }
+
+    /// <summary>Everything downstream — the filter, the pins, universal search — works off the merged
+    /// list, so a command that is not in it may as well not exist.</summary>
+    [Fact]
+    public void AllEntries_IsTheCatalogPlusTheUsersOwn() {
+        var vm = new ToolkitViewModel();
+
+        vm.AddCommand(Mine());
+
+        Assert.Equal(ToolkitCatalog.Entries.Count + 1, vm.AllEntries.Count);
+        Assert.Contains(vm.AllEntries, e => e.Command == "My folder");
+        Assert.All(ToolkitCatalog.Entries, e => Assert.Contains(e, vm.AllEntries));
+    }
+
+    [Fact]
+    public void AddCommand_IsFoundByTheSearchBoxLikeAnyOtherRow() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine("zzz-my-own-command"));
+
+        vm.Search = "zzz-my-own";
+
+        Assert.True(vm.HasCommands);
+        Assert.Contains(vm.Groups.SelectMany(g => g.Items), e => e.Command == "zzz-my-own-command");
+    }
+
+    [Fact]
+    public void EncodeCommands_RoundTripsThroughLoadCommands() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine("First"));
+        vm.AddCommand(new ToolkitCommand(
+            "Ports", "Listening sockets", ToolkitCommandType.Capture, "netstat", "-an",
+            ToolkitCategory.Diagnostics));
+
+        var encoded = vm.EncodeCommands();
+        var restored = new ToolkitViewModel();
+        restored.LoadCommands(encoded);
+
+        Assert.Equal(["First", "Ports"], restored.Custom.Select(e => e.Command));
+        Assert.Equal(vm.Custom.Select(e => e.Source), restored.Custom.Select(e => e.Source));
+    }
+
+    /// <summary>Restoring what was saved is not a change to save back — announcing it would have every
+    /// startup write the settings file straight back out.</summary>
+    [Fact]
+    public void LoadCommands_ReplacesWhatIsThereWithoutAnnouncingAChange() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine("Old"));
+        var announced = 0;
+        vm.CommandsChanged += () => announced++;
+
+        vm.LoadCommands(ToolkitCommandCodec.Encode([Mine("New")]));
+
+        Assert.Equal(["New"], vm.Custom.Select(e => e.Command));
+        Assert.Equal(0, announced);
+    }
+
+    [Fact]
+    public void LoadCommands_NothingStored_LeavesNoCustomRows() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(Mine());
+
+        vm.LoadCommands("");
+
+        Assert.Empty(vm.Custom);
+    }
+
+    /// <summary>Pins are keyed by command text against the merged list, so one of the user's own commands
+    /// pins exactly like a catalog row — which is why the shell loads commands before pins.</summary>
+    [Fact]
+    public void Pins_ApplyToTheUsersOwnCommandsToo() {
+        var vm = new ToolkitViewModel();
+        vm.LoadPins("");
+        vm.AddCommand(Mine("Pinnable"));
+        var entry = vm.Custom[0];
+
+        vm.TogglePinCommand.Execute(entry);
+        var encoded = vm.EncodePins();
+
+        Assert.Contains("Pinnable", ToolkitPins.Decode(encoded));
+
+        var restored = new ToolkitViewModel();
+        restored.LoadCommands(vm.EncodeCommands());
+        restored.LoadPins(encoded);
+
+        Assert.True(restored.Custom[0].IsPinned);
+        vm.LoadPins("");
+    }
+
+    /// <summary>Loading pins before the commands they name is the ordering bug this guards: the pin finds
+    /// nothing and is silently dropped.</summary>
+    [Fact]
+    public void LoadPins_BeforeLoadCommands_LosesThePinOnACustomRow() {
+        var vm = new ToolkitViewModel();
+        var pins = ToolkitPins.Encode(["Pinnable"]);
+
+        vm.LoadPins(pins);
+        vm.LoadCommands(ToolkitCommandCodec.Encode([Mine("Pinnable")]));
+
+        Assert.False(vm.Custom[0].IsPinned);
+
+        // The order the shell actually uses.
+        vm.LoadCommands(ToolkitCommandCodec.Encode([Mine("Pinnable")]));
+        vm.LoadPins(pins);
+        Assert.True(vm.Custom[0].IsPinned);
+        vm.LoadPins("");
+    }
+
+    /// <summary>A user's command runs down the ordinary path — the runner cannot tell it from an authored
+    /// row, which is the whole point of building it through the same action factories.</summary>
+    [Fact]
+    public async Task Run_AUsersOwnCaptureCommand_IsLoggedLikeAnyOther() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(new ToolkitCommand(
+            "Mine", "", ToolkitCommandType.Capture, "not-a-real-tool-xyz.exe", "-an"));
+
+        await vm.RunCommand.ExecuteAsync(vm.Custom[0]);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Equal("not-a-real-tool-xyz.exe -an", logged.Command);
+        Assert.NotEqual(ToolkitOutputFormatter.Running, logged.Output);
+    }
+
     // ----- Copy -----
 
     /// <summary>What is copied is what would have run, so a paste into a terminal behaves the same as
