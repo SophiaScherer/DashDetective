@@ -449,6 +449,21 @@ public class ToolkitViewModelTests {
         vm.LoadPins("");
     }
 
+    /// <summary>A labelled custom command is on screen twice on purpose, but it is still one command —
+    /// the count beside the chips is of commands, not of places to click one.</summary>
+    [Fact]
+    public void CountLabel_CountsALabelledCustomCommandOnceDespiteItsTwoRows() {
+        var vm = new ToolkitViewModel();
+        vm.AddCommand(new ToolkitCommand(
+            "zzz-my-own", "", ToolkitCommandType.Launch, "thing.exe", "", ToolkitCategory.Folders));
+
+        vm.Search = "zzz-my-own";
+
+        Assert.Equal(2, vm.Groups.Count);
+        Assert.Equal(2, vm.Groups.Sum(g => g.Items.Count));
+        Assert.Equal("1 command", vm.CountLabel);
+    }
+
     /// <summary>A user's command runs down the ordinary path — the runner cannot tell it from an authored
     /// row, which is the whole point of building it through the same action factories.</summary>
     [Fact]

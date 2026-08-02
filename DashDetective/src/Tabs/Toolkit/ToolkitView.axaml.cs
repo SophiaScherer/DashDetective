@@ -5,6 +5,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -56,7 +57,12 @@ public partial class ToolkitView : UserControl {
     /// found by the command in their <c>Tag</c>, so nothing here has to know the command set — the same
     /// seam SettingsView uses.
     ///
-    /// Posted at Loaded because resetting the filter rebuilds the rows: the row does not exist in the
+    /// **Every** row carrying the command is flashed, not just the first. A custom command the user filed
+    /// under a category owns two rows — one under My Commands, one under that category — and flashing
+    /// only one of them would leave the other looking like a different command that happens to share a
+    /// name. The scroll goes to the first, since only one can be brought into view.
+    ///
+    /// Posted at Loaded because resetting the filter rebuilds the rows: the rows do not exist in the
     /// visual tree until that layout pass has run.
     /// </summary>
     private void ScheduleReveal() {
@@ -64,18 +70,20 @@ public partial class ToolkitView : UserControl {
             return;
 
         Dispatcher.UIThread.Post(() => {
-            if (FindRow(command) is not { } row)
+            var rows = FindRows(command);
+            if (rows.Count == 0)
                 return;
 
-            row.BringIntoView();
-            Flash(row);
+            rows[0].BringIntoView();
+            foreach (var row in rows)
+                Flash(row);
         }, DispatcherPriority.Loaded);
     }
 
-    private Border? FindRow(string command) =>
-        this.GetVisualDescendants()
-            .OfType<Border>()
-            .FirstOrDefault(border => border.Tag is string tag && tag == command);
+    private List<Border> FindRows(string command) =>
+        [.. this.GetVisualDescendants()
+               .OfType<Border>()
+               .Where(border => border.Tag is string tag && tag == command)];
 
     // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
     private static void Flash(Border row) {

@@ -358,15 +358,19 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// changes on a keystroke or a chip, so there is nothing here for a keyed diff to save.</summary>
     private void RebuildGroups() {
         Groups.Clear();
-        var matched = 0;
+
+        // Counted by distinct row rather than by section total: a custom command the user filed under a
+        // category shows in two sections, and the count is of commands, not of places to click one.
+        var matched = new HashSet<ToolkitEntry>();
         foreach (var group in ToolkitFilter.Group(AllEntries, _category, Search)) {
             Groups.Add(group);
-            matched += group.Items.Count;
+            foreach (var item in group.Items)
+                matched.Add(item);
         }
 
-        HasCommands = matched > 0;
-        CountLabel = matched == 1
+        HasCommands = matched.Count > 0;
+        CountLabel = matched.Count == 1
             ? "1 command"
-            : matched.ToString(CultureInfo.InvariantCulture) + " commands";
+            : matched.Count.ToString(CultureInfo.InvariantCulture) + " commands";
     }
 }

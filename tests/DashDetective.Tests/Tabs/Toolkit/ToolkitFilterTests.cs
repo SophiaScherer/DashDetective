@@ -132,6 +132,92 @@ public class ToolkitFilterTests {
         Assert.Equal(["tool-pin"], byTerm[0].Items.Select(e => e.Command));
     }
 
+    // ----- Custom commands, and the two places a labelled one appears -----
+
+    private static ToolkitEntry Custom(string title, ToolkitCategory? label = null) =>
+        ToolkitCommandFactory.ToEntry(
+            new ToolkitCommand(title, "", ToolkitCommandType.Launch, "thing.exe", "", label));
+
+    [Fact]
+    public void Group_UnlabelledCustomEntry_AppearsUnderMyCommandsOnly() {
+        var groups = ToolkitFilter.Group([Custom("mine")], null, null);
+
+        var group = Assert.Single(groups);
+        Assert.Equal(ToolkitCategory.Custom, group.Category);
+        Assert.Equal(["mine"], group.Items.Select(e => e.Command));
+    }
+
+    /// <summary>The user asked for it in both places, so it is in both places — the one case where the
+    /// same command deliberately owns two rows.</summary>
+    [Fact]
+    public void Group_LabelledCustomEntry_AppearsUnderMyCommandsAndThatCategory() {
+        var groups = ToolkitFilter.Group([Custom("mine", ToolkitCategory.Diagnostics)], null, null);
+
+        Assert.Equal<ToolkitCategory?>(
+            [ToolkitCategory.Custom, ToolkitCategory.Diagnostics], groups.Select(g => g.Category));
+        Assert.All(groups, g => Assert.Equal(["mine"], g.Items.Select(e => e.Command)));
+    }
+
+    [Fact]
+    public void Group_LabelledCustomEntry_SitsAlongsideTheCatalogRowsInThatSection() {
+        ToolkitEntry[] entries = [
+            Entry("authored", category: ToolkitCategory.Diagnostics),
+            Custom("mine", ToolkitCategory.Diagnostics),
+        ];
+
+        var groups = ToolkitFilter.Group(entries, null, null);
+
+        var diagnostics = groups.Single(g => g.Category == ToolkitCategory.Diagnostics);
+        Assert.Equal(["authored", "mine"], diagnostics.Items.Select(e => e.Command));
+    }
+
+    /// <summary>Asking for Folders should give the Folders section, not the Folders section plus a My
+    /// Commands section holding the same row again.</summary>
+    [Fact]
+    public void Group_ChipCollapsesALabelledCustomEntryToTheOneSectionAskedFor() {
+        ToolkitEntry[] entries = [Custom("mine", ToolkitCategory.Folders)];
+
+        var byLabel = Assert.Single(ToolkitFilter.Group(entries, ToolkitCategory.Folders, null));
+        Assert.Equal(ToolkitCategory.Folders, byLabel.Category);
+
+        var byCustom = Assert.Single(ToolkitFilter.Group(entries, ToolkitCategory.Custom, null));
+        Assert.Equal(ToolkitCategory.Custom, byCustom.Category);
+    }
+
+    /// <summary>The chip has to see both of a custom row's categories, or labelling it Folders would file
+    /// it there and then hide it the moment someone picked that very chip.</summary>
+    [Fact]
+    public void Matches_ALabelledCustomEntry_SatisfiesEitherOfItsCategories() {
+        var entry = Custom("mine", ToolkitCategory.Folders);
+
+        Assert.True(ToolkitFilter.Matches(entry, ToolkitCategory.Custom, null));
+        Assert.True(ToolkitFilter.Matches(entry, ToolkitCategory.Folders, null));
+        Assert.False(ToolkitFilter.Matches(entry, ToolkitCategory.Diagnostics, null));
+    }
+
+    /// <summary>Pinning still lifts rather than copies, so a labelled custom row that was in two places
+    /// ends up in exactly one — the whole point of pinning it.</summary>
+    [Fact]
+    public void Group_APinnedLabelledCustomEntry_LeavesBothOfItsSections() {
+        var entry = Custom("mine", ToolkitCategory.Folders);
+        entry.IsPinned = true;
+
+        var groups = ToolkitFilter.Group([entry], null, null);
+
+        var group = Assert.Single(groups);
+        Assert.Equal(ToolkitGroup.PinnedHeader, group.Header);
+        Assert.Single(groups.SelectMany(g => g.Items));
+    }
+
+    [Fact]
+    public void Group_MyCommandsLeadsTheCategorySections() {
+        ToolkitEntry[] entries = [Entry("authored", category: ToolkitCategory.Folders), Custom("mine")];
+
+        var groups = ToolkitFilter.Group(entries, null, null);
+
+        Assert.Equal(ToolkitCategory.Custom, groups[0].Category);
+    }
+
     [Fact]
     public void Group_KeepsEntryOrderWithinASection() {
         var entries = new[] { Entry("first"), Entry("second"), Entry("third") };
