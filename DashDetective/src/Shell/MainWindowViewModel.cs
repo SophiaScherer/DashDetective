@@ -168,7 +168,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Help.Open, Icons.Help),
-            new ToolkitSearchProvider(() => ToolkitCatalog.Entries, RevealToolkit, Icons.Toolkit),
+            new ToolkitSearchProvider(() => _toolkit.AllEntries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
                 new WindowsSearchIndex(), new FileSystemFallbackSearch(),
@@ -176,6 +176,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Icons.Document, Icons.FileExplorer),
         ], _recents);
         _recents.Changed += Persist;
+        _toolkit.PinsChanged += Persist;
+        _toolkit.CommandsChanged += Persist;
+
+        // A Toolkit folder row opening in the app's own File Explorer is the same jump universal search
+        // makes, so it reuses it rather than teaching the page about another tab.
+        _toolkit.FileExplorerRevealRequested += RevealFile;
 
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
@@ -198,6 +204,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
         _fileExplorer.ShowHidden = settings.ShowHiddenFiles;
+
+        // Commands before pins: a pin naming one of the user's own commands has nothing to find until
+        // that command is on the page.
+        _toolkit.LoadCommands(settings.CustomCommands);
+        _toolkit.LoadPins(settings.PinnedCommands);
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
@@ -223,6 +234,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavCollapsed = Nav.IsCollapsed,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
+        PinnedCommands = _toolkit.EncodePins(),
+        CustomCommands = _toolkit.EncodeCommands(),
         LaunchAtStartup = _settings.LaunchAtStartup,
         ShowInTray = _settings.ShowInTray,
         ResourceAlerts = _settings.ResourceAlerts,

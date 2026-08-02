@@ -37,6 +37,9 @@ public sealed class SettingsStoreTests : IDisposable {
             PerformanceShowAllDevices = true,
             CpuDetailedView = true,
             GpuDetailedView = true,
+            // Carries the ASCII record separator the pin encoder uses, so the round trip proves JSON
+            // escapes and restores it rather than eating a control character.
+            PinnedCommands = "%temp%\u001Eipconfig /all",
         };
 
         using (var store = new SettingsStore(_path)) {

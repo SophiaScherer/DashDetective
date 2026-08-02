@@ -33,6 +33,12 @@ public static class ToolkitIcons {
         "M9,1.5 V3.5 M9,14.5 V16.5 M1.5,9 H3.5 M14.5,9 H16.5 " +
         "M3.7,3.7 L5.1,5.1 M12.9,12.9 L14.3,14.3 M14.3,3.7 L12.9,5.1 M5.1,12.9 L3.7,14.3");
 
+    /// <summary>Leaving for somewhere else: a box with an arrow escaping its top-right corner.</summary>
+    public static readonly Geometry Link = Geometry.Parse(
+        "M10,3.5 H14.5 V8 M14.5,3.5 L8.5,9.5 " +
+        "M12,10.5 V14 A0.5,0.5 0 0 1 11.5,14.5 H4 A0.5,0.5 0 0 1 3.5,14 V6.5 " +
+        "A0.5,0.5 0 0 1 4,6 H7.5");
+
     // ----- Fixed per-kind colours (foreground + 14%-tint background, as #AARRGGBB) -----
 
     private static readonly IBrush Blue = Brush.Parse("#4cc2ff");
@@ -43,12 +49,15 @@ public static class ToolkitIcons {
     private static readonly IBrush GreenBg = Brush.Parse("#246ccb5f");
     private static readonly IBrush Yellow = Brush.Parse("#ffcf4d");
     private static readonly IBrush YellowBg = Brush.Parse("#24ffcf4d");
+    private static readonly IBrush Orange = Brush.Parse("#ff8a5c");
+    private static readonly IBrush OrangeBg = Brush.Parse("#24ff8a5c");
 
     /// <summary>The row glyph for a kind.</summary>
     public static Geometry GlyphFor(ToolkitEntryKind kind) => kind switch {
         ToolkitEntryKind.Folder => Folder,
         ToolkitEntryKind.App => App,
         ToolkitEntryKind.Panel => Panel,
+        ToolkitEntryKind.Link => Link,
         _ => Command,
     };
 
@@ -57,6 +66,7 @@ public static class ToolkitIcons {
         ToolkitEntryKind.Folder => Blue,
         ToolkitEntryKind.App => Purple,
         ToolkitEntryKind.Panel => Yellow,
+        ToolkitEntryKind.Link => Orange,
         _ => Green,
     };
 
@@ -65,6 +75,7 @@ public static class ToolkitIcons {
         ToolkitEntryKind.Folder => BlueBg,
         ToolkitEntryKind.App => PurpleBg,
         ToolkitEntryKind.Panel => YellowBg,
+        ToolkitEntryKind.Link => OrangeBg,
         _ => GreenBg,
     };
 }

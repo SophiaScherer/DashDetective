@@ -52,6 +52,16 @@ public sealed record AppSettings {
     /// value equality (which the round-trip relies on) compares a collection by reference.</summary>
     public string RecentSearches { get; init; } = "";
 
+    /// <summary>The Toolkit commands the user has pinned, encoded by <c>ToolkitPins</c>. Opaque here for
+    /// the same reason as <see cref="RecentSearches"/> above: this record — and the settings file — stay
+    /// free of any knowledge of what a Toolkit command is.</summary>
+    public string PinnedCommands { get; init; } = "";
+
+    /// <summary>The Toolkit commands the user authored themselves, encoded by <c>ToolkitCommandCodec</c>.
+    /// Opaque here for the same reason as the two above. Nothing in this string ever runs on its own: a
+    /// stored command becomes a row, and a row runs only when it is clicked.</summary>
+    public string CustomCommands { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();

@@ -21,6 +21,9 @@
         <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
         <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
         <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
+        <!-- The elevation shield. Fixed rather than themed, like the kind badges and the status dots:
+             "this raises a UAC prompt" must read the same under every accent. -->
+        <SolidColorBrush x:Key="ShieldAmber" Color="#ffcf4d"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -38,26 +41,60 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
-        <!-- One command row. The bottom hairline separates rows inside the grouped card; the
-             transition makes the search-reveal flash fade out rather than blink off, as
-             SettingsView's settingRow does. -->
+        <!-- One command row. The bottom hairline separates rows inside the grouped card.
+             Hover is instant and untransitioned, matching File Explorer's fileRow and Performance's
+             resCard: a brush transition here would animate the hover itself, so scrolling the list
+             under a stationary pointer smears the highlight across every row it passes. The
+             search-reveal fade lives on revealFlash below instead — the two used to share this
+             element, which is what made the drag. -->
         <Style Selector="Border.cmdRow">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="Padding" Value="14,12"/>
-            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.cmdRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+
+        <!-- The search-reveal tint, on its own layer behind the row's content. It carries the
+             transition — and has no hover rule of its own — so the flash still fades out rather than
+             blinking off, exactly as SettingsView's settingRow does. -->
+        <Style Selector="Border.revealFlash">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <BrushTransition Property="Background" Duration="0:0:0.4"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="Border.cmdRow:pointerover">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-        </Style>
-        <Style Selector="Border.cmdRow.highlighted">
+        <Style Selector="Border.cmdRow.highlighted Border.revealFlash">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
+        <!-- The run affordance: a chrome-less button filling the row, so the whole thing is clickable
+             AND reachable by Tab. Being a real Button is what makes Enter work on a focused row — the
+             shortcut layer leaves Enter unconsumed (Activate falls through MainWindowViewModel's global
+             switch), so it arrives here natively and no IShortcutTarget case is needed. -->
+        <Style Selector="Button.rowRun">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.rowRun /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- Concurrent runs are refused, so a run in flight disables every row at once. Dimmed only
+             lightly: this is a second-or-two state for most commands, and greying the whole list hard
+             would read as the page having broken rather than as it being busy. -->
+        <Style Selector="Button.rowRun:disabled">
+            <Setter Property="Opacity" Value="0.65"/>
         </Style>
 
         <!-- Uppercase section label above each category card. -->
@@ -82,6 +119,18 @@
         <Style Selector="Button.rowAction:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
+        <!-- Copy confirmation. The glyph goes accent for a moment and fades back, so the click is not
+             silent — the same "flash then fade" the search reveal uses on a row. -->
+        <Style Selector="Button.rowAction Path">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Stroke" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.rowAction.copied Path">
+            <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
+        </Style>
 
         <!-- Chrome-less text button for the log panel's "Clear", so it reads as inline text rather
              than a control (as SharedStyles' pathToggle does on the path row). -->
@@ -100,6 +149,34 @@
         </Style>
         <Style Selector="Button.linkAction:pointerover">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <!-- ===== "+ Add command" form ===== -->
+        <!-- The same field chrome the search box and the row parameter slot draw by hand, named once
+             here because the form has five of them. -->
+        <Style Selector="Border.formField">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Height" Value="32"/>
+        </Style>
+        <Style Selector="Border.formField TextBox">
+            <Setter Property="Margin" Value="9,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.fieldLabel">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+        <!-- The app's first inline field error. A log stanza — how a refused ping answers — would be
+             wrong here: nothing has run, so there is no transcript for it to belong to. Fixed orange
+             rather than the accent, which is swappable and would sometimes read as approval. -->
+        <Style Selector="TextBlock.formError">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
         <!-- Console text: one fixed pitch and one fixed colour set on the dark inset. -->
@@ -173,6 +250,131 @@
              rounded grouped list of command rows. The column scrolls on its own so the Execution
              Log panel beside it stays pinned — the page is ISelfScrollingPage. -->
         <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="16">
+
+                <!-- ===== "+ Add command" ===== -->
+                <!-- Closed to one button, so the page still opens on its commands rather than on a form.
+                     Above the list rather than below it: what you add lands in the first section. -->
+                <Button Classes="action" HorizontalAlignment="Left" Content="+ Add command"
+                        IsVisible="{Binding !Form.IsOpen}"
+                        Command="{Binding Form.OpenCommand}"/>
+
+                <Border Classes="panel" IsVisible="{Binding Form.IsOpen}">
+                    <StackPanel Spacing="12" DataContext="{Binding Form}"
+                                x:DataType="vm:ToolkitCommandFormViewModel">
+                        <TextBlock Classes="panelTitle" Text="{Binding Heading}"/>
+
+                        <!-- Type first: it decides what the payload field below is even called, so
+                             picking it last would mean re-reading the form. Chips rather than a
+                             drop-down — every short pick in this app is chips. -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="Type"/>
+                            <Border Classes="segments" HorizontalAlignment="Left">
+                                <ItemsControl ItemsSource="{Binding Types}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ToolkitCommandTypeOption">
+                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                    <TextBlock Text="{Binding Label}"/>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Classes="fieldLabel" Text="Title"/>
+                                <Border Classes="formField">
+                                    <TextBox Classes="flat" PlaceholderText="What the row will read"
+                                             Text="{Binding Title, Mode=TwoWay}">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Classes="fieldLabel" Text="Description (optional)"/>
+                                <Border Classes="formField">
+                                    <TextBox Classes="flat" PlaceholderText="One line on what it does"
+                                             Text="{Binding Description, Mode=TwoWay}"/>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- The payload's label and placeholder follow the chosen type. Plain view-model
+                             strings, not a converter — this codebase does without them. -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="{Binding PayloadLabel}"/>
+                            <Border Classes="formField">
+                                <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
+                                         PlaceholderText="{Binding PayloadPrompt}"
+                                         Text="{Binding Payload, Mode=TwoWay}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- A folder and a URL take no arguments, so the field goes rather than sitting
+                             there inert. -->
+                        <StackPanel Spacing="6" IsVisible="{Binding TakesArguments}">
+                            <TextBlock Classes="fieldLabel" Text="Arguments (optional)"/>
+                            <Border Classes="formField">
+                                <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
+                                         PlaceholderText="Separated by spaces; quote anything containing one"
+                                         Text="{Binding Arguments, Mode=TwoWay}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="Also show under (optional)"/>
+                            <Border Classes="segments" HorizontalAlignment="Left">
+                                <ItemsControl ItemsSource="{Binding Categories}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ToolkitCategoryOption">
+                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                    <TextBlock Text="{Binding Label}"/>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <TextBlock Classes="formError" Text="{Binding Error}"
+                                   IsVisible="{Binding HasError}"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Classes="action" Content="Cancel"
+                                    Command="{Binding CancelCommand}"/>
+                            <Button Classes="action primary" Content="{Binding SubmitLabel}"
+                                    Command="{Binding SaveCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
             <Panel>
                 <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasCommands}">
                     <ItemsControl.ItemsPanel>
@@ -189,57 +391,223 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
                                                 <Border Classes="cmdRow" Tag="{Binding Command}">
-                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                                                        <Border Grid.Column="0" Width="28" Height="28"
-                                                                CornerRadius="7"
-                                                                Background="{Binding BadgeBackground}">
-                                                            <Path Data="{Binding Icon}"
-                                                                  Stroke="{Binding BadgeForeground}"
-                                                                  StrokeThickness="1.4" StrokeLineCap="Round"
-                                                                  StrokeJoin="Round" Stretch="None"
-                                                                  HorizontalAlignment="Center"
-                                                                  VerticalAlignment="Center"/>
+                                                  <Panel>
+                                                    <!-- Reveal tint, behind the content and spanning
+                                                         the whole row — which is why the row's inset
+                                                         is a Margin on the grid below rather than
+                                                         Padding up here. -->
+                                                    <Border Classes="revealFlash"/>
+
+                                                    <!-- The run button covers everything but the row's
+                                                         own affordances, which stay siblings: nesting a
+                                                         button inside a button would make those clicks
+                                                         run the command too. -->
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                                          ColumnSpacing="10" Margin="14,12">
+                                                        <Button Grid.Column="0" Classes="rowRun"
+                                                                ToolTip.Tip="{Binding Description}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                                                <Border Grid.Column="0" Width="28" Height="28"
+                                                                        CornerRadius="7"
+                                                                        Background="{Binding BadgeBackground}">
+                                                                    <Path Data="{Binding Icon}"
+                                                                          Stroke="{Binding BadgeForeground}"
+                                                                          StrokeThickness="1.4" StrokeLineCap="Round"
+                                                                          StrokeJoin="Round" Stretch="None"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"/>
+                                                                </Border>
+
+                                                                <!-- Command over its description, both
+                                                                     ellipsizing. This is the only flexible
+                                                                     column, so a long command trims here
+                                                                     instead of shouldering the badge out of
+                                                                     the card. -->
+                                                                <StackPanel Grid.Column="1" Spacing="2"
+                                                                            VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Command}"
+                                                                               FontFamily="{StaticResource MonoFont}"
+                                                                               FontSize="13" FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource TextStrong}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Text="{Binding Description}"
+                                                                               FontSize="11.5"
+                                                                               Foreground="{DynamicResource TextSubtle}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                </StackPanel>
+
+                                                                <!-- Elevation shield, on the one row that
+                                                                     raises a UAC prompt. Shown before the
+                                                                     click rather than after, so consent is
+                                                                     never a surprise. -->
+                                                                <Path Grid.Column="2" Width="12" Height="13"
+                                                                      Stretch="Uniform" VerticalAlignment="Center"
+                                                                      Stroke="{StaticResource ShieldAmber}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      ToolTip.Tip="Asks for administrator approval"
+                                                                      IsVisible="{Binding RequiresElevation}"
+                                                                      Data="M6,0.5 L11.5,2.5 V6.5
+                                                                            C11.5,9.3 9.2,11.4 6,12.5
+                                                                            C2.8,11.4 0.5,9.3 0.5,6.5 V2.5 Z"/>
+
+                                                                <!-- The kind badge gets its own fixed column
+                                                                     so it stays legible at any width, and the
+                                                                     badges line up down the card. -->
+                                                                <Border Grid.Column="3" CornerRadius="10"
+                                                                        Padding="7,2" VerticalAlignment="Center"
+                                                                        Background="{Binding BadgeBackground}">
+                                                                    <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
+                                                                               Foreground="{Binding BadgeForeground}"/>
+                                                                </Border>
+                                                            </Grid>
+                                                        </Button>
+
+                                                        <!-- The editable slot on a parameterised row
+                                                             (ping/tracert), and nothing at all on the
+                                                             rest. A sibling of the run button rather
+                                                             than inside it: a TextBox nested in a
+                                                             Button would run the command on every
+                                                             click into the field. Enter in the box
+                                                             runs the row, which the shortcut layer
+                                                             allows through because Activate is
+                                                             AllowInTextInput: false. -->
+                                                        <Border Grid.Column="1" Width="132" Height="28"
+                                                                VerticalAlignment="Center"
+                                                                Background="{DynamicResource FieldBackground}"
+                                                                BorderBrush="{DynamicResource Hairline}"
+                                                                BorderThickness="1" CornerRadius="6"
+                                                                IsVisible="{Binding Parameter,
+                                                                    Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                            <TextBox Classes="flat" Margin="8,0"
+                                                                     FontSize="11.5"
+                                                                     FontFamily="{StaticResource MonoFont}"
+                                                                     VerticalContentAlignment="Center"
+                                                                     PlaceholderText="{Binding Parameter.Prompt}"
+                                                                     Text="{Binding Parameter.Value, Mode=TwoWay}">
+                                                                <TextBox.KeyBindings>
+                                                                    <KeyBinding Gesture="Enter"
+                                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                </TextBox.KeyBindings>
+                                                            </TextBox>
                                                         </Border>
 
-                                                        <!-- Command over its description, both
-                                                             ellipsizing. This is the only flexible
-                                                             column, so a long command trims here
-                                                             instead of shouldering the badge out of
-                                                             the card. -->
-                                                        <StackPanel Grid.Column="1" Spacing="2"
-                                                                    VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Command}"
-                                                                       FontFamily="{StaticResource MonoFont}"
-                                                                       FontSize="13" FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource TextStrong}"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{Binding Description}"
-                                                                       FontSize="11.5"
-                                                                       Foreground="{DynamicResource TextSubtle}"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                        </StackPanel>
+                                                        <!-- "Open where?" on the rows that name a
+                                                             location. Clicking the row body opens the
+                                                             in-app File Explorer, so this icon repeats
+                                                             that deliberately: the pair reads as a
+                                                             choice, and neither destination is the one
+                                                             you have to discover. Hidden on a shell:
+                                                             row, which has no path to navigate to. -->
+                                                        <!-- The slot is held open by the Panel, not the
+                                                             button: a hidden button would collapse this
+                                                             Auto column, the flexible column would take
+                                                             the space, and shell:startup's badge would
+                                                             sit 28px right of every other Folders row. -->
+                                                        <Panel Grid.Column="2" Width="28"
+                                                               IsVisible="{Binding IsPathEntry}">
+                                                            <Button Classes="rowAction"
+                                                                    ToolTip.Tip="Open in DashDetective's File Explorer"
+                                                                    IsVisible="{Binding CanOpenInApp}"
+                                                                    Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenInAppCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Path Width="13" Height="13" Stretch="Uniform"
+                                                                      Stroke="{DynamicResource TextTertiary}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      Data="M1.5,2.5 H11.5 A0.5,0.5 0 0 1 12,3
+                                                                            V11 A0.5,0.5 0 0 1 11.5,11.5
+                                                                            H1.5 A0.5,0.5 0 0 1 1,11 V3
+                                                                            A0.5,0.5 0 0 1 1.5,2.5 Z
+                                                                            M1,5.5 H12"/>
+                                                            </Button>
+                                                        </Panel>
 
-                                                        <!-- The kind badge gets its own fixed column
-                                                             so it stays legible at any width, and the
-                                                             badges line up down the card. -->
-                                                        <Border Grid.Column="2" CornerRadius="10"
-                                                                Padding="7,2" VerticalAlignment="Center"
-                                                                Background="{Binding BadgeBackground}">
-                                                            <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
-                                                                       Foreground="{Binding BadgeForeground}"/>
-                                                        </Border>
+                                                        <!-- The machine's own Explorer. The box-with-an-
+                                                             escaping-arrow is the same "leaves the app"
+                                                             idea ToolkitIcons.Link draws for a URL. -->
+                                                        <Button Grid.Column="3" Classes="rowAction"
+                                                                ToolTip.Tip="Open in Windows Explorer"
+                                                                IsVisible="{Binding IsPathEntry}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenExternallyCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M7.5,1.5 H12 V6 M12,1.5 L6.5,7
+                                                                        M9.5,8 V11.5 A0.5,0.5 0 0 1 9,12
+                                                                        H2 A0.5,0.5 0 0 1 1.5,11.5 V4.5
+                                                                        A0.5,0.5 0 0 1 2,4 H5.5"/>
+                                                        </Button>
+
+                                                        <!-- Edit and delete, on the user's own rows only:
+                                                             a catalog row has no Source to fill the form
+                                                             from, and is not the user's to remove. -->
+                                                        <Button Grid.Column="4" Classes="rowAction"
+                                                                ToolTip.Tip="Edit this command"
+                                                                IsVisible="{Binding IsCustom}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).EditCustomCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M1.5,11.5 V9 L9,1.5 L11.5,4
+                                                                        L4,11.5 Z M7.5,3 L10,5.5"/>
+                                                        </Button>
+
+                                                        <Button Grid.Column="5" Classes="rowAction"
+                                                                ToolTip.Tip="Delete this command"
+                                                                IsVisible="{Binding IsCustom}"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).DeleteCustomCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Path Width="13" Height="13" Stretch="Uniform"
+                                                                  Stroke="{DynamicResource TextTertiary}"
+                                                                  StrokeThickness="1.3" StrokeJoin="Round"
+                                                                  Data="M2,3.5 H11 M5,3.5 V2 H8 V3.5
+                                                                        M3,3.5 L3.6,11.5 H9.4 L10,3.5
+                                                                        M5.5,5.5 V9.5 M7.5,5.5 V9.5"/>
+                                                        </Button>
+
+                                                        <!-- Pin toggle. Two glyphs rather than one with
+                                                             a bound Fill, because a bool-to-brush step
+                                                             would mean a value converter — which this
+                                                             codebase does without everywhere else. -->
+                                                        <Button Grid.Column="6" Classes="rowAction"
+                                                                ToolTip.Tip="Pin to the top of the list"
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).TogglePinCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <Panel>
+                                                                <Path Width="13" Height="13" Stretch="Uniform"
+                                                                      IsVisible="{Binding !IsPinned}"
+                                                                      Stroke="{DynamicResource TextTertiary}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      Data="M7,1 L8.9,5 L13,5.6 L10,8.6
+                                                                            L10.7,12.9 L7,10.9 L3.3,12.9
+                                                                            L4,8.6 L1,5.6 L5.1,5 Z"/>
+                                                                <Path Width="13" Height="13" Stretch="Uniform"
+                                                                      IsVisible="{Binding IsPinned}"
+                                                                      Fill="{DynamicResource Accent}"
+                                                                      Stroke="{DynamicResource Accent}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      Data="M7,1 L8.9,5 L13,5.6 L10,8.6
+                                                                            L10.7,12.9 L7,10.9 L3.3,12.9
+                                                                            L4,8.6 L1,5.6 L5.1,5 Z"/>
+                                                            </Panel>
+                                                        </Button>
 
                                                         <!-- Copy affordance. Placed with the row it
-                                                             belongs to; wiring the clipboard is not
-                                                             part of this UI-only pass. -->
-                                                        <Button Grid.Column="3" Classes="rowAction"
-                                                                ToolTip.Tip="Copy command">
+                                                             belongs to. -->
+                                                        <Button Grid.Column="7" Classes="rowAction"
+                                                                ToolTip.Tip="Copy command"
+                                                                Click="OnCopyClick">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
                                                                   Stroke="{DynamicResource TextTertiary}"
                                                                   StrokeThickness="1.3" StrokeJoin="Round"
                                                                   Data="M4.5,1.5 H11 V8 H4.5 Z M1.5,4.5 H8 V11 H1.5 Z"/>
                                                         </Button>
                                                     </Grid>
+                                                  </Panel>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -250,21 +618,22 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Empty state. Covers both "no commands authored yet" and "the filter matched
-                     nothing", which read the same to the user: an empty list. -->
+                <!-- Empty state. Covers both a search that matched nothing and a category with no
+                     commands in it, which read the same to the user: an empty list. -->
                 <Border Classes="panel" VerticalAlignment="Top" Padding="16,40"
                         IsVisible="{Binding !HasCommands}">
                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                         <TextBlock Text="No commands to show" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Commands will appear here, grouped by category."
+                        <TextBlock Text="Try a different search term or category."
                                    FontSize="11.5" Foreground="{DynamicResource TextSubtle}"
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>
             </Panel>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- ===== Execution Log ===== -->
@@ -273,10 +642,16 @@
              command and capturing its output is not part of this UI-only pass, so it stays empty. -->
         <Border Grid.Column="1" Classes="panel" Padding="14">
             <Grid RowDefinitions="Auto,*" RowSpacing="10">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <!-- Both actions are disabled while the log is empty: there is nothing to clear and
+                     nothing to save, and a picker over an empty log would only waste a click. -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                     <TextBlock Text="Execution Log" Classes="panelTitle" FontSize="13"
                                Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="linkAction" Content="Clear"
+                    <Button Grid.Column="1" Classes="linkAction" Content="Export"
+                            Click="OnExportLogClick" IsEnabled="{Binding HasLog}"
+                            ToolTip.Tip="Save the log to a text file"
+                            VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Classes="linkAction" Content="Clear"
                             Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"
                             VerticalAlignment="Center"/>
                 </Grid>

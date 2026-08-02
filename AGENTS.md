@@ -33,34 +33,132 @@ task explicitly assigns, and do not modify a live feature without an explicit sc
 patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
-drives/health view; status below), **Toolkit** (UI only; status below) and **Keyboard shortcuts**
+drives/health view; status below), **Toolkit** (live; status below) and **Keyboard shortcuts**
 (status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
 de-duplication / composition refactor) — write-ups in the Appendix.
 
-**Toolkit — implementation status** (UI ONLY):
+**Toolkit — implementation status** (LIVE):
 
 - **Toolkit** — the design document's **"Commands"** tab, shipped in the live app as **Toolkit** (nav
-  label, folder, namespace and type names; "Commands" is a design-doc-only name). Built in phases
-  (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`). It is the **ninth** tab,
+  label, folder, namespace and type names; "Commands" is a design-doc-only name). The UI was built in
+  phases (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`); execution and the
+  command set are being built in phases now (plan:
+  `C:\Users\User\.claude\plans\develop-a-phased-plan-sunny-crystal.md`). It is the **ninth** tab,
   sitting between Hardware and Settings, which is why the Ctrl+digit tab jumps now run **Ctrl+1 …
   Ctrl+9**.
-- **Only the UI exists.** `ToolkitCatalog.Entries` is deliberately **empty** — the design document's
-  command data was inaccurate, so no entries were authored — and **nothing runs a command**. The page
-  therefore renders its empty states. `ToolkitCatalog.Entries` is the single seam to change when the
-  command set is written; the filter, grouping, search provider and every container already work off it.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
-  four categories (`ToolkitCategory`) and four entry kinds (`ToolkitEntryKind`, each with a badge
-  label, colour and glyph) exist and are tested.
-- **Deliberately unbuilt** (do NOT add without an explicit task): running a command, capturing its
-  output into the log, and the per-row copy-to-clipboard. The copy button is placed but inert; Clear
-  really does empty the log and is simply disabled while it is empty. Running arbitrary commands is a
-  **security-relevant** capability — treat it as its own task with its own sign-off, not a follow-on tidy.
+  four categories (`ToolkitCategory` — Folders / System Tools / Diagnostics / Docs & Links) and five
+  entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
+- **Execution is live.** Clicking a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
+  stanza to the Execution Log. A row that names a place on disk is the exception: it opens the in-app File
+  Explorer instead (`ToolkitViewModel.OpenInApp` → `FileExplorerRevealRequested` → the shell's existing
+  `RevealFile`), with Windows Explorer on the row's other icon.
+- **The safety invariants.** `ToolkitCatalog.Entries` used to be an allow-list, and the Toolkit had no
+  free-form entry at all. That changed when users gained the ability to author their own commands
+  (`ToolkitCommand` + the "+ Add command" form). What was actually load-bearing is kept, and **these four
+  are the rules — do not weaken them**:
+  1. **Arguments always reach the OS as a list.** `ToolkitAction.Arguments` is an `IReadOnlyList<string>`
+     passed to `ProcessStartInfo.ArgumentList`; nothing is ever joined into a command line, and `Capture`
+     keeps `UseShellExecute = false`. There is no `cmd /c` anywhere. `ToolkitArgumentParser` splits the
+     user's typed string, so `&`, `|`, `>` and `$(…)` reach the program as literal text — no shell exists
+     to interpret them. `ToolkitAction.CommandLine` is display-only and nothing is ever run from it.
+  2. **Elevation is catalog-only.** `ToolkitCommandType` (the form's types: `FolderPath`, `Launch`,
+     `Capture`, `Url`) has **no elevated member**, so no form input can produce a row that raises UAC.
+     `sfc /scannow` remains the one elevated entry. Elevation is its own `ToolkitActionKind` (not a flag)
+     because Windows refuses to redirect a `runas` process's streams, so "elevated *and* captured" is not
+     expressible.
+  3. **`OpenUrl` is https-only**, refused in `ToolkitRunner.RunAsync` regardless of where the action was
+     authored — which covers user URLs for free. `ToolkitCommandValidator` says the same thing earlier, in
+     the form, where it is still fixable.
+  4. **Nothing persisted ever runs on its own.** A stored command becomes a row; a row runs only when it is
+     clicked. The Execution Log's `$` line prints the resolved target and arguments, so a row whose label
+     disagrees with what it runs is visible the moment it fires.
+
+  Accepted, documented residual risk: `settings.json` can now put a mislabelled runnable row on the page if
+  it is tampered with. That is not an escalation — anything able to write `%AppData%\DashDetective` can
+  already write `shell:startup` — and it cannot fire without a click.
+- **Catalog:** four authored categories — Folders, System Tools, Diagnostics (parameterised ping/tracert
+  and the elevated `sfc /scannow`) and Docs & Links — plus **My Commands** (`ToolkitCategory.Custom`),
+  which holds what the user authored. Adding a *built-in* row still means editing `ToolkitCatalog.Entries`
+  and nothing else. What everything downstream reads is `ToolkitViewModel.AllEntries` (catalog + custom),
+  **not** `ToolkitCatalog.Entries` — filter, grouping, pins and the search provider all go through it.
+- **User-authored commands.** `ToolkitCommand` is what the user typed; `ToolkitCommandFactory` turns it
+  into an ordinary `ToolkitEntry` through the catalog's own `ToolkitAction` factories, so `ToolkitRunner`
+  cannot tell a user's row from an authored one and there is no second execution path to keep safe. The
+  *typed* payload is what persists (via `ToolkitCommandCodec` into `AppSettings.CustomCommands`, `ToolkitPins`'
+  encoding one level deeper: `0x1E` between records, `0x1F` between fields, enums by name) — so the edit
+  form re-fills with the user's own words rather than something reconstructed from an action. Commands load
+  **before** pins in `ApplySettings`, or a pin naming one finds nothing.
+- **A custom command can appear twice.** It is always in My Commands, and additionally in the category the
+  user labelled it with (`ToolkitEntry.SecondaryCategory`) — the one case where a command deliberately owns
+  two rows. `ToolkitFilter.Matches` therefore accepts *either* of its categories, and picking a chip
+  collapses it back to the one section asked for. Two consequences: `RebuildGroups` counts **distinct rows**
+  for the count label, and `ToolkitView.FindRows` flashes **every** row carrying a revealed command rather
+  than the first. Pinning still lifts rather than copies, so a pinned labelled row leaves both sections.
+- The Execution Log **exports** to a text file (`BuildLogText` + a save picker in the view code-behind,
+  the `SettingsView.SaveAsync` flow). Stanzas keep the order they are shown in — newest first — so the
+  file reads as what was on screen.
+- **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
+  opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
+  text, not by index**, so a list that gains or loses a row between sessions cannot silently re-point
+  them; a pin naming a command that no longer exists is dropped when applied. Storing by live text is
+  also why renaming a custom command keeps its pin without any identity field: `EncodePins` reads current
+  state, so the next persist writes the new title. A pinned row is **lifted** into the Pinned section, not
+  copied there — it is the one row the user asked to be able to find in a fixed place. The chip and search
+  term still apply to pinned rows. Note `IsPinned` lives on the shared `ToolkitCatalog` entries (there is
+  exactly one Toolkit page, so they *are* its rows) — tests that touch pins must reset them rather than
+  assume a clean slate.
+- **Docs & Links rows are labelled by title, not URL** (a Learn URL ellipsizes to nothing in the row's
+  mono label); the URL still reaches the Execution Log through `ToolkitAction.CommandLine`, so what was
+  opened is on the record. Every URL was **fetched and confirmed live** when authored — one candidate
+  (`troubleshoot/.../use-system-file-checker-tool`) was a 404 and was replaced by the
+  `windows-commands/sfc` reference. A test pins that every link is `https://`, since the runner refuses
+  anything else and a non-https row could only ever be a dead button.
+- **`sfc /scannow` is the only row that elevates**, and `ToolkitCatalogTests` pins that set **by name** —
+  adding another must be a deliberate edit to that test, not something that slips in. It is `Elevated`
+  rather than `Capture` for two independent reasons: Windows will not redirect a `runas` process's
+  streams, and sfc runs for many minutes, which a captured command's timeout would cut short. The row
+  carries an amber shield (fixed colour, like the kind badges) **and** says "needs administrator" in its
+  description, because the shield is invisible to anyone reaching the row through universal search.
+- **`ping`/`tracert` carry the only user input in the app**, and `ToolkitHostValidator` is the only place
+  it is checked. Injection is already impossible (the value becomes one `ArgumentList` element), so the
+  validator's real job is that **an accepted value cannot be a flag** — a DNS label may not begin with a
+  hyphen, so `-t` and friends are refused. The box is seeded with the primary adapter's gateway via
+  `ToolkitDefaults` (reusing `NetworkUsageSampler.SelectPrimary`), off the UI thread and **never over a
+  value already typed**. The log's `$` line shows `ToolkitAction.CommandLine` — the resolved target plus
+  arguments — not the row's label, so a placeholder (`ping <host>`) and any flags the label omits
+  (`tracert -h 20`) are both visible in the transcript.
+- **The page has no separate busy flag, on purpose.** Refusing concurrent runs makes the generated
+  command report `CanExecute` false while one is in flight, which disables every row's button by itself.
+  The stanza is written to the log *before* the command runs and replaced **in place** on completion
+  (reference equality, so a log cleared mid-run drops the result rather than resurrecting it), and it
+  keeps the time the command **started** — stamping it on completion would put a 90 s `systeminfo` a
+  minute and a half away from the click that caused it.
+- System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
+  resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly
+  as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so
+  ShellExecute takes the first — `cplopen` → `control.exe` — which is why the launch must **not** set a
+  Verb unless it is deliberately elevating.
+- The per-row **copy button is live**: it copies `ToolkitViewModel.CopyTextFor` — the same resolved
+  command line the log would record — so a paste into a terminal does what clicking the row does, and a
+  documentation row yields its URL rather than its title. A refused or half-filled host box is left off
+  altogether rather than pasted as a dangling argument. It lives in the view code-behind because the
+  clipboard is reached through the window's `TopLevel`, as `SettingsView.OnCopyDiagnosticsClick` is;
+  `SetTextAsync` needs `using Avalonia.Input.Platform`. Success flashes the glyph accent for a second
+  (the click needs an answer, and the log is for what *ran*).
 - Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the
   comp's `position:sticky` has no Avalonia equivalent. Wired to `IShortcutTarget` (`ShortcutScope.Toolkit`,
   `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the
   reveal gotcha in the *Universal search* write-up in the Appendix. Not `IRefreshablePage` /
   `ILiveSamplingPage`: the page has nothing live to sample or re-read.
+- **Row hover carries no brush transition** — instant, like File Explorer's `fileRow` and Performance's
+  `resCard`. A transition on the hover-bearing element animates the hover itself, so scrolling the list
+  under a stationary pointer smears the highlight across every row it passes. The search-reveal fade
+  therefore lives on its own `revealFlash` layer behind the row content, which owns the transition and
+  has no `:pointerover` rule — the same split `SettingsView.settingRow` gets for free by having no hover
+  state at all. That is also why the row's inset is a `Margin` on the inner grid rather than `Padding` on
+  the row border: the tint has to span the whole row. **Do not merge the two back together.**
 - Two layout decisions were made **against** the comp, both after seeing them fail on screen at the
   window's 920px minimum, and both should be left alone: the **filter bar wraps** (box + five chips
   overflow the content area, and the last chip was unreachable), and the **kind badge sits in its own
@@ -349,16 +447,20 @@ currently exist.
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Toolkit                  ToolkitView.axaml(.cs) + ToolkitViewModel.cs
-                                (UI ONLY — the design doc's "Commands" tab. Filter bar (search box +
-                                 category chips + count) over a grouped command list, beside a pinned
-                                 340px Execution Log. ISelfScrollingPage (each column scrolls itself)
-                                 + IShortcutTarget. No entries and no execution — see the Toolkit
-                                 status bullet under Current Scope. View code-behind owns the search
-                                 focus + the search-reveal flash, like ProcessesView/SettingsView)
+                                (the design doc's "Commands" tab. Filter bar (search box + category
+                                 chips + count) over a grouped command list, beside a pinned 340px
+                                 Execution Log. ISelfScrollingPage (each column scrolls itself) +
+                                 IShortcutTarget. Running a row is an async RelayCommand that refuses
+                                 concurrent runs and prepends one stanza to the log. View code-behind
+                                 owns the search focus + the search-reveal flash, like
+                                 ProcessesView/SettingsView. The row is a chrome-less Button so Enter
+                                 works on a focused row natively — ShortcutId.Activate falls through
+                                 MainWindowViewModel's global switch unconsumed, so no IShortcutTarget
+                                 case is needed. The copy button is a SIBLING of it, not nested)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
-                                ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel — what a
-                                                         command opens, driving its icon + badge)
+                                ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —
+                                                         what a command opens, driving its icon + badge)
                                 ToolkitEntry.cs         (immutable row model; its Icon/Badge* getters
                                                          resolve through ToolkitIcons ON READ, so the
                                                          filter/catalog tests never load geometry)
@@ -368,8 +470,33 @@ currently exist.
                                 ToolkitLogEntry.cs      (record: Time / Command / Output — one console
                                                          stanza in the Execution Log)
                                 ToolkitCatalog.cs       (static copy table + the command set. Entries is
-                                                         EMPTY and is the one seam to change when the
-                                                         commands are authored)
+                                                         also the app's ALLOW-LIST — the runner only ever
+                                                         runs an action authored here)
+                                ToolkitActionKind.cs    (enum: OpenPath / OpenUrl / Launch / Capture /
+                                                         Elevated — how a row is carried out. An enum,
+                                                         not flags, so "elevated AND captured" cannot be
+                                                         expressed: Windows forbids redirecting a runas
+                                                         process's streams)
+                                ToolkitAction.cs        (immutable: target + argument LIST + timeout,
+                                                         built only via static factories. WithArgument
+                                                         appends exactly one element, so a parameterised
+                                                         entry's value can never split into a flag)
+                                ToolkitRunner.cs        (THE single entry point for running a row. Never
+                                                         throws — a missing tool, non-zero exit, timeout
+                                                         or declined UAC prompt all become worded
+                                                         failures. Expands env vars in the TARGET only;
+                                                         refuses any OpenUrl that isn't https://)
+                                ToolkitRunResult.cs     (record: Success / Output / ExitCode)
+                                ToolkitOutputFormatter.cs (pure statics: stream merge, CRLF normalising,
+                                                         console sign-off trim, 200-line / 16 KB caps with
+                                                         the trim announced, plus the outcome wording)
+                                IProcessLauncher.cs +   (the process seam + its real implementation — the
+                                SystemProcessLauncher.cs only place in the app that starts a process.
+                                                         Arguments go via ProcessStartInfo.ArgumentList,
+                                                         never the joined string. Both output streams are
+                                                         drained CONCURRENTLY and WITHOUT the timeout
+                                                         token, or a command that floods its pipe
+                                                         deadlocks and a killed one loses what it printed)
                                 ToolkitFilter.cs        (pure statics: Matches (chip AND term, over the
                                                          command and its description) + Group (buckets
                                                          into catalog order, dropping emptied sections).

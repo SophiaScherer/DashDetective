@@ -17,11 +17,14 @@ namespace DashDetective.Tests.Shell.Search;
 public class ToolkitSearchProviderTests {
     private static readonly IReadOnlyList<ToolkitEntry> Sample = [
         new("ipconfig /flushdns", "Clears the DNS resolver cache",
-            ToolkitCategory.Terminal, ToolkitEntryKind.Command),
+            ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture("ipconfig", "/flushdns")),
         new("ncpa.cpl", "Opens the network adapter list",
-            ToolkitCategory.SystemTools, ToolkitEntryKind.Panel),
+            ToolkitCategory.SystemTools, ToolkitEntryKind.Panel,
+            ToolkitAction.Launch("ncpa.cpl")),
         new("shell:startup", "Opens the folder ipconfig knows nothing about",
-            ToolkitCategory.FileLocations, ToolkitEntryKind.Folder),
+            ToolkitCategory.Folders, ToolkitEntryKind.Folder,
+            ToolkitAction.OpenPath("shell:startup")),
     ];
 
     private static Task<IReadOnlyList<SearchResult>> Query(
@@ -82,10 +85,52 @@ public class ToolkitSearchProviderTests {
         Assert.Empty(await Query("zzzz"));
     }
 
-    /// <summary>The shipped state: the command set is empty until the entries are authored, and search
-    /// must simply find nothing rather than fault the whole query.</summary>
+    /// <summary>A filtered-to-nothing command set must simply find nothing rather than fault the whole
+    /// query — the provider reads the catalog through a callback, so it cannot assume a populated one.</summary>
     [Fact]
     public async Task QueryAsync_EmptyCommandSet_ReturnsNothing() {
-        Assert.Empty(await Query("ipconfig", entries: ToolkitCatalog.Entries));
+        Assert.Empty(await Query("ipconfig", entries: []));
+    }
+
+    /// <summary>The real catalog is reachable through the provider, so an authored command is findable
+    /// from the toolbar without the provider being told about it.</summary>
+    [Fact]
+    public async Task QueryAsync_RealCatalog_FindsAnAuthoredCommand() {
+        var results = await Query("appdata", entries: ToolkitCatalog.Entries);
+
+        Assert.Contains(results, r => r.Title == "%appdata%");
+    }
+
+    /// <summary>The page's merged list, not the catalog, is what the shell hands the provider — so a
+    /// command the user authored is findable from the toolbar exactly like an authored one.</summary>
+    [Fact]
+    public async Task QueryAsync_PageEntries_FindTheUsersOwnCommandsToo() {
+        var page = new ToolkitViewModel();
+        page.AddCommand(new ToolkitCommand(
+            "zzz-my-own", "Something only I have", ToolkitCommandType.Launch, "thing.exe"));
+
+        var byTitle = await Query("zzz-my-own", entries: page.AllEntries);
+        var byDescription = await Query("only I have", entries: page.AllEntries);
+        var authored = await Query("appdata", entries: page.AllEntries);
+
+        Assert.Contains(byTitle, r => r.Title == "zzz-my-own");
+        Assert.Contains(byDescription, r => r.Title == "zzz-my-own");
+        Assert.Contains(authored, r => r.Title == "%appdata%");
+    }
+
+    /// <summary>Read through a callback at query time, so a command added after the provider was built is
+    /// findable without anything having to re-register it.</summary>
+    [Fact]
+    public async Task QueryAsync_ACommandAddedAfterwards_IsFoundWithoutRewiring() {
+        var page = new ToolkitViewModel();
+        var provider = new ToolkitSearchProvider(() => page.AllEntries, _ => { });
+
+        Assert.Empty(await provider.QueryAsync(new SearchQuery("zzz-later"), CancellationToken.None));
+
+        page.AddCommand(new ToolkitCommand("zzz-later", "", ToolkitCommandType.Launch, "thing.exe"));
+
+        Assert.Contains(
+            await provider.QueryAsync(new SearchQuery("zzz-later"), CancellationToken.None),
+            r => r.Title == "zzz-later");
     }
 }
