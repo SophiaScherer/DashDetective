@@ -50,6 +50,19 @@ public sealed partial class ToolkitEntry : ObservableObject {
     /// rather than surprising the user with a consent dialog.</summary>
     public bool RequiresElevation => Action.RequiresElevation;
 
+    /// <summary>Whether this row opens a location rather than running something — the rows that get the
+    /// "open where?" pair of icons.</summary>
+    public bool IsPathEntry => Action.Kind == ToolkitActionKind.OpenPath;
+
+    /// <summary>Whether the app's own File Explorer could open this row. False for a <c>shell:</c>
+    /// location, which resolves through the shell namespace and has no path to navigate to — those rows
+    /// offer the external icon only.</summary>
+    public bool CanOpenInApp => IsPathEntry && ToolkitPaths.IsFileSystemPath(Action.Target);
+
+    /// <summary>The row's target with environment variables expanded: what the in-app File Explorer is
+    /// asked to reveal. Resolved on read, so it follows the session like the runner's does.</summary>
+    public string ResolvedPath => ToolkitPaths.Resolve(Action.Target);
+
     public string BadgeLabel => ToolkitCatalog.LabelFor(Kind);
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);
     public IBrush BadgeForeground => ToolkitIcons.ForegroundFor(Kind);

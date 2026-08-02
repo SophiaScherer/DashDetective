@@ -81,10 +81,9 @@ public sealed class ToolkitRunner {
         }
     }
 
-    // Expanded at run time, not when the catalog is built, so %temp% and friends follow the session
-    // rather than baking in whatever they meant at startup. Only the target is expanded — a
-    // parameterised entry's argument is user-supplied and stays literal.
-    private static string Resolve(string target) => Environment.ExpandEnvironmentVariables(target);
+    // Only the target is expanded — a parameterised entry's argument is user-supplied and stays literal.
+    // Shared with the rows, which resolve the same target to offer it to the in-app File Explorer.
+    private static string Resolve(string target) => ToolkitPaths.Resolve(target);
 
     private static bool IsHttps(string target) =>
         target.StartsWith("https://", StringComparison.OrdinalIgnoreCase);

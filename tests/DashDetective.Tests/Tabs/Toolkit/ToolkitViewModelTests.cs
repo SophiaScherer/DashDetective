@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Toolkit;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -441,6 +442,94 @@ public class ToolkitViewModelTests {
 
         Assert.Empty(vm.Log);
         Assert.False(vm.HasLog);
+    }
+
+    // ----- Opening a location: in the app, or in Explorer -----
+
+    private static ToolkitEntry PathRow(string target = "%windir%") =>
+        new(target, "A folder", ToolkitCategory.Folders, ToolkitEntryKind.Folder,
+            ToolkitAction.OpenPath(target));
+
+    /// <summary>Clicking a folder row keeps the user in the app: it navigates rather than handing the
+    /// path to the shell, so nothing is started and nothing lands in the transcript.</summary>
+    [Fact]
+    public async Task Run_PathRow_RevealsInTheAppAndRunsNothing() {
+        var vm = new ToolkitViewModel();
+        var revealed = new List<string>();
+        vm.FileExplorerRevealRequested += revealed.Add;
+
+        await vm.RunCommand.ExecuteAsync(PathRow());
+
+        Assert.Equal([ToolkitPaths.Resolve("%windir%")], revealed);
+        Assert.Empty(vm.Log);
+    }
+
+    /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%".</summary>
+    [Fact]
+    public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
+        var vm = new ToolkitViewModel();
+        string? revealed = null;
+        vm.FileExplorerRevealRequested += path => revealed = path;
+
+        vm.OpenInAppCommand.Execute(PathRow("%temp%"));
+
+        Assert.NotNull(revealed);
+        Assert.DoesNotContain("%", revealed, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A shell: row has no filesystem path, so it offers the external icon only — and asking
+    /// for the in-app one anyway is refused rather than sending a path Explorer would reject.</summary>
+    [Fact]
+    public void OpenInApp_ShellLocation_IsNotOfferedAndDoesNothing() {
+        var vm = new ToolkitViewModel();
+        var shellRow = PathRow("shell:startup");
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        vm.OpenInAppCommand.Execute(shellRow);
+
+        Assert.True(shellRow.IsPathEntry);
+        Assert.False(shellRow.CanOpenInApp);
+        Assert.Equal(0, revealed);
+    }
+
+    /// <summary>A shell: row still activates as a run, because there is no in-app destination to prefer
+    /// — it is the one folder row whose click behaviour is unchanged.</summary>
+    [Fact]
+    public async Task Run_ShellLocationRow_StillGoesToTheShellAndIsLogged() {
+        var vm = new ToolkitViewModel();
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        await vm.RunCommand.ExecuteAsync(PathRow("shell:not-a-real-shell-location-xyz"));
+
+        Assert.Equal(0, revealed);
+        Assert.Single(vm.Log);
+    }
+
+    /// <summary>The external icon is the row's original behaviour, so it must still write a stanza —
+    /// leaving the app is exactly the kind of thing the transcript is for.</summary>
+    [Fact]
+    public async Task OpenExternally_RunsThroughTheNormalPathAndIsLogged() {
+        var vm = new ToolkitViewModel();
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        await vm.OpenExternallyCommand.ExecuteAsync(PathRow(@"C:\not-a-real-folder-xyz"));
+
+        Assert.Equal(0, revealed);
+        var logged = Assert.Single(vm.Log);
+        Assert.NotEqual(ToolkitOutputFormatter.Running, logged.Output);
+    }
+
+    /// <summary>Only location rows get the pair of icons — a command or a documentation link has nowhere
+    /// on disk to open.</summary>
+    [Fact]
+    public void IsPathEntry_IsFalseForEverythingThatIsNotALocation() {
+        Assert.False(MissingTool().IsPathEntry);
+        Assert.False(MissingTool().CanOpenInApp);
+        Assert.All(ToolkitCatalog.Entries.Where(e => e.CanOpenInApp),
+                   entry => Assert.Equal(ToolkitActionKind.OpenPath, entry.Action.Kind));
     }
 
     /// <summary>Reveal resets the filter first: a chip or a half-typed search from earlier could

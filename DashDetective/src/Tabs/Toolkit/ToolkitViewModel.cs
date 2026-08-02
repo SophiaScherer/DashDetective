@@ -124,12 +124,50 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         }
     }
 
+    /// <summary>Raised when a row asks to be opened in the app's own File Explorer, carrying the resolved
+    /// path. The composition root binds it to the same jump universal search uses — the page itself has no
+    /// idea another tab exists, exactly as <see cref="PinsChanged"/> has no idea a settings file
+    /// does.</summary>
+    public event Action<string>? FileExplorerRevealRequested;
+
     /// <summary>
-    /// Runs a command row and records the outcome in the Execution Log, newest first. Concurrent runs
-    /// are refused rather than queued: a second click while one is in flight would interleave two
-    /// stanzas, and the log reads as a transcript. Refusing them also disables every row's button for
-    /// the duration (the generated command reports <c>CanExecute</c> false while it runs), which is the
-    /// page's whole busy state — no separate flag to keep in step.
+    /// Activates a row. A row that names a place on disk opens in the app's own File Explorer — staying
+    /// in the app is the point of having the tab — and the shell is still one click away on the row's
+    /// other icon. Everything else runs.
+    /// </summary>
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private Task Run(ToolkitEntry? entry) {
+        if (entry is { CanOpenInApp: true }) {
+            OpenInApp(entry);
+            return Task.CompletedTask;
+        }
+
+        return Execute(entry);
+    }
+
+    /// <summary>Opens the row's folder in the app's own File Explorer. Nothing is logged: the Execution
+    /// Log is a transcript of what ran, and this navigates rather than running anything.</summary>
+    [RelayCommand]
+    private void OpenInApp(ToolkitEntry? entry) {
+        if (entry is not { CanOpenInApp: true })
+            return;
+
+        FileExplorerRevealRequested?.Invoke(entry.ResolvedPath);
+    }
+
+    /// <summary>Opens the row's location in Windows Explorer — the row's original behaviour, kept as its
+    /// own icon now that the click goes to the in-app explorer. Goes through the ordinary run path, so
+    /// the Execution Log still records it.</summary>
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private Task OpenExternally(ToolkitEntry? entry) => Execute(entry);
+
+    /// <summary>
+    /// Runs a command row and records the outcome in the Execution Log, newest first. The commands that
+    /// reach here (<see cref="RunCommand"/>, <see cref="OpenExternallyCommand"/>) refuse concurrent runs
+    /// rather than queueing them: a second click while one is in flight would interleave two stanzas, and
+    /// the log reads as a transcript. Refusing them also disables every row's button for the duration (the
+    /// generated command reports <c>CanExecute</c> false while it runs), which is the page's whole busy
+    /// state — no separate flag to keep in step.
     ///
     /// The stanza is written **before** the command runs and replaced in place when it finishes, so a
     /// slow capture reads as in-flight rather than as a dead button. That is how a terminal transcript
@@ -138,8 +176,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// Nothing here interprets the command — <see cref="ToolkitRunner"/> already returns display-ready
     /// text for every outcome, including the failures.
     /// </summary>
-    [RelayCommand(AllowConcurrentExecutions = false)]
-    private async Task Run(ToolkitEntry? entry) {
+    private async Task Execute(ToolkitEntry? entry) {
         if (entry is null)
             return;
 

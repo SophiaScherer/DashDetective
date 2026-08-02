@@ -178,6 +178,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _recents.Changed += Persist;
         _toolkit.PinsChanged += Persist;
 
+        // A Toolkit folder row opening in the app's own File Explorer is the same jump universal search
+        // makes, so it reuses it rather than teaching the page about another tab.
+        _toolkit.FileExplorerRevealRequested += RevealFile;
+
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
