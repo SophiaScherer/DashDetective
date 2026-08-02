@@ -35,6 +35,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         Categories = options;
         options[0].IsSelected = true;
+        Form = new ToolkitCommandFormViewModel(() => AllEntries, AddCommand);
         Log.CollectionChanged += (_, _) => HasLog = Log.Count > 0;
         RebuildGroups();
 
@@ -61,6 +62,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>The rows the user authored, in the order they were added.</summary>
     public ObservableCollection<ToolkitEntry> Custom { get; } = [];
+
+    /// <summary>The "+ Add command" form. Always present, but closed to a single button until it is
+    /// opened.</summary>
+    public ToolkitCommandFormViewModel Form { get; }
 
     /// <summary>Every row the page knows about — the catalog's, then the user's. This, not
     /// <see cref="ToolkitCatalog.Entries"/>, is what the filter, the pins and universal search work

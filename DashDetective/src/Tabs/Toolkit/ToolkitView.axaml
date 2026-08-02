@@ -151,6 +151,34 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
+        <!-- ===== "+ Add command" form ===== -->
+        <!-- The same field chrome the search box and the row parameter slot draw by hand, named once
+             here because the form has five of them. -->
+        <Style Selector="Border.formField">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Height" Value="32"/>
+        </Style>
+        <Style Selector="Border.formField TextBox">
+            <Setter Property="Margin" Value="9,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.fieldLabel">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+        </Style>
+        <!-- The app's first inline field error. A log stanza — how a refused ping answers — would be
+             wrong here: nothing has run, so there is no transcript for it to belong to. Fixed orange
+             rather than the accent, which is swappable and would sometimes read as approval. -->
+        <Style Selector="TextBlock.formError">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
         <!-- Console text: one fixed pitch and one fixed colour set on the dark inset. -->
         <Style Selector="TextBlock.console">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
@@ -222,6 +250,131 @@
              rounded grouped list of command rows. The column scrolls on its own so the Execution
              Log panel beside it stays pinned — the page is ISelfScrollingPage. -->
         <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="16">
+
+                <!-- ===== "+ Add command" ===== -->
+                <!-- Closed to one button, so the page still opens on its commands rather than on a form.
+                     Above the list rather than below it: what you add lands in the first section. -->
+                <Button Classes="action" HorizontalAlignment="Left" Content="+ Add command"
+                        IsVisible="{Binding !Form.IsOpen}"
+                        Command="{Binding Form.OpenCommand}"/>
+
+                <Border Classes="panel" IsVisible="{Binding Form.IsOpen}">
+                    <StackPanel Spacing="12" DataContext="{Binding Form}"
+                                x:DataType="vm:ToolkitCommandFormViewModel">
+                        <TextBlock Classes="panelTitle" Text="New command"/>
+
+                        <!-- Type first: it decides what the payload field below is even called, so
+                             picking it last would mean re-reading the form. Chips rather than a
+                             drop-down — every short pick in this app is chips. -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="Type"/>
+                            <Border Classes="segments" HorizontalAlignment="Left">
+                                <ItemsControl ItemsSource="{Binding Types}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ToolkitCommandTypeOption">
+                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                    <TextBlock Text="{Binding Label}"/>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Classes="fieldLabel" Text="Title"/>
+                                <Border Classes="formField">
+                                    <TextBox Classes="flat" PlaceholderText="What the row will read"
+                                             Text="{Binding Title, Mode=TwoWay}">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Classes="fieldLabel" Text="Description (optional)"/>
+                                <Border Classes="formField">
+                                    <TextBox Classes="flat" PlaceholderText="One line on what it does"
+                                             Text="{Binding Description, Mode=TwoWay}"/>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- The payload's label and placeholder follow the chosen type. Plain view-model
+                             strings, not a converter — this codebase does without them. -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="{Binding PayloadLabel}"/>
+                            <Border Classes="formField">
+                                <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
+                                         PlaceholderText="{Binding PayloadPrompt}"
+                                         Text="{Binding Payload, Mode=TwoWay}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- A folder and a URL take no arguments, so the field goes rather than sitting
+                             there inert. -->
+                        <StackPanel Spacing="6" IsVisible="{Binding TakesArguments}">
+                            <TextBlock Classes="fieldLabel" Text="Arguments (optional)"/>
+                            <Border Classes="formField">
+                                <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
+                                         PlaceholderText="Separated by spaces; quote anything containing one"
+                                         Text="{Binding Arguments, Mode=TwoWay}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}"/>
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="fieldLabel" Text="Also show under (optional)"/>
+                            <Border Classes="segments" HorizontalAlignment="Left">
+                                <ItemsControl ItemsSource="{Binding Categories}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ToolkitCategoryOption">
+                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                                <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                    <TextBlock Text="{Binding Label}"/>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+
+                        <TextBlock Classes="formError" Text="{Binding Error}"
+                                   IsVisible="{Binding HasError}"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Classes="action" Content="Cancel"
+                                    Command="{Binding CancelCommand}"/>
+                            <Button Classes="action primary" Content="Save"
+                                    Command="{Binding SaveCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
             <Panel>
                 <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasCommands}">
                     <ItemsControl.ItemsPanel>
@@ -444,6 +597,7 @@
                     </StackPanel>
                 </Border>
             </Panel>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- ===== Execution Log ===== -->
