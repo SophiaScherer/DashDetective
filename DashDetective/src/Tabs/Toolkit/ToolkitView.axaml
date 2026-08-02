@@ -501,20 +501,28 @@
                                                              choice, and neither destination is the one
                                                              you have to discover. Hidden on a shell:
                                                              row, which has no path to navigate to. -->
-                                                        <Button Grid.Column="2" Classes="rowAction"
-                                                                ToolTip.Tip="Open in DashDetective's File Explorer"
-                                                                IsVisible="{Binding CanOpenInApp}"
-                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenInAppCommand}"
-                                                                CommandParameter="{Binding}">
-                                                            <Path Width="13" Height="13" Stretch="Uniform"
-                                                                  Stroke="{DynamicResource TextTertiary}"
-                                                                  StrokeThickness="1.3" StrokeJoin="Round"
-                                                                  Data="M1.5,2.5 H11.5 A0.5,0.5 0 0 1 12,3
-                                                                        V11 A0.5,0.5 0 0 1 11.5,11.5
-                                                                        H1.5 A0.5,0.5 0 0 1 1,11 V3
-                                                                        A0.5,0.5 0 0 1 1.5,2.5 Z
-                                                                        M1,5.5 H12"/>
-                                                        </Button>
+                                                        <!-- The slot is held open by the Panel, not the
+                                                             button: a hidden button would collapse this
+                                                             Auto column, the flexible column would take
+                                                             the space, and shell:startup's badge would
+                                                             sit 28px right of every other Folders row. -->
+                                                        <Panel Grid.Column="2" Width="28"
+                                                               IsVisible="{Binding IsPathEntry}">
+                                                            <Button Classes="rowAction"
+                                                                    ToolTip.Tip="Open in DashDetective's File Explorer"
+                                                                    IsVisible="{Binding CanOpenInApp}"
+                                                                    Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenInAppCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Path Width="13" Height="13" Stretch="Uniform"
+                                                                      Stroke="{DynamicResource TextTertiary}"
+                                                                      StrokeThickness="1.3" StrokeJoin="Round"
+                                                                      Data="M1.5,2.5 H11.5 A0.5,0.5 0 0 1 12,3
+                                                                            V11 A0.5,0.5 0 0 1 11.5,11.5
+                                                                            H1.5 A0.5,0.5 0 0 1 1,11 V3
+                                                                            A0.5,0.5 0 0 1 1.5,2.5 Z
+                                                                            M1,5.5 H12"/>
+                                                            </Button>
+                                                        </Panel>
 
                                                         <!-- The machine's own Explorer. The box-with-an-
                                                              escaping-arrow is the same "leaves the app"

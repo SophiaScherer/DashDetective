@@ -9,10 +9,11 @@ namespace DashDetective.Tabs.Toolkit;
 /// Runs a <see cref="ToolkitAction"/> and reports what happened, in words the Execution Log can show as
 /// they are. The whole feature's execution goes through here.
 ///
-/// **The safety boundary.** This takes a <see cref="ToolkitAction"/> — authored in
-/// <see cref="ToolkitCatalog"/> — never a string a user typed, and arguments reach the OS as a list
-/// rather than a command line (see <see cref="SystemProcessLauncher"/>). There is no free-form command
-/// entry anywhere in the app, so there is nothing to inject into.
+/// **The safety boundary.** This takes a <see cref="ToolkitAction"/> — never a string — and its arguments
+/// reach the OS as a list rather than a command line (see <see cref="SystemProcessLauncher"/>). That holds
+/// whether the action was authored in <see cref="ToolkitCatalog"/> or built from what a user typed into
+/// the "+ Add command" form: no shell is ever involved, so there is nothing to inject into. The
+/// <c>https</c> check below applies the same way, wherever the URL came from.
 ///
 /// Never throws: a missing tool, a refused launch, a dismissed UAC prompt and an overrunning command all
 /// become failure results, logged through <see cref="Log.Warn"/> like every other soft-fail here.

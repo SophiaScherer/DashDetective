@@ -100,4 +100,37 @@ public class ToolkitSearchProviderTests {
 
         Assert.Contains(results, r => r.Title == "%appdata%");
     }
+
+    /// <summary>The page's merged list, not the catalog, is what the shell hands the provider — so a
+    /// command the user authored is findable from the toolbar exactly like an authored one.</summary>
+    [Fact]
+    public async Task QueryAsync_PageEntries_FindTheUsersOwnCommandsToo() {
+        var page = new ToolkitViewModel();
+        page.AddCommand(new ToolkitCommand(
+            "zzz-my-own", "Something only I have", ToolkitCommandType.Launch, "thing.exe"));
+
+        var byTitle = await Query("zzz-my-own", entries: page.AllEntries);
+        var byDescription = await Query("only I have", entries: page.AllEntries);
+        var authored = await Query("appdata", entries: page.AllEntries);
+
+        Assert.Contains(byTitle, r => r.Title == "zzz-my-own");
+        Assert.Contains(byDescription, r => r.Title == "zzz-my-own");
+        Assert.Contains(authored, r => r.Title == "%appdata%");
+    }
+
+    /// <summary>Read through a callback at query time, so a command added after the provider was built is
+    /// findable without anything having to re-register it.</summary>
+    [Fact]
+    public async Task QueryAsync_ACommandAddedAfterwards_IsFoundWithoutRewiring() {
+        var page = new ToolkitViewModel();
+        var provider = new ToolkitSearchProvider(() => page.AllEntries, _ => { });
+
+        Assert.Empty(await provider.QueryAsync(new SearchQuery("zzz-later"), CancellationToken.None));
+
+        page.AddCommand(new ToolkitCommand("zzz-later", "", ToolkitCommandType.Launch, "thing.exe"));
+
+        Assert.Contains(
+            await provider.QueryAsync(new SearchQuery("zzz-later"), CancellationToken.None),
+            r => r.Title == "zzz-later");
+    }
 }

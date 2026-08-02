@@ -8,9 +8,13 @@ namespace DashDetective.Tabs.Toolkit;
 /// and <c>SettingCatalog</c> so both are testable without a UI. The view binds these strings rather
 /// than holding literals, so what is on screen is by construction what search matches against.
 ///
-/// <see cref="Entries"/> is also the app's **allow-list**: <see cref="ToolkitRunner"/> only ever runs a
-/// <see cref="ToolkitAction"/> authored here, and there is no free-form command entry anywhere in the
-/// UI. Adding a row here is the only way to make something runnable.
+/// <see cref="Entries"/> is the **built-in** command set. It is not the whole list any more — the user can
+/// author their own (<see cref="ToolkitCommand"/>), and what the filter, the pins and universal search all
+/// read is <see cref="ToolkitViewModel.AllEntries"/>. Adding a built-in row still means editing this table
+/// and nothing else.
+///
+/// This table is also where <see cref="ToolkitActionKind.Elevated"/> lives and the only place it can:
+/// <see cref="ToolkitCommandType"/> has no elevated member, so no user-authored row can raise a UAC prompt.
 /// </summary>
 public static class ToolkitCatalog {
     /// <summary>Every command, in no particular order — the list groups them by category.</summary>

@@ -168,7 +168,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Help.Open, Icons.Help),
-            new ToolkitSearchProvider(() => ToolkitCatalog.Entries, RevealToolkit, Icons.Toolkit),
+            new ToolkitSearchProvider(() => _toolkit.AllEntries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
                 new WindowsSearchIndex(), new FileSystemFallbackSearch(),

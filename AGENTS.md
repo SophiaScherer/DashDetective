@@ -51,26 +51,64 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   four categories (`ToolkitCategory` — Folders / System Tools / Diagnostics / Docs & Links) and five
   entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
 - **Execution is live.** Clicking a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
-  stanza to the Execution Log. **`ToolkitCatalog.Entries` is the app's allow-list**: the runner only ever
-  runs an action authored there, arguments reach the OS through `ProcessStartInfo.ArgumentList` rather
-  than a joined command line, and there is **no free-form command box anywhere — do not add one**.
-  Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
-  process's streams, so "elevated *and* captured" is not expressible.
-- **Catalog:** all four categories authored — Folders, System Tools, Diagnostics (parameterised
-  ping/tracert and the elevated `sfc /scannow`) and Docs & Links. Adding a row means editing
-  `ToolkitCatalog.Entries` and nothing else; the filter, grouping, search provider, runner and every
-  container already work off it.
+  stanza to the Execution Log. A row that names a place on disk is the exception: it opens the in-app File
+  Explorer instead (`ToolkitViewModel.OpenInApp` → `FileExplorerRevealRequested` → the shell's existing
+  `RevealFile`), with Windows Explorer on the row's other icon.
+- **The safety invariants.** `ToolkitCatalog.Entries` used to be an allow-list, and the Toolkit had no
+  free-form entry at all. That changed when users gained the ability to author their own commands
+  (`ToolkitCommand` + the "+ Add command" form). What was actually load-bearing is kept, and **these four
+  are the rules — do not weaken them**:
+  1. **Arguments always reach the OS as a list.** `ToolkitAction.Arguments` is an `IReadOnlyList<string>`
+     passed to `ProcessStartInfo.ArgumentList`; nothing is ever joined into a command line, and `Capture`
+     keeps `UseShellExecute = false`. There is no `cmd /c` anywhere. `ToolkitArgumentParser` splits the
+     user's typed string, so `&`, `|`, `>` and `$(…)` reach the program as literal text — no shell exists
+     to interpret them. `ToolkitAction.CommandLine` is display-only and nothing is ever run from it.
+  2. **Elevation is catalog-only.** `ToolkitCommandType` (the form's types: `FolderPath`, `Launch`,
+     `Capture`, `Url`) has **no elevated member**, so no form input can produce a row that raises UAC.
+     `sfc /scannow` remains the one elevated entry. Elevation is its own `ToolkitActionKind` (not a flag)
+     because Windows refuses to redirect a `runas` process's streams, so "elevated *and* captured" is not
+     expressible.
+  3. **`OpenUrl` is https-only**, refused in `ToolkitRunner.RunAsync` regardless of where the action was
+     authored — which covers user URLs for free. `ToolkitCommandValidator` says the same thing earlier, in
+     the form, where it is still fixable.
+  4. **Nothing persisted ever runs on its own.** A stored command becomes a row; a row runs only when it is
+     clicked. The Execution Log's `$` line prints the resolved target and arguments, so a row whose label
+     disagrees with what it runs is visible the moment it fires.
+
+  Accepted, documented residual risk: `settings.json` can now put a mislabelled runnable row on the page if
+  it is tampered with. That is not an escalation — anything able to write `%AppData%\DashDetective` can
+  already write `shell:startup` — and it cannot fire without a click.
+- **Catalog:** four authored categories — Folders, System Tools, Diagnostics (parameterised ping/tracert
+  and the elevated `sfc /scannow`) and Docs & Links — plus **My Commands** (`ToolkitCategory.Custom`),
+  which holds what the user authored. Adding a *built-in* row still means editing `ToolkitCatalog.Entries`
+  and nothing else. What everything downstream reads is `ToolkitViewModel.AllEntries` (catalog + custom),
+  **not** `ToolkitCatalog.Entries` — filter, grouping, pins and the search provider all go through it.
+- **User-authored commands.** `ToolkitCommand` is what the user typed; `ToolkitCommandFactory` turns it
+  into an ordinary `ToolkitEntry` through the catalog's own `ToolkitAction` factories, so `ToolkitRunner`
+  cannot tell a user's row from an authored one and there is no second execution path to keep safe. The
+  *typed* payload is what persists (via `ToolkitCommandCodec` into `AppSettings.CustomCommands`, `ToolkitPins`'
+  encoding one level deeper: `0x1E` between records, `0x1F` between fields, enums by name) — so the edit
+  form re-fills with the user's own words rather than something reconstructed from an action. Commands load
+  **before** pins in `ApplySettings`, or a pin naming one finds nothing.
+- **A custom command can appear twice.** It is always in My Commands, and additionally in the category the
+  user labelled it with (`ToolkitEntry.SecondaryCategory`) — the one case where a command deliberately owns
+  two rows. `ToolkitFilter.Matches` therefore accepts *either* of its categories, and picking a chip
+  collapses it back to the one section asked for. Two consequences: `RebuildGroups` counts **distinct rows**
+  for the count label, and `ToolkitView.FindRows` flashes **every** row carrying a revealed command rather
+  than the first. Pinning still lifts rather than copies, so a pinned labelled row leaves both sections.
 - The Execution Log **exports** to a text file (`BuildLogText` + a save picker in the view code-behind,
   the `SettingsView.SaveAsync` flow). Stanzas keep the order they are shown in — newest first — so the
   file reads as what was on screen.
 - **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
   opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
-  text, not by index**, so a catalog that gains or loses a row between sessions cannot silently
-  re-point them; a pin naming a command that no longer exists is dropped when applied. A pinned row is
-  **lifted** into the Pinned section, not copied there — two rows carrying one command would break the
-  search reveal, which flashes the first row it matches. The chip and search term still apply to pinned
-  rows. Note `IsPinned` lives on the shared `ToolkitCatalog` entries (there is exactly one Toolkit page,
-  so they *are* its rows) — tests that touch pins must reset them rather than assume a clean slate.
+  text, not by index**, so a list that gains or loses a row between sessions cannot silently re-point
+  them; a pin naming a command that no longer exists is dropped when applied. Storing by live text is
+  also why renaming a custom command keeps its pin without any identity field: `EncodePins` reads current
+  state, so the next persist writes the new title. A pinned row is **lifted** into the Pinned section, not
+  copied there — it is the one row the user asked to be able to find in a fixed place. The chip and search
+  term still apply to pinned rows. Note `IsPinned` lives on the shared `ToolkitCatalog` entries (there is
+  exactly one Toolkit page, so they *are* its rows) — tests that touch pins must reset them rather than
+  assume a clean slate.
 - **Docs & Links rows are labelled by title, not URL** (a Learn URL ellipsizes to nothing in the row's
   mono label); the URL still reaches the Execution Log through `ToolkitAction.CommandLine`, so what was
   opened is on the record. Every URL was **fetched and confirmed live** when authored — one candidate

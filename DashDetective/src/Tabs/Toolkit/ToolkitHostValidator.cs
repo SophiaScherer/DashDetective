@@ -7,12 +7,12 @@ namespace DashDetective.Tabs.Toolkit;
 /// Whether a string is something we are willing to hand to <c>ping</c> or <c>tracert</c> as a target.
 /// Pure statics, so the rule is testable without a UI or a process.
 ///
-/// This is the **only user input in the whole Toolkit**, and the only place it is checked. Injection is
-/// already impossible — the value becomes one element of a <c>ProcessStartInfo.ArgumentList</c>, never
-/// part of a command line (see <see cref="ToolkitAction.WithArgument"/>) — so this is defence in depth
-/// with one job of its own: an accepted value **cannot be a flag**. A hostname label may not begin with
-/// a hyphen, so <c>-t</c> (ping forever) and friends are rejected before they can change what the
-/// command does.
+/// This guards the parameterised rows only; what the "+ Add command" form collects is
+/// <see cref="ToolkitCommandValidator"/>'s. Injection is already impossible either way — the value becomes
+/// one element of a <c>ProcessStartInfo.ArgumentList</c>, never part of a command line (see
+/// <see cref="ToolkitAction.WithArgument"/>) — so this is defence in depth with one job of its own: an
+/// accepted value **cannot be a flag**. A hostname label may not begin with a hyphen, so <c>-t</c> (ping
+/// forever) and friends are rejected before they can change what an authored row does.
 /// </summary>
 public static class ToolkitHostValidator {
     /// <summary>The longest a DNS name may be, per RFC 1035.</summary>

@@ -5,14 +5,16 @@ namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
 /// What running an entry actually does: a target plus the arguments it takes, and the path it runs down.
-/// Authored in <see cref="ToolkitCatalog"/> through the static factories below, never built from user
-/// input — this is the type that makes the Toolkit's safety property structural rather than a
-/// convention. <see cref="Arguments"/> is a **list**, and <see cref="ToolkitRunner"/> passes it to
-/// <c>ProcessStartInfo.ArgumentList</c>, so nothing is ever concatenated into a command line and there
-/// is no quoting or interpolation to get wrong.
+/// Only ever built through the static factories below — by <see cref="ToolkitCatalog"/> for the built-in
+/// rows, and by <see cref="ToolkitCommandFactory"/> for the user's own. This is the type that makes the
+/// Toolkit's safety property structural rather than a convention: <see cref="Arguments"/> is a **list**,
+/// and <see cref="ToolkitRunner"/> passes it to <c>ProcessStartInfo.ArgumentList</c>, so nothing is ever
+/// concatenated into a command line and there is no quoting or interpolation to get wrong.
 ///
-/// The one variable slot in the whole feature is a parameterised entry's argument (ping/tracert), and it
-/// is validated before it reaches <see cref="WithArgument"/>.
+/// Two slots are filled from what a user typed — a parameterised entry's argument (ping/tracert), through
+/// <see cref="WithArgument"/> after <see cref="ToolkitHostValidator"/> has passed it, and a custom
+/// command's target and arguments, split by <see cref="ToolkitArgumentParser"/>. Both arrive here as
+/// separate list elements, so neither can become a flag or a second command however it is spelled.
 /// </summary>
 public sealed record ToolkitAction {
     /// <summary>How long a captured command may run before it is killed. Generous because
