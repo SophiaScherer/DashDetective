@@ -77,6 +77,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     private readonly SystemMetricsService _service;
+    private readonly HardwareProviders _providers;
     private readonly IDisposable[] _subscriptions;
 
     // ---- CPU (live) ----
@@ -143,7 +144,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel(SystemMetricsService service) {
+    public PerformanceViewModel(SystemMetricsService service)
+        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
+    /// one, so the shell still builds this exactly as before.</summary>
+    internal PerformanceViewModel(SystemMetricsService service, HardwareProviders providers) {
+        _providers = providers;
+
         _service = service;
 
         // Build the stat tiles first, then the resource rows (their initial charts come from the all-zero
@@ -384,7 +392,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole path so a
         // surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await CpuInfoProvider.GetAsync();
+            var info = await _providers.Cpu.GetAsync();
             _cpuMaxClockMhz = info.MaxClockMhz;
             _cpuRow.Sub = FormatCpuSub(info);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
@@ -449,7 +457,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole path
         // so a surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await MemoryInfoProvider.GetAsync();
+            var info = await _providers.Memory.GetAsync();
             _memoryRow.Spec = FormatMemorySpec(info);
         } catch {
             _memoryRow.Spec = "Unknown RAM";
@@ -470,7 +478,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
     private async Task LoadInventoryAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync();
+            var inventory = await DeviceInventory.LoadAsync(_providers);
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
         } catch {

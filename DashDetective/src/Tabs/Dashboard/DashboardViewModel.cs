@@ -32,6 +32,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private const double MinNetworkScaleMbps = 1.0;
 
     private readonly SystemMetricsService _service;
+    private readonly HardwareProviders _providers;
     private readonly IDisposable[] _subscriptions;
 
     // Per-view rolling histories (the samplers are shared; the histories are not).
@@ -119,7 +120,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _motherboardText = "";
     [ObservableProperty] private string _uptimeText = "";
 
-    public DashboardViewModel(SystemMetricsService service) {
+    public DashboardViewModel(SystemMetricsService service)
+        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
+    /// one, so the shell still builds this exactly as before.</summary>
+    internal DashboardViewModel(SystemMetricsService service, HardwareProviders providers) {
+        _providers = providers;
+
         _service = service;
 
         // The adapter label is chosen once from the busiest active adapter.
@@ -257,11 +265,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Formats a metric value for CSV with two decimals, invariant culture.</summary>
     private static string Csv(double value) => value.ToString("F2", CultureInfo.InvariantCulture);
 
-    private async Task LoadCpuInfoAsync() {
+    /// <summary>Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
+    internal async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await CpuInfoProvider.GetAsync();
+            var info = await _providers.Cpu.GetAsync();
             CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
@@ -273,11 +282,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         }
     }
 
-    private async Task LoadMemoryInfoAsync() {
+    /// <summary>Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
+    internal async Task LoadMemoryInfoAsync() {
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await MemoryInfoProvider.GetAsync();
+            var info = await _providers.Memory.GetAsync();
             MemoryModelText = FormatMemoryModel(info);
         } catch {
             MemoryModelText = "Unknown RAM";
@@ -289,7 +299,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// error.</summary>
     private async Task LoadGpusAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync();
+            var inventory = await DeviceInventory.LoadAsync(_providers);
             RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
         } catch {
             // Leave the existing GPU cards in place on a transient failure.
@@ -320,11 +330,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         UpdateGpuAdapters();
     }
 
-    private async Task LoadSystemInfoAsync() {
+    /// <summary>Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
+    internal async Task LoadSystemInfoAsync() {
         // GetAsync never throws (it falls back to SystemStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await SystemInfoProvider.GetAsync();
+            var info = await _providers.System.GetAsync();
             OsText = info.Os;
             DeviceText = info.Device;
             BiosText = info.Bios;
@@ -537,8 +548,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     private async Task LoadDisksAsync() {
         try {
-            var disksTask = PhysicalDiskProvider.GetAsync();
-            var volumesTask = VolumeProvider.GetAsync();
+            var disksTask = _providers.Disks.GetAsync();
+            var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
             _systemDiskNumber = FindSystemDisk(volumesTask.Result);
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));

@@ -385,10 +385,27 @@ currently exist.
                                  = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
                                  the Dashboard cards + Performance rows each own one for per-adapter readings)
-        GpuAdapterProvider.cs   (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
+        HardwareProviders.cs    (the "what hardware is in this machine" bundle + the single
+                                 ForCurrentPlatform() that picks the Windows or unsupported set for all
+                                 SEVEN members. Built by each consuming page's public ctor (Dashboard,
+                                 Performance, Storage) and handed to DeviceInventory.LoadAsync.
+                                 EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
+                                 members run concurrently; stateful providers are deliberately excluded)
+        IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
+                                 pure, unit-tested — lives on the record, not the DXGI reader)
+        WindowsGpuAdapterProvider.cs
+                                (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
                                  flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
                                  DedicatedVideoMemory rides through DeviceInventory onto
                                  DeviceInstance.VramBytes → the Performance GPU VRAM tile)
+        IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
+                                (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
+                                 ForCurrentPlatform shares ONE reader with the Storage page)
+        IVolumeProvider.cs / WindowsVolumeProvider.cs
+                                (MSFT_Volume enumeration incl. unlettered Recovery/EFI)
+        IDiskTemperatureProvider.cs / WindowsDiskTemperatureProvider.cs
+                                (NVMe composite temp via non-admin IOCTL health log. SYNCHRONOUS by
+                                 design — called per-disk on a slow sub-tick of a timer the caller owns)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
         MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
@@ -436,14 +453,18 @@ currently exist.
         NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
-                                CpuInfoProvider.cs      (static CPU info via WMI, async)
+                                ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
+                                                        (CPU info via WMI, async. Reached through the shared
+                                                         HardwareProviders bundle, NOT statically)
                                 CpuStaticInfo.cs        (record for the WMI result)
-                                MemoryInfoProvider.cs   (static RAM info via WMI, async)
+                                IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
+                                                        (RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
                                 (the CPU/Memory/GPU/Storage/Network *samplers* now live under
                                  src/Services/SystemMetrics + /Network and are owned by
                                  SystemMetricsService — the Dashboard VM subscribes, it no longer owns them)
-                                SystemInfoProvider.cs   (static system identity — OS/device/BIOS/board/build —
+                                ISystemInfoProvider.cs + WindowsSystemInfoProvider.cs
+                                                        (static system identity — OS/device/BIOS/board/build —
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
