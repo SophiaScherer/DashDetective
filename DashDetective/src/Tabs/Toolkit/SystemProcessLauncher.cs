@@ -8,7 +8,7 @@ namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
 /// The real <see cref="IProcessLauncher"/> — **the only place in the app that starts a process**
-/// (File Explorer's <c>ShellInterop.Open</c> aside, which opens what the user picked in its own tree and
+/// (File Explorer's <c>IShellInterop.Open</c> aside, which opens what the user picked in its own tree and
 /// deliberately fails invisibly).
 ///
 /// Arguments always go through <c>ProcessStartInfo.ArgumentList</c>, never the joined

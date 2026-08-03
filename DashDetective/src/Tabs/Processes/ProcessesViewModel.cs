@@ -39,6 +39,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from the
     // shared SystemMetricsService (so there's one sampler across all tabs).
     private readonly SystemMetricsService _service;
+    private readonly IProcessSnapshotProvider _snapshots;
+    private readonly IProcessInterop _interop;
     private readonly IDisposable[] _subscriptions;
 
     // Sort state: which column + direction. Sorting applies within each group; Apps stay above
@@ -257,7 +259,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
                 }
     }
 
-    public ProcessesViewModel(SystemMetricsService service) {
+    public ProcessesViewModel(SystemMetricsService service)
+        : this(service, IProcessInterop.ForCurrentPlatform()) { }
+
+    private ProcessesViewModel(SystemMetricsService service, IProcessInterop interop)
+        : this(service, IProcessSnapshotProvider.ForCurrentPlatform(interop), interop) { }
+
+    /// <summary>Test seam: the same page over explicit providers. The public ctor resolves the real ones,
+    /// so the shell still builds this exactly as before.</summary>
+    internal ProcessesViewModel(SystemMetricsService service, IProcessSnapshotProvider snapshots,
+                                IProcessInterop interop) {
+        _snapshots = snapshots;
+        _interop = interop;
+
         _service = service;
         NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
         PidSort = new ProcessSortColumn(ProcessSortKey.Pid, OnSort);
@@ -306,12 +320,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Reads the snapshot off the UI thread and applies it. Guarded against overlap (a slow
     /// enumeration must not pile up ticks) and never throws.</summary>
-    private async Task LoadAsync() {
+    /// <summary>Internal rather than private so a test can await the poll the ctor fires and forgets.</summary>
+    internal async Task LoadAsync() {
         if (_inFlight)
             return;
         _inFlight = true;
         try {
-            var processes = await ProcessSnapshotProvider.GetAsync();
+            var processes = await _snapshots.GetAsync();
             // Awaited on the UI thread, so the continuation resumes there — safe to touch collections.
             _lastSnapshot = processes;
             ApplySnapshot(processes);
@@ -697,4 +712,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         foreach (var subscription in _subscriptions)
             subscription.Dispose();
     }
+
+    /// <summary>Shows the native Properties dialog for the selected process. Lives here rather than in
+    /// the view because the view has no injection point (the ViewLocator builds views by name with a
+    /// parameterless ctor); the code-behind's job is only to fetch the window handle.</summary>
+    internal void ShowProperties(IntPtr owner, int pid) => _interop.ShowProperties(owner, pid);
 }

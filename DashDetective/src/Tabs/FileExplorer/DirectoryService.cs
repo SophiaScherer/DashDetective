@@ -51,8 +51,11 @@ public static class DirectoryService {
     public static Task<IReadOnlyList<DirEntry>> GetSubdirectoriesAsync(string path, bool includeHidden) =>
         Task.Run(() => ReadSubdirectories(path, includeHidden));
 
-    public static Task<IReadOnlyList<FileItem>> GetEntriesAsync(string path, bool includeHidden) =>
-        Task.Run(() => ReadEntries(path, includeHidden));
+    /// <summary>Lists a folder's entries. Takes the shell seam because each row carries the shell's
+    /// friendly type name; this class stays static and holds no state of its own.</summary>
+    internal static Task<IReadOnlyList<FileItem>> GetEntriesAsync(
+        string path, bool includeHidden, IShellInterop shell) =>
+        Task.Run(() => ReadEntries(path, includeHidden, shell));
 
     private static IReadOnlyList<DriveEntry> ReadDrives() {
         var drives = new List<DriveEntry>();
@@ -115,7 +118,7 @@ public static class DirectoryService {
 
     // Folders first (both alphabetical), matching Explorer's default ordering. Each entry's
     // type name, date and size are computed here, off the UI thread.
-    private static IReadOnlyList<FileItem> ReadEntries(string path, bool includeHidden) {
+    private static IReadOnlyList<FileItem> ReadEntries(string path, bool includeHidden, IShellInterop shell) {
         var dirs = new List<FileItem>();
         var files = new List<FileItem>();
         var opts = Options(includeHidden);
@@ -124,7 +127,7 @@ public static class DirectoryService {
             foreach (var sub in di.EnumerateDirectories("*", opts)) {
                 try {
                     dirs.Add(new FileItem(sub.Name, sub.FullName, true,
-                        ShellInterop.GetTypeName(sub.FullName, true),
+                        shell.GetTypeName(sub.FullName, true),
                         FormatDate(sub.LastWriteTime), "—", "",
                         FormatDate(sub.CreationTime), FormatAttributes(sub.Attributes),
                         -1, sub.LastWriteTime));
@@ -135,7 +138,7 @@ public static class DirectoryService {
             foreach (var f in di.EnumerateFiles("*", opts)) {
                 try {
                     files.Add(new FileItem(f.Name, f.FullName, false,
-                        ShellInterop.GetTypeName(f.FullName, false),
+                        shell.GetTypeName(f.FullName, false),
                         FormatDate(f.LastWriteTime), FileSizeFormatter.Format(f.Length),
                         f.Extension,
                         FormatDate(f.CreationTime), FormatAttributes(f.Attributes),

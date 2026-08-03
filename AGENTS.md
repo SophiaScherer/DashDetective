@@ -541,7 +541,10 @@ currently exist.
                                                          subdirectories, folder entries; per-entry
                                                          soft-fail, Task.Run off the UI thread; takes
                                                          includeHidden to reveal hidden/system entries.
-                                                         FileItem carries raw Size/Modified sort keys)
+                                                         FileItem carries raw Size/Modified sort keys.
+                                                         GetEntriesAsync also takes IShellInterop — each row
+                                                         carries the shell's type name. Still static: it
+                                                         holds no state and is in no bundle)
                                 DirectoryWatcher.cs     (debounced FileSystemWatcher over the open folder;
                                                          raises Changed → VM auto-refreshes the list + tree.
                                                          Windows-guarded, soft-failing, app-lifetime)
@@ -554,8 +557,13 @@ currently exist.
                                                          + Arrow — same shape as FilterOption)
                                 FileSizeFormatter.cs    (humanize bytes KB/MB/GB/TB; folders → "—")
                                 FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
-                                ShellInterop.cs         (feature-local shell32 P/Invoke:
-                                                         SHGetFileInfo type name + SHObjectProperties)
+                                IShellInterop.cs        (seam + ForCurrentPlatform())
+                                WindowsShellInterop.cs  (feature-local shell32 P/Invoke:
+                                                         SHGetFileInfo type name + SHObjectProperties.
+                                                         Holds UnsupportedShellInterop + the shared
+                                                         ShellFallback. NOTE Open() stays live in BOTH —
+                                                         it is managed Process.Start with UseShellExecute
+                                                         and was never platform-guarded)
       /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
                                                         (VM implements IRefreshablePage + ILiveSamplingPage;
                                                          always-on like Dashboard. Owns the throughput
@@ -689,6 +697,10 @@ given a second platform later. The idiom, established by `IStartupRegistration` 
   and `NetworkProviders.ForCurrentPlatform()` chooses between them alone.
 - One `ForCurrentPlatform()` picking between them — on the interface for a lone provider, on a bundle
   record (the `MetricSamplers` shape) for a set. That is the **only** place the platform is decided.
+- **A view code-behind has no injection point** — `ViewLocator` builds views by name with a parameterless
+  ctor. When code-behind needs an interop (it fetches the window handle for the native Properties dialog),
+  it calls a small forwarder on the view model it has *already* resolved from `DataContext`, e.g.
+  `vm.ShowProperties(handle, pid)`. Do not reach a static from a view.
 - Consumers take the interface by constructor. A ViewModel with a parameterless ctor keeps it and chains:
   `public FooViewModel() : this(FooProviders.ForCurrentPlatform()) { }` + an `internal` injecting ctor, so
   `MainWindowViewModel` and `App.axaml.cs` are untouched.

@@ -1,17 +1,19 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Processes;
 
 /// <summary>
-/// Feature-local Win32 shell interop for the process table: shows the native Windows Properties sheet
-/// for a process's executable. Mirrors File Explorer's <c>ShellInterop</c> (same <c>SHObjectProperties</c>
-/// call) — duplicated tab-local rather than shared, per the self-contained-tab rule (promote a shared
-/// shell-interop helper if a third caller appears). Classic <see cref="DllImportAttribute"/> with
-/// <see cref="CharSet.Unicode"/> and soft-fail, matching the app's interop conventions.
+/// Feature-local Win32 interop for the process table: per-process I/O counters (kernel32) and the native
+/// Properties sheet for a process's executable (shell32). Mirrors File Explorer's
+/// <c>WindowsShellInterop</c> — duplicated tab-local rather than shared, per the self-contained-tab rule.
+/// Classic <see cref="DllImportAttribute"/> with <see cref="CharSet.Unicode"/> and soft-fail; the platform
+/// check lives in <see cref="IProcessInterop.ForCurrentPlatform"/>.
 /// </summary>
-public static class ProcessInterop {
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsProcessInterop : IProcessInterop {
     private const uint SHOP_FILEPATH = 0x00000002;
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
@@ -37,15 +39,8 @@ public static class ProcessInterop {
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetProcessIoCounters(IntPtr hProcess, out IoCounters counters);
 
-    /// <summary>
-    /// Reads a process's cumulative read+write transfer bytes for the Disk column. The caller diffs
-    /// these over the sample interval to get a rate. Soft-fails (returns false) when the process denies
-    /// a handle (protected/elevated) or has exited.
-    /// </summary>
-    public static bool TryGetIoBytes(Process process, out ulong totalBytes) {
+    public bool TryGetIoBytes(Process process, out ulong totalBytes) {
         totalBytes = 0;
-        if (!OperatingSystem.IsWindows())
-            return false;
         try {
             if (GetProcessIoCounters(process.Handle, out var counters)) {
                 totalBytes = counters.ReadTransferCount + counters.WriteTransferCount;
@@ -58,16 +53,11 @@ public static class ProcessInterop {
     }
 
     /// <summary>
-    /// Shows the Windows Properties dialog for the given process's executable. The exe path is resolved
-    /// from the PID on demand (deferred from the snapshot to keep polling cheap); a protected/elevated
-    /// process that denies <c>MainModule</c>, or one that has exited, simply shows nothing. Needs the
-    /// owning window handle, so it's invoked from the view code-behind — the pattern used by the Export
-    /// and File Explorer Properties dialogs.
+    /// The exe path is resolved from the PID on demand (deferred from the snapshot to keep polling
+    /// cheap); a protected/elevated process that denies <c>MainModule</c>, or one that has exited, simply
+    /// shows nothing.
     /// </summary>
-    public static void ShowProperties(IntPtr owner, int pid) {
-        if (!OperatingSystem.IsWindows())
-            return;
-
+    public void ShowProperties(IntPtr owner, int pid) {
         string? path = null;
         try {
             using var process = Process.GetProcessById(pid);
@@ -84,4 +74,15 @@ public static class ProcessInterop {
             // Dialog couldn't be shown (item gone, shell busy) — ignore.
         }
     }
+}
+
+/// <summary>The no-interop set: no I/O figures (the Disk column stays blank) and no Properties dialog —
+/// what the old <c>OperatingSystem.IsWindows()</c> guards returned.</summary>
+internal sealed class UnsupportedProcessInterop : IProcessInterop {
+    public bool TryGetIoBytes(Process process, out ulong totalBytes) {
+        totalBytes = 0;
+        return false;
+    }
+
+    public void ShowProperties(IntPtr owner, int pid) { }
 }

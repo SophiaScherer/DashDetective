@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -13,25 +14,24 @@ namespace DashDetective.Tabs.Processes;
 /// CPU% has no direct API, so it's derived the way Task Manager does: the change in a process's
 /// <see cref="Process.TotalProcessorTime"/> across the sampling interval, divided by (wall-clock ×
 /// logical-processor count). The previous per-PID CPU times and the last sample time are held in
-/// static state between calls; the table is swapped each snapshot so exited PIDs are evicted (PIDs get
-/// reused). Not thread-safe by design — the VM polls from a single timer with an in-flight guard, so
-/// calls never overlap.
+/// instance state between calls; the table is swapped each snapshot so exited PIDs are evicted (PIDs get
+/// reused). Not thread-safe by design, and SINGLE-CONSUMER — the VM polls from a single timer with an
+/// in-flight guard, so calls never overlap. The platform check lives in
+/// <see cref="IProcessSnapshotProvider.ForCurrentPlatform"/>.
 /// </summary>
-public static class ProcessSnapshotProvider {
-    private static readonly Dictionary<int, TimeSpan> PrevCpuTime = new();
-    private static readonly Dictionary<int, ulong> PrevIoBytes = new();
-    private static DateTime _prevSampledAt;
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsProcessSnapshotProvider(IProcessInterop interop) : IProcessSnapshotProvider {
+    private readonly Dictionary<int, TimeSpan> _prevCpuTime = new();
+    private readonly Dictionary<int, ulong> _prevIoBytes = new();
+    private DateTime _prevSampledAt;
 
     /// <summary>Logical processors — the divisor that normalises CPU% to Task Manager's 0–100 scale
     /// (a single fully-busy thread on a 12-thread box reads ~8%, not 100%).</summary>
     private static readonly int LogicalProcessors = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : 1;
 
-    public static Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
 
-    private static IReadOnlyList<ProcessInfo> Snapshot() {
-        if (!OperatingSystem.IsWindows())
-            return Array.Empty<ProcessInfo>();
-
+    private IReadOnlyList<ProcessInfo> Snapshot() {
         var now = DateTime.UtcNow;
         // First snapshot has no prior point, so every CPU% reads 0 this pass and real next pass.
         var wallSeconds = _prevSampledAt == default ? 0 : (now - _prevSampledAt).TotalSeconds;
@@ -85,8 +85,8 @@ public static class ProcessSnapshotProvider {
         }
 
         // Swap in the fresh CPU-time / IO-byte tables so PIDs that have exited don't linger.
-        Swap(PrevCpuTime, nextCpuTime);
-        Swap(PrevIoBytes, nextIoBytes);
+        Swap(_prevCpuTime, nextCpuTime);
+        Swap(_prevIoBytes, nextIoBytes);
         _prevSampledAt = now;
 
         return result;
@@ -100,18 +100,18 @@ public static class ProcessSnapshotProvider {
 
     /// <summary>Disk rate in bytes/sec: the change in cumulative read+write transfer bytes over the
     /// interval. Records the current total in <paramref name="nextIoBytes"/> for the next diff.</summary>
-    private static double ComputeDiskRate(Process process, int pid, Dictionary<int, ulong> nextIoBytes, double wallSeconds) {
-        if (!ProcessInterop.TryGetIoBytes(process, out var bytes))
+    private double ComputeDiskRate(Process process, int pid, Dictionary<int, ulong> nextIoBytes, double wallSeconds) {
+        if (!interop.TryGetIoBytes(process, out var bytes))
             return 0;
         nextIoBytes[pid] = bytes;
 
-        if (wallSeconds <= 0 || !PrevIoBytes.TryGetValue(pid, out var prev) || bytes < prev)
+        if (wallSeconds <= 0 || !_prevIoBytes.TryGetValue(pid, out var prev) || bytes < prev)
             return 0;
         return (bytes - prev) / wallSeconds;
     }
 
-    private static double ComputeCpuPercent(int pid, TimeSpan cpuTime, double wallSeconds) {
-        if (wallSeconds <= 0 || !PrevCpuTime.TryGetValue(pid, out var prev))
+    private double ComputeCpuPercent(int pid, TimeSpan cpuTime, double wallSeconds) {
+        if (wallSeconds <= 0 || !_prevCpuTime.TryGetValue(pid, out var prev))
             return 0;
 
         var delta = (cpuTime - prev).TotalSeconds;
@@ -139,4 +139,9 @@ public static class ProcessSnapshotProvider {
     private static string SafeName(Process process) {
         try { return process.ProcessName + ".exe"; } catch { return "Unknown"; }
     }
+}
+
+/// <summary>The no-processes set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
+internal sealed class UnsupportedProcessSnapshotProvider : IProcessSnapshotProvider {
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.FromResult<IReadOnlyList<ProcessInfo>>([]);
 }

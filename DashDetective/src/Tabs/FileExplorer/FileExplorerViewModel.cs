@@ -86,6 +86,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
     // ----- Navigation history -----
 
+    private readonly IShellInterop _shell;
     private readonly NavigationHistory _history = new();
 
     /// <summary>Whether Back has somewhere to return to.</summary>
@@ -192,7 +193,13 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // the user's selection; navigation leaves it null so selection clears as before).
     private string? _reselectPath;
 
-    public FileExplorerViewModel() {
+    public FileExplorerViewModel() : this(IShellInterop.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit shell. The public ctor resolves the real one,
+    /// so the shell still builds this with <c>new()</c>.</summary>
+    internal FileExplorerViewModel(IShellInterop shell) {
+        _shell = shell;
+
         Filters = new ObservableCollection<FilterOption> {
             new FilterOption("All", null, OnFilterSelected),
             new FilterOption("Documents", FileCategory.Document, OnFilterSelected),
@@ -270,14 +277,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         if (entry.IsDirectory)
             SetCurrentFolder(entry.FullPath);
         else
-            ShellInterop.Open(entry.FullPath);
+            _shell.Open(entry.FullPath);
     }
 
     /// <summary>Opens the selected entry (details-pane Open button).</summary>
     [RelayCommand]
     private void Open() {
         if (SelectedEntry is { } entry)
-            ShellInterop.Open(entry.FullPath);
+            _shell.Open(entry.FullPath);
     }
 
     /// <summary>
@@ -430,7 +437,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         IReadOnlyList<FileItem> items;
         try {
-            items = await DirectoryService.GetEntriesAsync(path, ShowHidden);
+            items = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
         } catch {
             return;
         }
@@ -609,4 +616,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Disposes the directory watcher (its <see cref="FileSystemWatcher"/> and debounce timer)
     /// on shutdown. Safe to call more than once.</summary>
     public void Dispose() => _watcher.Dispose();
+
+    /// <summary>Shows the native Properties dialog for the selected entry. Lives here rather than in the
+    /// view because the view has no injection point (the ViewLocator builds views by name with a
+    /// parameterless ctor); the code-behind's job is only to fetch the window handle.</summary>
+    internal void ShowProperties(IntPtr owner, string path) => _shell.ShowProperties(owner, path);
 }
