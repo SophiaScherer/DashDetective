@@ -580,8 +580,16 @@ currently exist.
                                                          HardwareCard models, populates them from
                                                          HardwareInfoProvider in the ctor, and implements
                                                          IRefreshablePage; Sensors card left as "—")
-                                HardwareInfoProvider.cs (async WMI reader, SystemInfoProvider idiom: one
-                                                         soft-failing section per card → HardwareInfo)
+                                IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
+                                                         whole surface — the public shape is already a
+                                                         single method returning one aggregate)
+                                WindowsHardwareInfoProvider.cs
+                                                        (async WMI reader: one soft-failing section per
+                                                         card → HardwareInfo. Carries ONE class-level
+                                                         SupportedOSPlatform in place of the old guard +
+                                                         nine per-method attributes. Holds
+                                                         UnsupportedHardwareInfoProvider — .Unknown for
+                                                         every card, so every field renders "—")
                                 HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
                                                          each with .Unknown; fields default to "—")
                                 HardwareCard.cs         (observable: fixed title/icon/colours, observable

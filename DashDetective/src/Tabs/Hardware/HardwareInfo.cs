@@ -4,7 +4,7 @@ namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
 /// A one-shot snapshot of the machine's static hardware facts, read via WMI by
-/// <see cref="HardwareInfoProvider"/> and mapped onto the Hardware cards by
+/// <see cref="WindowsHardwareInfoProvider"/> and mapped onto the Hardware cards by
 /// <c>HardwareViewModel</c>. Each per-card sub-record carries <b>display-ready</b> strings (the WMI
 /// formatting — mV→V, KB→MB, etc. — lives in the provider), each defaulting to the neutral
 /// placeholder "—" so a field WMI cannot supply simply stays "—". The <c>Sensors</c> card has no

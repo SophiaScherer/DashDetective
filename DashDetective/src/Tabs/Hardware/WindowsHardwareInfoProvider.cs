@@ -11,37 +11,29 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// Reads the machine's static hardware facts for the Hardware tab from WMI, following the same
-/// async-provider idiom as the Dashboard's <c>SystemInfoProvider</c>: <see cref="GetAsync"/> runs the
-/// blocking WMI queries on a background thread, an <see cref="OperatingSystem.IsWindows"/> guard
-/// doubles as the platform check, and each per-card section fails independently to its
-/// <c>.Unknown</c> record so one dead source can't blank the others — the read never throws.
+/// Reads the machine's static hardware facts for the Hardware tab from WMI: <see cref="GetAsync"/> runs
+/// the blocking queries on a background thread, and each per-card section fails independently to its
+/// <c>.Unknown</c> record so one dead source can't blank the others — the read never throws. The
+/// platform check lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>, which is why the
+/// class carries one <see cref="SupportedOSPlatformAttribute"/> instead of a guard and nine per-method
+/// attributes.
 ///
 /// The queries are kept Hardware-local (not shared with the Dashboard's providers) because this tab
 /// needs richer fields than the Dashboard exposes; per the repo convention a helper only moves to
 /// <c>src/Services</c> once a second tab needs the same reading.
-///
-/// Sections are filled in one phase per card; a section still returns its <c>.Unknown</c> until its
-/// phase lands (every field then renders "—").
 /// </summary>
-public static class HardwareInfoProvider {
-    public static Task<HardwareInfo> GetAsync() => Task.Run(Read);
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
+    public Task<HardwareInfo> GetAsync() => Task.Run(Read);
 
-    private static HardwareInfo Read() {
-        // Guard doubles as the platform-compatibility check for the WMI calls in each section.
-        if (!OperatingSystem.IsWindows())
-            return HardwareInfo.Unknown;
-
-        return new HardwareInfo(
-            ReadProcessor(), ReadMemory(), ReadStorage(), ReadMotherboard(), ReadGraphics());
-    }
+    private static HardwareInfo Read() =>
+        new(ReadProcessor(), ReadMemory(), ReadStorage(), ReadMotherboard(), ReadGraphics());
 
     /// <summary>
     /// Processor facts from <c>Win32_Processor</c>. Core/thread counts are summed across sockets and
     /// the clock is the max, matching <c>CpuInfoProvider</c>; name/cache/socket come from the first
     /// package. Boost clock and TDP have no WMI source, so they stay "—".
     /// </summary>
-    [SupportedOSPlatform("windows")]
     private static ProcessorInfo ReadProcessor() {
         try {
             var name = "";
@@ -98,7 +90,6 @@ public static class HardwareInfoProvider {
     /// <c>Win32_PhysicalMemoryArray.MemoryDevices</c> for the total slot count. Timings have no WMI
     /// source (SPD/SMBus only), so that row stays "—".
     /// </summary>
-    [SupportedOSPlatform("windows")]
     private static MemoryInfo ReadMemory() {
         try {
             var moduleGbs = new List<double>();
@@ -157,7 +148,6 @@ public static class HardwareInfoProvider {
     }
 
     /// <summary>Total DIMM slots on the board from <c>Win32_PhysicalMemoryArray</c> (0 if unavailable).</summary>
-    [SupportedOSPlatform("windows")]
     private static int ReadMemorySlotCount() {
         try {
             using var searcher = new ManagementObjectSearcher(
@@ -183,7 +173,6 @@ public static class HardwareInfoProvider {
     /// (SSD/HDD/NVMe) and health in one place. If that namespace is unavailable it falls back to
     /// <c>Win32_DiskDrive</c> for model + size only (type/health then read "—").
     /// </summary>
-    [SupportedOSPlatform("windows")]
     private static StorageInfo ReadStorage() {
         try {
             var devices = new List<StorageDeviceInfo>();
@@ -253,7 +242,6 @@ public static class HardwareInfoProvider {
     /// <c>Win32_BIOS</c>, and a best-effort PCIe slot count from <c>Win32_SystemSlot</c> (slots whose
     /// designation names PCI/PCIe). Chipset, form factor and M.2 count have no WMI source → "—".
     /// </summary>
-    [SupportedOSPlatform("windows")]
     private static MotherboardInfo ReadMotherboard() {
         try {
             var manufacturer = FirstString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
@@ -307,7 +295,6 @@ public static class HardwareInfoProvider {
     }
 
     /// <summary>BIOS version plus release year, e.g. "1203 (2024)".</summary>
-    [SupportedOSPlatform("windows")]
     private static string ReadBios() {
         var version = FirstString("SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS", "SMBIOSBIOSVersion");
         var releaseDate = FirstString("SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS", "ReleaseDate");
@@ -319,7 +306,6 @@ public static class HardwareInfoProvider {
 
     /// <summary>Best-effort count of PCIe slots — <c>Win32_SystemSlot</c> rows whose designation names
     /// PCI/PCIe. Lane width isn't in WMI, so only the count is reported.</summary>
-    [SupportedOSPlatform("windows")]
     private static int ReadPcieSlotCount() {
         try {
             var count = 0;
@@ -347,7 +333,6 @@ public static class HardwareInfoProvider {
     /// VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
     /// memory type, CUDA-core count, boost clock and bus width have no reliable WMI source → "—".
     /// </summary>
-    [SupportedOSPlatform("windows")]
     private static GraphicsInfo ReadGraphics() {
         try {
             var adapters = new List<GraphicsAdapterInfo>();
@@ -468,7 +453,6 @@ public static class HardwareInfoProvider {
 
     /// <summary>Returns the first non-empty string value of <paramref name="property"/> from a WMI query
     /// (the <c>SystemInfoProvider.QueryString</c> idiom).</summary>
-    [SupportedOSPlatform("windows")]
     private static string FirstString(string query, string property) {
         using var searcher = new ManagementObjectSearcher(query);
         using var results = searcher.Get();
@@ -496,4 +480,10 @@ public static class HardwareInfoProvider {
     private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
 
     private static ulong ToUInt64(object? value) => value is null ? 0 : Convert.ToUInt64(value);
+}
+
+/// <summary>The no-inventory set: every card reports <c>.Unknown</c> and so renders "—", which is what
+/// the old <c>OperatingSystem.IsWindows()</c> guard returned off Windows.</summary>
+internal sealed class UnsupportedHardwareInfoProvider : IHardwareInfoProvider {
+    public Task<HardwareInfo> GetAsync() => Task.FromResult(HardwareInfo.Unknown);
 }
