@@ -9,35 +9,32 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
 
-/// <summary>The connections snapshot: the (capped) rows to display plus the true total before
-/// capping, so the panel can report an honest count even when the list is truncated.</summary>
-public sealed record ConnectionsSnapshot(IReadOnlyList<ConnectionInfo> Rows, int Total);
-
 /// <summary>
-/// Builds the Active Connections snapshot from <see cref="ConnectionsInterop"/> (TCP + UDP), resolves
+/// Builds the Active Connections snapshot from <see cref="IConnectionsInterop"/> (TCP + UDP), resolves
 /// each owning PID to a process name, and returns a sorted, capped list. Runs off the UI thread via
 /// <see cref="GetAsync"/> and never throws (soft-fails to an empty list), matching the app's provider
 /// convention. PID→name results are cached because <see cref="Process.GetProcessById"/> is relatively
 /// costly and most PIDs recur across polls; the cache evicts PIDs no longer present (PIDs get reused).
 ///
-/// Not thread-safe by design: the Network VM polls it from a single timer with an in-flight guard, so
-/// calls never overlap.
+/// Portable managed code — no platform prefix, because the only Windows-specific part of this tab is the
+/// interop it is handed. Not thread-safe by design (the cache is per-instance mutable state): the Network
+/// VM polls it from a single timer with an in-flight guard, so calls never overlap.
 /// </summary>
-public static class ConnectionsProvider {
+internal sealed class ConnectionsProvider(IConnectionsInterop interop) : IConnectionsProvider {
     /// <summary>Safety ceiling on rows returned, so a machine with a pathological number of sockets
     /// can't bloat memory. Well above the UI's max page size (150) — the VM pages the full set
     /// client-side, only ever binding one page at a time — so this is a backstop, not the display cap.</summary>
     public const int MaxRows = 1000;
 
-    private static readonly Dictionary<int, string> NameCache = new();
+    private readonly Dictionary<int, string> _nameCache = new();
 
-    public static Task<ConnectionsSnapshot> GetAsync() => Task.Run(Snapshot);
+    public Task<ConnectionsSnapshot> GetAsync() => Task.Run(Snapshot);
 
-    private static ConnectionsSnapshot Snapshot() {
+    private ConnectionsSnapshot Snapshot() {
         try {
             var raw = new List<RawConnection>();
-            raw.AddRange(ConnectionsInterop.GetTcp());
-            raw.AddRange(ConnectionsInterop.GetUdp());
+            raw.AddRange(interop.GetTcp());
+            raw.AddRange(interop.GetUdp());
 
             var seenPids = new HashSet<int>();
             // De-duplicate by identity key: two rows can share Protocol|Local|Remote|Pid (e.g. UDP
@@ -81,12 +78,12 @@ public static class ConnectionsProvider {
 
     /// <summary>Resolves a PID to "name.exe", using well-known ids and a cache. Inaccessible (elevated/
     /// protected) or already-exited processes fall back to "PID n" rather than throwing.</summary>
-    private static string ResolveName(int pid) {
+    private string ResolveName(int pid) {
         if (pid == 0)
             return "System Idle";
         if (pid == 4)
             return "System";
-        if (NameCache.TryGetValue(pid, out var cached))
+        if (_nameCache.TryGetValue(pid, out var cached))
             return cached;
 
         string name;
@@ -98,16 +95,16 @@ public static class ConnectionsProvider {
             name = $"PID {pid.ToString(CultureInfo.InvariantCulture)}";
         }
 
-        NameCache[pid] = name;
+        _nameCache[pid] = name;
         return name;
     }
 
-    private static void EvictStalePids(HashSet<int> seenPids) {
-        if (NameCache.Count == 0)
+    private void EvictStalePids(HashSet<int> seenPids) {
+        if (_nameCache.Count == 0)
             return;
-        var stale = NameCache.Keys.Where(pid => !seenPids.Contains(pid)).ToList();
+        var stale = _nameCache.Keys.Where(pid => !seenPids.Contains(pid)).ToList();
         foreach (var pid in stale)
-            NameCache.Remove(pid);
+            _nameCache.Remove(pid);
     }
 
     /// <summary>Maps a MIB_TCP_STATE value to a display label (only a few are colour-coded specially;

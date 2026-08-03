@@ -2,31 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Network;
 
-/// <summary>One raw connection row from the OS tables: endpoints, TCP state (0 for UDP) and the
-/// owning process id. Addresses/ports are already host-usable (port byte order swapped).</summary>
-internal readonly record struct RawConnection(
-    string Protocol, IPAddress LocalAddress, int LocalPort,
-    IPAddress RemoteAddress, int RemotePort, uint State, int Pid);
-
 /// <summary>
-/// Feature-local <c>iphlpapi</c> interop for the Active Connections panel — the netstat data the
-/// managed <c>IPGlobalProperties</c> API can't provide because it omits the owning PID. Follows the
-/// File Explorer <c>ShellInterop</c> conventions: classic <see cref="DllImportAttribute"/>, private
-/// nested sequential structs, an <see cref="OperatingSystem.IsWindows"/> guard, and soft-fail (a
-/// native failure yields an empty list, never an exception).
+/// Feature-local <c>iphlpapi</c> interop for the Active Connections panel. Follows the File Explorer
+/// <c>ShellInterop</c> conventions: classic <see cref="DllImportAttribute"/>, private nested sequential
+/// structs, and soft-fail (a native failure yields an empty list, never an exception). The platform
+/// check lives in <see cref="NetworkProviders.ForCurrentPlatform"/>, which is why there is none here.
 ///
 /// IPv4 only for now (the OWNER_PID tables use different 16-byte-address structs for IPv6 — deferred).
 /// </summary>
-public static class ConnectionsInterop {
-    /// <summary>All IPv4 TCP connections with owning PID and state. Empty on any failure.</summary>
-    internal static IReadOnlyList<RawConnection> GetTcp() {
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsConnectionsInterop : IConnectionsInterop {
+    public IReadOnlyList<RawConnection> GetTcp() {
         var rows = new List<RawConnection>();
-        if (!OperatingSystem.IsWindows())
-            return rows;
-
         var table = IntPtr.Zero;
         try {
             var size = 0;
@@ -66,13 +57,8 @@ public static class ConnectionsInterop {
         return rows;
     }
 
-    /// <summary>All IPv4 UDP listeners with owning PID (UDP is connectionless — no remote/state).
-    /// Empty on any failure.</summary>
-    internal static IReadOnlyList<RawConnection> GetUdp() {
+    public IReadOnlyList<RawConnection> GetUdp() {
         var rows = new List<RawConnection>();
-        if (!OperatingSystem.IsWindows())
-            return rows;
-
         var table = IntPtr.Zero;
         try {
             var size = 0;
@@ -144,4 +130,12 @@ public static class ConnectionsInterop {
     [DllImport("iphlpapi.dll", SetLastError = true)]
     private static extern uint GetExtendedUdpTable(IntPtr pUdpTable, ref int dwOutBufLen,
         bool sort, int ipVersion, int tblClass, uint reserved);
+}
+
+/// <summary>The no-tables set: reports no connections, which is what the old
+/// <c>OperatingSystem.IsWindows()</c> guards produced off Windows.</summary>
+internal sealed class UnsupportedConnectionsInterop : IConnectionsInterop {
+    public IReadOnlyList<RawConnection> GetTcp() => [];
+
+    public IReadOnlyList<RawConnection> GetUdp() => [];
 }

@@ -542,23 +542,38 @@ currently exist.
                                                          the keyed-diff for the connections list. Tab-local
                                                          MonoFont + fixed console-colour resources live in
                                                          the view — promote to Shared if reused)
+                                NetworkProviders.cs     (the tab's provider bundle + ForCurrentPlatform();
+                                                         see Provider seams above. The ONLY platform choice
+                                                         here is which IConnectionsInterop — everything else
+                                                         is portable managed code)
+                                IAdapterInfoProvider.cs (seam + the AdapterSnapshot record)
                                 AdapterInfoProvider.cs  (async snapshot: all adapters + primary IP config
-                                                         via managed NetworkInterface; SystemInfoProvider
-                                                         pattern, per-adapter/field soft-fail)
+                                                         via managed NetworkInterface; per-adapter/field
+                                                         soft-fail. No platform prefix — portable; the one
+                                                         Windows-only field (DHCP) is guarded inline → "—")
                                 AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
-                                ConnectionsInterop.cs   (feature-local iphlpapi P/Invoke:
+                                IConnectionsInterop.cs  (seam + the RawConnection struct)
+                                WindowsConnectionsInterop.cs
+                                                        (feature-local iphlpapi P/Invoke:
                                                          GetExtendedTcpTable/GetExtendedUdpTable, IPv4
-                                                         OWNER_PID tables; port byte-order swap. IPv6 deferred)
+                                                         OWNER_PID tables; port byte-order swap. IPv6
+                                                         deferred. Holds UnsupportedConnectionsInterop —
+                                                         reports no connections off Windows)
+                                IConnectionsProvider.cs (seam + the ConnectionsSnapshot record)
                                 ConnectionsProvider.cs  (TCP+UDP snapshot off the UI thread; PID→name cache
-                                                         with stale eviction; de-dupe by key; sort; cap 100)
+                                                         with stale eviction; de-dupe by key; sort; cap 1000.
+                                                         Takes IConnectionsInterop by ctor. SINGLE-CONSUMER:
+                                                         the name cache is per-instance mutable state)
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
                                 PingMonitor.cs          (reused in-box Ping to 8.8.8.8; rolling avg/loss +
                                                          last-3 lines; soft-fails to a timeout)
+                                IDnsLookupProvider.cs   (seam + the DnsResult record)
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
-                                                         3 s CTS; record type by address family)
+                                                         3 s CTS; record type by address family. No platform
+                                                         prefix — portable)
       /Hardware                 HardwareView.axaml(.cs) + HardwareViewModel.cs
                                                         (spec grid; whole-page scroll like the Dashboard
                                                          — not self-scrolling. VM builds the six fixed
@@ -633,9 +648,16 @@ given a second platform later. The idiom, established by `IStartupRegistration` 
 
 - An `internal interface I<Name>` in its own file, **in the folder the provider already lives in** —
   nothing moves, no namespace changes. Its doc comment states the never-throw / soft-fail contract.
-- `internal sealed class Windows<Name>` carrying a **class-level** `[SupportedOSPlatform("windows")]`
-  instead of an inner `OperatingSystem.IsWindows()` guard, plus an `Unsupported<Name>` **at the bottom of
-  the same file** returning exactly what the old guard returned off Windows.
+- **The `Windows*` / `Unsupported*` split goes exactly where the platform-specific code is, and nowhere
+  else.** A genuinely Windows-only reader becomes `internal sealed class Windows<Name>` carrying a
+  **class-level** `[SupportedOSPlatform("windows")]` instead of an inner `OperatingSystem.IsWindows()`
+  guard, plus an `Unsupported<Name>` **at the bottom of the same file** returning exactly what the old
+  guard returned off Windows. A provider that is **portable managed code keeps its plain name** and gains
+  only an interface — naming it `Windows*` when it would run fine anywhere is a lie, and writing an
+  `Unsupported*` twin for it would either duplicate the portable body or silently blank a panel that used
+  to work. The Network tab is the worked example: `AdapterInfoProvider`, `ConnectionsProvider` and
+  `DnsLookupProvider` stay unprefixed; only `IConnectionsInterop` (the `iphlpapi` P/Invoke) gets the pair,
+  and `NetworkProviders.ForCurrentPlatform()` chooses between them alone.
 - One `ForCurrentPlatform()` picking between them — on the interface for a lone provider, on a bundle
   record (the `MetricSamplers` shape) for a set. That is the **only** place the platform is decided.
 - Consumers take the interface by constructor. A ViewModel with a parameterless ctor keeps it and chains:

@@ -48,6 +48,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <c>ping -t</c>). Longer than the 1.5 s ping timeout so sends never overlap.</summary>
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(2);
 
+    private readonly NetworkProviders _providers;
     private readonly NetworkUsageSampler _networkSampler = new();
     // The channel owns the download history; upload is a second rolling buffer pushed alongside it.
     private readonly double[] _upHistory = new double[WindowSeconds];
@@ -123,7 +124,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>DNS footer line (timing + record type, or a failure note).</summary>
     [ObservableProperty] private string _dnsFooter = "";
 
-    public NetworkViewModel() {
+    public NetworkViewModel() : this(NetworkProviders.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit provider set (see <see cref="NetworkProviders"/>).
+    /// The public ctor resolves the real one, so the shell still builds this with <c>new()</c>.</summary>
+    internal NetworkViewModel(NetworkProviders providers) {
+        _providers = providers;
+
         // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
         // samples then shift in from the right, one per second.
         _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
@@ -198,7 +205,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// </summary>
     private async Task LoadAdaptersAsync() {
         try {
-            var snapshot = await AdapterInfoProvider.GetAsync();
+            var snapshot = await _providers.Adapters.GetAsync();
             // GetAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
             Adapters.Clear();
             foreach (var adapter in snapshot.Adapters)
@@ -223,7 +230,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             return;
         _connectionsInFlight = true;
         try {
-            var snapshot = await ConnectionsProvider.GetAsync();
+            var snapshot = await _providers.Connections.GetAsync();
             // Awaited on the UI thread, so the continuation resumes there — safe to touch the collections.
             _allConnections.Clear();
             _allConnections.AddRange(snapshot.Rows);
@@ -340,7 +347,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
     private async Task LoadDnsAsync() {
         try {
-            var result = await DnsLookupProvider.GetAsync(DnsHost);
+            var result = await _providers.Dns.GetAsync(DnsHost);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
             DnsConsole = result.Console;
             DnsFooter = result.Footer;
