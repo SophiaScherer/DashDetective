@@ -18,9 +18,8 @@ public readonly record struct PhysicalDiskInfo(
 
 /// <summary>
 /// Enumerates every physical disk from WMI <c>MSFT_PhysicalDisk</c> (<c>root\Microsoft\Windows\Storage</c>) —
-/// model, size, media/bus type and <c>HealthStatus</c> — for the Storage tab's per-disk summary cards. This
-/// is the all-disks generalisation of <see cref="DiskInfoProvider"/> (which returns only the primary disk for
-/// the Dashboard/Hardware). If the Storage namespace is unavailable it falls back to <c>Win32_DiskDrive</c>
+/// model, size, media/bus type and <c>HealthStatus</c> — for the Storage tab's per-disk summary cards. If
+/// the Storage namespace is unavailable it falls back to <c>Win32_DiskDrive</c>
 /// for model + size only (health then defaults to healthy). Runs on a background thread; any failure (or a
 /// non-Windows host) yields an empty list rather than throwing.
 /// </summary>
@@ -100,8 +99,8 @@ public static class PhysicalDiskProvider {
         string.IsNullOrWhiteSpace(model) ? "Drive" : model.Trim();
 
     /// <summary>Media/bus type label: NVMe drives read "NVMe SSD"; otherwise the media flag ("SSD"/"HDD"),
-    /// or "" when unknown. BusType 17 = NVMe; MediaType 4 = SSD, 3 = HDD (same codes as
-    /// <see cref="DiskInfoProvider"/> / <c>HardwareInfoProvider</c>).</summary>
+    /// or "" when unknown. BusType 17 = NVMe; MediaType 4 = SSD, 3 = HDD (the same codes
+    /// <c>HardwareInfoProvider</c> reads).</summary>
     private static string DriveTypeLabel(int mediaType, int busType) {
         if (busType == BusTypeNvme)
             return "NVMe SSD";

@@ -343,8 +343,8 @@ public static class HardwareInfoProvider {
     /// <summary>
     /// Graphics facts from <c>Win32_VideoController</c> — <b>every</b> physical adapter's name and Windows
     /// driver version, since a machine can have a discrete GPU alongside an integrated one and the Dashboard
-    /// and Performance tabs already show both. Filtered to PCI-bus adapters (skipping virtual/software ones)
-    /// the same way as <c>GpuInfoProvider</c>. VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
+    /// and Performance tabs already show both. Filtered to PCI-bus adapters, skipping virtual/software ones.
+    /// VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading),
     /// memory type, CUDA-core count, boost clock and bus width have no reliable WMI source → "—".
     /// </summary>
     [SupportedOSPlatform("windows")]

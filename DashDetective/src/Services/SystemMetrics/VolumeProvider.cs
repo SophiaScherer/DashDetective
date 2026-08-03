@@ -23,7 +23,7 @@ public readonly record struct VolumeInfo(
 /// would omit. Each volume is joined to its host disk via <c>MSFT_Partition</c> (matching the volume's
 /// device path against the partition's access paths), so the drive-card rollup can sum used space per disk.
 /// The query is comparatively slow and blocking, so it runs on a background thread; any failure (or a
-/// non-Windows host) yields an empty list rather than throwing. Mirrors <see cref="DiskInfoProvider"/>.
+/// non-Windows host) yields an empty list rather than throwing. Mirrors <see cref="PhysicalDiskProvider"/>.
 /// </summary>
 public static class VolumeProvider {
     public static Task<IReadOnlyList<VolumeInfo>> GetAsync() => Task.Run(Read);

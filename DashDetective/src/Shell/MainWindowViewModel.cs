@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Search;
 using DashDetective.Services.Settings;
+using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
@@ -126,7 +127,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         // Build the Settings page with the shared theming seam + nav, the metrics service (refresh
         // interval), the loaded settings (toggle/interval seed) and the report/CSV builders.
-        _settings = new SettingsViewModel(_theme, Nav, metrics, settings, BuildReport, BuildMetricsCsv);
+        _settings = new SettingsViewModel(_theme, Nav, metrics, settings,
+                                          IStartupRegistration.ForCurrentPlatform(),
+                                          BuildReport, BuildMetricsCsv);
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;

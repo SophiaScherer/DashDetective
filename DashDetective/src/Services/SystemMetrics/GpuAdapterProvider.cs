@@ -23,7 +23,7 @@ public sealed record GpuAdapter(
 /// <summary>
 /// Enumerates the machine's graphics adapters via DXGI (<c>dxgi.dll</c>: <c>CreateDXGIFactory1</c> →
 /// <c>EnumAdapters1</c> → <c>GetDesc1</c>) — the authoritative LUID→name map. Unlike WMI's
-/// <c>Win32_VideoController</c> (used by <see cref="DashDetective.Tabs.Dashboard.GpuInfoProvider"/>), DXGI
+/// <c>Win32_VideoController</c> (which <c>HardwareInfoProvider</c> still reads for its spec card), DXGI
 /// exposes each adapter's <b>LUID</b> (so per-GPU PDH counters can be attributed to a name) and a software
 /// flag (so the Microsoft Basic Render Driver and similar are dropped). Each <see cref="GpuAdapter.LuidToken"/>
 /// is formatted to match the PDH instance-name token (<c>luid_0x{High:x8}_0x{Low:x8}</c>).

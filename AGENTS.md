@@ -266,8 +266,9 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
-- `Win32_VideoController` (`GpuInfoProvider`) is retained only for the single-name callers; the inventory
-  uses `GpuAdapterProvider`.
+- `Win32_VideoController` is still read by `HardwareInfoProvider` for the Hardware tab's spec card; the
+  inventory uses `GpuAdapterProvider`. (The old single-name `GpuInfoProvider` was deleted once nothing
+  called it.)
 
 ## Strict Working Boundaries
 
@@ -358,8 +359,11 @@ currently exist.
                                  persistence — knows no view-models; the composition root applies/observes)
         SettingsJsonContext.cs  (System.Text.Json source-gen context for AppSettings; string enums)
       /Startup
-        StartupRegistration.cs  (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
-                                 Windows-guarded + soft-failing, like CurrentUserProvider)
+        IStartupRegistration.cs (the seam + ForCurrentPlatform(); see Provider seams below)
+        WindowsStartupRegistration.cs
+                                (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
+                                 soft-failing. Holds UnsupportedStartupRegistration too — reports
+                                 "not enabled" and ignores writes off Windows)
       /Diagnostics
         Log.cs                  (minimal soft-failing logger → Debug output + a per-day rolling file in
                                  %LocalAppData%/DashDetective/logs; never throws. The sampler / provider /
@@ -387,7 +391,6 @@ currently exist.
                                  DeviceInstance.VramBytes → the Performance GPU VRAM tile)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
-        DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
         MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
@@ -437,8 +440,6 @@ currently exist.
                                 CpuStaticInfo.cs        (record for the WMI result)
                                 MemoryInfoProvider.cs   (static RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
-                                GpuInfoProvider.cs      (static GPU name via WMI, async)
-                                GpuStaticInfo.cs        (record for the WMI result)
                                 (the CPU/Memory/GPU/Storage/Network *samplers* now live under
                                  src/Services/SystemMetrics + /Network and are owned by
                                  SystemMetricsService — the Dashboard VM subscribes, it no longer owns them)
@@ -625,6 +626,27 @@ Processes). A subscriber keeps its own 60-sample rolling buffer (two for network
 and rebuilds its `Sparkline` via `SparklinePoints.Build`, using `ChartScale.FitAxis` for the unbounded
 network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer` + `Array.Copy`
 buffer or a bespoke points/peak helper.
+
+**Provider seams (IN PROGRESS — being rolled out phase by phase).** The OS-touching providers are being
+retrofitted from `public static class` into the `IGpuSensorReader` shape so they can be faked in tests and
+given a second platform later. The idiom, established by `IStartupRegistration` (`src/Services/Startup`):
+
+- An `internal interface I<Name>` in its own file, **in the folder the provider already lives in** —
+  nothing moves, no namespace changes. Its doc comment states the never-throw / soft-fail contract.
+- `internal sealed class Windows<Name>` carrying a **class-level** `[SupportedOSPlatform("windows")]`
+  instead of an inner `OperatingSystem.IsWindows()` guard, plus an `Unsupported<Name>` **at the bottom of
+  the same file** returning exactly what the old guard returned off Windows.
+- One `ForCurrentPlatform()` picking between them — on the interface for a lone provider, on a bundle
+  record (the `MetricSamplers` shape) for a set. That is the **only** place the platform is decided.
+- Consumers take the interface by constructor. A ViewModel with a parameterless ctor keeps it and chains:
+  `public FooViewModel() : this(FooProviders.ForCurrentPlatform()) { }` + an `internal` injecting ctor, so
+  `MainWindowViewModel` and `App.axaml.cs` are untouched.
+- Everything new is `internal` — which is why `SettingsViewModel`'s ctor is now internal too (a public ctor
+  cannot take an internal parameter type). Tests reach it all through `InternalsVisibleTo`.
+
+**Never put `[SupportedOSPlatform]` on the interface** — every consumer would inherit the requirement and
+light up CA1416 across the app. Adding a platform later = one new class per interface plus one line in
+`ForCurrentPlatform()`; that is the whole point.
 
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
@@ -879,7 +901,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     `SystemMetricsService` (raises `AlertActiveChanged` after CPU or memory stays ≥ 90 % for 10
     consecutive samples); the shell shows an inline warning banner below the toolbar (auto-clears on
     recovery, `×` to dismiss the current breach, gated by the setting). **Launch at startup** writes the
-    HKCU `…\Run` value via `StartupRegistration` (`src/Services/Startup`, soft-failing).
+    HKCU `…\Run` value via `IStartupRegistration` (`src/Services/Startup`, soft-failing).
   - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
     with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
     Real exit still runs the composition root's disposal.
