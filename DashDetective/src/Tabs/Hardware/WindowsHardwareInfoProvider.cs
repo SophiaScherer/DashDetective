@@ -2,8 +2,6 @@ using DashDetective.Shared;
 using DashDetective.Tabs.Hardware.Catalog;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Management;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
@@ -76,8 +74,8 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 Cores: cores > 0 ? cores.ToString() : "—",
                 LogicalProcessors: threads.ToString(),
-                BaseBoost: FormatBaseBoost(maxClockMhz, spec?.Boost),
-                CacheL3: l3CacheKb > 0 ? $"{l3CacheKb / 1024} MB" : "—",
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost),
+                CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb),
                 Tdp: spec?.Tdp ?? "—",
                 Socket: string.IsNullOrEmpty(socket) ? "—" : socket);
         } catch {
@@ -124,24 +122,18 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
                 return MemoryInfo.Unknown;
 
             var totalGb = totalBytes / (double)(1L << 30);
-            var type = MemoryTypeLabel(memoryType);
-            var populated = moduleGbs.Count;
-            var totalSlots = ReadMemorySlotCount();
+            var type = MemorySpecFormatter.TypeLabel(memoryType);
 
             // Timings aren't in WMI — fill from the spec catalog by module part number (rated profile).
             var timings = HardwareCatalog.LookupMemory(partNumber)?.Timings ?? "—";
 
             return new MemoryInfo(
-                Summary: speed > 0
-                    ? $"{FormatGb(totalGb)} GB {type}-{speed}"
-                    : $"{FormatGb(totalGb)} GB {type}",
-                Installed: FormatModules(moduleGbs),
-                Speed: speed > 0 ? $"{speed} MT/s" : "—",
+                Summary: MemorySpecFormatter.Summary(totalGb, type, speed),
+                Installed: MemorySpecFormatter.Modules(moduleGbs),
+                Speed: MemorySpecFormatter.Speed(speed),
                 Timings: timings,
-                SlotsUsed: totalSlots > 0 ? $"{populated} / {totalSlots}" : populated.ToString(),
-                Voltage: voltageMv > 0
-                    ? (voltageMv / 1000.0).ToString("0.##", CultureInfo.InvariantCulture) + " V"
-                    : "—");
+                SlotsUsed: MemorySpecFormatter.SlotsUsed(moduleGbs.Count, ReadMemorySlotCount()),
+                Voltage: MemorySpecFormatter.Voltage(voltageMv));
         } catch {
             return MemoryInfo.Unknown;
         }
@@ -191,11 +183,11 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
                     using (obj) {
                         var model = (obj["FriendlyName"] as string)?.Trim();
                         var bytes = ToUInt64(obj["Size"]);
-                        var type = DriveTypeLabel(ToInt(obj["MediaType"]), ToInt(obj["BusType"]));
+                        var type = StorageSpecFormatter.TypeLabel(ToInt(obj["MediaType"]), ToInt(obj["BusType"]));
                         totalBytes += bytes;
                         devices.Add(new StorageDeviceInfo(
                             string.IsNullOrWhiteSpace(model) ? "Drive" : model,
-                            FormatDriveDetail(bytes, type)));
+                            StorageSpecFormatter.DriveDetail(bytes, type)));
                         healthCodes.Add(ToInt(obj["HealthStatus"]));
                         haveHealth = true;
                     }
@@ -219,7 +211,7 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
                         totalBytes += bytes;
                         devices.Add(new StorageDeviceInfo(
                             string.IsNullOrWhiteSpace(model) ? "Drive" : model,
-                            FormatDriveDetail(bytes, "")));
+                            StorageSpecFormatter.DriveDetail(bytes, "")));
                     }
                 }
             }
@@ -227,11 +219,10 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
             if (devices.Count == 0)
                 return StorageInfo.Unknown;
 
-            var noun = devices.Count == 1 ? "drive" : "drives";
             return new StorageInfo(
-                Summary: $"{devices.Count} {noun} · {FormatDriveSize(totalBytes)} total",
+                Summary: StorageSpecFormatter.Summary(devices.Count, totalBytes),
                 Drives: devices,
-                TotalHealth: haveHealth ? AggregateHealth(healthCodes) : "—");
+                TotalHealth: haveHealth ? StorageSpecFormatter.Health(healthCodes) : "—");
         } catch {
             return StorageInfo.Unknown;
         }
@@ -370,86 +361,6 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
             return GraphicsInfo.Unknown;
         }
     }
-
-    /// <summary>Formats a clock speed in MHz as GHz to one decimal (e.g. 3200 → "3.2 GHz").</summary>
-    private static string FormatGhz(double mhz) =>
-        (mhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " GHz";
-
-    /// <summary>Composes the "Base / Boost" value from the WMI base clock and the catalog boost string.
-    /// When both are known the unit is shared ("4.7 / 5.3 GHz", matching the comp); otherwise the known
-    /// side carries its own unit and the missing side is "—".</summary>
-    private static string FormatBaseBoost(double baseMhz, string? boost) {
-        var hasBase = baseMhz > 0;
-        var hasBoost = !string.IsNullOrEmpty(boost);
-        if (!hasBase && !hasBoost) return "—";
-        if (hasBase && hasBoost)
-            return $"{(baseMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} / {boost}";
-        return hasBase ? $"{FormatGhz(baseMhz)} / —" : $"— / {boost}";
-    }
-
-    /// <summary>Formats a GB figure without a trailing ".0" for whole values (16.0 → "16", 1.5 → "1.5").</summary>
-    private static string FormatGb(double gb) =>
-        gb.ToString(gb % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture);
-
-    /// <summary>Renders the module layout: "2 × 16 GB" when uniform, else "16 GB + 8 GB".</summary>
-    private static string FormatModules(IReadOnlyList<double> moduleGbs) {
-        if (moduleGbs.Count == 0)
-            return "—";
-        if (moduleGbs.Distinct().Count() == 1)
-            return $"{moduleGbs.Count} × {FormatGb(moduleGbs[0])} GB";
-        return string.Join(" + ", moduleGbs.Select(g => $"{FormatGb(g)} GB"));
-    }
-
-    /// <summary>Media/bus type label for a physical disk: NVMe wins over the SSD/HDD media flag; "" if
-    /// neither is known (the row then shows size only).</summary>
-    private static string DriveTypeLabel(int mediaType, int busType) {
-        if (busType == 17) return "NVMe";   // BusType 17 = NVMe
-        if (mediaType == 4) return "SSD";    // MediaType 4 = SSD
-        if (mediaType == 3) return "HDD";    // MediaType 3 = HDD
-        return "";
-    }
-
-    /// <summary>A drive row's value: capacity plus optional type, e.g. "2 TB NVMe" or "500 GB".</summary>
-    private static string FormatDriveDetail(ulong bytes, string type) {
-        if (bytes == 0)
-            return string.IsNullOrEmpty(type) ? "—" : type;
-        var size = FormatDriveSize(bytes);
-        return string.IsNullOrEmpty(type) ? size : $"{size} {type}";
-    }
-
-    /// <summary>Formats drive capacity in decimal (marketing) units — TB at/above 1 TB, else GB —
-    /// dropping a trailing ".0" (2000398934016 → "2 TB").</summary>
-    private static string FormatDriveSize(ulong bytes) {
-        const double tb = 1_000_000_000_000d, gb = 1_000_000_000d;
-        return bytes >= tb
-            ? (bytes / tb).ToString("0.#", CultureInfo.InvariantCulture) + " TB"
-            : (bytes / gb).ToString("0.#", CultureInfo.InvariantCulture) + " GB";
-    }
-
-    /// <summary>Worst-status-wins summary of the drives' HealthStatus codes (0 Healthy, 1 Warning,
-    /// 2 Unhealthy; anything else Unknown).</summary>
-    private static string AggregateHealth(IReadOnlyList<int> codes) {
-        if (codes.Count == 0) return "—";
-        if (codes.Contains(2)) return "Unhealthy";
-        if (codes.Contains(1)) return "Warning";
-        if (codes.All(c => c == 0)) return "Good";
-        return "—";
-    }
-
-    /// <summary>Maps an SMBIOS memory-type code to a human label, falling back to "RAM".</summary>
-    private static string MemoryTypeLabel(int smbiosType) => smbiosType switch {
-        20 => "DDR",
-        21 => "DDR2",
-        24 => "DDR3",
-        26 => "DDR4",
-        34 => "DDR5",
-        27 => "LPDDR",
-        28 => "LPDDR2",
-        29 => "LPDDR3",
-        30 => "LPDDR4",
-        35 => "LPDDR5",
-        _ => "RAM",
-    };
 
     /// <summary>Returns the first non-empty string value of <paramref name="property"/> from a WMI query
     /// (the <c>SystemInfoProvider.QueryString</c> idiom).</summary>
