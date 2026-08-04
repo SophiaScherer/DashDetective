@@ -5,6 +5,9 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
 
+        <!-- Matches the app's gate so CA1416 fails the build here too. Without it the analyzer would only
+             warn in this project, and CI's build step passes no -warnaserror. -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!-- Hand-rolled fakes only, no mocking framework (the codebase's zero-dependency ethos). -->
     </PropertyGroup>
 
