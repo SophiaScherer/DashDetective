@@ -12,8 +12,8 @@ namespace DashDetective.Tabs.Hardware;
 /// deliberately NOT an <see cref="ISelfScrollingPage"/>.
 ///
 /// The card structure (titles, icons, row keys) is fixed; the values are filled once at startup from
-/// <see cref="HardwareInfoProvider"/> (async WMI, off the UI thread — the continuation resumes here to
-/// bind), and re-read on demand via <see cref="IRefreshablePage"/>. Any field WMI cannot supply stays
+/// <see cref="IHardwareInfoProvider"/> (async WMI on one reader per card, off the UI thread — the
+/// continuation resumes here to bind), and re-read on demand via <see cref="IRefreshablePage"/>. Any field WMI cannot supply stays
 /// the neutral placeholder "—". The <b>Sensors</b> card is intentionally left as placeholders — live
 /// thermals/voltages are deferred (see the plan's appendix), so there is no live-sampling
 /// (<see cref="ILiveSamplingPage"/>) wiring here.

@@ -20,9 +20,6 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
     // HealthStatus 0 = Healthy; anything else (Warning/Unhealthy/Unknown) is surfaced as "Caution".
     private const int HealthStatusHealthy = 0;
 
-    // BusType 17 = NVMe — the only bus we can read a composite temperature from.
-    private const int BusTypeNvme = 17;
-
     public Task<IReadOnlyList<PhysicalDiskInfo>> GetAsync() => Task.Run(Read);
 
     private IReadOnlyList<PhysicalDiskInfo> Read() {
@@ -41,13 +38,13 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
                 foreach (var obj in results) {
                     using (obj) {
                         int deviceId = ToInt(obj["DeviceId"]);
-                        int busType = ToInt(obj["BusType"]);
+                        var kind = DriveKinds.FromStorageCodes(ToInt(obj["MediaType"]), ToInt(obj["BusType"]));
                         // Only NVMe drives expose a readable composite temperature; leave others at null.
-                        double? temperature = busType == BusTypeNvme ? readTemperatureCelsius(deviceId) : null;
+                        double? temperature = kind == DriveKind.Nvme ? readTemperatureCelsius(deviceId) : null;
                         disks.Add(new PhysicalDiskInfo(
                             deviceId,
                             ModelOrDefault(obj["FriendlyName"] as string),
-                            DriveTypeLabel(ToInt(obj["MediaType"]), busType),
+                            DriveTypeLabel(kind),
                             ToUInt64(obj["Size"]),
                             ToInt(obj["HealthStatus"]) == HealthStatusHealthy,
                             temperature));
@@ -84,18 +81,15 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
     private static string ModelOrDefault(string? model) =>
         string.IsNullOrWhiteSpace(model) ? "Drive" : model.Trim();
 
-    /// <summary>Media/bus type label: NVMe drives read "NVMe SSD"; otherwise the media flag ("SSD"/"HDD"),
-    /// or "" when unknown. BusType 17 = NVMe; MediaType 4 = SSD, 3 = HDD (the same codes
-    /// <c>HardwareInfoProvider</c> reads).</summary>
-    private static string DriveTypeLabel(int mediaType, int busType) {
-        if (busType == BusTypeNvme)
-            return "NVMe SSD";
-        if (mediaType == 4)
-            return "SSD";
-        if (mediaType == 3)
-            return "HDD";
-        return "";
-    }
+    /// <summary>The drive card's type label — spelled out ("NVMe SSD") since it heads its own card, unlike
+    /// the Hardware tab's terser spec row. "" when the kind is unknown. The codes behind
+    /// <paramref name="kind"/> are decoded once, in <see cref="DriveKinds"/>.</summary>
+    private static string DriveTypeLabel(DriveKind kind) => kind switch {
+        DriveKind.Nvme => "NVMe SSD",
+        DriveKind.Ssd => "SSD",
+        DriveKind.Hdd => "HDD",
+        _ => "",
+    };
 
     private static int ToInt(object? value) {
         try {

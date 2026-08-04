@@ -1,3 +1,4 @@
+using DashDetective.Services.SystemMetrics;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -13,11 +14,6 @@ internal static class StorageSpecFormatter {
     private const double Tb = 1_000_000_000_000d;
     private const double Gb = 1_000_000_000d;
 
-    // MSFT_PhysicalDisk codes: BusType 17 = NVMe; MediaType 4 = SSD, 3 = HDD.
-    private const int BusTypeNvme = 17;
-    private const int MediaTypeSsd = 4;
-    private const int MediaTypeHdd = 3;
-
     // MSFT_PhysicalDisk HealthStatus codes.
     private const int HealthHealthy = 0;
     private const int HealthWarning = 1;
@@ -29,14 +25,15 @@ internal static class StorageSpecFormatter {
         return $"{driveCount} {noun} · {Capacity(totalBytes)} total";
     }
 
-    /// <summary>Media/bus type label for a physical disk: NVMe wins over the SSD/HDD media flag; "" if
-    /// neither is known (the row then shows size only).</summary>
-    public static string TypeLabel(int mediaType, int busType) {
-        if (busType == BusTypeNvme) return "NVMe";
-        if (mediaType == MediaTypeSsd) return "SSD";
-        if (mediaType == MediaTypeHdd) return "HDD";
-        return "";
-    }
+    /// <summary>The spec row's drive type — terser than the Storage tab's wording, since it sits beside a
+    /// capacity on one line. "" when the drive's kind is unknown (the row then shows size only).</summary>
+    public static string TypeLabel(int mediaType, int busType) =>
+        DriveKinds.FromStorageCodes(mediaType, busType) switch {
+            DriveKind.Nvme => "NVMe",
+            DriveKind.Ssd => "SSD",
+            DriveKind.Hdd => "HDD",
+            _ => "",
+        };
 
     /// <summary>A drive row's value: capacity plus optional type, e.g. "2 TB NVMe" or "500 GB".</summary>
     public static string DriveDetail(ulong bytes, string type) {
