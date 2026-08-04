@@ -3,11 +3,11 @@ using System.Collections.Generic;
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// A one-shot snapshot of the machine's static hardware facts, read via WMI by
-/// <see cref="WindowsHardwareInfoProvider"/> and mapped onto the Hardware cards by
-/// <c>HardwareViewModel</c>. Each per-card sub-record carries <b>display-ready</b> strings (the WMI
-/// formatting — mV→V, KB→MB, etc. — lives in the provider), each defaulting to the neutral
-/// placeholder "—" so a field WMI cannot supply simply stays "—". The <c>Sensors</c> card has no
+/// A one-shot snapshot of the machine's static hardware facts, read via WMI by one provider per card and
+/// composed by <see cref="WindowsHardwareInfoProvider"/>, then mapped onto the Hardware cards by
+/// <c>HardwareViewModel</c>. Each per-card sub-record carries <b>display-ready</b> strings (the unit
+/// conversions — mV→V, KB→MB, bytes→TB — live in the <c>*SpecFormatter</c> classes), each defaulting to
+/// the neutral placeholder "—" so a field WMI cannot supply simply stays "—". The <c>Sensors</c> card has no
 /// sub-record here: live thermals/fans/voltages are deferred and it keeps its placeholders.
 /// </summary>
 public sealed record HardwareInfo(
