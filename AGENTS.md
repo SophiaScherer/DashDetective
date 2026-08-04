@@ -688,8 +688,12 @@ given a second platform later. The idiom, established by `IStartupRegistration` 
 - **The `Windows*` / `Unsupported*` split goes exactly where the platform-specific code is, and nowhere
   else.** A genuinely Windows-only reader becomes `internal sealed class Windows<Name>` carrying a
   **class-level** `[SupportedOSPlatform("windows")]` instead of an inner `OperatingSystem.IsWindows()`
-  guard, plus an `Unsupported<Name>` **at the bottom of the same file** returning exactly what the old
-  guard returned off Windows. A provider that is **portable managed code keeps its plain name** and gains
+  guard, plus an `Unsupported<Name>` **at the bottom of the same file**. `Unsupported*` is **the no-data
+  contract for any platform without an implementation** — not "the non-Windows arm". It covers a platform
+  whose milestone has not landed yet, and members a supported platform genuinely cannot supply (per-DIMM
+  modules needs `dmidecode` with root; disk temperature on Linux). It follows that **if an implementation
+  for a new platform would return exactly what `Unsupported*` returns, do not write the class** — leave
+  that member on `Unsupported*` in that platform's arm, rather than accumulating empty `Linux*Provider`s. A provider that is **portable managed code keeps its plain name** and gains
   only an interface — naming it `Windows*` when it would run fine anywhere is a lie, and writing an
   `Unsupported*` twin for it would either duplicate the portable body or silently blank a panel that used
   to work. The Network tab is the worked example: `AdapterInfoProvider`, `ConnectionsProvider` and
@@ -786,14 +790,15 @@ reference is needed** (adding the `Microsoft.Win32.Registry` package is redundan
 
 The **Settings persistence** work (settings store + "Launch at startup" + system tray) likewise added
 **no** new package: `System.Text.Json` (source-generated `SettingsJsonContext`) and
-`Microsoft.Win32.Registry` (the HKCU `Run` key) are in-box on `net10.0-windows`, and Avalonia's
+`Microsoft.Win32.Registry` (the HKCU `Run` key) are in-box on `net10.0`, and Avalonia's
 `TrayIcon` ships with the framework. Reuse the in-box JSON + registry for future persisted state.
 
 ## Testing conventions
 
-Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0-windows`, referenced by
-`DashDetective.sln`). CI runs them on `windows-latest` and collects coverage; `dotnet format` gates the
-test code too, so keep usings alphabetical (`System` is **not** sorted first).
+Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0`, referenced by `DashDetective.sln`).
+CI builds and format-checks on `windows-latest` **and** `ubuntu-latest`, but runs the tests and collects
+coverage on Windows only for now — the suite still asserts on drive-letter paths. `dotnet format` gates
+the test code on both legs, so keep usings alphabetical (`System` is **not** sorted first).
 
 - **Layout mirrors the app.** A test file sits under the same relative path as its subject
   (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`),

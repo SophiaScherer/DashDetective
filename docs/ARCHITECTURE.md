@@ -8,9 +8,17 @@ reading every file.
 
 Build, run and test instructions live in the [README](../README.md).
 
-DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0-windows`, using the
-MVVM pattern with `CommunityToolkit.Mvvm`. It is Windows-only on purpose (WMI, PDH performance
-counters, registry, and Win32 P/Invoke).
+DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
+pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
+counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
+today Linux builds and launches, but most panels read "—".
+
+**Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
+per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
+provider's `ForCurrentPlatform()`. A neutral TFM is also what makes the platform-compatibility analyzer
+(CA1416) a real gate, so a Windows-only API reached from unguarded code is a build error rather than a
+crash on someone else's machine. Windows-only NuGet assets still load correctly because packages like
+`System.Management` ship `runtimes/win` alongside their neutral stub, and the host resolves by RID.
 
 ## Guiding principles
 
@@ -271,8 +279,8 @@ lacks a given vendor's driver, the `DllImport` simply fails and that tile degrad
 
 ## Testing
 
-Unit tests live in `tests/DashDetective.Tests` (xUnit, also targeting `net10.0-windows` because it
-references the Windows-only app assembly). Fakes are small hand-written classes under `Fakes/` — there
+Unit tests live in `tests/DashDetective.Tests` (xUnit, on the same neutral `net10.0` TFM as the app).
+Fakes are small hand-written classes under `Fakes/` — there
 is no mocking framework, matching the codebase's zero-dependency ethos. The test layout mirrors the app,
 so a test file sits at the same relative path as its subject
 (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`).

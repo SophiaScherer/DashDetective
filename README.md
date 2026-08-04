@@ -2,7 +2,7 @@
 
 [![.NET Desktop (Avalonia)](https://github.com/SophiaScherer/DashDetective/actions/workflows/dotnet-desktop.yml/badge.svg)](https://github.com/SophiaScherer/DashDetective/actions/workflows/dotnet-desktop.yml)
 
-A Windows system-information console built with [Avalonia UI](https://avaloniaui.net/) and .NET 10.
+A system-information console built with [Avalonia UI](https://avaloniaui.net/) and .NET 10.
 It presents live machine metrics and hardware details across eight tabs — Dashboard, File Explorer,
 Processes, Performance, Network, Storage, Hardware and Settings — in a single themeable window.
 
@@ -11,8 +11,8 @@ Most of it can be driven from the keyboard: `Ctrl+1`–`Ctrl+8` jump between tab
 
 ## Requirements
 
-1. [.NET 10 SDK](https://dotnet.microsoft.com/download) — both projects target `net10.0-windows`
-2. Windows 10 or 11
+1. [.NET 10 SDK](https://dotnet.microsoft.com/download) — both projects target `net10.0`
+2. Windows 10 or 11 for the full feature set (see [Platform Support](#platform-support))
 3. Git
 
 ## Building and Running
@@ -103,9 +103,13 @@ Source layout and design conventions are documented in [docs/ARCHITECTURE.md](do
 
 ## Platform Support
 
-DashDetective is Windows-only by design. Both projects target `net10.0-windows`, and the application
-reads the machine through facilities that exist only on Windows: WMI (`System.Management`) for static
-hardware identity, PDH performance counters for live CPU/GPU/disk metrics, the registry for build
-details, and Win32 P/Invoke (`shell32`, `iphlpapi`, `IOCTL_STORAGE_QUERY_PROPERTY`) for shell
-integration, the connections table and NVMe drive temperature. There is no cross-platform fallback.
-No elevation is required — the application runs as a standard user.
+**Windows is the fully supported platform.** The application reads the machine through facilities that
+exist only on Windows: WMI (`System.Management`) for static hardware identity, PDH performance counters
+for live CPU/GPU/disk metrics, the registry for build details, and Win32 P/Invoke (`shell32`,
+`iphlpapi`, `IOCTL_STORAGE_QUERY_PROPERTY`) for shell integration, the connections table and NVMe drive
+temperature. No elevation is required — the application runs as a standard user.
+
+**Linux support is in progress.** Both projects now target a neutral `net10.0` TFM and CI builds on
+`ubuntu-latest`, so the app compiles and launches on Linux. Data sources are being ported one at a time;
+until each lands, the affected panel reads "—" rather than failing. Every reader degrades on its own, so
+a missing source is never a crash. macOS is not started.
