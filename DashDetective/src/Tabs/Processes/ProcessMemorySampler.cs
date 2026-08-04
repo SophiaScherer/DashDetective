@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Processes;
 
@@ -20,8 +21,10 @@ namespace DashDetective.Tabs.Processes;
 /// Static like <see cref="ProcessGpuSampler"/> (its sibling, and its sole caller's other PDH source): the
 /// query is opened lazily and lives for the app's lifetime — the OS reclaims it at exit — so there is no
 /// disposal to thread through the app-lifetime-singleton tab. Any failure yields an empty map and the
-/// caller falls back.
+/// caller falls back. The platform check lives in
+/// <see cref="IProcessSnapshotProvider.ForCurrentPlatform"/>.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public static class ProcessMemorySampler {
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;

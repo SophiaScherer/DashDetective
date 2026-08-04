@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Processes;
 
@@ -16,8 +17,10 @@ namespace DashDetective.Tabs.Processes;
 /// Static like <see cref="ProcessSnapshotProvider"/> (its sole caller, which polls from one timer with
 /// an in-flight guard). The PDH query is opened lazily and lives for the app's lifetime — the OS
 /// reclaims it at exit — so there is no disposal to thread through the app-lifetime-singleton tab. Any
-/// failure yields an empty map, so the GPU column simply shows 0.
+/// failure yields an empty map, so the GPU column simply shows 0. The platform check lives in
+/// <see cref="IProcessSnapshotProvider.ForCurrentPlatform"/>.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public static class ProcessGpuSampler {
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;
