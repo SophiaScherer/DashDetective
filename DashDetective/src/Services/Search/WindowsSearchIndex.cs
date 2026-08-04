@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.OleDb;
 using System.Globalization;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -95,6 +96,10 @@ public sealed class WindowsSearchIndex : IFileSearch {
 
     // One row, defensively: the index can hold an entry whose columns are null (a file removed since it
     // was indexed), and one such row must not cost the whole result set.
+    //
+    // Annotated because the only caller is Run, whose OperatingSystem.IsWindows() guard CA1416 cannot see
+    // across the method boundary. The attribute restates that guard for the analyzer; it adds no check.
+    [SupportedOSPlatform("windows")]
     private static FileHit? ReadHit(OleDbDataReader reader) {
         try {
             if (reader.GetValue(1) is not string fullPath || fullPath.Length == 0)

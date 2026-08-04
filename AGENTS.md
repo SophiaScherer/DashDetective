@@ -679,9 +679,9 @@ and rebuilds its `Sparkline` via `SparklinePoints.Build`, using `ChartScale.FitA
 network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer` + `Array.Copy`
 buffer or a bespoke points/peak helper.
 
-**Provider seams (IN PROGRESS — being rolled out phase by phase).** The OS-touching providers are being
-retrofitted from `public static class` into the `IGpuSensorReader` shape so they can be faked in tests and
-given a second platform later. The idiom, established by `IStartupRegistration` (`src/Services/Startup`):
+**Provider seams.** The OS-touching providers follow the `IGpuSensorReader` shape so they can be faked in
+tests and given a second platform later. Most already do; the stragglers are listed under *What CA1416
+does not catch* below. The idiom, established by `IStartupRegistration` (`src/Services/Startup`):
 
 - An `internal interface I<Name>` in its own file, **in the folder the provider already lives in** —
   nothing moves, no namespace changes. Its doc comment states the never-throw / soft-fail contract.
@@ -714,6 +714,36 @@ given a second platform later. The idiom, established by `IStartupRegistration` 
 **Never put `[SupportedOSPlatform]` on the interface** — every consumer would inherit the requirement and
 light up CA1416 across the app. Adding a platform later = one new class per interface plus one line in
 `ForCurrentPlatform()`; that is the whole point.
+
+**CA1416 is what enforces all of the above.** Both projects build on the neutral `net10.0` TFM with
+`TreatWarningsAsErrors`, and neither carries a `NoWarn` for it, so an unguarded call to a Windows-only API
+fails the build on both CI legs. Put the attribute on the **narrowest thing that is genuinely
+platform-specific**: the type when the whole type is (`WindowsGpuAdapterProvider`), or a single ctor or
+method when only that is. `WindowsHardwareInfoProvider` is the worked example — its public ctor resolves
+the WMI readers and carries the attribute, while its composition and per-card guard are portable and stay
+callable from tests on every platform. Where a guard cannot be seen across a method boundary, the
+attribute restates it: `WindowsSearchIndex.ReadHit` is annotated because its only caller `Run` holds the
+`OperatingSystem.IsWindows()` check.
+
+**What CA1416 does not catch.** It fires only on APIs that are themselves annotated — BCL surface like
+`System.Management`, OleDb and `Microsoft.Win32.Registry`. **A hand-written `DllImport` declaration carries
+no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating those classes is therefore not
+busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
+from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
+
+Eleven classes still reach native Windows APIs unannotated, because annotating them today would land the
+attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
+already scheduled. Each gets its attribute when its seam lands:
+
+| Class | Seam lands in |
+|---|---|
+| `LogicalProcessorSampler`, `ProcessorFrequencySampler` | M5 |
+| `MemoryUsageSampler`, `SystemPerformanceProvider` | M6 |
+| `PhysicalDiskThroughputSampler` | M8 |
+| `GpuUsageSampler`, `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 |
+
+`ProcessorUtilityCpuSampler` and `SystemTimesCpuSampler` are the same case resolved differently: their only
+consumer is `CpuUsageSampler`'s ctor, which gains a Linux arm in M5.
 
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →

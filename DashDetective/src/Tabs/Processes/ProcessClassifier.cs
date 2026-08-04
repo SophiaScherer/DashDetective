@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Processes;
 
@@ -23,9 +24,11 @@ namespace DashDetective.Tabs.Processes;
 /// </list>
 ///
 /// Task Manager uses undocumented internal heuristics, so this is "close and correct," not byte-exact
-/// on every edge case. Static + soft-failing, matching the tab's other providers; on non-Windows it
-/// yields an empty classification (everything falls back to Background).
+/// on every edge case. Static + soft-failing, matching the tab's other providers. Reached only from
+/// <see cref="WindowsProcessSnapshotProvider"/>, so the platform check lives in
+/// <see cref="IProcessSnapshotProvider.ForCurrentPlatform"/>.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public static class ProcessClassifier {
     // ----- Toolhelp: parent PID + image name for every live process, in one snapshot -----
     private const uint Th32csSnapProcess = 0x00000002;
