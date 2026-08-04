@@ -63,20 +63,30 @@ public sealed class LogicalProcessorSampler : IDisposable {
 
     public LogicalProcessorSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns an empty set forever.
-        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
-            return;
+        // The catch covers pdh.dll failing to load or bind, which a return-code check can't see.
+        try {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
+                return;
 
-        if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
-            PdhCloseQuery(_query);
-            _query = IntPtr.Zero;
-            return;
+            if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
+                PdhCloseQuery(_query);
+                _query = IntPtr.Zero;
+                return;
+            }
+
+            // Seed one collect so the first Sample() reflects a real interval (this is a rate counter needing two
+            // data points), mirroring the other array samplers.
+            PdhCollectQueryData(_query);
+            _ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
+            NativeLoadFailure.Report(nameof(LogicalProcessorSampler), ex);
         }
-
-        // Seed one collect so the first Sample() reflects a real interval (this is a rate counter needing two
-        // data points), mirroring the other array samplers.
-        PdhCollectQueryData(_query);
-        _ready = true;
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal LogicalProcessorSampler(SamplerInit _) { }
 
     /// <summary>Returns one reading per logical processor at the moment of the call, ordered by (group, core)
     /// with the <c>_Total</c> roll-ups dropped. Any failure yields an empty set.</summary>
