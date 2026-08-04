@@ -52,21 +52,31 @@ public sealed class ProcessorFrequencySampler : IDisposable {
 
     public ProcessorFrequencySampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns 0 forever and the
-        // caller renders a placeholder. Mirrors the other page-local samplers' soft-fail contract.
-        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
-            return;
+        // caller renders a placeholder. Mirrors the other page-local samplers' soft-fail contract. The
+        // catch covers pdh.dll failing to load or bind, which a return-code check can't see.
+        try {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
+                return;
 
-        if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
-            PdhCloseQuery(_query);
-            _query = IntPtr.Zero;
-            return;
+            if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
+                PdhCloseQuery(_query);
+                _query = IntPtr.Zero;
+                return;
+            }
+
+            // Seed one collect so the first Sample() reflects a real interval — this is a ratio counter that
+            // needs two data points, like the utilisation counter.
+            PdhCollectQueryData(_query);
+            _ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
+            NativeLoadFailure.Report(nameof(ProcessorFrequencySampler), ex);
         }
-
-        // Seed one collect so the first Sample() reflects a real interval — this is a ratio counter that
-        // needs two data points, like the utilisation counter.
-        PdhCollectQueryData(_query);
-        _ready = true;
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal ProcessorFrequencySampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns the current clock as a percentage of the base clock. Deliberately left unclamped above 100:
