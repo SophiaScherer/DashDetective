@@ -12,10 +12,12 @@ namespace DashDetective.Tabs.Hardware;
 /// that throws instead of honouring the never-throw contract costs only its own card — one dead source
 /// still can't blank the others.
 ///
-/// The platform check lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>, which is why this
-/// carries one <see cref="SupportedOSPlatformAttribute"/> rather than a guard per reader.
+/// The platform check lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>, which is why the
+/// public ctor carries one <see cref="SupportedOSPlatformAttribute"/> rather than a guard per reader. It
+/// sits on that ctor rather than the type because resolving the WMI readers is the only Windows-specific
+/// part — the composition and its per-card guard are platform-neutral, so the injected-reader tests run
+/// everywhere.
 /// </summary>
-[SupportedOSPlatform("windows")]
 internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
     private readonly IProcessorInfoProvider _processor;
     private readonly IMemoryModulesProvider _memory;
@@ -23,6 +25,7 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
     private readonly IMotherboardInfoProvider _motherboard;
     private readonly IGraphicsInfoProvider _graphics;
 
+    [SupportedOSPlatform("windows")]
     public WindowsHardwareInfoProvider()
         : this(new WindowsProcessorInfoProvider(), new WindowsMemoryModulesProvider(),
                new WindowsStorageInfoProvider(), new WindowsMotherboardInfoProvider(),

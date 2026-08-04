@@ -5,8 +5,6 @@
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
 
-        <!-- TEMPORARY — removed in M3 alongside the app's copy; see DashDetective.csproj for why. -->
-        <NoWarn>$(NoWarn);CA1416</NoWarn>
         <!-- Hand-rolled fakes only, no mocking framework (the codebase's zero-dependency ethos). -->
     </PropertyGroup>
 
