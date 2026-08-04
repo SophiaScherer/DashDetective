@@ -81,24 +81,34 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
 
     public PhysicalDiskThroughputSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns an empty set forever.
-        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
-            return;
+        // The catch covers pdh.dll failing to load or bind, which a return-code check can't see.
+        try {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
+                return;
 
-        if (PdhAddEnglishCounter(_query, ReadPath, IntPtr.Zero, out _readCounter) != ErrorSuccess
-            || PdhAddEnglishCounter(_query, WritePath, IntPtr.Zero, out _writeCounter) != ErrorSuccess
-            || PdhAddEnglishCounter(_query, IdlePath, IntPtr.Zero, out _idleCounter) != ErrorSuccess
-            || PdhAddEnglishCounter(_query, ResponsePath, IntPtr.Zero, out _responseCounter) != ErrorSuccess
-            || PdhAddEnglishCounter(_query, QueuePath, IntPtr.Zero, out _queueCounter) != ErrorSuccess) {
-            PdhCloseQuery(_query);
-            _query = IntPtr.Zero;
-            return;
+            if (PdhAddEnglishCounter(_query, ReadPath, IntPtr.Zero, out _readCounter) != ErrorSuccess
+                || PdhAddEnglishCounter(_query, WritePath, IntPtr.Zero, out _writeCounter) != ErrorSuccess
+                || PdhAddEnglishCounter(_query, IdlePath, IntPtr.Zero, out _idleCounter) != ErrorSuccess
+                || PdhAddEnglishCounter(_query, ResponsePath, IntPtr.Zero, out _responseCounter) != ErrorSuccess
+                || PdhAddEnglishCounter(_query, QueuePath, IntPtr.Zero, out _queueCounter) != ErrorSuccess) {
+                PdhCloseQuery(_query);
+                _query = IntPtr.Zero;
+                return;
+            }
+
+            // Seed one collect so the first Sample() reflects a real interval (these are rate counters needing
+            // two data points), mirroring the other PDH samplers priming their queries.
+            PdhCollectQueryData(_query);
+            _ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
+            NativeLoadFailure.Report(nameof(PhysicalDiskThroughputSampler), ex);
         }
-
-        // Seed one collect so the first Sample() reflects a real interval (these are rate counters needing
-        // two data points), mirroring the other PDH samplers priming their queries.
-        PdhCollectQueryData(_query);
-        _ready = true;
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal PhysicalDiskThroughputSampler(SamplerInit _) { }
 
     /// <summary>Returns per-disk read/write throughput at the moment of the call, one entry per physical
     /// disk instance. Any failure yields an empty set.</summary>

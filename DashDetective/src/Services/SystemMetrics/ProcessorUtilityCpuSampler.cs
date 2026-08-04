@@ -46,26 +46,37 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
     private IntPtr _query;
     private IntPtr _counter;
 
-    /// <summary>Whether the counter stood up; when false the caller uses the fallback sampler.</summary>
+    /// <summary>Whether the counter stood up; when false — including when <c>pdh.dll</c> can't be loaded
+    /// at all — the caller uses the fallback sampler.</summary>
     public bool Ready { get; }
 
     public ProcessorUtilityCpuSampler() {
         // A failure to stand up the query leaves Ready false; CpuUsageSampler then falls back to
-        // GetSystemTimes. Mirrors GpuUsageSampler's soft-fail contract.
-        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
-            return;
+        // GetSystemTimes. Mirrors GpuUsageSampler's soft-fail contract. The catch covers pdh.dll failing
+        // to load or bind, which a return-code check can't see.
+        try {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
+                return;
 
-        if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
-            PdhCloseQuery(_query);
-            _query = IntPtr.Zero;
-            return;
+            if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
+                PdhCloseQuery(_query);
+                _query = IntPtr.Zero;
+                return;
+            }
+
+            // Seed one collect so the first Sample() reflects a real interval — the utilisation counter
+            // is a rate that needs two data points, mirroring SystemTimesCpuSampler seeding GetSystemTimes.
+            PdhCollectQueryData(_query);
+            Ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            // _query is left as the runtime found it: an unwritten `out` stays Zero, so Dispose is a no-op.
+            NativeLoadFailure.Report(nameof(ProcessorUtilityCpuSampler), ex);
         }
-
-        // Seed one collect so the first Sample() reflects a real interval — the utilisation counter
-        // is a rate that needs two data points, mirroring SystemTimesCpuSampler seeding GetSystemTimes.
-        PdhCollectQueryData(_query);
-        Ready = true;
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal ProcessorUtilityCpuSampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns total CPU utilisation (0–100) since the previous call. Utility can exceed 100 while the

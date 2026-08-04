@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace DashDetective.Services.SystemMetrics;
@@ -6,7 +7,8 @@ namespace DashDetective.Services.SystemMetrics;
 /// Idle-based CPU sampler via the Win32 <c>GetSystemTimes</c> API — the "% Processor Time" method.
 /// Used as the fallback when the frequency-normalised PDH "% Processor Utility" counter (which Task
 /// Manager uses, see <see cref="ProcessorUtilityCpuSampler"/>) can't be created. No dependencies,
-/// negligible per-sample cost.
+/// negligible per-sample cost. Being the last CPU fallback, a <c>kernel32</c> load failure leaves it
+/// inert (returning 0 forever) rather than throwing — there is nothing further to fall back to.
 /// </summary>
 internal sealed class SystemTimesCpuSampler : ICpuSampler {
     [StructLayout(LayoutKind.Sequential)]
@@ -25,21 +27,36 @@ internal sealed class SystemTimesCpuSampler : ICpuSampler {
     private ulong _prevKernel;
     private ulong _prevUser;
 
+    /// <summary>Whether <c>GetSystemTimes</c> is usable at all; when false <see cref="Sample"/> returns 0
+    /// without touching the native call.</summary>
+    internal bool Ready { get; }
+
     public SystemTimesCpuSampler() {
         // Seed an initial snapshot so the very first Sample() reflects a real interval
         // rather than the whole time since boot.
-        GetSystemTimes(out var idle, out var kernel, out var user);
-        _prevIdle = idle.ToUInt64();
-        _prevKernel = kernel.ToUInt64();
-        _prevUser = user.ToUInt64();
+        try {
+            GetSystemTimes(out var idle, out var kernel, out var user);
+            _prevIdle = idle.ToUInt64();
+            _prevKernel = kernel.ToUInt64();
+            _prevUser = user.ToUInt64();
+            Ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            NativeLoadFailure.Report(nameof(SystemTimesCpuSampler), ex);
+        }
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal SystemTimesCpuSampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns average CPU utilisation (0–100) since the previous call. Kernel time already
-    /// includes idle time, so busy = (kernel + user) − idle over the elapsed interval.
+    /// includes idle time, so busy = (kernel + user) − idle over the elapsed interval. Yields 0 when the
+    /// sampler is inert — the Ready check short-circuits before the native call, so an unusable
+    /// <c>kernel32</c> can't throw once per tick.
     /// </summary>
     public double Sample() {
-        if (!GetSystemTimes(out var idle, out var kernel, out var user))
+        if (!Ready || !GetSystemTimes(out var idle, out var kernel, out var user))
             return 0;
 
         var idleNow = idle.ToUInt64();

@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace DashDetective.Services.SystemMetrics;
@@ -19,6 +20,10 @@ public readonly record struct MemorySample(
 /// Shared: the Dashboard and the Processes tab each own an instance (the Processes summary strip
 /// shows the same system-wide Memory% as the Dashboard). Moved here from src/Tabs/Dashboard with
 /// sign-off when the Processes tab was activated — the same precedent as <c>NetworkUsageSampler</c>.
+///
+/// Unlike the PDH samplers there is no query to stand up in a constructor, so the soft-fail contract
+/// lives in <see cref="Sample"/>: a <c>kernel32</c> load failure latches the sampler inert, and every
+/// later call returns a zeroed reading without re-entering the native call.
 /// </summary>
 public sealed class MemoryUsageSampler {
     [StructLayout(LayoutKind.Sequential)]
@@ -38,16 +43,39 @@ public sealed class MemoryUsageSampler {
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
 
+    /// <summary>The "nothing to report" reading — an API failure, or a sampler latched inert.</summary>
+    private static readonly MemorySample NoReading = new(0, 0, 0, 0, 0);
+
+    // Latches false the first time kernel32 can't be bound, so that failure is caught and logged once
+    // rather than thrown and swallowed on every tick of the shared 1 Hz timer.
+    private bool _available = true;
+
+    public MemoryUsageSampler() { }
+
+    /// <summary>Test seam: starts the sampler latched inert so the soft-fail contract can be exercised on
+    /// a healthy host, where the native call always succeeds.</summary>
+    internal MemoryUsageSampler(SamplerInit _) => _available = false;
+
     /// <summary>
     /// Returns the current physical-memory snapshot. <c>MemoryLoad</c> is used directly for the
     /// percentage; used bytes are total − available. Memory is an absolute reading, so unlike the
-    /// CPU sampler there is no prior state to seed or diff.
+    /// CPU sampler there is no prior state to seed or diff. Yields a zeroed reading once the sampler
+    /// has latched inert.
     /// </summary>
     public MemorySample Sample() {
+        if (!_available)
+            return NoReading;
+
         // Length must be set before the call so the OS knows the struct version/size.
         var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
-        if (!GlobalMemoryStatusEx(ref status))
-            return new MemorySample(0, 0, 0, 0, 0);
+        try {
+            if (!GlobalMemoryStatusEx(ref status))
+                return NoReading;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            _available = false;
+            NativeLoadFailure.Report(nameof(MemoryUsageSampler), ex);
+            return NoReading;
+        }
 
         var used = status.TotalPhys >= status.AvailPhys
             ? status.TotalPhys - status.AvailPhys

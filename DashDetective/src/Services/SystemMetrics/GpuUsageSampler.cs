@@ -61,22 +61,32 @@ public sealed class GpuUsageSampler : IDisposable {
 
     public GpuUsageSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns 0 forever and
-        // the caller stops its timer — the same soft-fail contract as the CPU/Memory samplers.
-        if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
-            return;
+        // the caller stops its timer — the same soft-fail contract as the CPU/Memory samplers. The
+        // catch covers pdh.dll failing to load or bind, which a return-code check can't see.
+        try {
+            if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
+                return;
 
-        if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
-            PdhCloseQuery(_query);
-            _query = IntPtr.Zero;
-            return;
+            if (PdhAddEnglishCounter(_query, CounterPath, IntPtr.Zero, out _counter) != ErrorSuccess) {
+                PdhCloseQuery(_query);
+                _query = IntPtr.Zero;
+                return;
+            }
+
+            // Seed one collect so the first Sample() reflects a real interval. The utilisation counter
+            // is a rate that needs two data points, so priming here mirrors CpuUsageSampler seeding
+            // GetSystemTimes in its constructor.
+            PdhCollectQueryData(_query);
+            _ready = true;
+        } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
+            // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
+            NativeLoadFailure.Report(nameof(GpuUsageSampler), ex);
         }
-
-        // Seed one collect so the first Sample() reflects a real interval. The utilisation counter
-        // is a rate that needs two data points, so priming here mirrors CpuUsageSampler seeding
-        // GetSystemTimes in its constructor.
-        PdhCollectQueryData(_query);
-        _ready = true;
     }
+
+    /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
+    /// a healthy host, where the real constructor always succeeds.</summary>
+    internal GpuUsageSampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns total GPU utilisation (0–100) at the moment of the call: the busiest engine type's
