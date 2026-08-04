@@ -24,6 +24,12 @@
         <AnalysisLevel>latest</AnalysisLevel>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+        <!-- TEMPORARY — remove in M3 of the cross-platform port. The neutral TFM above wakes CA1416 on
+             every unguarded Windows-only call site at once, and TreatWarningsAsErrors leaves no
+             "downgrade to warning" option, so the build cannot go green incrementally. M3 annotates or
+             guards those sites and deletes this line. Do not park any other rule here. -->
+        <NoWarn>$(NoWarn);CA1416</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
