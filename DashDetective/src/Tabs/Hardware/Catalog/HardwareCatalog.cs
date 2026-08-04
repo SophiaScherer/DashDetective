@@ -10,8 +10,9 @@ namespace DashDetective.Tabs.Hardware.Catalog;
 /// count, RAM timings). These are fixed properties of a known model, so they are keyed here by the model
 /// strings WMI already yields (CPU/GPU <c>Name</c>, board <c>Product</c>, memory <c>PartNumber</c>).
 ///
-/// This is a pure enrichment layer: <see cref="HardwareInfoProvider"/> calls it <i>after</i> its WMI
-/// read and fills only the fields the machine couldn't report. An unknown part returns <c>null</c> and
+/// This is a pure enrichment layer: each per-card reader (<c>WindowsProcessorInfoProvider</c> and the
+/// rest) calls it <i>after</i> its own WMI read and fills only the fields the machine couldn't report,
+/// which is why the tables are keyed per domain. An unknown part returns <c>null</c> and
 /// the caller leaves the neutral placeholder "—" — the catalog never guesses, and a near-miss must resolve
 /// to nothing rather than to a similarly-named part's datasheet. No dependency, no admin, no network;
 /// adding a part is a one-line entry in the relevant per-domain table.
