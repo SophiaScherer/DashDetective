@@ -9,7 +9,7 @@ namespace DashDetective.Services.Startup;
 /// Registers (or clears) the app in the per-user Windows startup list — the HKCU <c>Run</c> key, the
 /// same mechanism the Task Manager "Startup apps" tab reflects. Fully soft-failing, so a locked-down
 /// host degrades to "not enabled" rather than crashing. Uses the in-box <c>Microsoft.Win32.Registry</c>
-/// API (no package on the net10.0-windows target). The platform check lives in
+/// API (in-box on the net10.0 target, no package). The platform check lives in
 /// <see cref="IStartupRegistration.ForCurrentPlatform"/>, which is why there is no guard in here.
 /// </summary>
 [SupportedOSPlatform("windows")]

@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <!-- The whole app is Windows-only (WMI, PDH performance counters, Win32 P/Invoke), so the
-             target framework is pinned to -windows. This makes the assembly implicitly windows to the
-             platform-compatibility analyzers, which is what AnalysisLevel=latest below engages. -->
-        <TargetFramework>net10.0-windows</TargetFramework>
+        <!-- One neutral TFM for every platform: platform differences are decided at runtime by the
+             ForCurrentPlatform() provider seams, never by multi-targeting or #if. The neutral TFM is
+             also what makes the platform-compatibility analyzer (CA1416) a real gate rather than a
+             no-op, which is what AnalysisLevel=latest below engages. -->
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -23,6 +24,12 @@
         <AnalysisLevel>latest</AnalysisLevel>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+        <!-- TEMPORARY — remove in M3 of the cross-platform port. The neutral TFM above wakes CA1416 on
+             every unguarded Windows-only call site at once, and TreatWarningsAsErrors leaves no
+             "downgrade to warning" option, so the build cannot go green incrementally. M3 annotates or
+             guards those sites and deletes this line. Do not park any other rule here. -->
+        <NoWarn>$(NoWarn);CA1416</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

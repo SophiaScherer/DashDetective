@@ -1,10 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <!-- Matches the app's TFM: the app assembly is Windows-only (WMI/PDH/P-Invoke), so the test
-             assembly that references it must target a Windows TFM too. -->
-        <TargetFramework>net10.0-windows</TargetFramework>
+        <!-- Matches the app's neutral TFM, so the suite runs on every platform the app builds for. -->
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
+
+        <!-- TEMPORARY — removed in M3 alongside the app's copy; see DashDetective.csproj for why. -->
+        <NoWarn>$(NoWarn);CA1416</NoWarn>
         <!-- Hand-rolled fakes only, no mocking framework (the codebase's zero-dependency ethos). -->
     </PropertyGroup>
 
