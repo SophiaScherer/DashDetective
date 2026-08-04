@@ -22,6 +22,7 @@ namespace DashDetective.Tabs.Settings;
 public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
     private readonly SystemMetricsService _metrics;
+    private readonly IStartupRegistration _startup;
     private readonly Func<string> _buildReport;
     private readonly Func<string> _buildMetricsCsv;
 
@@ -67,10 +68,15 @@ public partial class SettingsViewModel : ViewModelBase {
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
 
-    public SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
-                             AppSettings settings, Func<string> buildReport, Func<string> buildMetricsCsv) {
+    /// <summary>Internal because <see cref="IStartupRegistration"/> is: the class stays public for the
+    /// <c>ViewLocator</c> and binding, but the shell is its only caller (and the tests, via
+    /// <c>InternalsVisibleTo</c>).</summary>
+    internal SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
+                               AppSettings settings, IStartupRegistration startup,
+                               Func<string> buildReport, Func<string> buildMetricsCsv) {
         _theme = theme;
         _metrics = metrics;
+        _startup = startup;
         Nav = nav;
         _buildReport = buildReport;
         _buildMetricsCsv = buildMetricsCsv;
@@ -109,7 +115,7 @@ public partial class SettingsViewModel : ViewModelBase {
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
         // registry state, which is the ground truth if it was changed outside the app.
-        _launchAtStartup = StartupRegistration.IsEnabled();
+        _launchAtStartup = _startup.IsEnabled();
         _showInTray = settings.ShowInTray;
         _resourceAlerts = settings.ResourceAlerts;
 
@@ -180,7 +186,7 @@ public partial class SettingsViewModel : ViewModelBase {
     }
 
     partial void OnLaunchAtStartupChanged(bool value) {
-        StartupRegistration.SetEnabled(value);
+        _startup.SetEnabled(value);
         Changed?.Invoke();
     }
 

@@ -11,29 +11,27 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
 
-/// <summary>The Adapters + IP Configuration snapshot: every adapter (for the list) plus the primary
-/// adapter's IPv4 configuration (for the IP panel).</summary>
-public sealed record AdapterSnapshot(IReadOnlyList<AdapterInfo> Adapters, IpConfigInfo PrimaryConfig);
-
 /// <summary>
 /// Reads the machine's network adapters and the primary adapter's IPv4 configuration via the managed
 /// <see cref="NetworkInterface"/> API. Enumeration is a cheap stateless snapshot (unlike the
 /// throughput sampler's stateful byte-counter differencing), but it is still done off the UI thread
-/// to match the app's provider convention. Follows <c>SystemInfoProvider</c>: a static
-/// <see cref="GetAsync"/> that never throws — each adapter and each field falls back independently so
-/// one dead source can't blank the panel.
+/// to match the app's provider convention. <see cref="GetAsync"/> never throws — each adapter and each
+/// field falls back independently so one dead source can't blank the panel.
+///
+/// Portable managed code, so no platform prefix: the one Windows-only field (DHCP) is guarded inline and
+/// degrades to "—", which is a per-field fallback rather than a per-platform implementation.
 ///
 /// The primary adapter is identified with <see cref="NetworkUsageSampler.SelectPrimary"/> so the
 /// "which adapter is internet-facing" logic lives in exactly one place (shared with the sampler).
 /// </summary>
-public static class AdapterInfoProvider {
+internal sealed class AdapterInfoProvider : IAdapterInfoProvider {
     // Name/description fragments that mark an adapter as virtual/host rather than a physical NIC.
     private static readonly string[] VirtualMarkers = {
         "virtual", "hyper-v", "vethernet", "vmware", "virtualbox", "tap-", "tap ", "loopback",
         "pseudo", "wan miniport", "bluetooth", "wintun", "wireguard", "npcap", "docker",
     };
 
-    public static Task<AdapterSnapshot> GetAsync() => Task.Run(Read);
+    public Task<AdapterSnapshot> GetAsync() => Task.Run(Read);
 
     private static AdapterSnapshot Read() {
         try {

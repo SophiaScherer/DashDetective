@@ -61,13 +61,17 @@ public sealed class DeviceInventory {
     /// Reads every provider once (off the UI thread) and composes the inventory. Each provider soft-fails to
     /// its <c>Unknown</c>/empty value, so a partial read still yields a usable inventory rather than throwing.
     /// </summary>
-    public static async Task<DeviceInventory> LoadAsync() {
-        var cpuTask = CpuInfoProvider.GetAsync();
-        var memoryTask = MemoryInfoProvider.GetAsync();
-        var gpusTask = GpuAdapterProvider.GetAsync();
+    /// <remarks>The five injected reads run concurrently, so every member of
+    /// <paramref name="providers"/> must be thread-safe — see the note on <see cref="HardwareProviders"/>.
+    /// The GPU-LUID and network reads still reach page-local samplers directly, so this is not fully
+    /// fakeable; tests that need composed devices should drive <see cref="Compose"/> instead.</remarks>
+    internal static async Task<DeviceInventory> LoadAsync(HardwareProviders providers) {
+        var cpuTask = providers.Cpu.GetAsync();
+        var memoryTask = providers.Memory.GetAsync();
+        var gpusTask = providers.GpuAdapters.GetAsync();
         var gpuLuidsTask = Task.Run(SampleActiveGpuLuids);
-        var disksTask = PhysicalDiskProvider.GetAsync();
-        var volumesTask = VolumeProvider.GetAsync();
+        var disksTask = providers.Disks.GetAsync();
+        var volumesTask = providers.Volumes.GetAsync();
         var networkTask = Task.Run(ReadNetwork);
         await Task.WhenAll(cpuTask, memoryTask, gpusTask, gpuLuidsTask, disksTask, volumesTask, networkTask);
 

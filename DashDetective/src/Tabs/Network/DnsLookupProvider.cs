@@ -9,24 +9,22 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
 
-/// <summary>The DNS lookup result: the console body (name + resolved addresses) and a footer line
-/// (timing + record type), or a failure note.</summary>
-public sealed record DnsResult(string Console, string Footer);
-
 /// <summary>
 /// Resolves a user-supplied host via the in-box <see cref="Dns"/> API, timing the lookup. A one-shot
 /// query — run at startup, on toolbar Refresh, and whenever the user submits a new host — not a live
 /// loop. A bounded <see cref="CancellationTokenSource"/> caps the wait (an untokened lookup can hang
 /// ~10 s when offline). Never throws: failure (or a blank host) yields a "could not resolve" note.
+///
+/// Portable managed code — no platform prefix, and no per-platform implementation to pick between.
 /// </summary>
-public static class DnsLookupProvider {
+internal sealed class DnsLookupProvider : IDnsLookupProvider {
     /// <summary>The default lookup host, used until the user edits the field.</summary>
     public const string DefaultHost = "example.com";
 
     private const int TimeoutMs = 3000;
     private const int MaxAddresses = 3;
 
-    public static Task<DnsResult> GetAsync(string host) => ResolveAsync(host);
+    public Task<DnsResult> GetAsync(string host) => ResolveAsync(host);
 
     private static async Task<DnsResult> ResolveAsync(string host) {
         host = host?.Trim() ?? "";

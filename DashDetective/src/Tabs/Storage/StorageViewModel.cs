@@ -40,6 +40,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Held only to follow the Settings refresh interval: the tab reads no shared feed, but its Disk Activity
     // chart has to advance at the same rate as the charts on other pages to cover the same span of time.
     private readonly SystemMetricsService _service;
+    private readonly HardwareProviders _providers;
 
     // Page-local per-disk sampler + its timer, and the disk-number → card / history / latest-sample maps the
     // tick updates. Histories are kept for every disk (not just the selected one) so switching drives shows
@@ -57,7 +58,14 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly List<int> _temperatureDiskNumbers = new();
     private int _temperatureTickCounter;
 
-    public StorageViewModel(SystemMetricsService service) {
+    public StorageViewModel(SystemMetricsService service)
+        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
+    /// one, so the shell still builds this exactly as before.</summary>
+    internal StorageViewModel(SystemMetricsService service, HardwareProviders providers) {
+        _providers = providers;
+
         _service = service;
 
         // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
@@ -192,10 +200,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// unlettered Recovery/EFI). Both providers soft-fail to empty lists, so any failure just clears the
     /// surfaces rather than faulting the task.
     /// </summary>
-    private async Task LoadStorageAsync() {
+    /// <summary>Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
+    internal async Task LoadStorageAsync() {
         try {
-            var disksTask = PhysicalDiskProvider.GetAsync();
-            var volumesTask = VolumeProvider.GetAsync();
+            var disksTask = _providers.Disks.GetAsync();
+            var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
             var disks = disksTask.Result;
             var volumes = volumesTask.Result;
@@ -271,7 +280,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// leaves the last shown value untouched.</summary>
     private void UpdateTemperatures() {
         foreach (var diskNumber in _temperatureDiskNumbers)
-            if (DiskTemperatureProvider.ReadCelsius(diskNumber) is double celsius
+            if (_providers.DiskTemperature.ReadCelsius(diskNumber) is double celsius
                 && _cardsByDisk.TryGetValue(diskNumber, out var card))
                 card.Temp = DriveTemperatureFormatter.Format(celsius);
     }

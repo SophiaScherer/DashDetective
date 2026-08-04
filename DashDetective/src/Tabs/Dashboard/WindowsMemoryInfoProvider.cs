@@ -2,6 +2,7 @@ using DashDetective.Services.Diagnostics;
 using DashDetective.Shared;
 using System;
 using System.Management;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Dashboard;
@@ -9,17 +10,14 @@ namespace DashDetective.Tabs.Dashboard;
 /// <summary>
 /// Reads static physical-memory hardware information from WMI (<c>Win32_PhysicalMemory</c>). The
 /// query is comparatively slow and blocking, so it runs on a background thread and is awaited once
-/// at startup. Any failure (or a non-Windows host) yields <see cref="MemoryStaticInfo.Unknown"/>
-/// rather than throwing.
+/// at startup. Any failure yields <see cref="MemoryStaticInfo.Unknown"/> rather than throwing. The
+/// platform check lives in <c>HardwareProviders.ForCurrentPlatform</c>.
 /// </summary>
-public static class MemoryInfoProvider {
-    public static Task<MemoryStaticInfo> GetAsync() => Task.Run(Read);
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsMemoryInfoProvider : IMemoryInfoProvider {
+    public Task<MemoryStaticInfo> GetAsync() => Task.Run(Read);
 
     private static MemoryStaticInfo Read() {
-        // Guard doubles as the platform-compatibility check for the WMI calls below.
-        if (!OperatingSystem.IsWindows())
-            return MemoryStaticInfo.Unknown;
-
         try {
             ulong totalBytes = 0;
             int speed = 0, modules = 0, memoryType = 0;
@@ -72,4 +70,9 @@ public static class MemoryInfoProvider {
     private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
 
     private static ulong ToUInt64(object? value) => value is null ? 0 : Convert.ToUInt64(value);
+}
+
+/// <summary>The no-memory-facts set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
+internal sealed class UnsupportedMemoryInfoProvider : IMemoryInfoProvider {
+    public Task<MemoryStaticInfo> GetAsync() => Task.FromResult(MemoryStaticInfo.Unknown);
 }

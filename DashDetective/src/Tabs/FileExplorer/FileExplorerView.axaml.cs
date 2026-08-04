@@ -145,11 +145,11 @@ public partial class FileExplorerView : UserControl {
     // The native Properties dialog needs the owning window handle, so it's invoked here rather
     // than from the view model (the same reason the Export dialog lives in MainWindow.axaml.cs).
     private void OnPropertiesClick(object? sender, RoutedEventArgs e) {
-        if (DataContext is not FileExplorerViewModel { SelectedEntry: { } entry })
+        if (DataContext is not FileExplorerViewModel { SelectedEntry: { } entry } vm)
             return;
 
         var handle = TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-        ShellInterop.ShowProperties(handle, entry.FullPath);
+        vm.ShowProperties(handle, entry.FullPath);
     }
 
     // Single tap selects the row (drives the details pane); double tap activates it (a folder

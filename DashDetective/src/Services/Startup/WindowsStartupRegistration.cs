@@ -7,20 +7,17 @@ namespace DashDetective.Services.Startup;
 
 /// <summary>
 /// Registers (or clears) the app in the per-user Windows startup list — the HKCU <c>Run</c> key, the
-/// same mechanism the Task Manager "Startup apps" tab reflects. A plain static reader/writer like
-/// <c>CurrentUserProvider</c>: Windows-guarded and fully soft-failing, so a locked-down or non-Windows
+/// same mechanism the Task Manager "Startup apps" tab reflects. Fully soft-failing, so a locked-down
 /// host degrades to "not enabled" rather than crashing. Uses the in-box <c>Microsoft.Win32.Registry</c>
-/// API (no package on the net10.0-windows target).
+/// API (no package on the net10.0-windows target). The platform check lives in
+/// <see cref="IStartupRegistration.ForCurrentPlatform"/>, which is why there is no guard in here.
 /// </summary>
-public static class StartupRegistration {
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsStartupRegistration : IStartupRegistration {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "DashDetective";
 
-    /// <summary>Whether a startup entry for this app currently exists. Safe on any platform.</summary>
-    public static bool IsEnabled() {
-        if (!OperatingSystem.IsWindows())
-            return false;
-
+    public bool IsEnabled() {
         try {
             using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
             return key?.GetValue(ValueName) is not null;
@@ -30,12 +27,9 @@ public static class StartupRegistration {
         }
     }
 
-    /// <summary>Adds or removes the startup entry. A denied write (or non-Windows host) logs and returns
-    /// without throwing, so a failure never propagates into the settings toggle.</summary>
-    public static void SetEnabled(bool enabled) {
-        if (!OperatingSystem.IsWindows())
-            return;
-
+    /// <summary>A denied write logs and returns without throwing, so a failure never propagates into
+    /// the settings toggle.</summary>
+    public void SetEnabled(bool enabled) {
         try {
             Apply(enabled);
         } catch (Exception e) {
@@ -43,7 +37,6 @@ public static class StartupRegistration {
         }
     }
 
-    [SupportedOSPlatform("windows")]
     private static void Apply(bool enabled) {
         using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath);
         if (key is null)
@@ -58,4 +51,12 @@ public static class StartupRegistration {
             key.DeleteValue(ValueName);
         }
     }
+}
+
+/// <summary>The no-startup-store set: reports "not enabled" and ignores writes — byte-for-byte what
+/// the old <c>OperatingSystem.IsWindows()</c> guards returned off Windows.</summary>
+internal sealed class UnsupportedStartupRegistration : IStartupRegistration {
+    public bool IsEnabled() => false;
+
+    public void SetEnabled(bool enabled) { }
 }

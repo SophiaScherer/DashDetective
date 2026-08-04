@@ -3,6 +3,7 @@ using Microsoft.Win32.SafeHandles;
 using System;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
@@ -11,10 +12,11 @@ namespace DashDetective.Services.SystemMetrics;
 /// query — no admin, no dependency, and only for NVMe drives (SATA/HDD/USB return <c>null</c>). Opens
 /// <c>\\.\PhysicalDriveN</c> with zero access (enough for the read-only property query, so no elevation), asks
 /// for NVMe SMART/Health log page 0x02, and parses the composite temperature (Kelvin) into Celsius. Every
-/// failure — non-Windows, non-NVMe, unsupported, access denied, implausible reading — soft-fails to
-/// <c>null</c> rather than throwing.
+/// failure — non-NVMe, unsupported, access denied, implausible reading — soft-fails to <c>null</c>
+/// rather than throwing. The platform check lives in <see cref="HardwareProviders.ForCurrentPlatform"/>.
 /// </summary>
-public static class DiskTemperatureProvider {
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsDiskTemperatureProvider : IDiskTemperatureProvider {
     private const uint IoctlStorageQueryProperty = 0x002D1400;
     private const int StorageDeviceProtocolSpecificProperty = 50; // STORAGE_PROPERTY_ID
     private const int PropertyStandardQuery = 0;                   // STORAGE_QUERY_TYPE
@@ -40,10 +42,7 @@ public static class DiskTemperatureProvider {
 
     /// <summary>NVMe composite temperature in °C for physical drive <paramref name="deviceId"/>, or
     /// <c>null</c> when unavailable (non-NVMe, unsupported, or any failure).</summary>
-    public static double? ReadCelsius(int deviceId) {
-        if (!OperatingSystem.IsWindows())
-            return null;
-
+    public double? ReadCelsius(int deviceId) {
         try {
             using var handle = CreateFileW(
                 $@"\\.\PhysicalDrive{deviceId}", GenericNone, FileShareReadWrite,
@@ -93,4 +92,10 @@ public static class DiskTemperatureProvider {
     private static extern bool DeviceIoControl(
         SafeFileHandle hDevice, uint dwIoControlCode, byte[] lpInBuffer, uint nInBufferSize,
         byte[] lpOutBuffer, uint nOutBufferSize, out uint lpBytesReturned, IntPtr lpOverlapped);
+}
+
+/// <summary>The no-sensor set: every drive reports <c>null</c>, so the Temp cell stays "—" — what the
+/// old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
+internal sealed class UnsupportedDiskTemperatureProvider : IDiskTemperatureProvider {
+    public double? ReadCelsius(int deviceId) => null;
 }

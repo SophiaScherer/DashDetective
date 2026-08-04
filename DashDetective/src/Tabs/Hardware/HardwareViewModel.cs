@@ -31,11 +31,18 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     /// lands.</summary>
     private readonly List<HardwareCard> _graphicsCards = new();
 
+    private readonly IHardwareInfoProvider _provider;
+
     /// <summary>The component cards, in comp order, bound by the view's 2-column grid. Observable because a
     /// multi-GPU machine gains a Graphics card per extra adapter once the async read completes.</summary>
     public ObservableCollection<HardwareCard> Cards { get; }
 
-    public HardwareViewModel() {
+    public HardwareViewModel() : this(IHardwareInfoProvider.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit reader. The public ctor resolves the real one,
+    /// so the shell still builds this with <c>new()</c>.</summary>
+    internal HardwareViewModel(IHardwareInfoProvider provider) {
+        _provider = provider;
         _processor = new HardwareCard("Processor", "—", HardwareIcons.Chip,
             HardwareIcons.Blue, HardwareIcons.BlueBg, new[] {
                 new HardwareSpec("Cores"),
@@ -119,7 +126,7 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
         // GetAsync never throws (each section falls back to its .Unknown record), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
         try {
-            var info = await HardwareInfoProvider.GetAsync();
+            var info = await _provider.GetAsync();
             // Constructed on the UI thread, so the continuation resumes there — safe to bind.
             ApplyProcessor(info.Processor);
             ApplyMemory(info.Memory);

@@ -2,20 +2,11 @@ using DashDetective.Services.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Management;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 namespace DashDetective.Services.SystemMetrics;
 
-/// <summary>
-/// One mounted volume: its host physical-disk number (for the drive-card rollup, <c>null</c> when it can't
-/// be resolved), drive letter (<c>null</c> for unlettered partitions like Recovery/EFI), label, file
-/// system, and total/free bytes. Sizes are raw so callers format them with <c>FileSizeFormatter</c>.
-/// <c>GptType</c> is the host partition's raw GPT type GUID (empty on MBR disks or when unresolved) —
-/// callers turn it into a display name with <c>PartitionTypeFormatter</c>.
-/// </summary>
-public readonly record struct VolumeInfo(
-    int? DiskNumber, char? DriveLetter, string Label, string FileSystem, ulong SizeBytes, ulong FreeBytes,
-    string GptType = "");
 
 /// <summary>
 /// Enumerates all mounted volumes from WMI <c>MSFT_Volume</c> (<c>root\Microsoft\Windows\Storage</c>) —
@@ -23,16 +14,13 @@ public readonly record struct VolumeInfo(
 /// would omit. Each volume is joined to its host disk via <c>MSFT_Partition</c> (matching the volume's
 /// device path against the partition's access paths), so the drive-card rollup can sum used space per disk.
 /// The query is comparatively slow and blocking, so it runs on a background thread; any failure (or a
-/// non-Windows host) yields an empty list rather than throwing. Mirrors <see cref="DiskInfoProvider"/>.
+/// non-Windows host) yields an empty list rather than throwing. Mirrors <see cref="PhysicalDiskProvider"/>.
 /// </summary>
-public static class VolumeProvider {
-    public static Task<IReadOnlyList<VolumeInfo>> GetAsync() => Task.Run(Read);
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsVolumeProvider : IVolumeProvider {
+    public Task<IReadOnlyList<VolumeInfo>> GetAsync() => Task.Run(Read);
 
     private static IReadOnlyList<VolumeInfo> Read() {
-        // Guard doubles as the platform-compatibility check for the WMI calls below.
-        if (!OperatingSystem.IsWindows())
-            return Array.Empty<VolumeInfo>();
-
         try {
             var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
             scope.Connect();
@@ -143,4 +131,9 @@ public static class VolumeProvider {
             return 0;
         }
     }
+}
+
+/// <summary>The no-volumes set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
+internal sealed class UnsupportedVolumeProvider : IVolumeProvider {
+    public Task<IReadOnlyList<VolumeInfo>> GetAsync() => Task.FromResult<IReadOnlyList<VolumeInfo>>([]);
 }

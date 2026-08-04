@@ -1,6 +1,7 @@
 using DashDetective.Services.Diagnostics;
 using System;
 using System.Management;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Dashboard;
@@ -8,17 +9,14 @@ namespace DashDetective.Tabs.Dashboard;
 /// <summary>
 /// Reads static CPU hardware information from WMI (<c>Win32_Processor</c>). The query is
 /// comparatively slow (~100–300 ms) and blocking, so it runs on a background thread and is
-/// awaited once at startup. Any failure (or a non-Windows host) yields
-/// <see cref="CpuStaticInfo.Unknown"/> rather than throwing.
+/// awaited once at startup. Any failure yields <see cref="CpuStaticInfo.Unknown"/> rather than
+/// throwing. The platform check lives in <c>HardwareProviders.ForCurrentPlatform</c>.
 /// </summary>
-public static class CpuInfoProvider {
-    public static Task<CpuStaticInfo> GetAsync() => Task.Run(Read);
+[SupportedOSPlatform("windows")]
+internal sealed class WindowsCpuInfoProvider : ICpuInfoProvider {
+    public Task<CpuStaticInfo> GetAsync() => Task.Run(Read);
 
     private static CpuStaticInfo Read() {
-        // Guard doubles as the platform-compatibility check for the WMI calls below.
-        if (!OperatingSystem.IsWindows())
-            return CpuStaticInfo.Unknown;
-
         try {
             var name = "Unknown processor";
             int physical = 0, logical = 0;
@@ -54,4 +52,9 @@ public static class CpuInfoProvider {
     }
 
     private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
+}
+
+/// <summary>The no-CPU-facts set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
+internal sealed class UnsupportedCpuInfoProvider : ICpuInfoProvider {
+    public Task<CpuStaticInfo> GetAsync() => Task.FromResult(CpuStaticInfo.Unknown);
 }

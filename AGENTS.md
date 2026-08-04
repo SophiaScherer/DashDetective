@@ -266,8 +266,9 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
-- `Win32_VideoController` (`GpuInfoProvider`) is retained only for the single-name callers; the inventory
-  uses `GpuAdapterProvider`.
+- `Win32_VideoController` is still read by `HardwareInfoProvider` for the Hardware tab's spec card; the
+  inventory uses `GpuAdapterProvider`. (The old single-name `GpuInfoProvider` was deleted once nothing
+  called it.)
 
 ## Strict Working Boundaries
 
@@ -358,8 +359,11 @@ currently exist.
                                  persistence — knows no view-models; the composition root applies/observes)
         SettingsJsonContext.cs  (System.Text.Json source-gen context for AppSettings; string enums)
       /Startup
-        StartupRegistration.cs  (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
-                                 Windows-guarded + soft-failing, like CurrentUserProvider)
+        IStartupRegistration.cs (the seam + ForCurrentPlatform(); see Provider seams below)
+        WindowsStartupRegistration.cs
+                                (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
+                                 soft-failing. Holds UnsupportedStartupRegistration too — reports
+                                 "not enabled" and ignores writes off Windows)
       /Diagnostics
         Log.cs                  (minimal soft-failing logger → Debug output + a per-day rolling file in
                                  %LocalAppData%/DashDetective/logs; never throws. The sampler / provider /
@@ -381,13 +385,29 @@ currently exist.
                                  = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
                                  the Dashboard cards + Performance rows each own one for per-adapter readings)
-        GpuAdapterProvider.cs   (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
+        HardwareProviders.cs    (the "what hardware is in this machine" bundle + the single
+                                 ForCurrentPlatform() that picks the Windows or unsupported set for all
+                                 SEVEN members. Built by each consuming page's public ctor (Dashboard,
+                                 Performance, Storage) and handed to DeviceInventory.LoadAsync.
+                                 EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
+                                 members run concurrently; stateful providers are deliberately excluded)
+        IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
+                                 pure, unit-tested — lives on the record, not the DXGI reader)
+        WindowsGpuAdapterProvider.cs
+                                (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
                                  flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
                                  DedicatedVideoMemory rides through DeviceInventory onto
                                  DeviceInstance.VramBytes → the Performance GPU VRAM tile)
+        IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
+                                (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
+                                 ForCurrentPlatform shares ONE reader with the Storage page)
+        IVolumeProvider.cs / WindowsVolumeProvider.cs
+                                (MSFT_Volume enumeration incl. unlettered Recovery/EFI)
+        IDiskTemperatureProvider.cs / WindowsDiskTemperatureProvider.cs
+                                (NVMe composite temp via non-admin IOCTL health log. SYNCHRONOUS by
+                                 design — called per-disk on a slow sub-tick of a timer the caller owns)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
-        DiskInfoProvider.cs     (static primary-disk model/type/capacity via WMI, async)
         MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
@@ -433,16 +453,18 @@ currently exist.
         NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
     /Tabs                       (one self-contained folder per feature)
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
-                                CpuInfoProvider.cs      (static CPU info via WMI, async)
+                                ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
+                                                        (CPU info via WMI, async. Reached through the shared
+                                                         HardwareProviders bundle, NOT statically)
                                 CpuStaticInfo.cs        (record for the WMI result)
-                                MemoryInfoProvider.cs   (static RAM info via WMI, async)
+                                IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
+                                                        (RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
-                                GpuInfoProvider.cs      (static GPU name via WMI, async)
-                                GpuStaticInfo.cs        (record for the WMI result)
                                 (the CPU/Memory/GPU/Storage/Network *samplers* now live under
                                  src/Services/SystemMetrics + /Network and are owned by
                                  SystemMetricsService — the Dashboard VM subscribes, it no longer owns them)
-                                SystemInfoProvider.cs   (static system identity — OS/device/BIOS/board/build —
+                                ISystemInfoProvider.cs + WindowsSystemInfoProvider.cs
+                                                        (static system identity — OS/device/BIOS/board/build —
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
                                 SystemStaticInfo.cs     (record for the system-identity result)
@@ -519,7 +541,10 @@ currently exist.
                                                          subdirectories, folder entries; per-entry
                                                          soft-fail, Task.Run off the UI thread; takes
                                                          includeHidden to reveal hidden/system entries.
-                                                         FileItem carries raw Size/Modified sort keys)
+                                                         FileItem carries raw Size/Modified sort keys.
+                                                         GetEntriesAsync also takes IShellInterop — each row
+                                                         carries the shell's type name. Still static: it
+                                                         holds no state and is in no bundle)
                                 DirectoryWatcher.cs     (debounced FileSystemWatcher over the open folder;
                                                          raises Changed → VM auto-refreshes the list + tree.
                                                          Windows-guarded, soft-failing, app-lifetime)
@@ -532,8 +557,13 @@ currently exist.
                                                          + Arrow — same shape as FilterOption)
                                 FileSizeFormatter.cs    (humanize bytes KB/MB/GB/TB; folders → "—")
                                 FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
-                                ShellInterop.cs         (feature-local shell32 P/Invoke:
-                                                         SHGetFileInfo type name + SHObjectProperties)
+                                IShellInterop.cs        (seam + ForCurrentPlatform())
+                                WindowsShellInterop.cs  (feature-local shell32 P/Invoke:
+                                                         SHGetFileInfo type name + SHObjectProperties.
+                                                         Holds UnsupportedShellInterop + the shared
+                                                         ShellFallback. NOTE Open() stays live in BOTH —
+                                                         it is managed Process.Start with UseShellExecute
+                                                         and was never platform-guarded)
       /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
                                                         (VM implements IRefreshablePage + ILiveSamplingPage;
                                                          always-on like Dashboard. Owns the throughput
@@ -541,31 +571,54 @@ currently exist.
                                                          the keyed-diff for the connections list. Tab-local
                                                          MonoFont + fixed console-colour resources live in
                                                          the view — promote to Shared if reused)
+                                NetworkProviders.cs     (the tab's provider bundle + ForCurrentPlatform();
+                                                         see Provider seams above. The ONLY platform choice
+                                                         here is which IConnectionsInterop — everything else
+                                                         is portable managed code)
+                                IAdapterInfoProvider.cs (seam + the AdapterSnapshot record)
                                 AdapterInfoProvider.cs  (async snapshot: all adapters + primary IP config
-                                                         via managed NetworkInterface; SystemInfoProvider
-                                                         pattern, per-adapter/field soft-fail)
+                                                         via managed NetworkInterface; per-adapter/field
+                                                         soft-fail. No platform prefix — portable; the one
+                                                         Windows-only field (DHCP) is guarded inline → "—")
                                 AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
-                                ConnectionsInterop.cs   (feature-local iphlpapi P/Invoke:
+                                IConnectionsInterop.cs  (seam + the RawConnection struct)
+                                WindowsConnectionsInterop.cs
+                                                        (feature-local iphlpapi P/Invoke:
                                                          GetExtendedTcpTable/GetExtendedUdpTable, IPv4
-                                                         OWNER_PID tables; port byte-order swap. IPv6 deferred)
+                                                         OWNER_PID tables; port byte-order swap. IPv6
+                                                         deferred. Holds UnsupportedConnectionsInterop —
+                                                         reports no connections off Windows)
+                                IConnectionsProvider.cs (seam + the ConnectionsSnapshot record)
                                 ConnectionsProvider.cs  (TCP+UDP snapshot off the UI thread; PID→name cache
-                                                         with stale eviction; de-dupe by key; sort; cap 100)
+                                                         with stale eviction; de-dupe by key; sort; cap 1000.
+                                                         Takes IConnectionsInterop by ctor. SINGLE-CONSUMER:
+                                                         the name cache is per-instance mutable state)
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
                                 PingMonitor.cs          (reused in-box Ping to 8.8.8.8; rolling avg/loss +
                                                          last-3 lines; soft-fails to a timeout)
+                                IDnsLookupProvider.cs   (seam + the DnsResult record)
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
-                                                         3 s CTS; record type by address family)
+                                                         3 s CTS; record type by address family. No platform
+                                                         prefix — portable)
       /Hardware                 HardwareView.axaml(.cs) + HardwareViewModel.cs
                                                         (spec grid; whole-page scroll like the Dashboard
                                                          — not self-scrolling. VM builds the six fixed
                                                          HardwareCard models, populates them from
                                                          HardwareInfoProvider in the ctor, and implements
                                                          IRefreshablePage; Sensors card left as "—")
-                                HardwareInfoProvider.cs (async WMI reader, SystemInfoProvider idiom: one
-                                                         soft-failing section per card → HardwareInfo)
+                                IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
+                                                         whole surface — the public shape is already a
+                                                         single method returning one aggregate)
+                                WindowsHardwareInfoProvider.cs
+                                                        (async WMI reader: one soft-failing section per
+                                                         card → HardwareInfo. Carries ONE class-level
+                                                         SupportedOSPlatform in place of the old guard +
+                                                         nine per-method attributes. Holds
+                                                         UnsupportedHardwareInfoProvider — .Unknown for
+                                                         every card, so every field renders "—")
                                 HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
                                                          each with .Unknown; fields default to "—")
                                 HardwareCard.cs         (observable: fixed title/icon/colours, observable
@@ -625,6 +678,38 @@ Processes). A subscriber keeps its own 60-sample rolling buffer (two for network
 and rebuilds its `Sparkline` via `SparklinePoints.Build`, using `ChartScale.FitAxis` for the unbounded
 network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer` + `Array.Copy`
 buffer or a bespoke points/peak helper.
+
+**Provider seams (IN PROGRESS — being rolled out phase by phase).** The OS-touching providers are being
+retrofitted from `public static class` into the `IGpuSensorReader` shape so they can be faked in tests and
+given a second platform later. The idiom, established by `IStartupRegistration` (`src/Services/Startup`):
+
+- An `internal interface I<Name>` in its own file, **in the folder the provider already lives in** —
+  nothing moves, no namespace changes. Its doc comment states the never-throw / soft-fail contract.
+- **The `Windows*` / `Unsupported*` split goes exactly where the platform-specific code is, and nowhere
+  else.** A genuinely Windows-only reader becomes `internal sealed class Windows<Name>` carrying a
+  **class-level** `[SupportedOSPlatform("windows")]` instead of an inner `OperatingSystem.IsWindows()`
+  guard, plus an `Unsupported<Name>` **at the bottom of the same file** returning exactly what the old
+  guard returned off Windows. A provider that is **portable managed code keeps its plain name** and gains
+  only an interface — naming it `Windows*` when it would run fine anywhere is a lie, and writing an
+  `Unsupported*` twin for it would either duplicate the portable body or silently blank a panel that used
+  to work. The Network tab is the worked example: `AdapterInfoProvider`, `ConnectionsProvider` and
+  `DnsLookupProvider` stay unprefixed; only `IConnectionsInterop` (the `iphlpapi` P/Invoke) gets the pair,
+  and `NetworkProviders.ForCurrentPlatform()` chooses between them alone.
+- One `ForCurrentPlatform()` picking between them — on the interface for a lone provider, on a bundle
+  record (the `MetricSamplers` shape) for a set. That is the **only** place the platform is decided.
+- **A view code-behind has no injection point** — `ViewLocator` builds views by name with a parameterless
+  ctor. When code-behind needs an interop (it fetches the window handle for the native Properties dialog),
+  it calls a small forwarder on the view model it has *already* resolved from `DataContext`, e.g.
+  `vm.ShowProperties(handle, pid)`. Do not reach a static from a view.
+- Consumers take the interface by constructor. A ViewModel with a parameterless ctor keeps it and chains:
+  `public FooViewModel() : this(FooProviders.ForCurrentPlatform()) { }` + an `internal` injecting ctor, so
+  `MainWindowViewModel` and `App.axaml.cs` are untouched.
+- Everything new is `internal` — which is why `SettingsViewModel`'s ctor is now internal too (a public ctor
+  cannot take an internal parameter type). Tests reach it all through `InternalsVisibleTo`.
+
+**Never put `[SupportedOSPlatform]` on the interface** — every consumer would inherit the requirement and
+light up CA1416 across the app. Adding a platform later = one new class per interface plus one line in
+`ForCurrentPlatform()`; that is the whole point.
 
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
@@ -879,7 +964,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     `SystemMetricsService` (raises `AlertActiveChanged` after CPU or memory stays ≥ 90 % for 10
     consecutive samples); the shell shows an inline warning banner below the toolbar (auto-clears on
     recovery, `×` to dismiss the current breach, gated by the setting). **Launch at startup** writes the
-    HKCU `…\Run` value via `StartupRegistration` (`src/Services/Startup`, soft-failing).
+    HKCU `…\Run` value via `IStartupRegistration` (`src/Services/Startup`, soft-failing).
   - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
     with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
     Real exit still runs the composition root's disposal.

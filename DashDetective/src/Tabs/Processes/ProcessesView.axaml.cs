@@ -71,10 +71,10 @@ public partial class ProcessesView : UserControl {
     // from the view model (the same reason the Export and File Explorer Properties dialogs live in
     // code-behind).
     private void OnPropertiesClick(object? sender, RoutedEventArgs e) {
-        if (DataContext is not ProcessesViewModel { SelectedRow: { } row })
+        if (DataContext is not ProcessesViewModel { SelectedRow: { } row } vm)
             return;
 
         var handle = TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-        ProcessInterop.ShowProperties(handle, row.Pid);
+        vm.ShowProperties(handle, row.Pid);
     }
 }
