@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <!-- The whole app is Windows-only (WMI, PDH performance counters, Win32 P/Invoke), so the
-             target framework is pinned to -windows. This makes the assembly implicitly windows to the
-             platform-compatibility analyzers, which is what AnalysisLevel=latest below engages. -->
-        <TargetFramework>net10.0-windows</TargetFramework>
+        <!-- One neutral TFM for every platform: platform differences are decided at runtime by the
+             ForCurrentPlatform() provider seams, never by multi-targeting or #if. The neutral TFM is
+             also what makes the platform-compatibility analyzer (CA1416) a real gate rather than a
+             no-op, which is what AnalysisLevel=latest below engages. -->
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
