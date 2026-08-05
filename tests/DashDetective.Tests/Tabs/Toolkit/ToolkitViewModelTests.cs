@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Toolkit;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -719,9 +720,16 @@ public class ToolkitViewModelTests {
 
     // ----- Opening a location: in the app, or in Explorer -----
 
-    private static ToolkitEntry PathRow(string target = "%windir%") =>
-        new(target, "A folder", ToolkitCategory.Folders, ToolkitEntryKind.Folder,
-            ToolkitAction.OpenPath(target));
+    // Folder rows authored in the running platform's own notation, so they resolve to a rooted path
+    // and CanOpenInApp is true either way — the routing under test depends on it.
+    private static readonly string Folder = OperatingSystem.IsWindows() ? "%windir%" : "~";
+    private static readonly string OtherFolder = OperatingSystem.IsWindows() ? "%temp%" : "$HOME";
+
+    private static ToolkitEntry PathRow(string? target = null) {
+        target ??= Folder;
+        return new(target, "A folder", ToolkitCategory.Folders, ToolkitEntryKind.Folder,
+                   ToolkitAction.OpenPath(target));
+    }
 
     /// <summary>Clicking a folder row keeps the user in the app: it navigates rather than handing the
     /// path to the shell, so nothing is started and nothing lands in the transcript.</summary>
@@ -733,21 +741,22 @@ public class ToolkitViewModelTests {
 
         await vm.RunCommand.ExecuteAsync(PathRow());
 
-        Assert.Equal([ToolkitPaths.Resolve("%windir%")], revealed);
+        Assert.Equal([ToolkitPaths.Resolve(Folder)], revealed);
         Assert.Empty(vm.Log);
     }
 
-    /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%".</summary>
+    /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%" or
+    /// "$HOME".</summary>
     [Fact]
     public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
         var vm = new ToolkitViewModel();
         string? revealed = null;
         vm.FileExplorerRevealRequested += path => revealed = path;
 
-        vm.OpenInAppCommand.Execute(PathRow("%temp%"));
+        vm.OpenInAppCommand.Execute(PathRow(OtherFolder));
 
-        Assert.NotNull(revealed);
-        Assert.DoesNotContain("%", revealed, System.StringComparison.Ordinal);
+        Assert.Equal(ToolkitPaths.Resolve(OtherFolder), revealed);
+        Assert.NotEqual(OtherFolder, revealed);
     }
 
     /// <summary>A shell: row has no filesystem path, so it offers the external icon only — and asking

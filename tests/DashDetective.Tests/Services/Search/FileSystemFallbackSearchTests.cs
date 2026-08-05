@@ -36,6 +36,19 @@ public sealed class FileSystemFallbackSearchTests : IDisposable {
     private void File_(string name, params string[] folder) =>
         System.IO.File.WriteAllText(Path.Combine(folder.Length == 0 ? _root : Dir(folder), name), "x");
 
+    // Windows marks a file hidden with an attribute; Unix does it with a leading dot, where
+    // SetAttributes is a no-op. .NET's enumerator reports FileAttributes.Hidden for both, which is
+    // what the scan actually skips on.
+    private void HiddenFile_(string name) {
+        if (!OperatingSystem.IsWindows()) {
+            File_("." + name);
+            return;
+        }
+
+        File_(name);
+        System.IO.File.SetAttributes(Path.Combine(_root, name), FileAttributes.Hidden);
+    }
+
     private IReadOnlyList<FileHit> Scan(string term, int limit = 20, CancellationToken token = default) =>
         FileSystemFallbackSearch.Scan(term, [_root], limit, token);
 
@@ -124,9 +137,7 @@ public sealed class FileSystemFallbackSearchTests : IDisposable {
     [Fact]
     public void Scan_SkipsHiddenEntries() {
         // Matching DirectoryService: the File Explorer hides these by default, so search must too.
-        File_("report-hidden.txt");
-        var path = Path.Combine(_root, "report-hidden.txt");
-        System.IO.File.SetAttributes(path, FileAttributes.Hidden);
+        HiddenFile_("report-hidden.txt");
 
         Assert.Empty(Scan("report"));
     }

@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using Xunit;
 
@@ -9,8 +10,13 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// expansion happens at call time. This is what decides whether a row shows one open icon or two.
 /// </summary>
 public class ToolkitPathsTests {
+    /// <summary>"%windir%" is Windows notation; SpecialFolder.Windows is empty elsewhere, so there is
+    /// nothing to compare against off Windows. The Unix forms are covered below.</summary>
     [Fact]
     public void Resolve_ExpandsEnvironmentVariables() {
+        if (!OperatingSystem.IsWindows())
+            return;
+
         var resolved = ToolkitPaths.Resolve("%windir%");
 
         Assert.Equal(Environment.GetFolderPath(Environment.SpecialFolder.Windows), resolved,
@@ -20,7 +26,7 @@ public class ToolkitPathsTests {
 
     [Fact]
     public void Resolve_LeavesAPlainPathAlone() {
-        Assert.Equal(@"C:\Temp", ToolkitPaths.Resolve(@"C:\Temp"));
+        Assert.Equal(TestPaths.Of("Temp"), ToolkitPaths.Resolve(TestPaths.Of("Temp")));
     }
 
     // ----- Unix notation -----
@@ -83,14 +89,35 @@ public class ToolkitPathsTests {
         Assert.Equal("$DD_ONE", ToolkitPaths.Expand("$DD_ONE", windows: true));
     }
 
+    [Fact]
+    public void IsFileSystemPath_TrueForAPlainRootedPath() {
+        Assert.True(ToolkitPaths.IsFileSystemPath(TestPaths.Of("Temp")));
+    }
+
     /// <summary>The folder rows are authored unexpanded, so the judgement has to survive expansion —
     /// "%appdata%" has no separator in it until it is resolved.</summary>
     [Theory]
     [InlineData("%appdata%")]
     [InlineData("%windir%")]
     [InlineData(@"%windir%\System32\drivers\etc")]
-    [InlineData(@"C:\Temp")]
-    public void IsFileSystemPath_TrueForSomewhereOnDisk(string target) {
+    public void IsFileSystemPath_TrueForAnUnexpandedWindowsFolder(string target) {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        Assert.True(ToolkitPaths.IsFileSystemPath(target));
+    }
+
+    /// <summary>Same rule in the other notation: a Linux folder row is authored as "~/…" or "$HOME/…"
+    /// and only becomes a rooted path once resolved.</summary>
+    [Theory]
+    [InlineData("~")]
+    [InlineData("~/.config")]
+    [InlineData("$HOME/.config")]
+    [InlineData("${HOME}/.config")]
+    public void IsFileSystemPath_TrueForAnUnexpandedUnixFolder(string target) {
+        if (OperatingSystem.IsWindows())
+            return;
+
         Assert.True(ToolkitPaths.IsFileSystemPath(target));
     }
 
