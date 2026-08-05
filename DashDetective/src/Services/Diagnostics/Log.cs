@@ -6,7 +6,8 @@ namespace DashDetective.Services.Diagnostics;
 
 /// <summary>
 /// Minimal logging seam behind the app's soft-fail <c>catch</c> blocks. Writes to the debugger output
-/// and a per-day rolling file under <c>%LocalAppData%/DashDetective/logs</c>. It soft-fails itself — a
+/// and a per-day rolling file under <c>%LocalAppData%/DashDetective/logs</c> (on Linux,
+/// <c>$XDG_DATA_HOME</c> ?? <c>~/.local/share</c>). It soft-fails itself — a
 /// logging error is swallowed, so <see cref="Warn"/>/<see cref="Error"/> never throw back into a caller's
 /// catch block. No logging packages; deliberately tiny.
 /// </summary>
@@ -38,6 +39,8 @@ public static class Log {
         }
     }
 
+    // LocalApplicationData resolves to $XDG_DATA_HOME ?? ~/.local/share on Linux — a different tree
+    // from SettingsStore's $XDG_CONFIG_HOME, so the log and settings.json never collide.
     private static string? BuildLogPath() {
         try {
             var dir = Path.Combine(
