@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
@@ -31,6 +32,10 @@ internal sealed class SystemTimesCpuSampler : ICpuSampler {
     /// without touching the native call.</summary>
     internal bool Ready { get; }
 
+    /// <summary>Seeds the first snapshot. Annotated rather than the whole type, for the same reason as
+    /// <see cref="ProcessorUtilityCpuSampler"/>: <see cref="Sample"/> is guarded by <see cref="Ready"/>
+    /// and stays callable anywhere.</summary>
+    [SupportedOSPlatform("windows")]
     public SystemTimesCpuSampler() {
         // Seed an initial snapshot so the very first Sample() reflects a real interval
         // rather than the whole time since boot.

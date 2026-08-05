@@ -116,18 +116,18 @@ public class SamplerSoftFailTests {
     /// <summary>
     /// The whole point of the milestone: constructing and sampling every native sampler must not throw on
     /// any host. On Windows the counters stand up; anywhere else the guards make these go inert. Asserts
-    /// no values — only that nothing escapes — so it stays true on both CI legs.
+    /// no values — only that nothing escapes — so it stays true on both CI legs. <see cref="CpuUsageSampler"/>
+    /// belongs here rather than in the Windows-only fact below because its constructor now picks the
+    /// platform's reader, so it is the one CPU entry point that is genuinely callable everywhere.
     /// </summary>
     [Fact]
     public void RealConstructorsAndSamples_NeverThrow_OnThisHost() {
-        using var utility = new ProcessorUtilityCpuSampler();
         using var cpu = new CpuUsageSampler();
         using var gpu = new GpuUsageSampler();
         using var disk = new PhysicalDiskThroughputSampler();
         using var frequency = new ProcessorFrequencySampler();
         using var logical = new LogicalProcessorSampler();
 
-        _ = utility.Sample();
         _ = cpu.Sample();
         _ = gpu.Sample();
         _ = gpu.SampleEngines();
@@ -135,7 +135,20 @@ public class SamplerSoftFailTests {
         _ = disk.Sample();
         _ = frequency.Sample();
         _ = logical.Sample();
-        _ = new SystemTimesCpuSampler().Sample();
         _ = new MemoryUsageSampler().Sample();
+    }
+
+    /// <summary>The same contract for the two PDH/kernel32 CPU readers, which now carry
+    /// <c>[SupportedOSPlatform("windows")]</c> on their constructors — so the call has to sit behind a
+    /// guard, and the fact simply does not run on the Linux leg.</summary>
+    [Fact]
+    public void RealWindowsCpuConstructorsAndSamples_NeverThrow() {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        using var utility = new ProcessorUtilityCpuSampler();
+
+        _ = utility.Sample();
+        _ = new SystemTimesCpuSampler().Sample();
     }
 }
