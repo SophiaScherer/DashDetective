@@ -40,6 +40,27 @@ internal static class ProcFixtures {
         cpu1 500 50 250 4000 150 0 50
         """;
 
+    /// <summary>
+    /// A two-core <c>/proc/cpuinfo</c>. Built by joining escaped strings rather than as a raw literal
+    /// because the real file separates key from value with <b>tabs</b>, and the repo's
+    /// <c>indent_style = space</c> makes a literal tab inside a raw literal a formatting hazard. The tabs
+    /// are the point: a parser that splits on a fixed layout instead of trimming around the colon passes
+    /// a space-separated fixture and fails on a real machine.
+    /// </summary>
+    public static readonly string ProcCpuInfo = string.Join('\n', [
+        "processor\t: 0",
+        "vendor_id\t: GenuineIntel",
+        "model name\t: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz",
+        "cpu MHz\t\t: 3600.000",
+        "cache size\t: 12288 KB",
+        "",
+        "processor\t: 1",
+        "vendor_id\t: GenuineIntel",
+        "model name\t: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz",
+        "cpu MHz\t\t: 2400.000",
+        "cache size\t: 12288 KB",
+        ""]);
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>

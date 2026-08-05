@@ -86,11 +86,11 @@ public class SamplerSoftFailTests {
     }
 
     [Fact]
-    public void ProcessorFrequencySampler_Inert_SamplesZero() {
-        using var sampler = new ProcessorFrequencySampler(SamplerInit.Inert);
+    public void WindowsProcessorFrequencySampler_Inert_SamplesDefault() {
+        using var sampler = new WindowsProcessorFrequencySampler(SamplerInit.Inert);
 
-        Assert.Equal(0.0, sampler.Sample());
-        Assert.Equal(0.0, sampler.Sample());
+        Assert.Equal(default, sampler.Sample());
+        Assert.Equal(default, sampler.Sample());
         sampler.Dispose();
     }
 
@@ -125,7 +125,7 @@ public class SamplerSoftFailTests {
         using var cpu = new CpuUsageSampler();
         using var gpu = new GpuUsageSampler();
         using var disk = new PhysicalDiskThroughputSampler();
-        using var frequency = new ProcessorFrequencySampler();
+        using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
         using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
 
         _ = cpu.Sample();
@@ -148,19 +148,24 @@ public class SamplerSoftFailTests {
 
         using var utility = new ProcessorUtilityCpuSampler();
         using var logical = new WindowsLogicalProcessorSampler();
+        using var frequency = new WindowsProcessorFrequencySampler();
 
         _ = utility.Sample();
         _ = logical.Sample();
+        _ = frequency.Sample();
         _ = new SystemTimesCpuSampler().Sample();
     }
 
-    /// <summary>The no-data arm has to honour the same empty contract, since it is what a platform whose
-    /// milestone has not landed actually gets.</summary>
+    /// <summary>The no-data arms have to honour the same empty contract, since they are what a platform
+    /// whose milestone has not landed actually gets.</summary>
     [Fact]
-    public void UnsupportedLogicalProcessorSampler_SamplesEmpty() {
-        using var sampler = new UnsupportedLogicalProcessorSampler();
+    public void UnsupportedSamplers_ReportNothing() {
+        using var logical = new UnsupportedLogicalProcessorSampler();
+        using var frequency = new UnsupportedProcessorFrequencySampler();
 
-        Assert.Empty(sampler.Sample());
-        sampler.Dispose();
+        Assert.Empty(logical.Sample());
+        Assert.Equal(default, frequency.Sample());
+        logical.Dispose();
+        frequency.Dispose();
     }
 }
