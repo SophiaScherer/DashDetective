@@ -6,10 +6,10 @@
 # Packaging (WAP / .wapproj) project or MSIX signing. The MSBuild/MSIX steps
 # from that template have therefore been removed.
 #
-# The job runs on Windows and Linux. Both legs restore, format-check and build;
-# only Windows runs tests, collects coverage and publishes, because the suite
-# still carries Windows path assumptions (fixed in M4 of the cross-platform
-# port) and Linux packaging is deliberately out of scope for now.
+# The job runs on Windows and Linux. Both legs restore, format-check, build and
+# test, so a change that only breaks one platform fails the run. Only Windows
+# publishes: Linux packaging (RID choice, self-contained vs framework-dependent,
+# .desktop file, icons) is deliberately out of scope for now.
 #
 # For more information on GitHub Actions, refer to https://github.com/features/actions
 
@@ -65,20 +65,21 @@ jobs:
       run: dotnet build ${{ env.Solution_Name }} --configuration ${{ matrix.configuration }} --no-restore
 
     # Execute all unit tests in the solution and collect code coverage (Cobertura, via coverlet).
-    # Windows only: the suite still asserts on drive-letter paths, which fail on a case-sensitive
-    # filesystem where `\` is not a separator. M4 of the cross-platform port fixes those and drops
-    # this condition; until then the ubuntu leg is a build-only regression gate.
+    # Runs on both legs: tests that touch the filesystem build their paths through Fakes/TestPaths
+    # rather than drive-letter literals, and path identity goes through Shared/PathComparison, so the
+    # suite means the same thing on a case-sensitive filesystem. Expect stderr lines from `gio` on
+    # ubuntu — the suites that exercise a failed launch point at tools that do not exist, and
+    # UseShellExecute hands those to xdg-open instead of throwing. Noise, not failures.
     - name: Execute unit tests
-      if: matrix.os == 'windows-latest'
       run: dotnet test ${{ env.Solution_Name }} --configuration ${{ matrix.configuration }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage
 
-    # Upload the coverage report (coverage/**/coverage.cobertura.xml) as a downloadable artifact,
-    # named per configuration so the Debug and Release legs don't collide.
+    # Upload the coverage report (coverage/**/coverage.cobertura.xml) as a downloadable artifact.
+    # Named per OS *and* configuration: all four legs upload now, and a name collision would fail the
+    # run outright because if-no-files-found is an error.
     - name: Upload coverage report
-      if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-${{ matrix.configuration }}
+        name: coverage-${{ matrix.os }}-${{ matrix.configuration }}
         path: coverage/**/coverage.cobertura.xml
         if-no-files-found: error
 
