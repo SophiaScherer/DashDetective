@@ -374,12 +374,48 @@ currently exist.
         ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+      /Platform
+        /Linux
+          IProcFileSystem.cs    (the /proc + /sys read seam — Exists/ReadAllText/ReadAllLines/
+                                 ListDirectory/ResolveLink, all never-throwing and empty-on-miss.
+                                 Infrastructure, not a provider seam, so it sits in its own Services
+                                 folder like IUiTimer. ProcFileSystem is the real one; the tests' fake
+                                 is what makes every Linux provider testable from a Windows box.
+                                 See "/proc access" below for the Path.Combine rule)
+          ProcFileSystem.cs
+          ProcStatParser.cs     (/proc/stat cpu-line format knowledge, shared by the aggregate and
+                                 per-core samplers: label + busy/total jiffies, read by index with a
+                                 length check. steal counts as busy; guest/guest_nice are excluded
+                                 because the kernel already folds them into user/nice)
       /SystemMetrics
-        ProcessorFrequencySampler.cs (live CPU current-clock ratio via PDH
-                                 \Processor Information(_Total)\% Processor Performance; page-local to the
-                                 Performance tab's CPU Speed tile — × the WMI base clock, like Task Manager.
-                                 NOT the % Processor Utility counter, which is utilisation, not clock speed)
-        CpuUsageSampler.cs      (live total CPU % via GetSystemTimes)
+        IProcessorFrequencySampler.cs (seam + ForCurrentPlatform() + the ProcessorClockSample record,
+                                 which carries EITHER a ratio or an absolute clock — Windows PDH reports
+                                 % of base clock, Linux reports MHz directly and has no dependable base
+                                 to divide by. Page-local to the Performance tab's CPU Speed tile)
+        WindowsProcessorFrequencySampler.cs
+                                (live CPU current-clock ratio via PDH
+                                 \Processor Information(_Total)\% Processor Performance — × the WMI base
+                                 clock, like Task Manager. NOT the % Processor Utility counter, which is
+                                 utilisation, not clock speed. Holds UnsupportedProcessorFrequencySampler)
+        LinuxProcessorFrequencySampler.cs
+                                (cpufreq scaling_cur_freq averaged over the online cores, falling back to
+                                 /proc/cpuinfo's cpu MHz — which is what a VM usually has, since cpufreq
+                                 is typically absent under VirtualBox)
+        ILogicalProcessorSampler.cs (seam + ForCurrentPlatform() + the LogicalProcessorSample record;
+                                 per-logical-processor % for the Performance tab's CPU "Detailed" view)
+        WindowsLogicalProcessorSampler.cs
+                                (per-core % via the PDH \Processor Information(*)\% Processor Utility
+                                 array, _Total roll-ups dropped. Holds UnsupportedLogicalProcessorSampler)
+        LinuxLogicalProcessorSampler.cs
+                                (per-core % from /proc/stat's cpu0..cpuN. /proc/stat lists ONLINE cpus
+                                 only, so state is keyed by core number and a core appearing mid-run
+                                 reports 0 until it has an interval — never its since-boot average)
+        ICpuSampler.cs          (seam over the total-CPU readers + UnsupportedCpuSampler)
+        CpuUsageSampler.cs      (live total CPU %; its public ctor is the ONE place the CPU reader's
+                                 platform is chosen — LinuxCpuSampler, else the PDH-then-GetSystemTimes
+                                 chain on Windows, else Unsupported)
+        LinuxCpuSampler.cs      (total CPU % from /proc/stat's aggregate line. STATEFUL — holds the
+                                 previous jiffy snapshot, so it must not go into HardwareProviders)
         MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
         GpuUsageSampler.cs      (live GPU % via PDH GPU Engine counters; owns a PDH query handle. Sample()
                                  = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
@@ -731,19 +767,23 @@ no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating tho
 busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
 from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
 
-Eleven classes still reach native Windows APIs unannotated, because annotating them today would land the
+Seven classes still reach native Windows APIs unannotated, because annotating them today would land the
 attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
 already scheduled. Each gets its attribute when its seam lands:
 
 | Class | Seam lands in |
 |---|---|
-| `LogicalProcessorSampler`, `ProcessorFrequencySampler` | M5 |
 | `MemoryUsageSampler`, `SystemPerformanceProvider` | M6 |
 | `PhysicalDiskThroughputSampler` | M8 |
 | `GpuUsageSampler`, `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 |
 
-`ProcessorUtilityCpuSampler` and `SystemTimesCpuSampler` are the same case resolved differently: their only
-consumer is `CpuUsageSampler`'s ctor, which gains a Linux arm in M5.
+**M5 annotated its four on the *constructor*, not the type, and later milestones should copy that.** A PDH
+sampler's `Sample()` and `Dispose()` are guarded by its own `Ready`/`_ready` flag and are genuinely callable
+anywhere, as are pure statics like `WindowsLogicalProcessorSampler.TryParseInstance`. Annotating the type
+would have dragged all of that behind an `IsWindows()` guard and cost the Linux leg its coverage of the
+inert-contract tests and the instance-name parser, for no gain — the attribute's whole job is to make the
+*constructor* visible at its call site, which is what forces `CpuUsageSampler`'s ctor and each
+`ForCurrentPlatform()` to hold a guard. This is the `WindowsHardwareInfoProvider` shape, applied to samplers.
 
 **Path hygiene — the other thing CA1416 cannot see.** A path assumption is runtime behaviour, not annotated
 API surface, so the analyzer is silent on every one of them: on Unix `\` is an ordinary filename character,
@@ -771,6 +811,29 @@ because the target is handed to `xdg-open`. Assert on structure, not on the OS's
 
 `Shared/SystemDrive` carries both shapes of "where the OS lives": `Letter` for matching a Windows volume
 record, `Root` for anything that has to open or measure it (`C:\` or `/`, never empty).
+
+**`/proc` access — the Linux counterpart, added in M5.** Every read of `/proc` or `/sys` goes through
+`Services/Platform/Linux/IProcFileSystem`, never `System.IO` directly. It exists so Linux providers are
+unit-testable from a Windows dev box against canned fixtures (`Fakes/FakeProcFileSystem` +
+`Fakes/ProcFixtures`); a provider that opens files itself cannot be tested until someone runs the VM. Three
+rules:
+
+- **Build these paths with string concatenation and forward-slash literals — never `Path.Combine`.** On
+  Windows `Path.Combine("/proc", "stat")` yields `/proc\stat`, and every fixture lookup then silently
+  misses. This is the `/proc` analogue of the drive-letter trap above, and just as invisible to CA1416.
+- **`IProcFileSystem` implementations must be stateless and must never throw** — a pseudo-file can vanish,
+  change shape or deny access under the reader, and all of that degrades to `null`/empty. Statelessness is
+  what lets a provider built on it go into `HardwareProviders`; note that a *sampler* holding a previous
+  snapshot (`LinuxCpuSampler`, `LinuxLogicalProcessorSampler`) is stateful and must not.
+- **Format knowledge lives in a parser beside the seam, not in a sampler** — `ProcStatParser` is shared by
+  the aggregate and per-core CPU samplers. Parse **by index with a length check**: the kernel has appended
+  columns to `/proc/stat` over time, so 7-column and 10-column forms both have to work.
+
+Two `/proc` gotchas worth knowing: `/proc/stat` lists **online** CPUs only, so per-core state must be keyed
+by core number and a core appearing mid-run reports 0 until it has an interval (diffing it against zero
+reports its whole since-boot average — this shipped as a bug in M5 and a test caught it); and
+`/proc/cpuinfo` separates key from value with **tabs**, so parse by trimming around the colon, never by
+layout.
 
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
@@ -871,6 +934,9 @@ the test code on both legs, so keep usings alphabetical (`System` is **not** sor
   - `IUiTimer` + `DispatcherTimerAdapter` (`src/Services/Threading`) — a UI-thread-timer seam so
     `MetricChannel` / `SystemMetricsService` can be driven without an Avalonia dispatcher; production
     still uses a real `DispatcherTimer` by default.
+  - `IProcFileSystem` + `ProcFileSystem` (`src/Services/Platform/Linux`) — the same shape for `/proc` and
+    `/sys`, so every Linux provider is testable from a Windows box against `FakeProcFileSystem` fixtures.
+    Each Linux sampler takes it by ctor, with a parameterless chain for production.
   - `SystemMetricsService`'s `internal` ctor takes a `MetricSamplers` bundle + a timer factory, so the
     five hardware samplers can be faked.
   - `SettingsStore`'s `internal` ctor takes an explicit file path (production resolves `%AppData%`).
@@ -1216,12 +1282,14 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `SparklinePoints`, and pushes into the selected row; static hardware labels load once via the
   `*InfoProvider` async-WMI providers. Implements `IRefreshablePage` (toolbar Refresh re-samples every
   metric), `ILiveSamplingPage` (Live/Pause is the shared service's) and `IDisposable`. No new packages,
-  no new shared controls. The CPU **Speed** tile is live: a page-local `ProcessorFrequencySampler`
-  (`src/Services/SystemMetrics`) reads the PDH `\Processor Information(_Total)\% Processor Performance`
-  ratio and `CpuSpeedFormatter` scales the WMI base clock (`CpuStaticInfo.MaxClockMhz`) by it — exactly
-  Task Manager's Speed figure, so it rises above the base clock under Turbo (deliberately uncapped) and
-  falls at idle. Pumped on the page-local throughput timer (fixed 1 Hz, not retimed by the Settings
-  refresh interval) and on Refresh; degrades to "—" if the counter or base clock is unavailable. This is
+  no new shared controls. The CPU **Speed** tile is live: a page-local `IProcessorFrequencySampler`
+  (`src/Services/SystemMetrics`, chosen by `ForCurrentPlatform()`). The Windows arm reads the PDH
+  `\Processor Information(_Total)\% Processor Performance` ratio and `CpuSpeedFormatter` scales the WMI
+  base clock (`CpuStaticInfo.MaxClockMhz`) by it — exactly Task Manager's Speed figure, so it rises above
+  the base clock under Turbo (deliberately uncapped) and falls at idle. The Linux arm instead reports an
+  absolute MHz reading, which the formatter uses as-is; that is why `ProcessorClockSample` carries both
+  shapes rather than one number. Pumped on the page-local throughput timer (fixed 1 Hz, not retimed by the
+  Settings refresh interval) and on Refresh; degrades to "—" if no source is readable. This is
   page-local, like the disk/GPU/per-core samplers — the shared CPU feed carries only the clamped
   utilisation figure, and this reads a *different* counter, so `ProcessorUtilityCpuSampler` /
   `SystemMetricsService` were untouched. The Memory **Cached** tile is live too: the page-local

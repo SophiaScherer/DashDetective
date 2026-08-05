@@ -92,14 +92,14 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     // CPU current clock: a page-local sampler reads the % Processor Performance ratio (the shared CPU feed
     // carries only the clamped utilisation figure), scaled by the base clock cached from the static info.
-    private readonly ProcessorFrequencySampler _speedSampler = new();
+    private readonly IProcessorFrequencySampler _speedSampler = IProcessorFrequencySampler.ForCurrentPlatform();
     private double _cpuMaxClockMhz;
 
     // CPU per-logical-processor "Detailed" view: a page-local per-core sampler drives one mini chart per
     // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
     // on the disk timer. Capped so an extreme core count stays responsive.
     private const int MaxLogicalProcessorCharts = 64;
-    private readonly LogicalProcessorSampler _cpuSampler = new();
+    private readonly ILogicalProcessorSampler _cpuSampler = ILogicalProcessorSampler.ForCurrentPlatform();
     private readonly List<CoreChart> _cpuCores = new();
     private readonly Dictionary<string, CoreChart> _cpuCoresByInstance = new();
 

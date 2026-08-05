@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
@@ -50,6 +51,11 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
     /// at all — the caller uses the fallback sampler.</summary>
     public bool Ready { get; }
 
+    /// <summary>Stands up the PDH query. Annotated rather than the whole type — <see cref="Sample"/> and
+    /// <see cref="Dispose"/> are guarded by <see cref="Ready"/> and stay callable anywhere, which is what
+    /// keeps the inert-contract tests running on both CI legs. The attribute is what makes
+    /// <see cref="CpuUsageSampler"/>'s constructor a CA1416 site unless it guards this call.</summary>
+    [SupportedOSPlatform("windows")]
     public ProcessorUtilityCpuSampler() {
         // A failure to stand up the query leaves Ready false; CpuUsageSampler then falls back to
         // GetSystemTimes. Mirrors GpuUsageSampler's soft-fail contract. The catch covers pdh.dll failing

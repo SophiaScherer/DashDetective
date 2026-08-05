@@ -86,17 +86,17 @@ public class SamplerSoftFailTests {
     }
 
     [Fact]
-    public void ProcessorFrequencySampler_Inert_SamplesZero() {
-        using var sampler = new ProcessorFrequencySampler(SamplerInit.Inert);
+    public void WindowsProcessorFrequencySampler_Inert_SamplesDefault() {
+        using var sampler = new WindowsProcessorFrequencySampler(SamplerInit.Inert);
 
-        Assert.Equal(0.0, sampler.Sample());
-        Assert.Equal(0.0, sampler.Sample());
+        Assert.Equal(default, sampler.Sample());
+        Assert.Equal(default, sampler.Sample());
         sampler.Dispose();
     }
 
     [Fact]
-    public void LogicalProcessorSampler_Inert_SamplesEmpty() {
-        using var sampler = new LogicalProcessorSampler(SamplerInit.Inert);
+    public void WindowsLogicalProcessorSampler_Inert_SamplesEmpty() {
+        using var sampler = new WindowsLogicalProcessorSampler(SamplerInit.Inert);
 
         Assert.Empty(sampler.Sample());
         Assert.Empty(sampler.Sample());
@@ -116,18 +116,18 @@ public class SamplerSoftFailTests {
     /// <summary>
     /// The whole point of the milestone: constructing and sampling every native sampler must not throw on
     /// any host. On Windows the counters stand up; anywhere else the guards make these go inert. Asserts
-    /// no values — only that nothing escapes — so it stays true on both CI legs.
+    /// no values — only that nothing escapes — so it stays true on both CI legs. <see cref="CpuUsageSampler"/>
+    /// belongs here rather than in the Windows-only fact below because its constructor now picks the
+    /// platform's reader, so it is the one CPU entry point that is genuinely callable everywhere.
     /// </summary>
     [Fact]
     public void RealConstructorsAndSamples_NeverThrow_OnThisHost() {
-        using var utility = new ProcessorUtilityCpuSampler();
         using var cpu = new CpuUsageSampler();
         using var gpu = new GpuUsageSampler();
         using var disk = new PhysicalDiskThroughputSampler();
-        using var frequency = new ProcessorFrequencySampler();
-        using var logical = new LogicalProcessorSampler();
+        using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
+        using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
 
-        _ = utility.Sample();
         _ = cpu.Sample();
         _ = gpu.Sample();
         _ = gpu.SampleEngines();
@@ -135,7 +135,37 @@ public class SamplerSoftFailTests {
         _ = disk.Sample();
         _ = frequency.Sample();
         _ = logical.Sample();
-        _ = new SystemTimesCpuSampler().Sample();
         _ = new MemoryUsageSampler().Sample();
+    }
+
+    /// <summary>The same contract for the readers that now carry <c>[SupportedOSPlatform("windows")]</c>
+    /// on their constructors — so the call has to sit behind a guard, and the fact simply does not run on
+    /// the Linux leg.</summary>
+    [Fact]
+    public void RealWindowsConstructorsAndSamples_NeverThrow() {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        using var utility = new ProcessorUtilityCpuSampler();
+        using var logical = new WindowsLogicalProcessorSampler();
+        using var frequency = new WindowsProcessorFrequencySampler();
+
+        _ = utility.Sample();
+        _ = logical.Sample();
+        _ = frequency.Sample();
+        _ = new SystemTimesCpuSampler().Sample();
+    }
+
+    /// <summary>The no-data arms have to honour the same empty contract, since they are what a platform
+    /// whose milestone has not landed actually gets.</summary>
+    [Fact]
+    public void UnsupportedSamplers_ReportNothing() {
+        using var logical = new UnsupportedLogicalProcessorSampler();
+        using var frequency = new UnsupportedProcessorFrequencySampler();
+
+        Assert.Empty(logical.Sample());
+        Assert.Equal(default, frequency.Sample());
+        logical.Dispose();
+        frequency.Dispose();
     }
 }
