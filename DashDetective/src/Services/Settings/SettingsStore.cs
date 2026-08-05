@@ -7,7 +7,8 @@ using System.Text.Json;
 namespace DashDetective.Services.Settings;
 
 /// <summary>
-/// Loads and saves <see cref="AppSettings"/> as JSON at <c>%AppData%/DashDetective/settings.json</c>.
+/// Loads and saves <see cref="AppSettings"/> as JSON at <c>%AppData%/DashDetective/settings.json</c>
+/// (on Linux, <c>$XDG_CONFIG_HOME</c> ?? <c>~/.config</c>).
 /// Pure persistence — it knows nothing about view-models; the composition root applies a loaded
 /// snapshot and hands back a fresh one to <see cref="Save"/> whenever a control changes.
 ///
@@ -92,6 +93,8 @@ public sealed class SettingsStore : IDisposable {
     }
 
     /// <summary>Builds <c>%AppData%/DashDetective/settings.json</c> (Roaming), creating the folder.
+    /// <c>ApplicationData</c> resolves to <c>$XDG_CONFIG_HOME</c> ?? <c>~/.config</c> on Linux, a
+    /// different tree from <see cref="Log"/>'s, so the two never collide.
     /// Returns <c>null</c> if the folder can't be created, disabling persistence gracefully.</summary>
     private static string? BuildSettingsPath() {
         try {

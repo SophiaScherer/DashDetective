@@ -81,14 +81,19 @@ public class ToolkitRunnerTests {
         Assert.Equal(["-n", "4", "a b & c"], launcher.Single.Arguments);
     }
 
+    /// <summary>Each platform in its own notation: "%windir%" on Windows, "~" elsewhere. Both go
+    /// through ToolkitPaths.Resolve, so this covers the wiring rather than the expansion itself.</summary>
     [Fact]
     public async Task RunAsync_ExpandsEnvironmentVariablesInTheTargetAtRunTime() {
         var (runner, launcher) = Build();
+        var windows = OperatingSystem.IsWindows();
 
-        await runner.RunAsync(ToolkitAction.OpenPath("%windir%"));
+        await runner.RunAsync(ToolkitAction.OpenPath(windows ? "%windir%" : "~"));
 
-        Assert.Equal(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                     launcher.Single.FileName, ignoreCase: true);
+        var expected = Environment.GetFolderPath(
+            windows ? Environment.SpecialFolder.Windows : Environment.SpecialFolder.UserProfile);
+
+        Assert.Equal(expected, launcher.Single.FileName, ignoreCase: true);
     }
 
     /// <summary>A user-supplied value stays literal — expansion is for the catalog's own targets only.</summary>

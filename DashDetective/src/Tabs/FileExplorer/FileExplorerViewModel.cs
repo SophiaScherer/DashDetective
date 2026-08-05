@@ -324,7 +324,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     private void SetCurrentFolder(string path, bool recordHistory = true) {
         // Navigating to a *different* folder resets the list scroll to the top; a same-path reload
         // (sort, filter, Refresh, auto-refresh) leaves the user where they were.
-        var isNavigation = !string.Equals(path, CurrentPath, StringComparison.OrdinalIgnoreCase);
+        var isNavigation = !string.Equals(path, CurrentPath, PathComparison.Comparison);
 
         if (isNavigation && recordHistory)
             _history.Record(CurrentPath);
@@ -420,7 +420,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // Depth-first search for the tree node at a path; used to point tree updates at the open folder.
     private static FileSystemNode? FindNode(IEnumerable<FileSystemNode> nodes, string path) {
         foreach (var node in nodes) {
-            if (string.Equals(node.FullPath, path, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(node.FullPath, path, PathComparison.Comparison))
                 return node;
             if (FindNode(node.Children, path) is { } found)
                 return found;
@@ -455,7 +455,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         // Auto-refresh keeps the user's selection: re-select the same path if it survived the change.
         if (reselect is not null)
             foreach (var entry in VisibleEntries)
-                if (string.Equals(entry.FullPath, reselect, StringComparison.OrdinalIgnoreCase)) {
+                if (string.Equals(entry.FullPath, reselect, PathComparison.Comparison)) {
                     entry.IsSelected = true;
                     break;
                 }

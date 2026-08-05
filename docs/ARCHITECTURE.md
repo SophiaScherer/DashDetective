@@ -226,7 +226,24 @@ Two conventions keep a bad file from being fatal:
   returns defaults), a broken settings file can never prevent launch.
 
 `SettingsStore` has an `internal` constructor taking an explicit file path — production resolves
-`%AppData%` — which is how the persistence tests run against a temporary file.
+`%AppData%` — which is how the persistence tests run against a temporary file. On Linux that resolves to
+`$XDG_CONFIG_HOME` ?? `~/.config`, a different tree from the log's `$XDG_DATA_HOME` ?? `~/.local/share`,
+so the two never collide.
+
+## Paths across platforms
+
+Two statics in `src/Shared` hold the assumptions that differ between Windows and Linux, so no caller has to
+know which it is running on:
+
+- **`PathComparison`** — how to tell whether two strings name the same path (`OrdinalIgnoreCase` on
+  Windows, `Ordinal` elsewhere). For identity only: sorting and filtering names stay case-insensitive
+  everywhere, because that is presentation rather than identity.
+- **`SystemDrive`** — where the OS itself lives, in both shapes the app needs. `Letter` is the Windows
+  drive letter that volume records are keyed by; **`Root` is the rooted path** (`C:\` or `/`), never empty,
+  for anything that has to open or measure it.
+
+Environment expansion is per-platform and belongs to `ToolkitPaths.Resolve` — `%VAR%` on Windows, `$VAR`,
+`${VAR}` and a leading `~` elsewhere — never to a direct `Environment.ExpandEnvironmentVariables` call.
 
 ## Shared control inventory
 

@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -50,7 +51,7 @@ public sealed class FileSystemFallbackSearch : IFileSearch {
 
         // (folder, depth), oldest first — the breadth-first frontier.
         var queue = new Queue<(string Path, int Depth)>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(PathComparison.Comparer);
 
         foreach (var scope in scopes)
             if (seen.Add(scope))

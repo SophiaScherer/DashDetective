@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using DashDetective.Shared.Completion;
 using System;
 using System.Collections.Generic;
@@ -65,7 +66,7 @@ public sealed class PathCompletion {
     }
 
     private async Task<IReadOnlyList<string>> NamesAsync(string parent, bool includeHidden) {
-        if (string.Equals(parent, _cachedParent, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(parent, _cachedParent, PathComparison.Comparison))
             return _cachedNames;
 
         List<string> names = new();

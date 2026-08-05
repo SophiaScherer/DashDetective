@@ -745,6 +745,33 @@ already scheduled. Each gets its attribute when its seam lands:
 `ProcessorUtilityCpuSampler` and `SystemTimesCpuSampler` are the same case resolved differently: their only
 consumer is `CpuUsageSampler`'s ctor, which gains a Linux arm in M5.
 
+**Path hygiene — the other thing CA1416 cannot see.** A path assumption is runtime behaviour, not annotated
+API surface, so the analyzer is silent on every one of them: on Unix `\` is an ordinary filename character,
+`Path.GetPathRoot(@"C:\x")` is `""`, `Path.IsPathRooted(@"C:\x")` is `false`, `%VAR%` never expands, and
+`FileAttributes.Hidden` is a leading dot rather than a bit. M4 fixed the existing ones and left three rules
+that keep them from coming back:
+
+- **`Shared/PathComparison` decides whether two strings name the same path** — `OrdinalIgnoreCase` on
+  Windows, `Ordinal` elsewhere. Use it for a path-keyed `HashSet`/`Dictionary`, a "did we navigate" check
+  or a dedupe. **Do not use it for sorting or filtering names**, which stay `OrdinalIgnoreCase` on every
+  platform: those are presentation, and someone typing "doc" expects to find "Documents" whatever the
+  filesystem thinks. Getting this backwards silently merges two real folders on Linux.
+- **`ToolkitPaths.Resolve` owns environment expansion**, because the notation is per-platform (`%VAR%` on
+  Windows; `$VAR`, `${VAR}` and a leading `~` elsewhere). Never call
+  `Environment.ExpandEnvironmentVariables` directly — off Windows it is an identity function. Its
+  `internal Expand(target, windows)` seam is how both arms stay testable from either dev machine.
+- **Tests whose subject calls `Path.*` build paths through `Fakes/TestPaths`** (`Root`, `Of(...)`,
+  `Dir(...)`), never from drive-letter literals. Where a path is only an opaque token being round-tripped
+  — `NavigationHistory`, `RecentSearches` — the literals are clearer and stay.
+
+Two traps worth knowing, both found the hard way: a literal reaches `Path.*` **transitively** far more often
+than a grep suggests (`ToolkitCommandFactory.ToEntry` → `CanOpenInApp` → `IsPathRooted` was the one that got
+through), and `Process.Start` with `UseShellExecute` **succeeds** on Linux where it throws on Windows,
+because the target is handed to `xdg-open`. Assert on structure, not on the OS's error text.
+
+`Shared/SystemDrive` carries both shapes of "where the OS lives": `Letter` for matching a Windows volume
+record, `Root` for anything that has to open or measure it (`C:\` or `/`, never empty).
+
 The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
 (`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
 "Unknown …") reads the static identity facts once at startup into a `SystemStaticInfo` record. It

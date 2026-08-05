@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -41,8 +42,8 @@ public static class SearchScopes {
             var normalPath = Normalize(path);
             var normalRoot = Normalize(root);
 
-            return normalPath.Equals(normalRoot, StringComparison.OrdinalIgnoreCase) ||
-                   normalPath.StartsWith(normalRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            return normalPath.Equals(normalRoot, PathComparison.Comparison) ||
+                   normalPath.StartsWith(normalRoot + Path.DirectorySeparatorChar, PathComparison.Comparison);
         } catch {
             // Malformed path: treat it as outside, so it is searched rather than silently dropped.
             return false;

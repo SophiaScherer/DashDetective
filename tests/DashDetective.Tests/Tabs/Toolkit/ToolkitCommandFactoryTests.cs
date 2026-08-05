@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Linq;
 using Xunit;
@@ -11,6 +12,10 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// that arguments stay a list and that nothing the factory can produce is elevated.
 /// </summary>
 public class ToolkitCommandFactoryTests {
+    // A rooted folder path: ToEntry's CanOpenInApp is decided by Path.IsPathRooted, so a drive-letter
+    // literal would read as an unrooted name off Windows and the row would offer one icon, not two.
+    private static readonly string Folder = TestPaths.Of("work");
+
     [Theory]
     [InlineData(ToolkitCommandType.FolderPath, ToolkitActionKind.OpenPath)]
     [InlineData(ToolkitCommandType.Url, ToolkitActionKind.OpenUrl)]
@@ -61,7 +66,7 @@ public class ToolkitCommandFactoryTests {
     [Fact]
     public void ActionFor_FolderAndUrlTakeNoArguments() {
         var folder = ToolkitCommandFactory.ActionFor(
-            new ToolkitCommand("f", "", ToolkitCommandType.FolderPath, @"C:\work", "ignored"));
+            new ToolkitCommand("f", "", ToolkitCommandType.FolderPath, Folder, "ignored"));
         var url = ToolkitCommandFactory.ActionFor(
             new ToolkitCommand("u", "", ToolkitCommandType.Url, "https://example.com", "ignored"));
 
@@ -72,7 +77,7 @@ public class ToolkitCommandFactoryTests {
     [Fact]
     public void ToEntry_CarriesTheTypedTextOntoTheRow() {
         var command = new ToolkitCommand(
-            "My folder", "Somewhere I go often", ToolkitCommandType.FolderPath, @"C:\work");
+            "My folder", "Somewhere I go often", ToolkitCommandType.FolderPath, Folder);
 
         var entry = ToolkitCommandFactory.ToEntry(command);
 
@@ -113,7 +118,7 @@ public class ToolkitCommandFactoryTests {
     [Fact]
     public void ToEntry_FolderCommand_OffersBothExplorers() {
         var entry = ToolkitCommandFactory.ToEntry(
-            new ToolkitCommand("Mine", "", ToolkitCommandType.FolderPath, @"C:\work"));
+            new ToolkitCommand("Mine", "", ToolkitCommandType.FolderPath, Folder));
 
         Assert.True(entry.IsPathEntry);
         Assert.True(entry.CanOpenInApp);

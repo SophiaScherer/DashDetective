@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -96,7 +97,7 @@ public partial class FileSystemNode : ObservableObject {
         // Existing children and the freshly-read list are both sorted by name, and survivors keep their
         // relative order, so one ordered pass aligns them: drop what's gone, then insert what's new at
         // its sorted position (a stale "Loading…" placeholder has an empty path and so is dropped too).
-        var present = new HashSet<string>(subs.Count, StringComparer.OrdinalIgnoreCase);
+        var present = new HashSet<string>(subs.Count, PathComparison.Comparer);
         foreach (var s in subs)
             present.Add(s.FullPath);
 
@@ -107,7 +108,7 @@ public partial class FileSystemNode : ObservableObject {
         for (var i = 0; i < subs.Count; i++) {
             var s = subs[i];
             if (i < Children.Count &&
-                string.Equals(Children[i].FullPath, s.FullPath, StringComparison.OrdinalIgnoreCase))
+                string.Equals(Children[i].FullPath, s.FullPath, PathComparison.Comparison))
                 continue;
             Children.Insert(i, new FileSystemNode(s.Name, s.FullPath, true, s.HasChildren,
                                                   _includeHidden, _collapseChildren, _onSelected));

@@ -1,6 +1,8 @@
 using DashDetective.Tabs.FileExplorer;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -33,65 +35,70 @@ public class PathCompletionTests {
     }
 
     private static FakeDirectory Disk() => new(new Dictionary<string, string[]> {
-        [@"C:\"] = ["Users", "Windows", "Program Files"],
-        [@"C:\Users\"] = ["Sophia", "Public"],
-        [@"C:\Users\Sophia\"] = ["Documents", "Downloads", "Desktop"],
+        [TestPaths.Dir()] = ["Users", "Windows", "Program Files"],
+        [TestPaths.Dir("Users")] = ["Sophia", "Public"],
+        [TestPaths.Dir("Users", "Sophia")] = ["Documents", "Downloads", "Desktop"],
     });
 
     private static PathCompletion Completion(FakeDirectory disk) => new(disk.ReadAsync);
 
     // ----- Splitting -----
 
-    [Theory]
-    [InlineData(@"C:\Us", @"C:\", "Us")]
-    [InlineData(@"C:\Users\Soph", @"C:\Users\", "Soph")]
-    [InlineData(@"C:/Users/Soph", "C:/Users/", "Soph")]
-    public void TrySplit_SeparatesTheFolderToReadFromTheNameToComplete(
-        string typed, string expectedParent, string expectedStub) {
+    [Fact]
+    public void TrySplit_SeparatesTheFolderToReadFromTheNameToComplete() {
+        AssertSplit(TestPaths.Dir() + "Us", TestPaths.Dir(), "Us");
+        AssertSplit(TestPaths.Dir("Users") + "Soph", TestPaths.Dir("Users"), "Soph");
+
+        // The alternate separator splits too (on Unix it is the same character as the primary one).
+        var alt = TestPaths.Root + "Users" + Path.AltDirectorySeparatorChar;
+        AssertSplit(alt + "Soph", alt, "Soph");
+    }
+
+    private static void AssertSplit(string typed, string expectedParent, string expectedStub) {
         Assert.True(PathCompletion.TrySplit(typed, out var parent, out var stub));
         Assert.Equal(expectedParent, parent);
         Assert.Equal(expectedStub, stub);
     }
 
-    [Theory]
-    [InlineData(@"C:\")]        // nothing typed after the separator
-    [InlineData(@"C:\Users\")]
-    [InlineData("Documents")]   // no separator names no folder to read
-    [InlineData("")]
-    [InlineData(null)]
-    public void TrySplit_ReportsNothingToComplete(string? typed) {
-        Assert.False(PathCompletion.TrySplit(typed, out _, out _));
+    [Fact]
+    public void TrySplit_ReportsNothingToComplete() {
+        Assert.False(PathCompletion.TrySplit(TestPaths.Dir(), out _, out _));         // nothing typed
+        Assert.False(PathCompletion.TrySplit(TestPaths.Dir("Users"), out _, out _));  // after the separator
+        Assert.False(PathCompletion.TrySplit("Documents", out _, out _));  // no separator, no folder to read
+        Assert.False(PathCompletion.TrySplit("", out _, out _));
+        Assert.False(PathCompletion.TrySplit(null, out _, out _));
     }
 
     // ----- Completing -----
 
     [Fact]
     public async Task CompleteAsync_CompletesTheLastSegmentOntoTheFullPath() {
-        Assert.Equal(@"C:\Users", await Completion(Disk()).CompleteAsync(@"C:\Us", false));
+        Assert.Equal(TestPaths.Of("Users"),
+            await Completion(Disk()).CompleteAsync(TestPaths.Dir() + "Us", false));
     }
 
     [Fact]
     public async Task CompleteAsync_CompletesADeeperSegment() {
-        Assert.Equal(@"C:\Users\Sophia\Documents",
-            await Completion(Disk()).CompleteAsync(@"C:\Users\Sophia\Docu", false));
+        Assert.Equal(TestPaths.Of("Users", "Sophia", "Documents"),
+            await Completion(Disk()).CompleteAsync(TestPaths.Dir("Users", "Sophia") + "Docu", false));
     }
 
     [Fact]
     public async Task CompleteAsync_SuggestsNothingWhenSiblingsDisagree() {
         // Documents, Downloads and Desktop share only the "D" already typed.
-        Assert.Null(await Completion(Disk()).CompleteAsync(@"C:\Users\Sophia\D", false));
+        Assert.Null(await Completion(Disk()).CompleteAsync(TestPaths.Dir("Users", "Sophia") + "D", false));
     }
 
     [Fact]
     public async Task CompleteAsync_SuggestsNothingForAnUnknownName() {
-        Assert.Null(await Completion(Disk()).CompleteAsync(@"C:\zzz", false));
+        Assert.Null(await Completion(Disk()).CompleteAsync(TestPaths.Dir() + "zzz", false));
     }
 
     [Fact]
     public async Task CompleteAsync_SuggestsNothingWithNoSegmentToComplete() {
         var disk = Disk();
 
-        Assert.Null(await Completion(disk).CompleteAsync(@"C:\", false));
+        Assert.Null(await Completion(disk).CompleteAsync(TestPaths.Dir(), false));
         Assert.Equal(0, disk.Reads);
     }
 
@@ -99,10 +106,11 @@ public class PathCompletionTests {
     public async Task CompleteAsync_ReadsAFolderOncePerRunOfKeystrokes() {
         var disk = Disk();
         var completion = Completion(disk);
+        var sophia = TestPaths.Dir("Users", "Sophia");
 
-        await completion.CompleteAsync(@"C:\Users\Sophia\D", false);
-        await completion.CompleteAsync(@"C:\Users\Sophia\Do", false);
-        await completion.CompleteAsync(@"C:\Users\Sophia\Doc", false);
+        await completion.CompleteAsync(sophia + "D", false);
+        await completion.CompleteAsync(sophia + "Do", false);
+        await completion.CompleteAsync(sophia + "Doc", false);
 
         Assert.Equal(1, disk.Reads);
     }
@@ -112,8 +120,8 @@ public class PathCompletionTests {
         var disk = Disk();
         var completion = Completion(disk);
 
-        await completion.CompleteAsync(@"C:\Us", false);
-        await completion.CompleteAsync(@"C:\Users\So", false);
+        await completion.CompleteAsync(TestPaths.Dir() + "Us", false);
+        await completion.CompleteAsync(TestPaths.Dir("Users") + "So", false);
 
         Assert.Equal(2, disk.Reads);
     }
@@ -124,6 +132,6 @@ public class PathCompletionTests {
         var disk = Disk();
         disk.Failure = new UnauthorizedAccessException();
 
-        Assert.Null(await Completion(disk).CompleteAsync(@"C:\Us", false));
+        Assert.Null(await Completion(disk).CompleteAsync(TestPaths.Dir() + "Us", false));
     }
 }
