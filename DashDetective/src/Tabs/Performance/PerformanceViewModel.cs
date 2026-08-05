@@ -99,7 +99,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
     // on the disk timer. Capped so an extreme core count stays responsive.
     private const int MaxLogicalProcessorCharts = 64;
-    private readonly LogicalProcessorSampler _cpuSampler = new();
+    private readonly ILogicalProcessorSampler _cpuSampler = ILogicalProcessorSampler.ForCurrentPlatform();
     private readonly List<CoreChart> _cpuCores = new();
     private readonly Dictionary<string, CoreChart> _cpuCoresByInstance = new();
 

@@ -2,23 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
-
-/// <summary>One logical processor's utilisation: its PDH instance name ("group,core", e.g. "0,3"), the parsed
-/// group/core numbers, and the current utilisation percentage.</summary>
-public readonly record struct LogicalProcessorSample(string Instance, int Group, int Core, double Percent);
 
 /// <summary>
 /// Samples per-logical-processor utilisation from the Windows PDH <c>\Processor Information(*)\% Processor
 /// Utility</c> counters — the per-core form of the Task-Manager-matching aggregate the
 /// <see cref="ProcessorUtilityCpuSampler"/> reads. Reads every instance at once via
 /// <c>PdhGetFormattedCounterArray</c>, drops the <c>_Total</c> roll-ups, and returns one reading per logical
-/// processor ordered by (group, core). Page-local to the Performance tab's CPU "Detailed" view; drives one mini
-/// chart per logical processor. A failure to stand up the query leaves it inert, returning an empty set forever —
-/// the same soft-fail contract as the other samplers. No dependencies beyond the OS <c>pdh.dll</c>.
+/// processor ordered by (group, core). A failure to stand up the query leaves it inert, returning an empty
+/// set forever — the same soft-fail contract as the other samplers. No dependencies beyond the OS
+/// <c>pdh.dll</c>.
 /// </summary>
-public sealed class LogicalProcessorSampler : IDisposable {
+internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;
@@ -61,7 +58,11 @@ public sealed class LogicalProcessorSampler : IDisposable {
     private readonly IntPtr _counter;
     private readonly bool _ready;
 
-    public LogicalProcessorSampler() {
+    /// <summary>Stands up the PDH query. Annotated rather than the whole type so <see cref="Sample"/> and
+    /// the pure <see cref="TryParseInstance"/> stay callable from tests on every platform — the
+    /// <c>WindowsHardwareInfoProvider</c> shape.</summary>
+    [SupportedOSPlatform("windows")]
+    public WindowsLogicalProcessorSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns an empty set forever.
         // The catch covers pdh.dll failing to load or bind, which a return-code check can't see.
         try {
@@ -80,13 +81,13 @@ public sealed class LogicalProcessorSampler : IDisposable {
             _ready = true;
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
-            NativeLoadFailure.Report(nameof(LogicalProcessorSampler), ex);
+            NativeLoadFailure.Report(nameof(WindowsLogicalProcessorSampler), ex);
         }
     }
 
     /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
     /// a healthy host, where the real constructor always succeeds.</summary>
-    internal LogicalProcessorSampler(SamplerInit _) { }
+    internal WindowsLogicalProcessorSampler(SamplerInit _) { }
 
     /// <summary>Returns one reading per logical processor at the moment of the call, ordered by (group, core)
     /// with the <c>_Total</c> roll-ups dropped. Any failure yields an empty set.</summary>
@@ -148,4 +149,12 @@ public sealed class LogicalProcessorSampler : IDisposable {
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
+}
+
+/// <summary>The no-data arm: a platform with no per-core reader yet reports nothing, so the Performance
+/// tab simply never marks the CPU row detail-capable.</summary>
+internal sealed class UnsupportedLogicalProcessorSampler : ILogicalProcessorSampler {
+    public IReadOnlyList<LogicalProcessorSample> Sample() => Array.Empty<LogicalProcessorSample>();
+
+    public void Dispose() { }
 }

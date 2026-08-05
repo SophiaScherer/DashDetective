@@ -3,7 +3,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.SystemMetrics;
 
-/// <summary>Covers <see cref="LogicalProcessorSampler.TryParseInstance"/>: parsing "group,core" PDH instance
+/// <summary>Covers <see cref="WindowsLogicalProcessorSampler.TryParseInstance"/>: parsing "group,core" PDH instance
 /// names into their numeric parts and rejecting the "_Total" roll-ups and malformed names.</summary>
 public class LogicalProcessorSamplerTests {
     [Theory]
@@ -12,7 +12,7 @@ public class LogicalProcessorSamplerTests {
     [InlineData("0,11", 0, 11)]
     [InlineData("1,10", 1, 10)]
     public void TryParseInstance_ValidCore_ParsesGroupAndCore(string instance, int group, int core) {
-        Assert.True(LogicalProcessorSampler.TryParseInstance(instance, out var g, out var c));
+        Assert.True(WindowsLogicalProcessorSampler.TryParseInstance(instance, out var g, out var c));
         Assert.Equal(group, g);
         Assert.Equal(core, c);
     }
@@ -29,6 +29,6 @@ public class LogicalProcessorSamplerTests {
     [InlineData(",3")]       // nothing before the comma
     [InlineData("a,b")]      // non-numeric
     public void TryParseInstance_TotalRollupsAndMalformed_AreRejected(string? instance) {
-        Assert.False(LogicalProcessorSampler.TryParseInstance(instance, out _, out _));
+        Assert.False(WindowsLogicalProcessorSampler.TryParseInstance(instance, out _, out _));
     }
 }

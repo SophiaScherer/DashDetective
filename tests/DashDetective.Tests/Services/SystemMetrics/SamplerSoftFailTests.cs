@@ -95,8 +95,8 @@ public class SamplerSoftFailTests {
     }
 
     [Fact]
-    public void LogicalProcessorSampler_Inert_SamplesEmpty() {
-        using var sampler = new LogicalProcessorSampler(SamplerInit.Inert);
+    public void WindowsLogicalProcessorSampler_Inert_SamplesEmpty() {
+        using var sampler = new WindowsLogicalProcessorSampler(SamplerInit.Inert);
 
         Assert.Empty(sampler.Sample());
         Assert.Empty(sampler.Sample());
@@ -126,7 +126,7 @@ public class SamplerSoftFailTests {
         using var gpu = new GpuUsageSampler();
         using var disk = new PhysicalDiskThroughputSampler();
         using var frequency = new ProcessorFrequencySampler();
-        using var logical = new LogicalProcessorSampler();
+        using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
 
         _ = cpu.Sample();
         _ = gpu.Sample();
@@ -138,17 +138,29 @@ public class SamplerSoftFailTests {
         _ = new MemoryUsageSampler().Sample();
     }
 
-    /// <summary>The same contract for the two PDH/kernel32 CPU readers, which now carry
-    /// <c>[SupportedOSPlatform("windows")]</c> on their constructors — so the call has to sit behind a
-    /// guard, and the fact simply does not run on the Linux leg.</summary>
+    /// <summary>The same contract for the readers that now carry <c>[SupportedOSPlatform("windows")]</c>
+    /// on their constructors — so the call has to sit behind a guard, and the fact simply does not run on
+    /// the Linux leg.</summary>
     [Fact]
-    public void RealWindowsCpuConstructorsAndSamples_NeverThrow() {
+    public void RealWindowsConstructorsAndSamples_NeverThrow() {
         if (!OperatingSystem.IsWindows())
             return;
 
         using var utility = new ProcessorUtilityCpuSampler();
+        using var logical = new WindowsLogicalProcessorSampler();
 
         _ = utility.Sample();
+        _ = logical.Sample();
         _ = new SystemTimesCpuSampler().Sample();
+    }
+
+    /// <summary>The no-data arm has to honour the same empty contract, since it is what a platform whose
+    /// milestone has not landed actually gets.</summary>
+    [Fact]
+    public void UnsupportedLogicalProcessorSampler_SamplesEmpty() {
+        using var sampler = new UnsupportedLogicalProcessorSampler();
+
+        Assert.Empty(sampler.Sample());
+        sampler.Dispose();
     }
 }
