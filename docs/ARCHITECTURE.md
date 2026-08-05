@@ -245,6 +245,24 @@ know which it is running on:
 Environment expansion is per-platform and belongs to `ToolkitPaths.Resolve` — `%VAR%` on Windows, `$VAR`,
 `${VAR}` and a leading `~` elsewhere — never to a direct `Environment.ExpandEnvironmentVariables` call.
 
+### Reading `/proc` and `/sys`
+
+Linux exposes machine data as pseudo-files rather than an API, so the Linux providers are file parsers.
+They all read through **`IProcFileSystem`** (`src/Services/Platform/Linux`) — `Exists`, `ReadAllText`,
+`ReadAllLines`, `ListDirectory`, `ResolveLink` — rather than touching `System.IO` themselves.
+
+That seam is infrastructure, not a provider seam, so it lives in its own `Services` folder like `IUiTimer`
+rather than in a tab folder. Its purpose is testability: development happens on Windows, and without it no
+Linux provider could be exercised until someone ran the VM. `FakeProcFileSystem` stages a tree of canned
+fixtures, which is how the CPU parsers are covered on both CI legs.
+
+Implementations **never throw and hold no state** — a pseudo-file can vanish, change shape or deny access
+mid-read, and all of that degrades to `null` or an empty list. Callers build paths by **string
+concatenation with forward-slash literals**, never `Path.Combine`, which on Windows would produce
+`/proc\stat`. Format knowledge lives in a parser beside the seam (`ProcStatParser`) rather than in any one
+sampler, and parses by index with a length check, because the kernel has appended columns to `/proc/stat`
+over the years.
+
 ## Shared control inventory
 
 Reusable widgets live in `src/Shared/Controls`:
