@@ -95,6 +95,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly IProcessorFrequencySampler _speedSampler = IProcessorFrequencySampler.ForCurrentPlatform();
     private double _cpuMaxClockMhz;
 
+    // System-wide process / thread / handle counts and the file-cache size, shared by the CPU and Memory
+    // panes. One reader for the page; the seam decides the platform, so this field initialiser stays legal.
+    private readonly ISystemPerformanceProvider _systemPerformance = ISystemPerformanceProvider.ForCurrentPlatform();
+
     // CPU per-logical-processor "Detailed" view: a page-local per-core sampler drives one mini chart per
     // logical processor, built lazily on the first sample (its instances name and count the charts) and updated
     // on the disk timer. Capped so an extreme core count stays responsive.
@@ -363,10 +367,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>Refreshes the live process / thread / handle counts — Task Manager's CPU-pane figures — from
-    /// one <see cref="SystemPerformanceProvider"/> read. A separate read from the Memory tick's (the two feeds
-    /// tick independently), but a single syscall each, against enumerating every process per second.</summary>
+    /// one <see cref="ISystemPerformanceProvider"/> read. A separate read from the Memory tick's (the two feeds
+    /// tick independently), but a single syscall each, against enumerating every process per second. A count
+    /// the platform has no analogue for reads "—" rather than zero (Linux has no handle count).</summary>
     private void UpdateCpuCounts() {
-        var sample = SystemPerformanceProvider.Read();
+        var sample = _systemPerformance.Read();
         _cpuProcessesTile.Value = FormatCount(sample?.ProcessCount);
         _cpuThreadsTile.Value = FormatCount(sample?.ThreadCount);
         _cpuHandlesTile.Value = FormatCount(sample?.HandleCount);
@@ -447,10 +452,10 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? $"{committedGb.ToString("F0", CultureInfo.InvariantCulture)} / {limitGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "—";
 
-        // Cached is not a field of the sample: GlobalMemoryStatusEx doesn't report it, and the sampler
-        // behind this feed is shared with Dashboard/Processes. It's a separate absolute psapi read taken
+        // Cached is not a field of the sample: the memory sampler's source doesn't report it, and the
+        // sampler behind this feed is shared with Dashboard/Processes. It's a separate absolute read taken
         // on the same tick, so it re-times, pauses and refreshes with its neighbours.
-        _memCachedTile.Value = MemoryCacheFormatter.Format(SystemPerformanceProvider.Read()?.CachedBytes);
+        _memCachedTile.Value = MemoryCacheFormatter.Format(_systemPerformance.Read()?.CachedBytes);
     }
 
     private async Task LoadMemoryInfoAsync() {
