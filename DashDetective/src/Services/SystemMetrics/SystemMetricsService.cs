@@ -69,7 +69,7 @@ public sealed class SystemMetricsService : IDisposable {
     // page-local (per adapter / per disk), so no shared sampler for either lives here.
     private static SystemSamplers CreateSystemSamplers() {
         var cpu = new CpuUsageSampler();
-        var memory = new MemoryUsageSampler();
+        var memory = IMemoryUsageSampler.ForCurrentPlatform();
         var network = new NetworkUsageSampler();
 
         var bundle = new MetricSamplers(

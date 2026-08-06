@@ -1,16 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
-
-/// <summary>
-/// A single physical-memory snapshot: load as a percentage (0–100), used and total physical bytes,
-/// plus the system commit charge and limit (<c>CommittedBytes</c> of <c>CommitLimitBytes</c>) — Task
-/// Manager's "Committed" figure, which counts pagefile-backed virtual memory beyond physical RAM.
-/// </summary>
-public readonly record struct MemorySample(
-    double LoadPercent, ulong UsedBytes, ulong TotalBytes,
-    ulong CommittedBytes, ulong CommitLimitBytes);
 
 /// <summary>
 /// Samples system physical-memory usage via the Win32 <c>GlobalMemoryStatusEx</c> API. Each
@@ -25,7 +17,7 @@ public readonly record struct MemorySample(
 /// lives in <see cref="Sample"/>: a <c>kernel32</c> load failure latches the sampler inert, and every
 /// later call returns a zeroed reading without re-entering the native call.
 /// </summary>
-public sealed class MemoryUsageSampler {
+internal sealed class WindowsMemoryUsageSampler : IMemoryUsageSampler {
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryStatusEx {
         public uint Length;
@@ -50,11 +42,14 @@ public sealed class MemoryUsageSampler {
     // rather than thrown and swallowed on every tick of the shared 1 Hz timer.
     private bool _available = true;
 
-    public MemoryUsageSampler() { }
+    /// <summary>Annotated rather than the whole type so <see cref="Sample"/> and the inert test seam stay
+    /// callable on every platform — the same shape as the PDH samplers.</summary>
+    [SupportedOSPlatform("windows")]
+    public WindowsMemoryUsageSampler() { }
 
     /// <summary>Test seam: starts the sampler latched inert so the soft-fail contract can be exercised on
     /// a healthy host, where the native call always succeeds.</summary>
-    internal MemoryUsageSampler(SamplerInit _) => _available = false;
+    internal WindowsMemoryUsageSampler(SamplerInit _) => _available = false;
 
     /// <summary>
     /// Returns the current physical-memory snapshot. <c>MemoryLoad</c> is used directly for the
@@ -73,7 +68,7 @@ public sealed class MemoryUsageSampler {
                 return NoReading;
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             _available = false;
-            NativeLoadFailure.Report(nameof(MemoryUsageSampler), ex);
+            NativeLoadFailure.Report(nameof(WindowsMemoryUsageSampler), ex);
             return NoReading;
         }
 
@@ -92,4 +87,10 @@ public sealed class MemoryUsageSampler {
 
         return new MemorySample(load, used, status.TotalPhys, committed, status.TotalPageFile);
     }
+}
+
+/// <summary>The no-data arm: a platform with no memory reader yet reports a zeroed sample, so the memory
+/// tiles stay empty rather than showing an invented figure.</summary>
+internal sealed class UnsupportedMemoryUsageSampler : IMemoryUsageSampler {
+    public MemorySample Sample() => new(0, 0, 0, 0, 0);
 }

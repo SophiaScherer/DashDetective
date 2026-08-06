@@ -106,8 +106,8 @@ public class SamplerSoftFailTests {
     /// <summary>Memory latches inert in <c>Sample()</c> rather than a constructor, so the repeat call also
     /// proves the latch stops the native call being re-entered.</summary>
     [Fact]
-    public void MemoryUsageSampler_Inert_ReturnsAZeroedReading() {
-        var sampler = new MemoryUsageSampler(SamplerInit.Inert);
+    public void WindowsMemoryUsageSampler_Inert_ReturnsAZeroedReading() {
+        var sampler = new WindowsMemoryUsageSampler(SamplerInit.Inert);
 
         Assert.Equal(new MemorySample(0, 0, 0, 0, 0), sampler.Sample());
         Assert.Equal(new MemorySample(0, 0, 0, 0, 0), sampler.Sample());
@@ -127,6 +127,7 @@ public class SamplerSoftFailTests {
         using var disk = new PhysicalDiskThroughputSampler();
         using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
         using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
+        var memory = IMemoryUsageSampler.ForCurrentPlatform();
 
         _ = cpu.Sample();
         _ = gpu.Sample();
@@ -135,7 +136,7 @@ public class SamplerSoftFailTests {
         _ = disk.Sample();
         _ = frequency.Sample();
         _ = logical.Sample();
-        _ = new MemoryUsageSampler().Sample();
+        _ = memory.Sample();
     }
 
     /// <summary>The same contract for the readers that now carry <c>[SupportedOSPlatform("windows")]</c>
@@ -154,6 +155,7 @@ public class SamplerSoftFailTests {
         _ = logical.Sample();
         _ = frequency.Sample();
         _ = new SystemTimesCpuSampler().Sample();
+        _ = new WindowsMemoryUsageSampler().Sample();
     }
 
     /// <summary>The no-data arms have to honour the same empty contract, since they are what a platform
@@ -165,6 +167,7 @@ public class SamplerSoftFailTests {
 
         Assert.Empty(logical.Sample());
         Assert.Equal(default, frequency.Sample());
+        Assert.Equal(new MemorySample(0, 0, 0, 0, 0), new UnsupportedMemoryUsageSampler().Sample());
         logical.Dispose();
         frequency.Dispose();
     }
