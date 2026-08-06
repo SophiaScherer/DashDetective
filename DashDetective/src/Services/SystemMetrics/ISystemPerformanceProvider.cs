@@ -25,6 +25,9 @@ internal interface ISystemPerformanceProvider {
         if (OperatingSystem.IsWindows())
             return new WindowsSystemPerformanceProvider();
 
+        if (OperatingSystem.IsLinux())
+            return new LinuxSystemPerformanceProvider();
+
         return new UnsupportedSystemPerformanceProvider();
     }
 }
