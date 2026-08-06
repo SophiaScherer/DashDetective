@@ -11,7 +11,7 @@ Build, run and test instructions live in the [README](../README.md).
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
-today Linux builds and launches, but most panels read "—".
+today Linux builds and launches with CPU, memory and network live, while most other panels read "—".
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -254,14 +254,21 @@ They all read through **`IProcFileSystem`** (`src/Services/Platform/Linux`) — 
 That seam is infrastructure, not a provider seam, so it lives in its own `Services` folder like `IUiTimer`
 rather than in a tab folder. Its purpose is testability: development happens on Windows, and without it no
 Linux provider could be exercised until someone ran the VM. `FakeProcFileSystem` stages a tree of canned
-fixtures, which is how the CPU parsers are covered on both CI legs.
+fixtures, which is how the CPU and memory parsers are covered on both CI legs.
 
 Implementations **never throw and hold no state** — a pseudo-file can vanish, change shape or deny access
 mid-read, and all of that degrades to `null` or an empty list. Callers build paths by **string
 concatenation with forward-slash literals**, never `Path.Combine`, which on Windows would produce
-`/proc\stat`. Format knowledge lives in a parser beside the seam (`ProcStatParser`) rather than in any one
-sampler, and parses by index with a length check, because the kernel has appended columns to `/proc/stat`
-over the years.
+`/proc\stat`. Format knowledge lives in a parser beside the seam — `ProcStatParser` for `/proc/stat`,
+`ProcMeminfoParser` for `/proc/meminfo` — rather than in any one sampler, so a file read by two providers
+is understood in exactly one place. Both parse defensively: by index with a length check, because the
+kernel has appended columns to `/proc/stat` over the years, and by explicit unit, because `/proc/meminfo`
+labels kibibytes as `kB` and leaves some lines unitless entirely.
+
+Where a platform genuinely has no source for a value, the provider returns `null` and the surface renders
+"—". It does not substitute a near-miss: the Performance tab's "Handles" tile is blank on Linux because a
+Windows handle covers events, threads and registry keys as well as files, so the closest candidate would
+put a differently-meaning number under the same label.
 
 ## Shared control inventory
 
