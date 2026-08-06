@@ -29,6 +29,9 @@ internal interface IMemoryUsageSampler {
         if (OperatingSystem.IsWindows())
             return new WindowsMemoryUsageSampler();
 
+        if (OperatingSystem.IsLinux())
+            return new LinuxMemoryUsageSampler();
+
         return new UnsupportedMemoryUsageSampler();
     }
 }
