@@ -37,6 +37,51 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
+    /// The L3 cache size in kilobytes, from <c>cpu0</c>'s <c>cache/index*</c> entries; 0 when the CPU has
+    /// no L3 or sysfs does not describe its caches (the usual case in a VM). Deliberately <b>not</b> a
+    /// field of this record: only the Hardware tab's Processor card has a row for it, and the Dashboard
+    /// should not pay for a directory walk it will not render.
+    ///
+    /// The kernel writes the size with a unit suffix ("8192K", "16M"), never as a byte count — reading it
+    /// as a bare number would be off by three orders of magnitude.
+    /// </summary>
+    internal static long L3CacheKilobytes(IProcFileSystem proc) {
+        const string cacheRoot = CpuRoot + "/cpu0/cache";
+
+        foreach (var entry in proc.ListDirectory(cacheRoot)) {
+            var level = proc.ReadAllText(cacheRoot + "/" + entry + "/level")?.Trim();
+            if (level != "3")
+                continue;
+
+            var size = proc.ReadAllText(cacheRoot + "/" + entry + "/size")?.Trim();
+            if (size is not null)
+                return ParseCacheKilobytes(size);
+        }
+
+        return 0;
+    }
+
+    /// <summary>Converts a sysfs cache size ("8192K", "16M") to kilobytes; 0 when unparseable.</summary>
+    private static long ParseCacheKilobytes(string size) {
+        var end = 0;
+        while (end < size.Length && char.IsAsciiDigit(size[end]))
+            end++;
+
+        if (end == 0
+            || !long.TryParse(
+                size.AsSpan(0, end), NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+            return 0;
+
+        var unit = size.AsSpan(end).Trim();
+        if (unit.IsEmpty || unit.Equals("K", StringComparison.OrdinalIgnoreCase))
+            return value;
+        if (unit.Equals("M", StringComparison.OrdinalIgnoreCase))
+            return value * 1024;
+
+        return unit.Equals("G", StringComparison.OrdinalIgnoreCase) ? value * 1024 * 1024 : 0;
+    }
+
+    /// <summary>
     /// The physical core count, from the distinct <c>(physical id, core id)</c> pairs — the only reading
     /// that is right on both a hyperthreaded chip (two blocks share a pair) and a multi-socket board (the
     /// same core id recurs under a different physical id). Falls back to <c>cpu cores</c> multiplied by
