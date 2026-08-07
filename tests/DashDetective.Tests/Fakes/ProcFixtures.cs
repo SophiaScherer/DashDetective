@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -89,9 +90,49 @@ internal static class ProcFixtures {
         Hugepagesize:       2048 kB
         """;
 
+    /// <summary>
+    /// A four-core, eight-thread AMD <c>/proc/cpuinfo</c> across <b>two sockets</b> — the shape
+    /// <see cref="ProcCpuInfo"/> cannot exercise. Blocks 0–3 are package 0 and blocks 4–7 package 1, and
+    /// each package's two cores appear twice, so the distinct <c>(physical id, core id)</c> pairs total 4
+    /// while the blocks total 8. Counting blocks, or trusting <c>cpu cores</c> alone, gets a different
+    /// answer for each — which is the point. The model name carries no "@ clock" suffix, as AMD's do not.
+    /// </summary>
+    public static readonly string AmdCpuInfo = string.Join('\n', BuildAmdBlocks());
+
     /// <summary>A <c>/proc/loadavg</c>: three load averages, then <c>nr_running/nr_threads</c> — 2 runnable
     /// of <b>1234 threads</b>, not processes — then the last-used PID.</summary>
     public const string ProcLoadavg = "0.52 0.58 0.59 2/1234 56789\n";
+
+    /// <summary>
+    /// A stock <c>/etc/os-release</c>. <c>PRETTY_NAME</c> is quoted and <c>VERSION_ID</c> is not, in the
+    /// same body: both forms are legal shell and a parser that handles only one silently mangles the
+    /// other. The comment line and the <c>=</c> inside <c>HOME_URL</c> are the malformed-input cases.
+    /// </summary>
+    public const string OsRelease =
+        """
+        # a comment the parser must skip
+        PRETTY_NAME="Ubuntu 24.04.1 LTS"
+        NAME="Ubuntu"
+        VERSION_ID=24.04
+        VERSION="24.04.1 LTS (Noble Numbat)"
+        ID=ubuntu
+        ID_LIKE=debian
+        HOME_URL="https://www.ubuntu.com/?q=1"
+        """;
+
+    /// <summary>Stages a VirtualBox guest's <c>/sys/class/dmi/id</c> tree onto a fake filesystem — the
+    /// values the VM acceptance check expects to see on screen. The root-only <c>board_serial</c>,
+    /// <c>product_serial</c> and <c>product_uuid</c> are deliberately absent, which is what a non-root
+    /// read of them looks like.</summary>
+    public static FakeProcFileSystem WithVirtualBoxDmi(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/dmi/id/board_vendor", "Oracle Corporation\n")
+            .WithFile("/sys/class/dmi/id/board_name", "VirtualBox\n")
+            .WithFile("/sys/class/dmi/id/board_version", "1.2\n")
+            .WithFile("/sys/class/dmi/id/bios_vendor", "innotek GmbH\n")
+            .WithFile("/sys/class/dmi/id/bios_version", "VirtualBox\n")
+            .WithFile("/sys/class/dmi/id/bios_date", "12/01/2006\n")
+            .WithFile("/sys/class/dmi/id/sys_vendor", "innotek GmbH\n")
+            .WithFile("/sys/class/dmi/id/product_name", "VirtualBox\n");
 
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
@@ -100,4 +141,25 @@ internal static class ProcFixtures {
 
     /// <summary>Assembles a <c>/proc/stat</c> body from lines built with <see cref="StatLine"/>.</summary>
     public static string Stat(params string[] lines) => string.Join('\n', lines);
+
+    /// <summary>Builds <see cref="AmdCpuInfo"/>'s eight blocks: two sockets of two cores, each core with
+    /// two hyperthread siblings. Tab-separated like the real file, and blank-line separated like the real
+    /// file — including the trailing blank, which must not yield a ninth processor.</summary>
+    private static List<string> BuildAmdBlocks() {
+        var lines = new List<string>();
+        for (var processor = 0; processor < 8; processor++) {
+            lines.Add($"processor\t: {processor}");
+            lines.Add("vendor_id\t: AuthenticAMD");
+            lines.Add("model name\t: AMD Ryzen 5 7600X 4-Core Processor");
+            lines.Add("cpu MHz\t\t: 3400.000");
+            lines.Add("cache size\t: 1024 KB");
+            lines.Add($"physical id\t: {processor / 4}");
+            lines.Add("siblings\t: 4");
+            lines.Add($"core id\t\t: {processor % 4 / 2}");
+            lines.Add("cpu cores\t: 2");
+            lines.Add("");
+        }
+
+        return lines;
+    }
 }

@@ -36,12 +36,13 @@ internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
                 return ProcessorInfo.Unknown;
 
             var spec = HardwareCatalog.LookupCpu(facts.Name);
-            var threads = facts.LogicalCores > 0 ? facts.LogicalCores : Environment.ProcessorCount;
 
+            // The logical count needs no fallback: a readable cpuinfo always has at least one block, and
+            // an unreadable one already returned Unknown above.
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(facts.Name) ? "—" : facts.Name,
                 Cores: facts.PhysicalCores > 0 ? facts.PhysicalCores.ToString() : "—",
-                LogicalProcessors: threads.ToString(),
+                LogicalProcessors: facts.LogicalCores.ToString(),
                 BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.MaxClockMhz, spec?.Boost),
                 CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc)),
                 Tdp: spec?.Tdp ?? "—",

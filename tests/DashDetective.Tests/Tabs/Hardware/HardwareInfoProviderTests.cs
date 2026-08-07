@@ -2,6 +2,7 @@ using DashDetective.Tabs.Hardware;
 using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -27,6 +28,53 @@ public class HardwareInfoProviderTests {
             Assert.IsType<HardwareInfoProvider>(provider);
         else
             Assert.IsType<UnsupportedHardwareInfoProvider>(provider);
+    }
+
+    /// <summary>
+    /// Both platforms compose the same portable provider, so its type no longer says which readers went
+    /// into it — this does. The Linux set is filled in one milestone at a time, and the cards still on
+    /// <c>Unsupported*</c> are the ones whose milestone has not landed; each moves here when it does.
+    /// </summary>
+    [Fact]
+    public void ForCurrentPlatform_ComposesTheReadersForThisHost() {
+        if (IHardwareInfoProvider.ForCurrentPlatform() is not HardwareInfoProvider provider)
+            return;
+
+        if (OperatingSystem.IsWindows()) {
+            Assert.IsType<WindowsProcessorInfoProvider>(ReaderOf<IProcessorInfoProvider>(provider));
+            Assert.IsType<WindowsMotherboardInfoProvider>(ReaderOf<IMotherboardInfoProvider>(provider));
+            Assert.IsType<WindowsMemoryModulesProvider>(ReaderOf<IMemoryModulesProvider>(provider));
+            Assert.IsType<WindowsStorageInfoProvider>(ReaderOf<IStorageInfoProvider>(provider));
+            Assert.IsType<WindowsGraphicsInfoProvider>(ReaderOf<IGraphicsInfoProvider>(provider));
+        } else {
+            Assert.IsType<LinuxProcessorInfoProvider>(ReaderOf<IProcessorInfoProvider>(provider));
+            Assert.IsType<LinuxMotherboardInfoProvider>(ReaderOf<IMotherboardInfoProvider>(provider));
+            Assert.IsType<UnsupportedMemoryModulesProvider>(ReaderOf<IMemoryModulesProvider>(provider));
+            Assert.IsType<UnsupportedStorageInfoProvider>(ReaderOf<IStorageInfoProvider>(provider));
+            Assert.IsType<UnsupportedGraphicsInfoProvider>(ReaderOf<IGraphicsInfoProvider>(provider));
+        }
+    }
+
+    /// <summary>Every per-card reader reports its <c>.Unknown</c> rather than throwing, whatever the
+    /// platform hands back — the contract the composite's guard exists to backstop, checked here against
+    /// the real readers on both CI legs.</summary>
+    [Fact]
+    public async Task Unsupported_PerCardReaders_ReportTheirUnknownRecord() {
+        Assert.Same(MemoryInfo.Unknown, await new UnsupportedMemoryModulesProvider().GetAsync());
+        Assert.Same(StorageInfo.Unknown, await new UnsupportedStorageInfoProvider().GetAsync());
+        Assert.Same(GraphicsInfo.Unknown, await new UnsupportedGraphicsInfoProvider().GetAsync());
+    }
+
+    /// <summary>Reads back the reader a <see cref="HardwareInfoProvider"/> was built with — they are
+    /// private fields, one per card interface. The same reflection shape
+    /// <c>HardwareProvidersTests</c> uses for the shared temperature reader.</summary>
+    private static object? ReaderOf<T>(HardwareInfoProvider provider) {
+        foreach (var field in provider.GetType()
+                     .GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
+            if (field.FieldType == typeof(T))
+                return field.GetValue(provider);
+
+        return null;
     }
 
     /// <summary>Every card reports <c>.Unknown</c>, so every field renders "—" rather than blanking.</summary>

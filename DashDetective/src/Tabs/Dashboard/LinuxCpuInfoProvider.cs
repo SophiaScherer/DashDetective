@@ -29,12 +29,13 @@ internal sealed class LinuxCpuInfoProvider : ICpuInfoProvider {
             if (facts == CpuFacts.None)
                 return CpuStaticInfo.Unknown;
 
-            // The same two substitutions the WMI arm makes: the runtime's processor count when cpuinfo
-            // reported none, and the placeholder name. Physical cores and clock stay 0, which renders "—".
+            // Only the name is substituted here. The logical count needs no fallback: a readable cpuinfo
+            // always has at least one block, and an unreadable one already returned Unknown above — which
+            // carries the runtime's processor count itself. Physical cores and clock stay 0, rendering "—".
             return new CpuStaticInfo(
                 string.IsNullOrWhiteSpace(facts.Name) ? "Unknown processor" : facts.Name,
                 facts.PhysicalCores,
-                facts.LogicalCores > 0 ? facts.LogicalCores : Environment.ProcessorCount,
+                facts.LogicalCores,
                 facts.MaxClockMhz);
         } catch (Exception e) {
             Log.Warn("CpuInfoProvider read failed", e);
