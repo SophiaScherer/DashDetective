@@ -1,16 +1,9 @@
 using DashDetective.Services.Diagnostics;
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
-
-/// <summary>
-/// One system-wide counters snapshot: the file-cache size in bytes (<c>null</c> when the reading is
-/// implausible) plus the live process, thread and handle totals — the figures Task Manager shows on its
-/// CPU and Memory panes.
-/// </summary>
-public readonly record struct SystemPerformanceSample(
-    ulong? CachedBytes, int ProcessCount, int ThreadCount, int HandleCount);
 
 /// <summary>
 /// Reads the system-wide counters — file-cache size (Task Manager's memory "Cached" figure) and the
@@ -18,24 +11,30 @@ public readonly record struct SystemPerformanceSample(
 /// <c>PERFORMANCE_INFORMATION</c> struct reports all four from a single call, so one read serves both the
 /// Performance tab's memory and CPU panes: no PDH counter, no admin rights, and no per-tick process
 /// enumeration. Like <c>GlobalMemoryStatusEx</c> this is an absolute one-shot reading, so there is no prior
-/// state to seed or diff. Every failure — non-Windows, a native <c>FALSE</c> — soft-fails to <c>null</c>
-/// rather than throwing; the first thrown exception is logged and then latches the provider off, so a
+/// state to seed or diff. Every failure — a native <c>FALSE</c>, a throw — soft-fails to <c>null</c>
+/// rather than propagating; the first thrown exception is logged and then latches the provider off, so a
 /// persistent fault cannot flood the log at the sampling cadence.
 ///
 /// Lives here rather than in a tab folder because the Performance and Processes tabs both read these counts
-/// and must agree on them. Deliberately separate from <see cref="MemoryUsageSampler"/>, which reports
+/// and must agree on them. Deliberately separate from <see cref="WindowsMemoryUsageSampler"/>, which reports
 /// physical memory instead.
 /// </summary>
-internal static class SystemPerformanceProvider {
+internal sealed class WindowsSystemPerformanceProvider : ISystemPerformanceProvider {
     // Latched by the first thrown exception: the export is either present for the process's lifetime or not,
     // so there is nothing to gain from re-invoking it every tick after a hard failure.
-    private static bool _unavailable;
+    private bool _unavailable;
 
-    /// <summary>The current system counters, or <c>null</c> when unavailable (non-Windows or a native
-    /// failure). A successful read whose cache figure is nonsensical still returns a sample — only its
-    /// <see cref="SystemPerformanceSample.CachedBytes"/> is <c>null</c>.</summary>
-    public static SystemPerformanceSample? Read() {
-        if (!OperatingSystem.IsWindows() || _unavailable)
+    /// <summary>Annotated rather than the whole type so <see cref="ToBytes"/> stays a pure helper callable
+    /// from tests on every platform — the same shape as the samplers.</summary>
+    [SupportedOSPlatform("windows")]
+    public WindowsSystemPerformanceProvider() { }
+
+    /// <summary>The current system counters, or <c>null</c> when unavailable. A successful read whose cache
+    /// figure is nonsensical still returns a sample — only its
+    /// <see cref="SystemPerformanceSample.CachedBytes"/> is <c>null</c>. Windows reports all three counts,
+    /// so none of them is ever <c>null</c> on this arm.</summary>
+    public SystemPerformanceSample? Read() {
+        if (_unavailable)
             return null;
 
         try {
@@ -48,7 +47,7 @@ internal static class SystemPerformanceProvider {
                 ToBytes(info.SystemCache, info.PageSize),
                 (int)info.ProcessCount, (int)info.ThreadCount, (int)info.HandleCount);
         } catch (Exception e) {
-            Log.Warn("SystemPerformanceProvider read failed", e);
+            Log.Warn("WindowsSystemPerformanceProvider read failed", e);
             _unavailable = true;
             return null;
         }
@@ -85,4 +84,10 @@ internal static class SystemPerformanceProvider {
     [DllImport("psapi.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetPerformanceInfo(ref PerformanceInformation info, uint cb);
+}
+
+/// <summary>The no-data arm: a platform with no counters reader yet reports nothing, so every tile keeps
+/// its "—".</summary>
+internal sealed class UnsupportedSystemPerformanceProvider : ISystemPerformanceProvider {
+    public SystemPerformanceSample? Read() => null;
 }

@@ -387,6 +387,10 @@ currently exist.
                                  per-core samplers: label + busy/total jiffies, read by index with a
                                  length check. steal counts as busy; guest/guest_nice are excluded
                                  because the kernel already folds them into user/nice)
+          ProcMeminfoParser.cs  (/proc/meminfo format knowledge, shared by the memory sampler and the
+                                 system-counters provider: "Key: value kB" → a byte-valued lookup. The
+                                 kB unit is KIBIbytes, so suffixed values scale by 1024 (saturating);
+                                 unitless values are counts and stay verbatim. Absent key → 0)
       /SystemMetrics
         IProcessorFrequencySampler.cs (seam + ForCurrentPlatform() + the ProcessorClockSample record,
                                  which carries EITHER a ratio or an absolute clock — Windows PDH reports
@@ -416,7 +420,31 @@ currently exist.
                                  chain on Windows, else Unsupported)
         LinuxCpuSampler.cs      (total CPU % from /proc/stat's aggregate line. STATEFUL — holds the
                                  previous jiffy snapshot, so it must not go into HardwareProviders)
-        MemoryUsageSampler.cs   (live RAM % + used/total via GlobalMemoryStatusEx)
+        IMemoryUsageSampler.cs  (seam + ForCurrentPlatform() + the MemorySample record; live RAM % +
+                                 used/total + the commit pair, feeding the shared Memory metric)
+        WindowsMemoryUsageSampler.cs
+                                (GlobalMemoryStatusEx. Latches inert in Sample() rather than a ctor, since
+                                 there is no query to stand up. Holds UnsupportedMemoryUsageSampler)
+        LinuxMemoryUsageSampler.cs
+                                (/proc/meminfo; used = MemTotal − MemAvailable, the closest analogue to
+                                 the Windows load figure and what `free -h` calls available. Falls back to
+                                 MemFree + Cached + Buffers on pre-3.14 kernels. Committed_AS/CommitLimit
+                                 pass through UNCLAMPED — overcommit legitimately exceeds the limit)
+        ISystemPerformanceProvider.cs
+                                (seam + ForCurrentPlatform() + the SystemPerformanceSample record: file
+                                 cache + process/thread/handle totals, shared by the Performance tab's CPU
+                                 and Memory panes. EVERY member is nullable — a platform with no analogue
+                                 reports null, which the tiles render "—")
+        WindowsSystemPerformanceProvider.cs
+                                (psapi GetPerformanceInfo — all four figures from one call, no PDH counter
+                                 and no per-tick process enumeration. Holds
+                                 UnsupportedSystemPerformanceProvider)
+        LinuxSystemPerformanceProvider.cs
+                                (cache = Cached + SReclaimable; threads = /proc/loadavg's nr_threads (the
+                                 DENOMINATOR of field 4 — it is threads, not processes); processes =
+                                 /proc's numeric entries, one listing and no per-PID opens. HANDLES ARE
+                                 PERMANENTLY "—": a Windows handle covers events, threads and registry keys
+                                 too, so /proc/sys/fs/file-nr would mean something else under the label)
         GpuUsageSampler.cs      (live GPU % via PDH GPU Engine counters; owns a PDH query handle. Sample()
                                  = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
@@ -767,13 +795,12 @@ no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating tho
 busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
 from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
 
-Seven classes still reach native Windows APIs unannotated, because annotating them today would land the
+Five classes still reach native Windows APIs unannotated, because annotating them today would land the
 attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
 already scheduled. Each gets its attribute when its seam lands:
 
 | Class | Seam lands in |
 |---|---|
-| `MemoryUsageSampler`, `SystemPerformanceProvider` | M6 |
 | `PhysicalDiskThroughputSampler` | M8 |
 | `GpuUsageSampler`, `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 |
 
@@ -784,6 +811,11 @@ would have dragged all of that behind an `IsWindows()` guard and cost the Linux 
 inert-contract tests and the instance-name parser, for no gain — the attribute's whole job is to make the
 *constructor* visible at its call site, which is what forces `CpuUsageSampler`'s ctor and each
 `ForCurrentPlatform()` to hold a guard. This is the `WindowsHardwareInfoProvider` shape, applied to samplers.
+M6 followed it for both of its classes, including the two whose Windows arm has an **empty** constructor —
+an empty annotated ctor is not a wasted one, it is the whole enforcement point, and it kept
+`WindowsSystemPerformanceProvider.ToBytes` and the samplers' `SamplerInit.Inert` seam covered on the Linux
+leg. M6 also shows what the seam buys beyond the attribute: with `ForCurrentPlatform()` deciding, the inner
+`OperatingSystem.IsWindows()` guard inside `Read()` became dead weight and was removed.
 
 **Path hygiene — the other thing CA1416 cannot see.** A path assumption is runtime behaviour, not annotated
 API surface, so the analyzer is silent on every one of them: on Unix `\` is an ordinary filename character,
@@ -826,8 +858,10 @@ rules:
   what lets a provider built on it go into `HardwareProviders`; note that a *sampler* holding a previous
   snapshot (`LinuxCpuSampler`, `LinuxLogicalProcessorSampler`) is stateful and must not.
 - **Format knowledge lives in a parser beside the seam, not in a sampler** — `ProcStatParser` is shared by
-  the aggregate and per-core CPU samplers. Parse **by index with a length check**: the kernel has appended
-  columns to `/proc/stat` over time, so 7-column and 10-column forms both have to work.
+  the aggregate and per-core CPU samplers, `ProcMeminfoParser` by the memory sampler and the system-counters
+  provider. Parse **by index with a length check**: the kernel has appended columns to `/proc/stat` over
+  time, so 7-column and 10-column forms both have to work. The same defensiveness applies to units —
+  `/proc/meminfo`'s `kB` is kibibytes, and some of its lines carry no unit at all.
 
 Two `/proc` gotchas worth knowing: `/proc/stat` lists **online** CPUs only, so per-core state must be keyed
 by core number and a core appearing mid-run reports 0 until it has an interval (diffing it against zero
@@ -1304,7 +1338,10 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   smaller number — 0.5 GB where Cached was 15 GB.) Deliberately a **page-local** P/Invoke under
   `src/Tabs/Performance/` (the `ShellInterop` / `ConnectionsInterop` precedent), so the shared
   `MemoryUsageSampler` and the `MemorySample` record — consumed by Dashboard and Processes too — were
-  **left untouched**. Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
+  **left untouched**. (Both have since moved and been seamed: the reader is
+  `WindowsSystemPerformanceProvider` behind `ISystemPerformanceProvider` in `Services/SystemMetrics`, and
+  the sampler is `WindowsMemoryUsageSampler` behind `IMemoryUsageSampler` — M6. The rationale above still
+  holds; only the names and the folder changed.) Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
   so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
   blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM** tile is live too, and it is
   the one tile that is **not** sampled: DXGI's dedicated video memory is static per adapter, so

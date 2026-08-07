@@ -61,6 +61,38 @@ internal static class ProcFixtures {
         "cache size\t: 12288 KB",
         ""]);
 
+    /// <summary>
+    /// A stock Ubuntu <c>/proc/meminfo</c>, trimmed to the fields the app reads plus enough neighbours to
+    /// prove the parser skips what it does not know. 16 GiB total; the numbers are round in <b>kB</b> so a
+    /// byte expectation is a visible ×1024. <c>HugePages_Total</c> is deliberately present: it is a count
+    /// with no unit, which a parser that assumes every value is kB gets wrong.
+    /// </summary>
+    public const string ProcMeminfo =
+        """
+        MemTotal:       16777216 kB
+        MemFree:         2097152 kB
+        MemAvailable:    8388608 kB
+        Buffers:          524288 kB
+        Cached:          5242880 kB
+        SwapCached:            0 kB
+        Active:          6291456 kB
+        Inactive:        4194304 kB
+        SwapTotal:       2097152 kB
+        SwapFree:        2097152 kB
+        Dirty:              1024 kB
+        Slab:            1048576 kB
+        SReclaimable:     786432 kB
+        SUnreclaim:       262144 kB
+        CommitLimit:    10485760 kB
+        Committed_AS:    9437184 kB
+        HugePages_Total:       0
+        Hugepagesize:       2048 kB
+        """;
+
+    /// <summary>A <c>/proc/loadavg</c>: three load averages, then <c>nr_running/nr_threads</c> — 2 runnable
+    /// of <b>1234 threads</b>, not processes — then the last-used PID.</summary>
+    public const string ProcLoadavg = "0.52 0.58 0.59 2/1234 56789\n";
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
