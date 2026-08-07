@@ -24,13 +24,16 @@ internal sealed record HardwareProviders(
     IVolumeProvider Volumes,
     IDiskTemperatureProvider DiskTemperature) {
 
-    /// <summary>The real readers on Windows, or the "nothing to report" set anywhere else — which returns
-    /// exactly the <c>.Unknown</c> / empty / <c>null</c> values the old inline
-    /// <c>OperatingSystem.IsWindows()</c> guards returned, so a non-Windows host renders "—" rather than
-    /// failing. This is the single place the platform is decided for all seven.</summary>
+    /// <summary>The real readers for this machine, or the "nothing to report" set on a platform with no
+    /// implementation — which returns exactly the <c>.Unknown</c> / empty / <c>null</c> values the old
+    /// inline <c>OperatingSystem.IsWindows()</c> guards returned, so an unsupported host renders "—"
+    /// rather than failing. This is the single place the platform is decided for all seven.</summary>
     public static HardwareProviders ForCurrentPlatform() {
         if (OperatingSystem.IsWindows())
             return Windows();
+
+        if (OperatingSystem.IsLinux())
+            return Linux();
 
         return new HardwareProviders(
             new UnsupportedCpuInfoProvider(),
@@ -58,4 +61,24 @@ internal sealed record HardwareProviders(
             new WindowsVolumeProvider(),
             temperature);
     }
+
+    /// <summary>
+    /// The <c>/proc</c> and <c>/sys</c> readers, filled in one milestone at a time — a member with no Linux
+    /// implementation yet keeps its <c>Unsupported*</c> instance and renders "—", which is the whole point
+    /// of the degrade-first port. Disks and volumes arrive with the Storage milestone, GPU adapters and
+    /// disk temperature with the GPU one; per-DIMM memory modules need <c>dmidecode</c> with root and stay
+    /// unsupported for good.
+    ///
+    /// Unlike <see cref="Windows"/> this carries no <see cref="SupportedOSPlatformAttribute"/>: the Linux
+    /// readers are portable managed code over <c>IProcFileSystem</c>, so there is no annotated API for
+    /// CA1416 to see and the attribute would be decoration rather than enforcement.
+    /// </summary>
+    private static HardwareProviders Linux() =>
+        new(new UnsupportedCpuInfoProvider(),
+            new UnsupportedMemoryInfoProvider(),
+            new LinuxSystemInfoProvider(),
+            new UnsupportedGpuAdapterProvider(),
+            new UnsupportedPhysicalDiskProvider(),
+            new UnsupportedVolumeProvider(),
+            new UnsupportedDiskTemperatureProvider());
 }
