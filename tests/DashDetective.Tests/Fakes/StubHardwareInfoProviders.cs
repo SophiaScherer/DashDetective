@@ -4,14 +4,14 @@ using System.Threading.Tasks;
 
 namespace DashDetective.Tests.Fakes;
 
-/// <summary>Composes a <see cref="WindowsHardwareInfoProvider"/> over canned per-card readers, so the
+/// <summary>Composes a <see cref="HardwareInfoProvider"/> over canned per-card readers, so the
 /// Hardware snapshot can be driven without WMI. Each section is the reader's whole <c>GetAsync</c> body,
 /// which lets a test pick any of the three shapes it can complete in: a value
 /// (<c>() =&gt; Task.FromResult(info)</c>), a faulted task (<c>() =&gt; Task.FromException&lt;T&gt;(e)</c>),
 /// or a synchronous throw before any task exists. The last two are the contract violations the
 /// composite's per-card guard exists for. An omitted section reports its <c>.Unknown</c> record.</summary>
 internal static class StubHardwareInfoProviders {
-    public static WindowsHardwareInfoProvider Compose(
+    public static HardwareInfoProvider Compose(
         Func<Task<ProcessorInfo>>? processor = null,
         Func<Task<MemoryInfo>>? memory = null,
         Func<Task<StorageInfo>>? storage = null,

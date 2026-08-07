@@ -59,8 +59,9 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
     private readonly bool _ready;
 
     /// <summary>Stands up the PDH query. Annotated rather than the whole type so <see cref="Sample"/> and
-    /// the pure <see cref="TryParseInstance"/> stay callable from tests on every platform — the
-    /// <c>WindowsHardwareInfoProvider</c> shape.</summary>
+    /// the pure <see cref="TryParseInstance"/> stay callable from tests on every platform — the same
+    /// narrowing that puts the attribute on the Hardware tab's Windows reader factory rather than on its
+    /// portable composer.</summary>
     [SupportedOSPlatform("windows")]
     public WindowsLogicalProcessorSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns an empty set forever.

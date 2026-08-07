@@ -81,3 +81,10 @@ internal sealed class WindowsMemoryModulesProvider : IMemoryModulesProvider {
         }
     }
 }
+
+/// <summary>The no-modules contract. Per-DIMM facts come from SMBIOS type 17, which no platform but
+/// Windows exposes without root — on Linux only <c>dmidecode</c> reading <c>/dev/mem</c> can see it — so
+/// this is where the Memory card stays off Windows rather than a milestone yet to land.</summary>
+internal sealed class UnsupportedMemoryModulesProvider : IMemoryModulesProvider {
+    public Task<MemoryInfo> GetAsync() => Task.FromResult(MemoryInfo.Unknown);
+}

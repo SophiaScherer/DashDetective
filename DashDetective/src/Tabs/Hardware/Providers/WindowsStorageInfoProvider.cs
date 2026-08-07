@@ -77,3 +77,8 @@ internal sealed class WindowsStorageInfoProvider : IStorageInfoProvider {
     private static string ModelOrDefault(string model) =>
         string.IsNullOrWhiteSpace(model) ? "Drive" : model;
 }
+
+/// <summary>The no-drives contract, until the Linux storage milestone lands its reader.</summary>
+internal sealed class UnsupportedStorageInfoProvider : IStorageInfoProvider {
+    public Task<StorageInfo> GetAsync() => Task.FromResult(StorageInfo.Unknown);
+}

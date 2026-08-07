@@ -16,12 +16,15 @@ namespace DashDetective.Tests.Tabs.Hardware;
 /// <c>HardwareIcons</c>, whose static initialiser calls <c>Geometry.Parse</c> and needs a render
 /// backend these tests deliberately don't have (see the Testing conventions in AGENTS.md).</summary>
 public class HardwareInfoProviderTests {
+    /// <summary>Windows and Linux both compose the portable <see cref="HardwareInfoProvider"/> — they
+    /// differ in which readers go into it, not in the composition. Only a platform with no readers at all
+    /// falls through to the unsupported set.</summary>
     [Fact]
     public void ForCurrentPlatform_ResolvesTheReaderForThisHost() {
         var provider = IHardwareInfoProvider.ForCurrentPlatform();
 
-        if (OperatingSystem.IsWindows())
-            Assert.IsType<WindowsHardwareInfoProvider>(provider);
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsLinux())
+            Assert.IsType<HardwareInfoProvider>(provider);
         else
             Assert.IsType<UnsupportedHardwareInfoProvider>(provider);
     }
@@ -39,14 +42,12 @@ public class HardwareInfoProviderTests {
         Assert.Empty(info.Graphics.Adapters);
     }
 
-    /// <summary>The real reader never throws, whatever WMI does — the whole page depends on it, and each
-    /// section is meant to fall back independently rather than propagate.</summary>
+    /// <summary>The real reader set never throws, whatever WMI or <c>/proc</c> does — the whole page
+    /// depends on it, and each section is meant to fall back independently rather than propagate. Runs
+    /// against whatever <c>ForCurrentPlatform</c> resolves, so it covers both CI legs.</summary>
     [Fact]
-    public async Task Windows_GetAsync_NeverThrows() {
-        if (!OperatingSystem.IsWindows())
-            return;
-
-        var info = await new WindowsHardwareInfoProvider().GetAsync();
+    public async Task ForCurrentPlatform_GetAsync_NeverThrows() {
+        var info = await IHardwareInfoProvider.ForCurrentPlatform().GetAsync();
 
         Assert.NotNull(info.Processor);
         Assert.NotNull(info.Memory);
