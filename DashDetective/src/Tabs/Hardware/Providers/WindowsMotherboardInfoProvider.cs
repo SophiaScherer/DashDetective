@@ -16,25 +16,13 @@ namespace DashDetective.Tabs.Hardware;
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsMotherboardInfoProvider : IMotherboardInfoProvider {
-    /// <summary>Chipset (vendor + model) tokens looked up in the board product string, more-specific
-    /// variants first (e.g. B650E before B650) so the derived label is the exact chipset.</summary>
-    private static readonly (string Token, string Label)[] Chipsets = {
-        // AMD (AM5 / AM4)
-        ("X670E", "AMD X670E"), ("X670", "AMD X670"), ("B650E", "AMD B650E"), ("B650", "AMD B650"),
-        ("A620", "AMD A620"), ("X570", "AMD X570"), ("B550", "AMD B550"), ("A520", "AMD A520"),
-        ("X470", "AMD X470"), ("B450", "AMD B450"),
-        // Intel (LGA 1700)
-        ("Z790", "Intel Z790"), ("Z690", "Intel Z690"), ("B760", "Intel B760"), ("B660", "Intel B660"),
-        ("H770", "Intel H770"), ("H670", "Intel H670"), ("Q670", "Intel Q670"), ("H610", "Intel H610"),
-    };
-
     public Task<MotherboardInfo> GetAsync() => Task.Run(Read);
 
     private static MotherboardInfo Read() {
         try {
             var (manufacturer, product) = ReadBoardNames();
             var spec = HardwareCatalog.LookupBoard(product);
-            var chipset = spec?.Chipset ?? DeriveChipset(product);
+            var chipset = spec?.Chipset ?? ChipsetNames.Derive(product);
             var board = WmiRead.Join(manufacturer, product);
             var bios = ReadBios();
             var pcie = ReadPcieSlotCount();
@@ -99,20 +87,5 @@ internal sealed class WindowsMotherboardInfoProvider : IMotherboardInfoProvider 
             Log.Warn("MotherboardInfoProvider PCIe slot count read failed", e);
             return 0;
         }
-    }
-
-    /// <summary>Best-effort chipset from the board product name (e.g. "MPG B650I EDGE" → "AMD B650");
-    /// "" when no known token is present.</summary>
-    private static string DeriveChipset(string product) {
-        if (string.IsNullOrWhiteSpace(product))
-            return "";
-
-        var upper = product.ToUpperInvariant();
-        foreach (var (token, label) in Chipsets) {
-            if (upper.Contains(token, StringComparison.Ordinal))
-                return label;
-        }
-
-        return "";
     }
 }

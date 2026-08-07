@@ -1,3 +1,6 @@
+using System;
+using System.Globalization;
+
 namespace DashDetective.Services.Platform.Linux;
 
 /// <summary>
@@ -53,6 +56,21 @@ internal sealed class DmiIdReader {
             return first.Trim();
 
         return $"{first.Trim()} {second.Trim()}";
+    }
+
+    /// <summary>The year from a DMI date, which SMBIOS specifies as <c>MM/DD/YYYY</c>; 0 if unparseable.
+    /// The counterpart to <c>WmiRead.DmtfYear</c>, which reads the same field out of WMI's very different
+    /// <c>yyyymmdd…</c> encoding.</summary>
+    internal static int Year(string dmiDate) {
+        var lastSlash = dmiDate.LastIndexOf('/');
+        if (lastSlash < 0)
+            return 0;
+
+        return int.TryParse(
+            dmiDate.AsSpan(lastSlash + 1).Trim(),
+            NumberStyles.None, CultureInfo.InvariantCulture, out var year)
+            ? year
+            : 0;
     }
 
     /// <summary>One DMI file, trimmed of the kernel's trailing newline; "" when absent or denied.</summary>
