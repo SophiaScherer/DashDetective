@@ -29,8 +29,8 @@ public class HardwareProvidersTests {
         } else if (OperatingSystem.IsLinux()) {
             // The port fills this set in one milestone at a time; the members still on Unsupported* are
             // the ones whose milestone has not landed, and each moves here when it does.
+            Assert.IsType<LinuxCpuInfoProvider>(providers.Cpu);
             Assert.IsType<LinuxSystemInfoProvider>(providers.System);
-            Assert.IsType<UnsupportedCpuInfoProvider>(providers.Cpu);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
             Assert.IsType<UnsupportedGpuAdapterProvider>(providers.GpuAdapters);
             Assert.IsType<UnsupportedPhysicalDiskProvider>(providers.Disks);

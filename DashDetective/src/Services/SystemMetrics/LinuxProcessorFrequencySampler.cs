@@ -19,7 +19,7 @@ internal sealed class LinuxProcessorFrequencySampler : IProcessorFrequencySample
     private const string CpuRoot = "/sys/devices/system/cpu";
     private const string CpuInfoPath = "/proc/cpuinfo";
     private const string CpuPrefix = "cpu";
-    private const string CpuMhzKey = "cpu mhz";
+    private const string CpuMhzKey = "cpu MHz";
 
     private readonly IProcFileSystem _proc;
 
@@ -67,22 +67,17 @@ internal sealed class LinuxProcessorFrequencySampler : IProcessorFrequencySample
         return count == 0 ? 0 : sum / count;
     }
 
-    /// <summary>The mean of <c>/proc/cpuinfo</c>'s <c>cpu MHz</c> lines. The real file separates key from
-    /// value with tabs, so the key is trimmed and matched case-insensitively rather than by layout.</summary>
+    /// <summary>The mean of every processor block's <c>cpu MHz</c>. Reads through
+    /// <see cref="ProcCpuinfoParser"/> so the file's tab separation and block layout are known in one
+    /// place rather than re-derived per consumer.</summary>
     private double ReadCpuInfoFrequency() {
         double sum = 0;
         var count = 0;
 
-        foreach (var line in _proc.ReadAllLines(CpuInfoPath)) {
-            var colon = line.IndexOf(':');
-            if (colon <= 0)
-                continue;
-
-            if (!line.AsSpan(0, colon).Trim().Equals(CpuMhzKey, StringComparison.OrdinalIgnoreCase))
-                continue;
-
+        foreach (var block in ProcCpuinfoParser.Parse(_proc.ReadAllLines(CpuInfoPath))) {
             if (!double.TryParse(
-                    line.AsSpan(colon + 1).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)
+                    ProcCpuinfoParser.Value(block, CpuMhzKey),
+                    NumberStyles.Float, CultureInfo.InvariantCulture, out var mhz)
                 || mhz <= 0)
                 continue;
 

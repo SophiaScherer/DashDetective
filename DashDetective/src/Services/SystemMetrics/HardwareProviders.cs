@@ -66,7 +66,7 @@ internal sealed record HardwareProviders(
     /// The <c>/proc</c> and <c>/sys</c> readers, filled in one milestone at a time — a member with no Linux
     /// implementation yet keeps its <c>Unsupported*</c> instance and renders "—", which is the whole point
     /// of the degrade-first port. Disks and volumes arrive with the Storage milestone, GPU adapters and
-    /// disk temperature with the GPU one; per-DIMM memory modules need <c>dmidecode</c> with root and stay
+    /// disk temperature with the GPU one; per-DIMM memory facts need <c>dmidecode</c> with root and stay
     /// unsupported for good.
     ///
     /// Unlike <see cref="Windows"/> this carries no <see cref="SupportedOSPlatformAttribute"/>: the Linux
@@ -74,7 +74,7 @@ internal sealed record HardwareProviders(
     /// CA1416 to see and the attribute would be decoration rather than enforcement.
     /// </summary>
     private static HardwareProviders Linux() =>
-        new(new UnsupportedCpuInfoProvider(),
+        new(new LinuxCpuInfoProvider(),
             new UnsupportedMemoryInfoProvider(),
             new LinuxSystemInfoProvider(),
             new UnsupportedGpuAdapterProvider(),
