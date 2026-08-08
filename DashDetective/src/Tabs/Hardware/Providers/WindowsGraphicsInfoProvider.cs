@@ -51,3 +51,8 @@ internal sealed class WindowsGraphicsInfoProvider : IGraphicsInfoProvider {
         }
     }
 }
+
+/// <summary>The no-adapters contract, until the Linux GPU milestone lands its reader.</summary>
+internal sealed class UnsupportedGraphicsInfoProvider : IGraphicsInfoProvider {
+    public Task<GraphicsInfo> GetAsync() => Task.FromResult(GraphicsInfo.Unknown);
+}

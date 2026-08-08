@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// A one-shot snapshot of the machine's static hardware facts, read via WMI by one provider per card and
-/// composed by <see cref="WindowsHardwareInfoProvider"/>, then mapped onto the Hardware cards by
+/// A one-shot snapshot of the machine's static hardware facts, read by one provider per card and
+/// composed by <see cref="HardwareInfoProvider"/>, then mapped onto the Hardware cards by
 /// <c>HardwareViewModel</c>. Each per-card sub-record carries <b>display-ready</b> strings (the unit
 /// conversions — mV→V, KB→MB, bytes→TB — live in the <c>*SpecFormatter</c> classes), each defaulting to
 /// the neutral placeholder "—" so a field WMI cannot supply simply stays "—". The <c>Sensors</c> card has no

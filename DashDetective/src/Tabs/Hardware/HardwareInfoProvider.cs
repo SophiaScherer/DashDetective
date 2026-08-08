@@ -1,39 +1,30 @@
 using DashDetective.Services.Diagnostics;
 using System;
-using System.Runtime.Versioning;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// Composes the Hardware tab's snapshot from one reader per card. Each reader owns its own WMI queries
-/// and its own soft-fail, so the five run <b>concurrently</b> and the card set populates in about the
-/// time of the slowest query rather than their sum. <see cref="Section"/> guards each await, so a reader
-/// that throws instead of honouring the never-throw contract costs only its own card — one dead source
-/// still can't blank the others.
+/// Composes the Hardware tab's snapshot from one reader per card. Each reader owns its own queries and its
+/// own soft-fail, so the five run <b>concurrently</b> and the card set populates in about the time of the
+/// slowest read rather than their sum. <see cref="Section"/> guards each await, so a reader that throws
+/// instead of honouring the never-throw contract costs only its own card — one dead source still can't
+/// blank the others.
 ///
-/// The platform check lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>, which is why the
-/// public ctor carries one <see cref="SupportedOSPlatformAttribute"/> rather than a guard per reader. It
-/// sits on that ctor rather than the type because resolving the WMI readers is the only Windows-specific
-/// part — the composition and its per-card guard are platform-neutral, so the injected-reader tests run
-/// everywhere.
+/// <b>The composition itself is portable</b>, which is why this carries no platform in its name and no
+/// <see cref="System.Runtime.Versioning.SupportedOSPlatformAttribute"/>: resolving the readers was the only
+/// Windows-specific part, and that now lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>
+/// alongside the Linux set. Adding a platform is one more factory there and a reader per card it can
+/// supply — cards it cannot keep their <c>Unsupported*</c> reader.
 /// </summary>
-internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
+internal sealed class HardwareInfoProvider : IHardwareInfoProvider {
     private readonly IProcessorInfoProvider _processor;
     private readonly IMemoryModulesProvider _memory;
     private readonly IStorageInfoProvider _storage;
     private readonly IMotherboardInfoProvider _motherboard;
     private readonly IGraphicsInfoProvider _graphics;
 
-    [SupportedOSPlatform("windows")]
-    public WindowsHardwareInfoProvider()
-        : this(new WindowsProcessorInfoProvider(), new WindowsMemoryModulesProvider(),
-               new WindowsStorageInfoProvider(), new WindowsMotherboardInfoProvider(),
-               new WindowsGraphicsInfoProvider()) { }
-
-    /// <summary>Test seam: the same composition over explicit readers. The public ctor resolves the real
-    /// ones, so <see cref="IHardwareInfoProvider.ForCurrentPlatform"/> is unchanged.</summary>
-    internal WindowsHardwareInfoProvider(
+    internal HardwareInfoProvider(
         IProcessorInfoProvider processor, IMemoryModulesProvider memory, IStorageInfoProvider storage,
         IMotherboardInfoProvider motherboard, IGraphicsInfoProvider graphics) {
         _processor = processor;
@@ -73,7 +64,8 @@ internal sealed class WindowsHardwareInfoProvider : IHardwareInfoProvider {
 }
 
 /// <summary>The no-inventory set: every card reports <c>.Unknown</c> and so renders "—", which is what
-/// the old <c>OperatingSystem.IsWindows()</c> guard returned off Windows.</summary>
+/// the old <c>OperatingSystem.IsWindows()</c> guard returned off Windows. Used on a platform with no
+/// reader for any card at all.</summary>
 internal sealed class UnsupportedHardwareInfoProvider : IHardwareInfoProvider {
     public Task<HardwareInfo> GetAsync() => Task.FromResult(HardwareInfo.Unknown);
 }

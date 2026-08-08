@@ -26,6 +26,16 @@ public class HardwareProvidersTests {
             Assert.IsType<WindowsPhysicalDiskProvider>(providers.Disks);
             Assert.IsType<WindowsVolumeProvider>(providers.Volumes);
             Assert.IsType<WindowsDiskTemperatureProvider>(providers.DiskTemperature);
+        } else if (OperatingSystem.IsLinux()) {
+            // The port fills this set in one milestone at a time; the members still on Unsupported* are
+            // the ones whose milestone has not landed, and each moves here when it does.
+            Assert.IsType<LinuxCpuInfoProvider>(providers.Cpu);
+            Assert.IsType<LinuxSystemInfoProvider>(providers.System);
+            Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
+            Assert.IsType<UnsupportedGpuAdapterProvider>(providers.GpuAdapters);
+            Assert.IsType<UnsupportedPhysicalDiskProvider>(providers.Disks);
+            Assert.IsType<UnsupportedVolumeProvider>(providers.Volumes);
+            Assert.IsType<UnsupportedDiskTemperatureProvider>(providers.DiskTemperature);
         } else {
             Assert.IsType<UnsupportedCpuInfoProvider>(providers.Cpu);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
