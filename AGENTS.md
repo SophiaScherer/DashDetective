@@ -391,6 +391,37 @@ currently exist.
                                  system-counters provider: "Key: value kB" → a byte-valued lookup. The
                                  kB unit is KIBIbytes, so suffixed values scale by 1024 (saturating);
                                  unitless values are counts and stay verbatim. Absent key → 0)
+          ProcCpuinfoParser.cs  (/proc/cpuinfo format knowledge, shared by CpuFacts and the frequency
+                                 sampler: one key/value block per logical processor, split on blank
+                                 lines. Keys are trimmed around the colon — the file separates them
+                                 with a VARYING number of tabs, so a fixed-column split passes a
+                                 hand-written fixture and fails on a real machine. Keys are prose, so
+                                 lookups are OrdinalIgnoreCase. Absent key → "")
+          CpuFacts.cs           (the derivation on top of ProcCpuinfoParser, shared by the Dashboard's
+                                 CPU tile and the Hardware tab's Processor card so the two cannot
+                                 disagree: name, physical/logical cores, max clock. Physical cores =
+                                 distinct (physical id, core id) PAIRS — block count over-reports on a
+                                 hyperthreaded chip and core id alone merges sockets. Max clock prefers
+                                 the highest cpuinfo_max_freq across cores (not cpu0's — that is a
+                                 little core on big.LITTLE), else the model name's "@ 3.60GHz". cpu MHz
+                                 IS NEVER USED for it: it is the instantaneous clock, so a scaling
+                                 governor would report an idle 800 MHz under a "max" label. Reports ""
+                                 and 0 honestly; each consumer applies its own placeholder.
+                                 L3CacheKilobytes is a separate static, not a field — only the Hardware
+                                 card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),
+                                 never as bytes)
+          OsReleaseParser.cs    (/etc/os-release format knowledge: KEY=value into a lookup. The file is
+                                 a shell fragment, so the same body mixes quoted and bare values — one
+                                 MATCHED pair of surrounding quotes is stripped and an unbalanced one is
+                                 left alone. Splits on the first = only. Absent key → "")
+          DmiIdReader.cs        (the one-line files under /sys/class/dmi/id, shared by the Dashboard's
+                                 System Information panel and the Hardware tab's Motherboard card.
+                                 EXPOSES ONLY THE WORLD-READABLE KEYS as named properties —
+                                 product_uuid, board_serial and product_serial are mode 0400 and are
+                                 deliberately not offered, so no caller can depend on a value that
+                                 silently reads "" for every non-root user. Carries Join (the DMI
+                                 counterpart to WmiRead.Join) and Year, which reads SMBIOS's MM/DD/YYYY
+                                 from the END — the opposite side from WmiRead.DmtfYear's yyyymmdd)
       /SystemMetrics
         IProcessorFrequencySampler.cs (seam + ForCurrentPlatform() + the ProcessorClockSample record,
                                  which carries EITHER a ratio or an absolute clock — Windows PDH reports
@@ -450,8 +481,12 @@ currently exist.
                                  = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
                                  the Dashboard cards + Performance rows each own one for per-adapter readings)
         HardwareProviders.cs    (the "what hardware is in this machine" bundle + the single
-                                 ForCurrentPlatform() that picks the Windows or unsupported set for all
-                                 SEVEN members. Built by each consuming page's public ctor (Dashboard,
+                                 ForCurrentPlatform() that picks the Windows, Linux or unsupported set
+                                 for all SEVEN members. The Linux arm is filled in one milestone at a
+                                 time — today CPU + System, the rest still Unsupported*. It carries NO
+                                 [SupportedOSPlatform]: the Linux readers are portable managed code over
+                                 IProcFileSystem, so there is no annotated API for CA1416 to see.
+                                 Built by each consuming page's public ctor (Dashboard,
                                  Performance, Storage) and handed to DeviceInventory.LoadAsync.
                                  EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
                                  members run concurrently; stateful providers are deliberately excluded)
@@ -520,7 +555,10 @@ currently exist.
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
-                                CpuStaticInfo.cs        (record for the WMI result)
+                                LinuxCpuInfoProvider.cs (the same card from /proc/cpuinfo + cpufreq, via the
+                                                         shared CpuFacts. Substitutes only the placeholder
+                                                         name; physical cores and clock stay 0 → "—")
+                                CpuStaticInfo.cs        (record for the result)
                                 IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
                                                         (RAM info via WMI, async)
                                 MemoryStaticInfo.cs     (record for the WMI result)
@@ -531,6 +569,13 @@ currently exist.
                                                         (static system identity — OS/device/BIOS/board/build —
                                                          via WMI + registry, async; uptime is live off
                                                          Environment.TickCount64 in the VM, no sampler file)
+                                LinuxSystemInfoProvider.cs
+                                                        (the same panel from /etc/os-release (PRETTY_NAME, then
+                                                         NAME+VERSION_ID, then OSDescription),
+                                                         /proc/sys/kernel/osrelease for Build — the kernel
+                                                         release is the analogue of the Windows build number —
+                                                         and DmiIdReader for BIOS + board, which falls back to
+                                                         the chassis fields laptops populate more reliably)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Toolkit                  ToolkitView.axaml(.cs) + ToolkitViewModel.cs
                                 (the design doc's "Commands" tab. Filter bar (search box + category
@@ -675,14 +720,19 @@ currently exist.
                                                          IRefreshablePage; Sensors card left as "—")
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
-                                                         single method returning one aggregate)
-                                WindowsHardwareInfoProvider.cs
-                                                        (async WMI reader: one soft-failing section per
-                                                         card → HardwareInfo. Carries ONE class-level
-                                                         SupportedOSPlatform in place of the old guard +
-                                                         nine per-method attributes. Holds
-                                                         UnsupportedHardwareInfoProvider — .Unknown for
-                                                         every card, so every field renders "—")
+                                                         single method returning one aggregate. Holds the
+                                                         per-platform reader factories: Windows() carries
+                                                         the SupportedOSPlatform because resolving the WMI
+                                                         readers is the only Windows-specific step; Linux()
+                                                         supplies processor + motherboard and leaves the
+                                                         other three cards on Unsupported*)
+                                HardwareInfoProvider.cs (async composer: one soft-failing section per card
+                                                         → HardwareInfo, the five run concurrently. NO
+                                                         platform prefix and NO attribute — the composition
+                                                         and its per-card guard are portable, which is what
+                                                         keeps them callable from tests on every platform.
+                                                         Holds UnsupportedHardwareInfoProvider — .Unknown
+                                                         for every card, for a platform with no readers)
                                 HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
                                                          each with .Unknown; fields default to "—")
                                 HardwareCard.cs         (observable: fixed title/icon/colours, observable
@@ -690,6 +740,28 @@ currently exist.
                                 HardwareSpec.cs         (observable: fixed Key, observable Value → "—")
                                 HardwareIcons.cs        (feature-local card glyph geometries + fixed
                                                          per-card icon colours)
+                                /Providers              one seam + reader per card, each with its own
+                                                         never-throw fall back to that card's .Unknown, so
+                                                         one dead source can't blank the others. WmiRead
+                                                         holds the WMI boilerplate the Windows readers
+                                                         share. Windows* for all five; Linux* for processor
+                                                         and motherboard; Unsupported* twins (at the bottom
+                                                         of their Windows file) for memory modules, storage
+                                                         and graphics.
+                                                         LinuxProcessorInfoProvider — the shared CpuFacts
+                                                         plus its L3 read; SOCKET IS PERMANENTLY "—"
+                                                         (SMBIOS type 4 needs dmidecode as root).
+                                                         LinuxMotherboardInfoProvider — DmiIdReader +
+                                                         HardwareCatalog, composing the same
+                                                         "version (year)" BIOS string as the WMI arm; PCIE
+                                                         SLOTS IS PERMANENTLY "—" (SMBIOS type 9 likewise;
+                                                         /sys/bus/pci counts occupied devices, not slots).
+                                                         UnsupportedMemoryModulesProvider is permanent too —
+                                                         per-DIMM facts are SMBIOS type 17.
+                                                         ChipsetNames — the board-name token scan BOTH
+                                                         platforms fall back to when the catalog has no
+                                                         entry; ordered most-specific-first so B650E does
+                                                         not match the B650 token)
                                 /Catalog                HardwareCatalog.cs (facade + name normalizer +
                                                          longest-key match) over per-domain static spec
                                                          tables: CpuCatalog / GpuCatalog / BoardCatalog /
@@ -783,9 +855,12 @@ light up CA1416 across the app. Adding a platform later = one new class per inte
 `TreatWarningsAsErrors`, and neither carries a `NoWarn` for it, so an unguarded call to a Windows-only API
 fails the build on both CI legs. Put the attribute on the **narrowest thing that is genuinely
 platform-specific**: the type when the whole type is (`WindowsGpuAdapterProvider`), or a single ctor or
-method when only that is. `WindowsHardwareInfoProvider` is the worked example — its public ctor resolves
-the WMI readers and carries the attribute, while its composition and per-card guard are portable and stay
-callable from tests on every platform. Where a guard cannot be seen across a method boundary, the
+method when only that is. The Hardware tab is the worked example — `IHardwareInfoProvider`'s `Windows()`
+factory resolves the WMI readers and carries the attribute, while `HardwareInfoProvider`'s composition and
+per-card guard are portable, keep no platform in their name, and stay callable from tests on every
+platform. (Until M7 the attribute sat on that composer's public ctor, for the same reason; splitting the
+factory out is what let a second platform reuse the composition.) Where a guard cannot be seen across a
+method boundary, the
 attribute restates it: `WindowsSearchIndex.ReadHit` is annotated because its only caller `Run` holds the
 `OperatingSystem.IsWindows()` check.
 
@@ -810,7 +885,7 @@ anywhere, as are pure statics like `WindowsLogicalProcessorSampler.TryParseInsta
 would have dragged all of that behind an `IsWindows()` guard and cost the Linux leg its coverage of the
 inert-contract tests and the instance-name parser, for no gain — the attribute's whole job is to make the
 *constructor* visible at its call site, which is what forces `CpuUsageSampler`'s ctor and each
-`ForCurrentPlatform()` to hold a guard. This is the `WindowsHardwareInfoProvider` shape, applied to samplers.
+`ForCurrentPlatform()` to hold a guard. This is the Hardware tab's shape, applied to samplers.
 M6 followed it for both of its classes, including the two whose Windows arm has an **empty** constructor —
 an empty annotated ctor is not a wasted one, it is the whole enforcement point, and it kept
 `WindowsSystemPerformanceProvider.ToBytes` and the samplers' `SamplerInit.Inert` seam covered on the Linux
@@ -859,21 +934,34 @@ rules:
   snapshot (`LinuxCpuSampler`, `LinuxLogicalProcessorSampler`) is stateful and must not.
 - **Format knowledge lives in a parser beside the seam, not in a sampler** — `ProcStatParser` is shared by
   the aggregate and per-core CPU samplers, `ProcMeminfoParser` by the memory sampler and the system-counters
-  provider. Parse **by index with a length check**: the kernel has appended columns to `/proc/stat` over
-  time, so 7-column and 10-column forms both have to work. The same defensiveness applies to units —
-  `/proc/meminfo`'s `kB` is kibibytes, and some of its lines carry no unit at all.
+  provider, `ProcCpuinfoParser` by `CpuFacts` and the frequency sampler, `OsReleaseParser` and `DmiIdReader`
+  by the Dashboard's identity panel and the Hardware tab's Motherboard card. Parse **by index with a length
+  check**: the kernel has appended columns to `/proc/stat` over time, so 7-column and 10-column forms both
+  have to work. The same defensiveness applies to units — `/proc/meminfo`'s `kB` is kibibytes, some of its
+  lines carry no unit at all, and sysfs cache sizes are suffixed (`8192K`, `16M`) rather than bytes.
+  Where two cards want the same *derived* numbers rather than the same file, the derivation is shared too:
+  `CpuFacts` exists so the Dashboard tile and the Processor card cannot report different core counts.
 
-Two `/proc` gotchas worth knowing: `/proc/stat` lists **online** CPUs only, so per-core state must be keyed
+Three `/proc` gotchas worth knowing: `/proc/stat` lists **online** CPUs only, so per-core state must be keyed
 by core number and a core appearing mid-run reports 0 until it has an interval (diffing it against zero
-reports its whole since-boot average — this shipped as a bug in M5 and a test caught it); and
-`/proc/cpuinfo` separates key from value with **tabs**, so parse by trimming around the colon, never by
-layout.
+reports its whole since-boot average — this shipped as a bug in M5 and a test caught it); `/proc/cpuinfo`
+separates key from value with **tabs**, so parse by trimming around the colon, never by layout; and
+`/etc/os-release` is a **shell fragment**, so the same file mixes quoted and bare values.
 
-The **System Information** panel reuses the same async-WMI provider pattern: `SystemInfoProvider`
-(`GetAsync() => Task.Run(Read)`, `OperatingSystem.IsWindows()` guard, per-section soft-fail →
-"Unknown …") reads the static identity facts once at startup into a `SystemStaticInfo` record. It
-also reads the **registry** (via the in-box `Microsoft.Win32.Registry` API) for the build revision
-(`UBR`) and feature-update label (`DisplayVersion`), which WMI does not expose. **Uptime** is the one
+**Permission-gated sysfs files: do not expose them at all.** `/sys/class/dmi/id/{product_uuid,board_serial,
+product_serial}` are mode **0400** — root-only. `DmiIdReader` therefore offers named properties for the
+world-readable keys *only*, rather than a general `Value(key)` that would let a caller reach a field which
+silently reads `""` for every normal user and logs a denial on every real machine. M7's tests pin this by
+asserting `FakeProcFileSystem.Reads` never contains a `*serial` or `*uuid` path — the one degradation that
+is invisible in the rendered output.
+
+The **System Information** panel reuses the same async provider pattern on both platforms
+(`GetAsync() => Task.Run(Read)`, per-section soft-fail → "Unknown …") reading the static identity facts
+once at startup into a `SystemStaticInfo` record; `HardwareProviders.ForCurrentPlatform()` picks the arm.
+`WindowsSystemInfoProvider` also reads the **registry** (via the in-box `Microsoft.Win32.Registry` API) for
+the build revision (`UBR`) and feature-update label (`DisplayVersion`), which WMI does not expose;
+`LinuxSystemInfoProvider` puts the **kernel release** in that same Build row, the closest analogue Linux
+has. **Uptime** is the one
 live value with no sampler/provider — the VM formats `Environment.TickCount64` (the 64-bit,
 non-wrapping tick count) on its own coarse 30 s `DispatcherTimer` (uptime's smallest displayed unit is
 minutes). Verbose vendor strings (e.g. "American Megatrends International, LLC.") are shown **in full**;
@@ -970,7 +1058,7 @@ the test code on both legs, so keep usings alphabetical (`System` is **not** sor
     still uses a real `DispatcherTimer` by default.
   - `IProcFileSystem` + `ProcFileSystem` (`src/Services/Platform/Linux`) — the same shape for `/proc` and
     `/sys`, so every Linux provider is testable from a Windows box against `FakeProcFileSystem` fixtures.
-    Each Linux sampler takes it by ctor, with a parameterless chain for production.
+    Each Linux sampler and provider takes it by ctor, with a parameterless chain for production.
   - `SystemMetricsService`'s `internal` ctor takes a `MetricSamplers` bundle + a timer factory, so the
     five hardware samplers can be faked.
   - `SettingsStore`'s `internal` ctor takes an explicit file path (production resolves `%AppData%`).

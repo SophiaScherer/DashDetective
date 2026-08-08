@@ -11,7 +11,9 @@ Build, run and test instructions live in the [README](../README.md).
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
-today Linux builds and launches with CPU, memory and network live, while most other panels read "—".
+today Linux builds and launches with CPU, memory and network live, plus the machine's static identity
+(OS, kernel, BIOS, board) and the Processor and Motherboard spec cards, while the remaining panels
+read "—".
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -259,16 +261,31 @@ fixtures, which is how the CPU and memory parsers are covered on both CI legs.
 Implementations **never throw and hold no state** — a pseudo-file can vanish, change shape or deny access
 mid-read, and all of that degrades to `null` or an empty list. Callers build paths by **string
 concatenation with forward-slash literals**, never `Path.Combine`, which on Windows would produce
-`/proc\stat`. Format knowledge lives in a parser beside the seam — `ProcStatParser` for `/proc/stat`,
-`ProcMeminfoParser` for `/proc/meminfo` — rather than in any one sampler, so a file read by two providers
-is understood in exactly one place. Both parse defensively: by index with a length check, because the
-kernel has appended columns to `/proc/stat` over the years, and by explicit unit, because `/proc/meminfo`
-labels kibibytes as `kB` and leaves some lines unitless entirely.
+`/proc\stat`.
+
+**Format knowledge lives in a parser beside the seam** — `ProcStatParser`, `ProcMeminfoParser`,
+`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader` — rather than in any one provider, so a file read by
+two consumers is understood in exactly one place. They parse defensively, each against its own trap: by
+index with a length check, because the kernel has appended columns to `/proc/stat` over the years; by
+explicit unit, because `/proc/meminfo` labels kibibytes as `kB` and leaves some lines unitless; by trimming
+around the colon, because `/proc/cpuinfo` uses a varying number of tabs; and by stripping only *matched*
+quotes, because `/etc/os-release` is a shell fragment mixing quoted and bare values.
+
+Where two surfaces need the same *derived* numbers rather than the same file, the derivation is shared as
+well: `CpuFacts` sits on `ProcCpuinfoParser` and feeds both the Dashboard's CPU tile and the Hardware tab's
+Processor card, so the two cannot report different core counts for the same machine.
+
+**A permission-gated file is not exposed at all.** `/sys/class/dmi/id/{product_uuid,board_serial,
+product_serial}` are root-only, so `DmiIdReader` offers named properties for the world-readable keys only,
+rather than a general accessor that would let a caller reach a value which reads empty for every normal
+user.
 
 Where a platform genuinely has no source for a value, the provider returns `null` and the surface renders
-"—". It does not substitute a near-miss: the Performance tab's "Handles" tile is blank on Linux because a
-Windows handle covers events, threads and registry keys as well as files, so the closest candidate would
-put a differently-meaning number under the same label.
+"—". It does not substitute a near-miss. Three worked examples: the Performance tab's "Handles" tile is
+blank on Linux because a Windows handle covers events, threads and registry keys as well as files;
+`/proc/cpuinfo`'s `cpu MHz` never fills a *maximum* clock, because it is the instantaneous one and a
+scaling governor would report an idle 800 MHz; and the Motherboard card's PCIe slot count and the Processor
+card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root.
 
 ## Shared control inventory
 
