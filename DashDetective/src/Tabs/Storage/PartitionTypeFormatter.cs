@@ -16,11 +16,12 @@ public static class PartitionTypeFormatter {
     };
 
     /// <summary>Names the partition type, e.g. "Recovery". An unrecognised or absent GUID (MBR disks report
-    /// none) falls back to "Data" for a mounted lettered volume, otherwise "—".</summary>
-    public static string Format(string? gptType, bool hasDriveLetter) {
+    /// none, and Linux reports none at all) falls back to "Data" for a volume the user can reach — one with
+    /// a drive letter or a mount point — otherwise "—".</summary>
+    public static string Format(string? gptType, bool isMounted) {
         var key = (gptType ?? "").Trim().Trim('{', '}');
         if (Names.TryGetValue(key, out var name))
             return name;
-        return hasDriveLetter ? "Data" : "—";
+        return isMounted ? "Data" : "—";
     }
 }

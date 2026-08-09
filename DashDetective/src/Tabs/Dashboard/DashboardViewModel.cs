@@ -551,18 +551,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var disksTask = _providers.Disks.GetAsync();
             var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
-            _systemDiskNumber = FindSystemDisk(volumesTask.Result);
+            _systemDiskNumber = SystemVolume.FindDiskNumber(volumesTask.Result) ?? -1;
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
         } catch {
             // Leave the existing disk cards in place on a transient failure.
         }
     }
-
-    /// <summary>The physical disk hosting Windows, or −1 when the system volume can't be traced to one (its
-    /// activity figures then stay at their last value rather than reporting another drive's).</summary>
-    private static int FindSystemDisk(IReadOnlyList<VolumeInfo> volumes) =>
-        volumes.FirstOrDefault(v => v.DriveLetter == SystemDrive.Letter && v.DiskNumber.HasValue)
-               .DiskNumber ?? -1;
 
     /// <summary>Reconciles the disk cards to the current drive set: drops the old disk cards, then inserts one
     /// per drive just before the Network card (keeping the CPU→Memory→GPU→Disks→Network grouping). A disk
