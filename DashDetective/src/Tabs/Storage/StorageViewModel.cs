@@ -22,7 +22,7 @@ namespace DashDetective.Tabs.Storage;
 /// Everything on the page is live and per-drive: the Partitions table (<see cref="VolumeProvider"/>), the
 /// drive summary cards (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), each card's
 /// Read/Write and the Disk Activity chart + readouts from the page-local
-/// <see cref="PhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
+/// <see cref="IPhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
 /// <see cref="DiskTemperatureProvider"/> (refreshed on a slow sub-cadence of the throughput timer). Non-NVMe
 /// drives show "—" for Temp (no readable SMART temperature without admin).
 ///
@@ -45,7 +45,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Page-local per-disk sampler + its timer, and the disk-number → card / history / latest-sample maps the
     // tick updates. Histories are kept for every disk (not just the selected one) so switching drives shows
     // that drive's real last minute.
-    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
+        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
     private readonly Dictionary<int, double[]> _historiesByDisk = new();
@@ -225,9 +226,13 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             }
 
             Partitions.Clear();
+            // Lettered volumes first and in letter order (Windows), then mounted ones shallowest-first
+            // (Linux). Only one of the two keys is ever populated, so neither platform sees the other's.
             foreach (var volume in volumes
                          .OrderByDescending(v => v.DriveLetter.HasValue)
-                         .ThenBy(v => v.DriveLetter))
+                         .ThenBy(v => v.DriveLetter)
+                         .ThenBy(v => (v.MountPoint ?? "").Length)
+                         .ThenBy(v => v.MountPoint, StringComparer.Ordinal))
                 Partitions.Add(ToPartitionRow(volume));
 
             HasMultipleDrives = Drives.Count > 1;
@@ -260,9 +265,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             return;
         }
 
-        var systemDisk = volumes
-            .FirstOrDefault(v => v.DriveLetter == SystemDrive.Letter && v.DiskNumber.HasValue)
-            .DiskNumber;
+        var systemDisk = SystemVolume.FindDiskNumber(volumes);
 
         SelectDrive(systemDisk is { } disk && _cardsByDisk.TryGetValue(disk, out var card) ? card : Drives[0]);
     }
@@ -340,19 +343,26 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         return data.UsagePercent >= 65 ? BarBlue : BarGreen;
     }
 
-    /// <summary>Maps one volume to a display row: "C:"/"—" for the letter, the formatted capacity/free
-    /// (binary units, like the Dashboard), and "—" for a missing file system. An unlabelled lettered volume
-    /// falls back to "Local Disk" (Explorer's convention, matching <see cref="StorageComposer"/>'s cards).</summary>
-    private static PartitionRow ToPartitionRow(VolumeInfo volume) => new() {
-        Vol = volume.DriveLetter is { } letter ? $"{letter}:" : "—",
-        Label = !string.IsNullOrEmpty(volume.Label) ? volume.Label
-            : volume.DriveLetter.HasValue ? "Local Disk"
-            : "—",
-        FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
-        Type = PartitionTypeFormatter.Format(volume.GptType, volume.DriveLetter.HasValue),
-        Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
-        Free = FileSizeFormatter.Format((long)volume.FreeBytes),
-    };
+    /// <summary>Maps one volume to a display row: the drive letter or mount point ("C:", "/boot/efi", "—"
+    /// for an unlettered Recovery partition), the formatted capacity/free (binary units, like the
+    /// Dashboard), and "—" for a missing file system. An unlabelled but reachable volume falls back to
+    /// "Local Disk" (Explorer's convention, matching <see cref="StorageComposer"/>'s cards).</summary>
+    private static PartitionRow ToPartitionRow(VolumeInfo volume) {
+        var mounted = volume.DriveLetter.HasValue || !string.IsNullOrEmpty(volume.MountPoint);
+
+        return new PartitionRow {
+            Vol = volume.DriveLetter is { } letter ? $"{letter}:"
+                : mounted ? volume.MountPoint
+                : "—",
+            Label = !string.IsNullOrEmpty(volume.Label) ? volume.Label
+                : mounted ? "Local Disk"
+                : "—",
+            FileSystem = string.IsNullOrEmpty(volume.FileSystem) ? "—" : volume.FileSystem,
+            Type = PartitionTypeFormatter.Format(volume.GptType, mounted),
+            Capacity = FileSizeFormatter.Format((long)volume.SizeBytes),
+            Free = FileSizeFormatter.Format((long)volume.FreeBytes),
+        };
+    }
 
     /// <summary>Pauses/resumes the tab's per-disk throughput timer for the shell's Live pill. That timer now
     /// drives every live surface on the page, so this is the whole of the tab's live sampling.</summary>

@@ -134,6 +134,97 @@ internal static class ProcFixtures {
             .WithFile("/sys/class/dmi/id/sys_vendor", "innotek GmbH\n")
             .WithFile("/sys/class/dmi/id/product_name", "VirtualBox\n");
 
+    /// <summary>
+    /// A stock Ubuntu GNOME <c>/proc/mounts</c>, trimmed to the shapes that matter. It carries the three
+    /// traps of the real file: the pseudo-filesystem flood (<c>tmpfs</c>, <c>cgroup2</c>, <c>proc</c>), a
+    /// snap mount backed by a <c>loop</c> device, and <c>/dev/sda2</c> listed twice — once as the root and
+    /// again as a bind mount, which a reader that does not dedupe counts twice into the drive's capacity.
+    /// The <c>\040</c> in the last mount point is the kernel's octal escape for a space.
+    /// </summary>
+    public const string ProcMounts =
+        """
+        sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+        proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+        udev /dev devtmpfs rw,nosuid,relatime,size=8110044k 0 0
+        tmpfs /run tmpfs rw,nosuid,nodev,noexec,relatime,size=1629636k 0 0
+        cgroup2 /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime 0 0
+        /dev/sda2 / ext4 rw,relatime,errors=remount-ro 0 0
+        /dev/sda1 /boot/efi vfat rw,relatime,fmask=0077 0 0
+        /dev/loop3 /snap/firefox/4793 squashfs ro,nodev,relatime 0 0
+        /dev/loop7 /snap/gnome-42-2204/141 squashfs ro,nodev,relatime 0 0
+        tmpfs /run/user/1000 tmpfs rw,nosuid,nodev,relatime,size=1629632k 0 0
+        /dev/sda2 /var/lib/docker/btrfs ext4 rw,relatime,errors=remount-ro 0 0
+        /dev/sdb1 /media/user/My\040Backup exfat rw,nosuid,nodev,relatime 0 0
+        """;
+
+    /// <summary>
+    /// A <c>/proc/diskstats</c> for the same machine, in the <b>14-field</b> pre-4.18 form. Numbers are
+    /// round so a rate over a one-second interval is readable: <c>sda</c> has read 2048 sectors (1 MiB) and
+    /// written 4096 (2 MiB), and <c>io_ticks</c> sits at 1000 ms. <c>sda1</c> and <c>sda2</c> are listed
+    /// alongside their disk, as the kernel always lists them — summing all three double-counts.
+    /// </summary>
+    public const string ProcDiskstats =
+        """
+        7 3 loop3 120 0 960 40 0 0 0 0 0 60 40
+        8 0 sda 5000 100 2048 800 3000 200 4096 900 0 1000 1700
+        8 1 sda1 200 0 512 30 100 0 256 40 0 60 70
+        8 2 sda2 4800 100 1536 770 2900 200 3840 860 0 940 1630
+        11 0 sr0 0 0 0 0 0 0 0 0 0 0 0
+        """;
+
+    /// <summary>The same <c>sda</c> row one second later: +1024 sectors read, +2048 written, +250 ms of
+    /// <c>io_ticks</c> and 4 more completed transfers, so a one-second diff lands on 512 KiB/s read,
+    /// 1 MiB/s written and 25% active.</summary>
+    public const string ProcDiskstatsLater =
+        """
+        8 0 sda 5002 100 3072 850 3002 200 6144 950 2 1250 1700
+        """;
+
+    /// <summary>
+    /// The <b>20-field</b> 5.5+ form — discards and flushes appended after the fourteen a parser may
+    /// assume. Reading the trailing columns as if they were the leading ones is what this catches.
+    /// </summary>
+    public const string ProcDiskstatsModern =
+        """
+        259 0 nvme0n1 5000 100 2048 800 3000 200 4096 900 0 1000 1700 10 0 80 5 3 12
+        """;
+
+    /// <summary>
+    /// Stages a VirtualBox guest's <c>/sys/block</c> tree: one SATA disk with two partitions, three snap
+    /// <c>loop</c> devices and an optical <c>sr0</c> — the flood the Storage tab must not render. Sizes are
+    /// in 512-byte sectors, so <c>sda</c>'s 41943040 is 20 GiB.
+    /// </summary>
+    public static FakeProcFileSystem WithVirtualBoxBlockTree(this FakeProcFileSystem proc) {
+        proc.WithFile("/sys/block/sda/dev", "8:0\n")
+            .WithFile("/sys/block/sda/size", "41943040\n")
+            .WithFile("/sys/block/sda/removable", "0\n")
+            .WithFile("/sys/block/sda/queue/rotational", "1\n")
+            .WithFile("/sys/block/sda/device/model", "VBOX HARDDISK\n")
+            .WithFile("/sys/block/sda/device/vendor", "ATA\n")
+            .WithFile("/sys/block/sda/sda1/dev", "8:1\n")
+            .WithFile("/sys/block/sda/sda1/size", "1048576\n")
+            .WithFile("/sys/block/sda/sda2/dev", "8:2\n")
+            .WithFile("/sys/block/sda/sda2/size", "40894464\n")
+            .WithFile("/sys/block/sr0/dev", "11:0\n")
+            .WithFile("/sys/block/sr0/size", "2097152\n");
+
+        foreach (var loop in new[] { 3, 7, 11 })
+            proc.WithFile($"/sys/block/loop{loop}/dev", $"7:{loop}\n")
+                .WithFile($"/sys/block/loop{loop}/size", "1024\n")
+                .WithFile($"/sys/block/loop{loop}/queue/rotational", "0\n");
+
+        return proc;
+    }
+
+    /// <summary>Stages an LVM root over <see cref="WithVirtualBoxBlockTree"/>'s disk: <c>dm-0</c> backed by
+    /// <c>sda2</c>, plus the <c>/dev/mapper</c> symlink a mount line names it by. Ubuntu Server's default
+    /// layout, where treating <c>dm-*</c> as unshowable would drop the root volume entirely.</summary>
+    public static FakeProcFileSystem WithLvmRoot(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/block/dm-0/dev", "252:0\n")
+            .WithFile("/sys/block/dm-0/size", "40894464\n")
+            .WithFile("/sys/block/dm-0/slaves/sda2", "")
+            .WithLink("/dev/mapper/ubuntu--vg-ubuntu--lv", "/dev/dm-0");
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>

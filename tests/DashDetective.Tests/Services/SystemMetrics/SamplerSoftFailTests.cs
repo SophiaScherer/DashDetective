@@ -77,8 +77,8 @@ public class SamplerSoftFailTests {
     }
 
     [Fact]
-    public void PhysicalDiskThroughputSampler_Inert_SamplesEmpty() {
-        using var sampler = new PhysicalDiskThroughputSampler(SamplerInit.Inert);
+    public void WindowsPhysicalDiskThroughputSampler_Inert_SamplesEmpty() {
+        using var sampler = new WindowsPhysicalDiskThroughputSampler(SamplerInit.Inert);
 
         Assert.Empty(sampler.Sample());
         Assert.Empty(sampler.Sample());
@@ -124,7 +124,7 @@ public class SamplerSoftFailTests {
     public void RealConstructorsAndSamples_NeverThrow_OnThisHost() {
         using var cpu = new CpuUsageSampler();
         using var gpu = new GpuUsageSampler();
-        using var disk = new PhysicalDiskThroughputSampler();
+        using var disk = IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
         using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
         var memory = IMemoryUsageSampler.ForCurrentPlatform();

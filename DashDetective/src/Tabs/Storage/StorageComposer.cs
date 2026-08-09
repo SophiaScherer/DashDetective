@@ -1,4 +1,5 @@
 using DashDetective.Services.SystemMetrics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -53,19 +54,32 @@ public static class StorageComposer {
         return cards;
     }
 
-    /// <summary>The card title: the label + letter of the disk's lowest-lettered volume (an unlabelled
-    /// volume reads "Local Disk", like Windows), or the disk model when the disk has no lettered volume.</summary>
+    /// <summary>The card title: the label plus the name of the disk's primary volume — its lowest-lettered
+    /// one on Windows, its shallowest mount point on Linux ("Ubuntu (/)" beats "… (/boot/efi)"). An
+    /// unlabelled volume reads "Local Disk", like Windows. Falls back to the disk model when the disk hosts
+    /// no mounted volume at all.</summary>
     private static string DriveName(PhysicalDiskInfo disk, IReadOnlyList<VolumeInfo> diskVolumes) {
-        var primary = diskVolumes
+        var lettered = diskVolumes
             .Where(v => v.DriveLetter.HasValue)
             .OrderBy(v => v.DriveLetter)
             .FirstOrDefault();
 
-        if (primary.DriveLetter is { } letter) {
-            var label = string.IsNullOrEmpty(primary.Label) ? "Local Disk" : primary.Label;
-            return $"{label} ({letter}:)";
-        }
+        if (lettered.DriveLetter is { } letter)
+            return Titled(lettered, $"{letter}:");
 
-        return disk.Model;
+        // A record struct's default has null strings, so the "no mounted volume" case is tested for
+        // emptiness rather than by reading through the result of FirstOrDefault.
+        var mounted = diskVolumes
+            .Where(v => !string.IsNullOrEmpty(v.MountPoint))
+            .OrderBy(v => v.MountPoint.Length)
+            .ThenBy(v => v.MountPoint, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        return string.IsNullOrEmpty(mounted.MountPoint) ? disk.Model : Titled(mounted, mounted.MountPoint);
     }
+
+    /// <summary>"&lt;label&gt; (&lt;where&gt;)", with Explorer's "Local Disk" standing in for a volume that
+    /// carries no label.</summary>
+    private static string Titled(VolumeInfo volume, string where) =>
+        $"{(string.IsNullOrEmpty(volume.Label) ? "Local Disk" : volume.Label)} ({where})";
 }

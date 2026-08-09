@@ -9,10 +9,14 @@ namespace DashDetective.Services.SystemMetrics;
 /// system, and total/free bytes. Sizes are raw so callers format them with <c>FileSizeFormatter</c>.
 /// <c>GptType</c> is the host partition's raw GPT type GUID (empty on MBR disks or when unresolved) —
 /// callers turn it into a display name with <c>PartitionTypeFormatter</c>.
+///
+/// <c>MountPoint</c> is the Unix analogue of <c>DriveLetter</c> ("/", "/boot/efi"): the two platforms name
+/// the same thing differently, so a volume carries whichever its own has and callers fall through from one
+/// to the other. Windows volumes leave it empty.
 /// </summary>
 public readonly record struct VolumeInfo(
     int? DiskNumber, char? DriveLetter, string Label, string FileSystem, ulong SizeBytes, ulong FreeBytes,
-    string GptType = "");
+    string GptType = "", string MountPoint = "");
 
 /// <summary>Enumerates the machine's volumes — including the unlettered Recovery/EFI partitions
 /// <c>System.IO.DriveInfo</c> omits. Implementations must never throw: any failure yields an empty

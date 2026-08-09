@@ -60,7 +60,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // its caption shows capacity used.
     private readonly Dictionary<int, DashboardCard> _diskCards = new();
     private readonly Dictionary<int, double[]> _diskHistories = new();
-    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
+        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
 
     /// <summary>Physical disk hosting Windows, resolved with the drive cards; −1 until then. The report and
@@ -445,13 +446,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>
     /// Reads the system drive's capacity via <see cref="DriveInfo"/> and updates the "used / total"
     /// caption. DriveInfo is a cheap syscall, so this runs on every tick; any failure clears the
-    /// caption.
+    /// caption. The root comes from <see cref="SystemDrive.Root"/> rather than
+    /// <c>Environment.SystemDirectory</c>, which is empty off Windows and would blank this every tick.
     /// </summary>
     private void UpdateStorageCapacity() {
         try {
-            var root = Path.GetPathRoot(Environment.SystemDirectory);
-            var drive = string.IsNullOrEmpty(root) ? null : new DriveInfo(root);
-            if (drive is null || !drive.IsReady || drive.TotalSize <= 0) {
+            var drive = new DriveInfo(SystemDrive.Root);
+            if (!drive.IsReady || drive.TotalSize <= 0) {
                 StorageSubText = "";
                 return;
             }
@@ -551,18 +552,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var disksTask = _providers.Disks.GetAsync();
             var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
-            _systemDiskNumber = FindSystemDisk(volumesTask.Result);
+            _systemDiskNumber = SystemVolume.FindDiskNumber(volumesTask.Result) ?? -1;
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
         } catch {
             // Leave the existing disk cards in place on a transient failure.
         }
     }
-
-    /// <summary>The physical disk hosting Windows, or −1 when the system volume can't be traced to one (its
-    /// activity figures then stay at their last value rather than reporting another drive's).</summary>
-    private static int FindSystemDisk(IReadOnlyList<VolumeInfo> volumes) =>
-        volumes.FirstOrDefault(v => v.DriveLetter == SystemDrive.Letter && v.DiskNumber.HasValue)
-               .DiskNumber ?? -1;
 
     /// <summary>Reconciles the disk cards to the current drive set: drops the old disk cards, then inserts one
     /// per drive just before the Network card (keeping the CPU→Memory→GPU→Disks→Network grouping). A disk

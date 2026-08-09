@@ -11,9 +11,9 @@ Build, run and test instructions live in the [README](../README.md).
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
-today Linux builds and launches with CPU, memory and network live, plus the machine's static identity
-(OS, kernel, BIOS, board) and the Processor and Motherboard spec cards, while the remaining panels
-read "—".
+today Linux builds and launches with CPU, memory, network and the whole Storage surface live — drives,
+partitions and per-disk activity — plus the machine's static identity (OS, kernel, BIOS, board) and the
+Processor, Motherboard and Storage Devices spec cards, while the remaining panels read "—".
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -264,16 +264,35 @@ concatenation with forward-slash literals**, never `Path.Combine`, which on Wind
 `/proc\stat`.
 
 **Format knowledge lives in a parser beside the seam** — `ProcStatParser`, `ProcMeminfoParser`,
-`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader` — rather than in any one provider, so a file read by
-two consumers is understood in exactly one place. They parse defensively, each against its own trap: by
-index with a length check, because the kernel has appended columns to `/proc/stat` over the years; by
-explicit unit, because `/proc/meminfo` labels kibibytes as `kB` and leaves some lines unitless; by trimming
-around the colon, because `/proc/cpuinfo` uses a varying number of tabs; and by stripping only *matched*
-quotes, because `/etc/os-release` is a shell fragment mixing quoted and bare values.
+`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader`, `ProcMountsParser`, `ProcDiskstatsParser` — rather
+than in any one provider, so a file read by two consumers is understood in exactly one place. They parse
+defensively, each against its own trap: by index with a length check, because the kernel has appended
+columns to `/proc/stat` and `/proc/diskstats` over the years; by explicit unit, because `/proc/meminfo`
+labels kibibytes as `kB` and leaves some lines unitless; by trimming around the colon, because
+`/proc/cpuinfo` uses a varying number of tabs; by stripping only *matched* quotes, because `/etc/os-release`
+is a shell fragment mixing quoted and bare values; and by expanding octal escapes, because `/proc/mounts`
+separates its fields with the space a mount point may itself contain.
 
 Where two surfaces need the same *derived* numbers rather than the same file, the derivation is shared as
 well: `CpuFacts` sits on `ProcCpuinfoParser` and feeds both the Dashboard's CPU tile and the Hardware tab's
-Processor card, so the two cannot report different core counts for the same machine.
+Processor card, so the two cannot report different core counts for the same machine. `SysBlockFacts` does
+the same for `/sys/block`, feeding the Storage tab's drive cards, its partitions table and the Hardware
+tab's Storage Devices card.
+
+**A record keyed by a platform's own identifier needs an equivalent derived, not invented.** The disk
+records are all keyed by an `int` disk number, which on Windows is the OS's own — so the three providers
+that fill them agree for free. Linux names disks `sda` and `nvme0n1`, and the answer is the kernel's
+`major:minor` packed into that int, because it is readable from both `/sys/block/*/dev` and
+`/proc/diskstats`: three separately-sampled readers still derive the same key from the same authority. A
+positional index would have looked identical in a screenshot and drifted the moment a USB drive was plugged
+in mid-run.
+
+Filtering matters as much as parsing here, because the pseudo-filesystems describe far more devices than a
+user has. `/sys/block` lists every snap loop device — around 25 on a stock Ubuntu GNOME install — and
+`/proc/mounts` lists both those and some thirty pseudo-filesystems. The volume list applies a single rule
+rather than an allowlist: keep a mount only when its device resolves to a disk that has a card. Mapper and
+RAID devices are *resolved* through their `slaves` links rather than dropped, so an LVM or encrypted root
+still lands on the drive that backs it.
 
 **A permission-gated file is not exposed at all.** `/sys/class/dmi/id/{product_uuid,board_serial,
 product_serial}` are root-only, so `DmiIdReader` offers named properties for the world-readable keys only,
@@ -281,11 +300,18 @@ rather than a general accessor that would let a caller reach a value which reads
 user.
 
 Where a platform genuinely has no source for a value, the provider returns `null` and the surface renders
-"—". It does not substitute a near-miss. Three worked examples: the Performance tab's "Handles" tile is
+"—". It does not substitute a near-miss. Four worked examples: the Performance tab's "Handles" tile is
 blank on Linux because a Windows handle covers events, threads and registry keys as well as files;
 `/proc/cpuinfo`'s `cpu MHz` never fills a *maximum* clock, because it is the instantaneous one and a
-scaling governor would report an idle 800 MHz; and the Motherboard card's PCIe slot count and the Processor
-card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root.
+scaling governor would report an idle 800 MHz; the Motherboard card's PCIe slot count and the Processor
+card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root; and
+drive health and temperature stay blank because both need SMART, which needs root.
+
+The same discipline cuts the other way when a field *does* have a source. `/proc/diskstats` was easy to read
+as two columns of transferred sectors, but the Storage tab's headline numbers and every sparkline on it
+render *active time* — for which `io_ticks`, the milliseconds with at least one request outstanding, is the
+exact analogue of the Windows counter. Reading only the obvious fields would have left the page rendering a
+confident, permanent zero.
 
 ## Shared control inventory
 
