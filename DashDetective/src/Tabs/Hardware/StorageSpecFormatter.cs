@@ -27,13 +27,16 @@ internal static class StorageSpecFormatter {
 
     /// <summary>The spec row's drive type — terser than the Storage tab's wording, since it sits beside a
     /// capacity on one line. "" when the drive's kind is unknown (the row then shows size only).</summary>
+    public static string TypeLabel(DriveKind kind) => kind switch {
+        DriveKind.Nvme => "NVMe",
+        DriveKind.Ssd => "SSD",
+        DriveKind.Hdd => "HDD",
+        _ => "",
+    };
+
+    /// <summary>The same label from WMI's raw code pair, decoded once in <see cref="DriveKinds"/>.</summary>
     public static string TypeLabel(int mediaType, int busType) =>
-        DriveKinds.FromStorageCodes(mediaType, busType) switch {
-            DriveKind.Nvme => "NVMe",
-            DriveKind.Ssd => "SSD",
-            DriveKind.Hdd => "HDD",
-            _ => "",
-        };
+        TypeLabel(DriveKinds.FromStorageCodes(mediaType, busType));
 
     /// <summary>A drive row's value: capacity plus optional type, e.g. "2 TB NVMe" or "500 GB".</summary>
     public static string DriveDetail(ulong bytes, string type) {
