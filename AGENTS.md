@@ -216,7 +216,7 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   Live sources: the drive cards from `PhysicalDiskProvider` + `StorageComposer` + `VolumeProvider`; the
   Disk Activity chart + Active time / Avg response / **Queue** readouts from the shared `StorageUsageSampler`
   feed (via `SystemMetricsService`); per-disk **Read/Write** from the page-local
-  `PhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
+  `IPhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
   card's **Temp** from `DiskTemperatureProvider` (non-admin `IOCTL_STORAGE_QUERY_PROPERTY` health-log read,
   refreshed on a slow ~15 s sub-cadence of the throughput timer). Wired to `IRefreshablePage` /
   `ILiveSamplingPage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
@@ -410,6 +410,46 @@ currently exist.
                                  L3CacheKilobytes is a separate static, not a field — only the Hardware
                                  card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),
                                  never as bytes)
+          ProcMountsParser.cs   (/proc/mounts format knowledge, used by LinuxVolumeProvider: space-separated
+                                 device / mountpoint / fstype, read by index with a length check. The device
+                                 and mount-point fields are OCTAL-ESCAPED (\040 = space, \134 = backslash),
+                                 because the separator is a space — read raw, a literal "\040" shows up in
+                                 the Partitions table for most removable media. A malformed escape is left
+                                 as written. UnescapeUdev handles the DIFFERENT \xNN hex convention the
+                                 /dev/disk/by-label symlink names use for the same job)
+          ProcDiskstatsParser.cs
+                                (/proc/diskstats format knowledge, used by the throughput sampler. Keyed by
+                                 the PACKED major:minor of columns 1-2 — the same identity SysBlockFacts
+                                 derives, which is what lets an independently-ticking sampler agree with the
+                                 drive cards. Read by index behind a 14-FIELD MINIMUM: the row grew to 18
+                                 fields in 4.18 (discards) and 20 in 5.5 (flushes), so only the first
+                                 fourteen may be assumed. Sectors are 512 bytes, as in /sys/block/*/size)
+          SysBlockFacts.cs      (the /sys/block derivation, shared by the Storage tab's drive cards, its
+                                 Partitions table and the Hardware tab's Storage Devices card — the CpuFacts
+                                 shape applied to disks. THE JOIN KEY FOR THE WHOLE STORAGE SURFACE is
+                                 Pack(major, minor) = (major << 20) | minor, read from /sys/block/*/dev:
+                                 PhysicalDiskInfo, VolumeInfo and DiskThroughputSample are all keyed by an
+                                 int disk number that Windows gets from the OS, and Linux has no such
+                                 number, so three independently-sampled providers derive one from the
+                                 kernel's own device identity. A positional index would drift the moment a
+                                 USB drive is plugged in mid-run. FILTERS loop*/ram*/zram*/sr* — a stock
+                                 Ubuntu GNOME install has ~25 snap loop devices and without this the Storage
+                                 tab is unusable. dm-*/md* are RESOLVED, NOT DROPPED: anything with a
+                                 slaves/ entry is followed (to a depth cap, for LUKS-over-LVM) to the disk
+                                 backing it, so an LVM root still lands on a real card. Partition→disk needs
+                                 no symlink resolution — the kernel nests partitions inside their disk and
+                                 prefixes them with its name. size is in 512-BYTE SECTORS regardless of the
+                                 drive's physical sector size. DiskNumbers() is the cheap half, for the
+                                 sampler, which runs every tick and only needs to tell a disk from a
+                                 partition)
+          IVolumeCapacityReader.cs
+                                (a mounted filesystem's total/free bytes by mount point, over DriveInfo —
+                                 the managed statvfs. A seam of its own beside IProcFileSystem for the same
+                                 reason: /proc/mounts carries no sizes and statvfs is not a pseudo-file, so
+                                 without it LinuxVolumeProvider could not be tested until someone ran the
+                                 VM. Free is TotalFreeSpace, not AvailableFreeSpace — only that makes the
+                                 cards' used figure agree with df, and it is what the WMI arm's
+                                 SizeRemaining means)
           OsReleaseParser.cs    (/etc/os-release format knowledge: KEY=value into a lookup. The file is
                                  a shell fragment, so the same body mixes quoted and bare values — one
                                  MATCHED pair of surrounding quotes is stripped and an unbalanced one is
@@ -483,7 +523,9 @@ currently exist.
         HardwareProviders.cs    (the "what hardware is in this machine" bundle + the single
                                  ForCurrentPlatform() that picks the Windows, Linux or unsupported set
                                  for all SEVEN members. The Linux arm is filled in one milestone at a
-                                 time — today CPU + System, the rest still Unsupported*. It carries NO
+                                 time — today CPU, System, Disks and Volumes; GPU adapters and disk
+                                 temperature are still Unsupported*, and per-DIMM memory stays that way
+                                 for good (dmidecode needs root). It carries NO
                                  [SupportedOSPlatform]: the Linux readers are portable managed code over
                                  IProcFileSystem, so there is no annotated API for CA1416 to see.
                                  Built by each consuming page's public ctor (Dashboard,
@@ -500,13 +542,56 @@ currently exist.
         IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
                                 (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
                                  ForCurrentPlatform shares ONE reader with the Storage page)
+        LinuxPhysicalDiskProvider.cs
+                                (the same cards from SysBlockFacts. Takes IDiskTemperatureProvider the same
+                                 way, so the temperature milestone is one swap. HEALTH IS ALWAYS HEALTHY and
+                                 TEMPERATURE ALWAYS NULL — both need SMART, which needs root, and neither
+                                 has a rootless near-miss worth substituting)
         IVolumeProvider.cs / WindowsVolumeProvider.cs
-                                (MSFT_Volume enumeration incl. unlettered Recovery/EFI)
+                                (MSFT_Volume enumeration incl. unlettered Recovery/EFI. VolumeInfo carries
+                                 BOTH DriveLetter and MountPoint — the platforms name the same thing
+                                 differently and callers fall through from one to the other; a Windows
+                                 volume leaves MountPoint empty and a Linux one DriveLetter null)
+        LinuxVolumeProvider.cs  (/proc/mounts joined to SysBlockFacts, sized through IVolumeCapacityReader.
+                                 ONE FILTER RULE does the whole job: keep a mount only when its device
+                                 resolves to a disk that has a card. tmpfs/cgroup/proc name no /dev device
+                                 and every snap mount resolves to an excluded loop, so both floods fall out
+                                 and no volume points at a cardless disk — a filesystem allowlist would be a
+                                 weaker second guess. DEDUPES BY RESOLVED DEVICE, shortest mount point
+                                 winning: /proc/mounts lists one device many times (bind mounts, btrfs
+                                 subvolumes) and StorageComposer SUMS a disk's volumes, so duplicates
+                                 multiply its capacity. /dev/mapper and /dev/disk/by-uuid names are
+                                 symlinks and are resolved. Labels come from the by-label symlinks)
+        SystemVolume.cs         (which volume hosts the OS, and through it which disk — the Dashboard's
+                                 Storage tile and the Storage tab's Disk Activity panel both need it and
+                                 each used to hold its own copy. Tries SystemDrive.Letter, then the "/"
+                                 mount point; only one arm can ever match on a given platform)
         IDiskTemperatureProvider.cs / WindowsDiskTemperatureProvider.cs
                                 (NVMe composite temp via non-admin IOCTL health log. SYNCHRONOUS by
                                  design — called per-disk on a slow sub-tick of a timer the caller owns)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
+        IPhysicalDiskThroughputSampler.cs
+                                (seam + the DiskThroughputSample record + ForCurrentPlatform(). Unlike the
+                                 HardwareProviders members this is deliberately STATEFUL — every arm reports
+                                 the interval since the previous call — so each page owns its own instance.
+                                 Holds UnsupportedPhysicalDiskThroughputSampler's contract; the twin itself
+                                 sits under the Windows arm)
+        WindowsPhysicalDiskThroughputSampler.cs
+                                (per-disk read/write/active/response/queue from the PDH \PhysicalDisk(*)
+                                 counter ARRAY — deliberately not the _Total instance, whose % Idle Time is
+                                 a mean across every disk. Holds the Unsupported twin)
+        LinuxPhysicalDiskThroughputSampler.cs
+                                (the same five figures from /proc/diskstats, diffed over a Stopwatch
+                                 interval like NetworkUsageSampler. ACTIVE TIME COMES FROM io_ticks
+                                 (milliseconds with a request outstanding) — the direct analogue of
+                                 100 − % Idle Time, and what every headline number and sparkline on the
+                                 Storage tab and the Dashboard's disk cards renders; without it they all
+                                 read a flat zero. Response = Δ(ms reading + ms writing) over Δ completed
+                                 transfers; queue depth is INSTANTANEOUS, not a delta. REPORTS WHOLE DISKS
+                                 ONLY — /proc/diskstats lists sda and sda1 alike and their I/O overlaps, so
+                                 counting both roughly doubles every figure. A counter that goes backwards
+                                 (device re-plugged) reads as no activity)
         MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
@@ -744,9 +829,9 @@ currently exist.
                                                          never-throw fall back to that card's .Unknown, so
                                                          one dead source can't blank the others. WmiRead
                                                          holds the WMI boilerplate the Windows readers
-                                                         share. Windows* for all five; Linux* for processor
-                                                         and motherboard; Unsupported* twins (at the bottom
-                                                         of their Windows file) for memory modules, storage
+                                                         share. Windows* for all five; Linux* for processor,
+                                                         motherboard and storage; Unsupported* twins (at the
+                                                         bottom of their Windows file) for memory modules
                                                          and graphics.
                                                          LinuxProcessorInfoProvider — the shared CpuFacts
                                                          plus its L3 read; SOCKET IS PERMANENTLY "—"
@@ -756,6 +841,11 @@ currently exist.
                                                          "version (year)" BIOS string as the WMI arm; PCIE
                                                          SLOTS IS PERMANENTLY "—" (SMBIOS type 9 likewise;
                                                          /sys/bus/pci counts occupied devices, not slots).
+                                                         LinuxStorageInfoProvider — the shared SysBlockFacts,
+                                                         so this card and the Storage tab's cards cannot
+                                                         disagree about a drive while keeping their own
+                                                         wording ("NVMe" here, "NVMe SSD" there);
+                                                         DRIVE HEALTH IS PERMANENTLY "—" (SMART needs root).
                                                          UnsupportedMemoryModulesProvider is permanent too —
                                                          per-DIMM facts are SMBIOS type 17.
                                                          ChipsetNames — the board-name token scan BOTH
@@ -801,7 +891,7 @@ currently exist.
                                  card (shared Sparkline, ChartStorage amber). Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
                                  VolumeProvider; Disk Activity + Queue from the shared StorageUsageSampler
-                                 feed; per-disk Read/Write from PhysicalDiskThroughputSampler; NVMe Temp
+                                 feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
                                  from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
                                  ILiveSamplingPage/IDisposable.)
 ```
@@ -870,14 +960,20 @@ no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating tho
 busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
 from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
 
-Five classes still reach native Windows APIs unannotated, because annotating them today would land the
+Four classes still reach native Windows APIs unannotated, because annotating them today would land the
 attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
 already scheduled. Each gets its attribute when its seam lands:
 
 | Class | Seam lands in |
 |---|---|
-| `PhysicalDiskThroughputSampler` | M8 |
 | `GpuUsageSampler`, `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 |
+
+**M8 cleared the fifth**, and it is the worked example of why the seam has to come first: three view models
+held `private readonly PhysicalDiskThroughputSampler _throughputSampler = new()`, and there is nowhere on a
+field initialiser to put the attribute. Introducing `IPhysicalDiskThroughputSampler` moved the construction
+into one guarded `ForCurrentPlatform()`, and only then could the class be renamed `Windows*` and annotated.
+Removing that guard now fails the build — which is the check worth running when adding an attribute, since a
+decorative one and a load-bearing one look identical in a passing build.
 
 **M5 annotated its four on the *constructor*, not the type, and later milestones should copy that.** A PDH
 sampler's `Sample()` and `Dispose()` are guarded by its own `Ready`/`_ready` flag and are genuinely callable
@@ -935,12 +1031,29 @@ rules:
 - **Format knowledge lives in a parser beside the seam, not in a sampler** — `ProcStatParser` is shared by
   the aggregate and per-core CPU samplers, `ProcMeminfoParser` by the memory sampler and the system-counters
   provider, `ProcCpuinfoParser` by `CpuFacts` and the frequency sampler, `OsReleaseParser` and `DmiIdReader`
-  by the Dashboard's identity panel and the Hardware tab's Motherboard card. Parse **by index with a length
+  by the Dashboard's identity panel and the Hardware tab's Motherboard card, `ProcMountsParser` and
+  `ProcDiskstatsParser` by the volume provider and the throughput sampler. Parse **by index with a length
   check**: the kernel has appended columns to `/proc/stat` over time, so 7-column and 10-column forms both
-  have to work. The same defensiveness applies to units — `/proc/meminfo`'s `kB` is kibibytes, some of its
-  lines carry no unit at all, and sysfs cache sizes are suffixed (`8192K`, `16M`) rather than bytes.
+  have to work, and `/proc/diskstats` grew from 14 fields to 18 in 4.18 and 20 in 5.5. The same defensiveness
+  applies to units — `/proc/meminfo`'s `kB` is kibibytes, some of its lines carry no unit at all, sysfs cache
+  sizes are suffixed (`8192K`, `16M`) rather than bytes, and both `/sys/block/*/size` and `/proc/diskstats`
+  count **512-byte sectors** regardless of the drive's physical sector size.
   Where two cards want the same *derived* numbers rather than the same file, the derivation is shared too:
-  `CpuFacts` exists so the Dashboard tile and the Processor card cannot report different core counts.
+  `CpuFacts` exists so the Dashboard tile and the Processor card cannot report different core counts, and
+  `SysBlockFacts` so the Storage tab and the Hardware tab cannot disagree about a drive.
+
+**Where a record is keyed by a platform's own identifier, derive an equivalent — do not invent one.** M8's
+case: `PhysicalDiskInfo`, `VolumeInfo` and `DiskThroughputSample` are all keyed by an `int` disk number,
+which on Windows is the OS's own, so three separately-sampled providers agree for free. Linux names disks
+`sda`/`nvme0n1`, and the answer is the kernel's `major:minor` packed as `(major << 20) | minor`
+(`SysBlockFacts.Pack`), because it is readable from both `/sys/block/*/dev` and `/proc/diskstats` — so all
+three still derive the same key from the same authority. **A positional index would have been the trap**: it
+drifts the moment a USB drive is plugged in mid-run, and only between two of the three readers.
+
+**`/proc/mounts` needs two defences a first pass misses.** It lists the same device many times (bind mounts,
+`/var/snap`, btrfs subvolumes) and `StorageComposer` *sums* a disk's volumes, so without a dedupe a drive's
+capacity and used space multiply. And its device/mount-point fields are octal-escaped, because the separator
+is a space.
 
 Three `/proc` gotchas worth knowing: `/proc/stat` lists **online** CPUs only, so per-core state must be keyed
 by core number and a core appearing mid-run reports 0 until it has an interval (diffing it against zero
