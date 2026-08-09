@@ -31,10 +31,10 @@ public class HardwareProvidersTests {
             // the ones whose milestone has not landed, and each moves here when it does.
             Assert.IsType<LinuxCpuInfoProvider>(providers.Cpu);
             Assert.IsType<LinuxSystemInfoProvider>(providers.System);
+            Assert.IsType<LinuxPhysicalDiskProvider>(providers.Disks);
+            Assert.IsType<LinuxVolumeProvider>(providers.Volumes);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
             Assert.IsType<UnsupportedGpuAdapterProvider>(providers.GpuAdapters);
-            Assert.IsType<UnsupportedPhysicalDiskProvider>(providers.Disks);
-            Assert.IsType<UnsupportedVolumeProvider>(providers.Volumes);
             Assert.IsType<UnsupportedDiskTemperatureProvider>(providers.DiskTemperature);
         } else {
             Assert.IsType<UnsupportedCpuInfoProvider>(providers.Cpu);
@@ -62,10 +62,11 @@ public class HardwareProvidersTests {
 
     /// <summary>The Storage page and the disk enumeration must read temperature through one object, so
     /// "the drive's temperature" has a single source. Cosmetic while the reader is stateless — which is
-    /// exactly why it would go unnoticed if someone later added a cache.</summary>
+    /// exactly why it would go unnoticed if someone later added a cache. Both real arms wire it the same
+    /// way, which is also what keeps the Linux temperature milestone to a single swap.</summary>
     [Fact]
-    public void Windows_SharesOneTemperatureReaderWithTheDiskEnumeration() {
-        if (!OperatingSystem.IsWindows())
+    public void ForCurrentPlatform_SharesOneTemperatureReaderWithTheDiskEnumeration() {
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
             return;
 
         var providers = HardwareProviders.ForCurrentPlatform();
@@ -73,8 +74,8 @@ public class HardwareProvidersTests {
         Assert.Same(providers.DiskTemperature, DiskTemperatureReaderOf(providers.Disks));
     }
 
-    /// <summary>Reads back the temperature reader a <see cref="WindowsPhysicalDiskProvider"/> was built
-    /// with — it is a primary-constructor parameter, so it is captured as a private field.</summary>
+    /// <summary>Reads back the temperature reader a physical-disk provider was built with — it is a
+    /// constructor parameter, so it is captured as a private field.</summary>
     private static object? DiskTemperatureReaderOf(IPhysicalDiskProvider disks) {
         foreach (var field in disks.GetType()
                      .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic))
