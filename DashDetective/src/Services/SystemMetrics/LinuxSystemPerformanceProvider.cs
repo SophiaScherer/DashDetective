@@ -21,7 +21,6 @@ internal sealed class LinuxSystemPerformanceProvider : ISystemPerformanceProvide
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string MeminfoPath = "/proc/meminfo";
     private const string LoadavgPath = "/proc/loadavg";
-    private const string ProcRoot = "/proc";
 
     private readonly IProcFileSystem _proc;
 
@@ -81,27 +80,13 @@ internal sealed class LinuxSystemPerformanceProvider : ISystemPerformanceProvide
             : null;
     }
 
-    /// <summary>The number of live processes, counted from <c>/proc</c>'s numeric entries. One directory
-    /// listing per read and no per-PID file opens, so it stays affordable at the sampling cadence — the
-    /// full walk belongs to the Processes tab. A count of zero means the listing failed, not that the
+    /// <summary>The number of live processes, from the shared <see cref="ProcPids"/> listing — the same
+    /// entries the Processes tab walks, so the two cannot disagree about what counts as a process. One
+    /// directory listing per read and no per-PID file opens, so it stays affordable at the sampling
+    /// cadence; the full walk belongs to that tab. A count of zero means the listing failed, not that the
     /// machine is idle, so it reports nothing.</summary>
     private int? ReadProcessCount() {
-        var processes = 0;
-        foreach (var entry in _proc.ListDirectory(ProcRoot)) {
-            // Only all-digit entries are PIDs; /proc is full of named files and "self"/"thread-self" links.
-            if (entry.Length > 0 && IsAllDigits(entry))
-                processes++;
-        }
-
+        var processes = ProcPids.List(_proc).Count;
         return processes > 0 ? processes : null;
-    }
-
-    private static bool IsAllDigits(string value) {
-        foreach (var character in value) {
-            if (!char.IsAsciiDigit(character))
-                return false;
-        }
-
-        return true;
     }
 }

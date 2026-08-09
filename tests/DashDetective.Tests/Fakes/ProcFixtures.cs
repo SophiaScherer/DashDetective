@@ -225,6 +225,31 @@ internal static class ProcFixtures {
             .WithFile("/sys/block/dm-0/slaves/sda2", "")
             .WithLink("/dev/mapper/ubuntu--vg-ubuntu--lv", "/dev/dm-0");
 
+    /// <summary>
+    /// A stock <c>/proc/[pid]/stat</c>: GNOME Shell, state <c>S</c>, parent <c>1</c>, 1200 + 340 ticks of
+    /// user + system time and 14 threads. The trailing fields past <c>num_threads</c> are present because a
+    /// parser must reach index 17 and stop, not consume the line.
+    /// </summary>
+    public const string ProcPidStat =
+        "412 (gnome-shell) S 1 412 412 0 -1 4194560 987654 1234 56 0 1200 340 12 3 20 0 14 0 " +
+        "5678 3456789012 45678 18446744073709551615 1 1 0 0 0 0 0 4096 16781312 0 0 0 17 2 0 0 0 0 0 0 0 0 0 0 0 0 0\n";
+
+    /// <summary>
+    /// The same shape for a process whose <c>comm</c> carries <b>both</b> a space and a nested pair of
+    /// parentheses — Firefox's content processes are the real-world case. A reader that splits the whole
+    /// line on spaces, or stops at the <b>first</b> <c>)</c>, lands on the wrong token for every field after
+    /// the name and reports a garbage parent PID for exactly the processes users care about.
+    /// </summary>
+    public const string ProcPidStatHostileName =
+        "1337 (Web (Content) 2) S 1300 1337 1337 0 -1 4194560 22222 0 0 0 3000 500 0 0 20 0 26 0 " +
+        "9999 987654321 12345 18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 17 4 0 0 0 0 0 0 0 0 0 0 0\n";
+
+    /// <summary>A kernel thread: <c>kthreadd</c>'s child, square-bracketed in <c>ps</c> because it has no
+    /// <c>cmdline</c> at all. Parent 2 is the marker the classifier keys on.</summary>
+    public const string ProcPidStatKernelThread =
+        "58 (kworker/3:1H-events_highpri) I 2 0 0 0 -1 69238880 0 0 0 0 0 8 0 0 0 -20 1 0 " +
+        "112 0 0 18446744073709551615 0 0 0 0 0 0 0 2147483647 0 0 0 0 17 3 0 0 0 0 0 0 0 0 0 0 0\n";
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
