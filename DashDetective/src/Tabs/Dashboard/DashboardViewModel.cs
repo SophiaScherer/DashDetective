@@ -446,13 +446,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>
     /// Reads the system drive's capacity via <see cref="DriveInfo"/> and updates the "used / total"
     /// caption. DriveInfo is a cheap syscall, so this runs on every tick; any failure clears the
-    /// caption.
+    /// caption. The root comes from <see cref="SystemDrive.Root"/> rather than
+    /// <c>Environment.SystemDirectory</c>, which is empty off Windows and would blank this every tick.
     /// </summary>
     private void UpdateStorageCapacity() {
         try {
-            var root = Path.GetPathRoot(Environment.SystemDirectory);
-            var drive = string.IsNullOrEmpty(root) ? null : new DriveInfo(root);
-            if (drive is null || !drive.IsReady || drive.TotalSize <= 0) {
+            var drive = new DriveInfo(SystemDrive.Root);
+            if (!drive.IsReady || drive.TotalSize <= 0) {
                 StorageSubText = "";
                 return;
             }
