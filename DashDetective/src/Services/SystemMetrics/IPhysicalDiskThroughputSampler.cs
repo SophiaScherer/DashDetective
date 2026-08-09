@@ -30,6 +30,9 @@ internal interface IPhysicalDiskThroughputSampler : IDisposable {
         if (OperatingSystem.IsWindows())
             return new WindowsPhysicalDiskThroughputSampler();
 
+        if (OperatingSystem.IsLinux())
+            return new LinuxPhysicalDiskThroughputSampler();
+
         return new UnsupportedPhysicalDiskThroughputSampler();
     }
 }

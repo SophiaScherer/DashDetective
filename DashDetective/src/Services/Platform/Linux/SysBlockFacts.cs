@@ -92,9 +92,30 @@ internal sealed record SysBlockFacts(
     internal int? DiskNumberFor(string deviceName) =>
         DiskNumberByDevice.TryGetValue(deviceName, out var number) ? number : null;
 
+    /// <summary>
+    /// The disk numbers of the whole disks, without reading their model, size or kind — the cheap half of
+    /// <see cref="Read"/>, for the throughput sampler, which runs on every tick and only needs to tell a
+    /// disk from a partition. <c>/proc/diskstats</c> lists <c>sda</c> and <c>sda1</c> alike, and counting
+    /// both double-counts the same I/O.
+    /// </summary>
+    internal static HashSet<int> DiskNumbers(IProcFileSystem proc) {
+        var numbers = new HashSet<int>();
+
+        foreach (var name in proc.ListDirectory(BlockRoot)) {
+            if (IsExcluded(name) || SlaveOf(proc, name) is not null)
+                continue;
+
+            if (ParseDeviceNumber(proc.ReadAllText(BlockRoot + "/" + name + "/dev")) is { } number)
+                numbers.Add(number);
+        }
+
+        return numbers;
+    }
+
     /// <summary>Packs a <c>major:minor</c> pair the way the kernel's 32-bit <c>dev_t</c> does. Majors are
-    /// 12 bits and minors 20, so every real block device lands in a positive <c>int</c>.</summary>
-    private static int Pack(int major, int minor) => (major << 20) | minor;
+    /// 12 bits and minors 20, so every real block device lands in a positive <c>int</c>. Shared with
+    /// <see cref="ProcDiskstatsParser"/>, whose first two columns are the same pair.</summary>
+    internal static int Pack(int major, int minor) => (major << 20) | minor;
 
     private static bool IsExcluded(string name) {
         foreach (var prefix in ExcludedPrefixes)
