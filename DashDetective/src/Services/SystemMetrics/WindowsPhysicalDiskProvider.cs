@@ -44,7 +44,7 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
                         disks.Add(new PhysicalDiskInfo(
                             deviceId,
                             ModelOrDefault(obj["FriendlyName"] as string),
-                            DriveTypeLabel(kind),
+                            DriveKinds.CardLabel(kind),
                             ToUInt64(obj["Size"]),
                             ToInt(obj["HealthStatus"]) == HealthStatusHealthy,
                             temperature));
@@ -80,16 +80,6 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
 
     private static string ModelOrDefault(string? model) =>
         string.IsNullOrWhiteSpace(model) ? "Drive" : model.Trim();
-
-    /// <summary>The drive card's type label — spelled out ("NVMe SSD") since it heads its own card, unlike
-    /// the Hardware tab's terser spec row. "" when the kind is unknown. The codes behind
-    /// <paramref name="kind"/> are decoded once, in <see cref="DriveKinds"/>.</summary>
-    private static string DriveTypeLabel(DriveKind kind) => kind switch {
-        DriveKind.Nvme => "NVMe SSD",
-        DriveKind.Ssd => "SSD",
-        DriveKind.Hdd => "HDD",
-        _ => "",
-    };
 
     private static int ToInt(object? value) {
         try {
