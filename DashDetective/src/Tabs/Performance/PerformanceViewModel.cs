@@ -121,7 +121,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     // number. This is the multi-instance category the Primary/All toggle expands or collapses.
     private readonly List<DiskResource> _disks = new();
     private readonly Dictionary<int, DiskResource> _disksByNumber = new();
-    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
+        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
 
     // ---- GPUs (live, one row per physical adapter) ----

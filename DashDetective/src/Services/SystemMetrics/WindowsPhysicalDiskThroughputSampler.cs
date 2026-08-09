@@ -2,15 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
-
-/// <summary>Per-disk snapshot, keyed by disk number: read/write throughput (bytes per second), Task Manager's
-/// disk "Active time" as a percentage (0–100, <c>100 − % Idle Time</c>), the average transfer response
-/// time in seconds, and the average disk queue length (outstanding requests).</summary>
-public readonly record struct DiskThroughputSample(
-    int DiskNumber, double ReadBytesPerSec, double WriteBytesPerSec, double ActivePercent, double ResponseSeconds,
-    double QueueLength);
 
 /// <summary>
 /// Samples per-disk read/write throughput, active time, response time and queue length from the Windows PDH
@@ -26,7 +20,7 @@ public readonly record struct DiskThroughputSample(
 /// leaves it inert, returning an empty set forever — the same soft-fail contract as the other samplers. No
 /// dependencies beyond the OS <c>pdh.dll</c>.
 /// </summary>
-public sealed class PhysicalDiskThroughputSampler : IDisposable {
+internal sealed class WindowsPhysicalDiskThroughputSampler : IPhysicalDiskThroughputSampler {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;
@@ -79,7 +73,14 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
     private readonly IntPtr _queueCounter;
     private readonly bool _ready;
 
-    public PhysicalDiskThroughputSampler() {
+    /// <summary>Carries the attribute rather than the type: <see cref="Sample"/> and <see cref="Dispose"/>
+    /// are guarded by <c>_ready</c> and genuinely callable anywhere, as is the pure
+    /// <see cref="TryParseDiskNumber"/> — annotating the type would drag all of that behind a platform
+    /// guard and cost the Linux CI leg their coverage. The constructor is what has to be visible at its
+    /// call site, which is what forces <see cref="IPhysicalDiskThroughputSampler.ForCurrentPlatform"/> to
+    /// hold the guard.</summary>
+    [SupportedOSPlatform("windows")]
+    public WindowsPhysicalDiskThroughputSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns an empty set forever.
         // The catch covers pdh.dll failing to load or bind, which a return-code check can't see.
         try {
@@ -102,13 +103,14 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
             _ready = true;
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
-            NativeLoadFailure.Report(nameof(PhysicalDiskThroughputSampler), ex);
+            NativeLoadFailure.Report(nameof(WindowsPhysicalDiskThroughputSampler), ex);
         }
     }
 
     /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
-    /// a healthy host, where the real constructor always succeeds.</summary>
-    internal PhysicalDiskThroughputSampler(SamplerInit _) { }
+    /// a healthy host, where the real constructor always succeeds. Deliberately unannotated, so that
+    /// contract stays covered on the Linux CI leg.</summary>
+    internal WindowsPhysicalDiskThroughputSampler(SamplerInit _) { }
 
     /// <summary>Returns per-disk read/write throughput at the moment of the call, one entry per physical
     /// disk instance. Any failure yields an empty set.</summary>
@@ -184,4 +186,13 @@ public sealed class PhysicalDiskThroughputSampler : IDisposable {
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
+}
+
+/// <summary>The no-readings set — a platform with no per-disk sampler leaves the drive cards' Read/Write on
+/// "—" and their activity charts flat, rather than failing the page.</summary>
+internal sealed class UnsupportedPhysicalDiskThroughputSampler : IPhysicalDiskThroughputSampler {
+    public IReadOnlyList<DiskThroughputSample> Sample() => [];
+
+    /// <summary>Nothing to release — the seam is <c>IDisposable</c> for the PDH arm's sake.</summary>
+    public void Dispose() { }
 }

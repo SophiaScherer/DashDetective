@@ -60,7 +60,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // its caption shows capacity used.
     private readonly Dictionary<int, DashboardCard> _diskCards = new();
     private readonly Dictionary<int, double[]> _diskHistories = new();
-    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
+        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
 
     /// <summary>Physical disk hosting Windows, resolved with the drive cards; −1 until then. The report and

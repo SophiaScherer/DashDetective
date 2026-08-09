@@ -22,7 +22,7 @@ namespace DashDetective.Tabs.Storage;
 /// Everything on the page is live and per-drive: the Partitions table (<see cref="VolumeProvider"/>), the
 /// drive summary cards (<see cref="PhysicalDiskProvider"/> + <see cref="StorageComposer"/>), each card's
 /// Read/Write and the Disk Activity chart + readouts from the page-local
-/// <see cref="PhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
+/// <see cref="IPhysicalDiskThroughputSampler"/>, and each NVMe card's Temp from
 /// <see cref="DiskTemperatureProvider"/> (refreshed on a slow sub-cadence of the throughput timer). Non-NVMe
 /// drives show "—" for Temp (no readable SMART temperature without admin).
 ///
@@ -45,7 +45,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     // Page-local per-disk sampler + its timer, and the disk-number → card / history / latest-sample maps the
     // tick updates. Histories are kept for every disk (not just the selected one) so switching drives shows
     // that drive's real last minute.
-    private readonly PhysicalDiskThroughputSampler _throughputSampler = new();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
+        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
     private readonly Dictionary<int, double[]> _historiesByDisk = new();
