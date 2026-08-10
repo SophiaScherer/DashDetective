@@ -74,8 +74,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// place.</summary>
     public ObservableCollection<ProcessRow> Background { get; } = new();
 
-    /// <summary>Windows processes (system/service processes outside the interactive session), updated in
-    /// place — Task Manager's third group.</summary>
+    /// <summary>Task Manager's third group, updated in place: system/service processes outside the
+    /// interactive session on Windows, kernel threads and <c>system.slice</c> units on Linux. Captioned by
+    /// <see cref="ProcessGroupNames"/>, which is the only part of it that differs per platform.</summary>
     public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
     // Clickable column headers.
@@ -93,8 +94,9 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Group header caption for the Background section (e.g. "Background processes · 127").</summary>
     [ObservableProperty] private string _backgroundHeader = "Background processes";
 
-    /// <summary>Group header caption for the Windows-processes section (e.g. "Windows processes · 150").</summary>
-    [ObservableProperty] private string _windowsHeader = "Windows processes";
+    /// <summary>Group header caption for the third section — "Windows processes · 150", or "System
+    /// processes · 150" on Linux.</summary>
+    [ObservableProperty] private string _windowsHeader = ProcessGroupNames.SystemHeader;
 
     // ----- Summary strip -----
 
@@ -338,7 +340,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             WindowsProcesses.Clear();
             AppsHeader = "Apps";
             BackgroundHeader = "Background processes";
-            WindowsHeader = "Windows processes";
+            WindowsHeader = ProcessGroupNames.SystemHeader;
             TotalProcessesText = "0";
             ProcessBreakdownText = "";
             ThreadsText = "0";
@@ -420,7 +422,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         // numbers stay put when a group is expanded.
         AppsHeader = $"Apps · {visibleApps.Count.ToString(CultureInfo.InvariantCulture)}";
         BackgroundHeader = $"Background processes · {visibleBackground.Count.ToString(CultureInfo.InvariantCulture)}";
-        WindowsHeader = $"Windows processes · {visibleWindows.Count.ToString(CultureInfo.InvariantCulture)}";
+        WindowsHeader =
+            $"{ProcessGroupNames.SystemHeader} · {visibleWindows.Count.ToString(CultureInfo.InvariantCulture)}";
 
         // Total threads span every process, not just the top-level entries.
         var totalThreads = 0;
@@ -431,7 +434,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         TotalProcessesText = _lastSnapshot.Count.ToString(CultureInfo.InvariantCulture);
         ProcessBreakdownText = $"{apps.ToString(CultureInfo.InvariantCulture)} apps · " +
                                $"{background.ToString(CultureInfo.InvariantCulture)} background · " +
-                               $"{windows.ToString(CultureInfo.InvariantCulture)} Windows";
+                               $"{windows.ToString(CultureInfo.InvariantCulture)} {ProcessGroupNames.SystemLabel}";
         ThreadsText = totalThreads.ToString("N0", CultureInfo.InvariantCulture);
     }
 

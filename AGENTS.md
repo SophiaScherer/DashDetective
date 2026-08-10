@@ -410,6 +410,38 @@ currently exist.
                                  L3CacheKilobytes is a separate static, not a field — only the Hardware
                                  card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),
                                  never as bytes)
+          ProcPids.cs           (the live PIDs, from /proc's all-digit entries. A shared DERIVATION, not a
+                                 parser: the Performance tab's process count and the Processes tab's full
+                                 walk both start here, so what counts as a process is decided once. Empty
+                                 means the listing failed, never that the machine is idle)
+          ProcPidStatParser.cs  (/proc/[pid]/stat format knowledge — NOT ProcStatParser, which is the
+                                 machine-wide /proc/stat. Yields comm, state char, parent PID, utime+stime
+                                 and num_threads, so one open covers most of a process row. THE comm FIELD
+                                 IS PARENTHESISED AND MAY HOLD SPACES AND PARENTHESES — "(Web Content)",
+                                 "(a (b) c)" — so it splits on the LAST ')'. A whole-line Split(' ') lands
+                                 on the wrong token for every field after the name, and does it for exactly
+                                 the processes users care about. Read by index behind an 18-token minimum;
+                                 anything shorter is a torn read and the process is skipped)
+          ProcPidStatusParser.cs
+                                (/proc/[pid]/status, for the two fields stat cannot supply: the real uid and
+                                 VmRSS. PPid, Threads and State are in this file too and are DELIBERATELY
+                                 NOT read — stat is already open, and one number should have one source.
+                                 The Uid line carries FOUR values (real, effective, saved-set, filesystem)
+                                 and only the first is the owner. An unknown uid is null, NOT 0: 0 is root,
+                                 and a denied read must never promote a user process into the System group.
+                                 A missing VmRSS is 0 bytes — a kernel thread has no address space, and
+                                 requiring the field would drop every kworker from the list)
+          ProcPidIoParser.cs    (/proc/[pid]/io, for the Disk column. rchar + wchar, NOT read_bytes +
+                                 write_bytes: the Windows column is ReadTransferCount + WriteTransferCount,
+                                 which counts bytes through the syscall layer including cache, and rchar/
+                                 wchar are that same measurement. Mode 0400 — readable for your own
+                                 processes, denied for root's and other users', which is a blank rate)
+          ProcCgroupParser.cs   (/proc/[pid]/cgroup, the input to LinuxProcessClassifier. Every line is
+                                 hierarchy-ID:controllers:path and the unified v2 hierarchy is the one with
+                                 ID 0 AND AN EMPTY CONTROLLER LIST — a hybrid v1/v2 host lists a dozen v1
+                                 controllers alongside it, so taking the first or last line yields a v1
+                                 path. Leaf() splits the last segment, which two classifier rules match on.
+                                 A v1-only host has no unified line at all and yields "")
           ProcMountsParser.cs   (/proc/mounts format knowledge, used by LinuxVolumeProvider: space-separated
                                  device / mountpoint / fstype, read by index with a length check. The device
                                  and mount-point fields are OCTAL-ESCAPED (\040 = space, \134 = backslash),
@@ -1032,15 +1064,26 @@ rules:
   the aggregate and per-core CPU samplers, `ProcMeminfoParser` by the memory sampler and the system-counters
   provider, `ProcCpuinfoParser` by `CpuFacts` and the frequency sampler, `OsReleaseParser` and `DmiIdReader`
   by the Dashboard's identity panel and the Hardware tab's Motherboard card, `ProcMountsParser` and
-  `ProcDiskstatsParser` by the volume provider and the throughput sampler. Parse **by index with a length
+  `ProcDiskstatsParser` by the volume provider and the throughput sampler, and the four per-PID parsers
+  (`ProcPidStatParser`, `ProcPidStatusParser`, `ProcPidIoParser`, `ProcCgroupParser`) by the Processes tab's
+  walk and its classifier. **One file, one parser, and the file is in the name** — `ProcStatParser` reads
+  `/proc/stat` while `ProcPidStatParser` reads `/proc/[pid]/stat`, which are unrelated formats. Parse **by
+  index with a length
   check**: the kernel has appended columns to `/proc/stat` over time, so 7-column and 10-column forms both
   have to work, and `/proc/diskstats` grew from 14 fields to 18 in 4.18 and 20 in 5.5. The same defensiveness
   applies to units — `/proc/meminfo`'s `kB` is kibibytes, some of its lines carry no unit at all, sysfs cache
   sizes are suffixed (`8192K`, `16M`) rather than bytes, and both `/sys/block/*/size` and `/proc/diskstats`
   count **512-byte sectors** regardless of the drive's physical sector size.
   Where two cards want the same *derived* numbers rather than the same file, the derivation is shared too:
-  `CpuFacts` exists so the Dashboard tile and the Processor card cannot report different core counts, and
-  `SysBlockFacts` so the Storage tab and the Hardware tab cannot disagree about a drive.
+  `CpuFacts` exists so the Dashboard tile and the Processor card cannot report different core counts,
+  `SysBlockFacts` so the Storage tab and the Hardware tab cannot disagree about a drive, and `ProcPids` so
+  the Performance tab's process count and the Processes tab's walk cannot disagree about what a process is.
+
+**Not every "not known" can be reported as 0.** The `CpuFacts` convention — report `""`/`0` honestly and let
+each consumer place its own placeholder — is right whenever 0 is impossible as a real reading. It is *wrong*
+for `/proc/[pid]/status`'s `Uid`, where 0 means root: a denied read reported as 0 silently moves a user's
+process into the System group. That field is `int?`, and `LinuxProcessClassifier` has a test pinning that an
+unknown owner is not treated as root. Check what 0 means in the domain before reaching for the convention.
 
 **Where a record is keyed by a platform's own identifier, derive an equivalent — do not invent one.** M8's
 case: `PhysicalDiskInfo`, `VolumeInfo` and `DiskThroughputSample` are all keyed by an `int` disk number,
@@ -1492,6 +1535,26 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `ApplicationFrameHost.exe` to the hosted process), Session 0 isolation via `ProcessIdToSessionId`
   marks a **Windows** process, and everything else is **Background**. Task Manager's own rules are
   undocumented heuristics, so this is "close and correct", not byte-exact on every edge case.
+  **Live on Linux too (M9).** `LinuxProcessSnapshotProvider` walks `/proc` and reads five small files per
+  process — `stat`, `status`, `cmdline`, `cgroup`, `io` — of which **only `stat` is required**: a PID whose
+  `stat` has gone is a process that exited mid-walk and is skipped, which is the normal case rather than the
+  exceptional one. `ProcessGpuSampler`, `ProcessMemorySampler` and `ProcessClassifier` are reached only from
+  the Windows provider, so the Linux one replaces all three rather than seaming them. Names come from
+  `cmdline`'s first **NUL-separated** argument (basename, **no `.exe`** — that suffix is the Windows
+  provider's), falling back to `comm`, which truncates at 15 characters. CPU% is the `utime + stime` delta
+  over `USER_HZ` (hardcoded 100 — there is no rootless `sysconf(_SC_CLK_TCK)`), wall clock and core count.
+  `LinuxProcessClassifier` replaces the window test with `/proc/[pid]/cgroup`, because **the X11 route is a
+  dead end**: the target desktop is GNOME on Wayland, where no client may enumerate another's windows by
+  design. Its rules run in order — kernel thread → System; root-owned or `system.slice` → System;
+  a `.service` leaf → Background; `app.slice` or an `app-*.scope` leaf → App; else Background. **The
+  `.service` test must precede the `app.slice` test**, because modern systemd puts user *units* inside
+  `app.slice` alongside launched app scopes, and the other order files every user daemon as a foreground app.
+  The kernel-thread rule keys on an empty `cmdline`, so it **exempts zombies** — a zombie has lost its
+  address space too, but it is the corpse of a user process and its cgroup still places it.
+  `ProcessGroupNames` captions the third group **"System processes" on Linux**, since
+  `ProcessCategory.Windows` means "Windows process" on one platform and "system process" on the other; the
+  enum member keeps its name because only the display strings differ. **Permanent gap:** per-process GPU has
+  no rootless Linux source, so that column is always 0 — not a TODO.
   **The per-process Network ("NET") column was REMOVED BY DESIGN** (2026-07, branch
   `processesRemoveNET`) — there is no in-box, non-admin per-process network-rate API on Windows (Task
   Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a

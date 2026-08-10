@@ -11,9 +11,9 @@ Build, run and test instructions live in the [README](../README.md).
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
-today Linux builds and launches with CPU, memory, network and the whole Storage surface live — drives,
-partitions and per-disk activity — plus the machine's static identity (OS, kernel, BIOS, board) and the
-Processor, Motherboard and Storage Devices spec cards, while the remaining panels read "—".
+today Linux builds and launches with CPU, memory, network, the whole Storage surface — drives, partitions
+and per-disk activity — the Processes tab, plus the machine's static identity (OS, kernel, BIOS, board) and
+the Processor, Motherboard and Storage Devices spec cards, while the remaining panels read "—".
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -264,20 +264,33 @@ concatenation with forward-slash literals**, never `Path.Combine`, which on Wind
 `/proc\stat`.
 
 **Format knowledge lives in a parser beside the seam** — `ProcStatParser`, `ProcMeminfoParser`,
-`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader`, `ProcMountsParser`, `ProcDiskstatsParser` — rather
-than in any one provider, so a file read by two consumers is understood in exactly one place. They parse
+`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader`, `ProcMountsParser`, `ProcDiskstatsParser`, and the
+four per-PID parsers behind the Processes tab — rather than in any one provider, so a file read by two
+consumers is understood in exactly one place. One file gets one parser and the file is in the name:
+`ProcStatParser` reads `/proc/stat`, `ProcPidStatParser` reads `/proc/[pid]/stat`, and they are unrelated
+formats. They parse
 defensively, each against its own trap: by index with a length check, because the kernel has appended
 columns to `/proc/stat` and `/proc/diskstats` over the years; by explicit unit, because `/proc/meminfo`
 labels kibibytes as `kB` and leaves some lines unitless; by trimming around the colon, because
 `/proc/cpuinfo` uses a varying number of tabs; by stripping only *matched* quotes, because `/etc/os-release`
-is a shell fragment mixing quoted and bare values; and by expanding octal escapes, because `/proc/mounts`
-separates its fields with the space a mount point may itself contain.
+is a shell fragment mixing quoted and bare values; by expanding octal escapes, because `/proc/mounts`
+separates its fields with the space a mount point may itself contain; by splitting on the *last* `)`,
+because a process's `comm` is parenthesised and may hold spaces and parentheses of its own; and by taking
+only hierarchy `0` with an empty controller list, because a hybrid host's `/proc/[pid]/cgroup` surrounds the
+unified v2 line with a dozen v1 ones.
 
 Where two surfaces need the same *derived* numbers rather than the same file, the derivation is shared as
 well: `CpuFacts` sits on `ProcCpuinfoParser` and feeds both the Dashboard's CPU tile and the Hardware tab's
 Processor card, so the two cannot report different core counts for the same machine. `SysBlockFacts` does
 the same for `/sys/block`, feeding the Storage tab's drive cards, its partitions table and the Hardware
-tab's Storage Devices card.
+tab's Storage Devices card. `ProcPids` is the smallest of the three — just the all-digit entries under
+`/proc` — but it is shared for the same reason: the Performance tab counts processes and the Processes tab
+walks them, and only one of them should get to decide what a process is.
+
+**Reporting "not known" as `0` is only safe when `0` is impossible as a real reading.** That is the usual
+case, and `CpuFacts` leans on it. It fails for the owner of a process: `/proc/[pid]/status`'s `Uid` is `0`
+for root, so a denied read reported as `0` would move someone's own process into the System group. That
+field is nullable, and the classifier is tested to prove an unknown owner is not treated as root.
 
 **A record keyed by a platform's own identifier needs an equivalent derived, not invented.** The disk
 records are all keyed by an `int` disk number, which on Windows is the OS's own — so the three providers
@@ -300,12 +313,23 @@ rather than a general accessor that would let a caller reach a value which reads
 user.
 
 Where a platform genuinely has no source for a value, the provider returns `null` and the surface renders
-"—". It does not substitute a near-miss. Four worked examples: the Performance tab's "Handles" tile is
+"—". It does not substitute a near-miss. Five worked examples: the Performance tab's "Handles" tile is
 blank on Linux because a Windows handle covers events, threads and registry keys as well as files;
 `/proc/cpuinfo`'s `cpu MHz` never fills a *maximum* clock, because it is the instantaneous one and a
 scaling governor would report an idle 800 MHz; the Motherboard card's PCIe slot count and the Processor
-card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root; and
-drive health and temperature stay blank because both need SMART, which needs root.
+card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root;
+drive health and temperature stay blank because both need SMART, which needs root; and the Processes tab's
+per-process GPU column is permanently zero, because Linux exposes no rootless per-process GPU accounting at
+all. All five are settled answers, not deferred work.
+
+The Processes tab is where the discipline gets tested hardest, because the Windows classifier's inputs
+simply do not exist: `EnumWindows` has no analogue on Wayland, where a client may not enumerate another
+client's windows by design. Rather than collapse to a two-bucket approximation, the Linux classifier reads
+`/proc/[pid]/cgroup`, which on any systemd distro already encodes the same distinction — world-readable, no
+root, no display server, one small file per process. Its ordering carries the subtlety: a `.service` leaf
+must be tested before the `app.slice` path, because modern systemd puts user *units* inside `app.slice`
+alongside the scopes it launches apps into, so the other order would file every user daemon as a foreground
+app.
 
 The same discipline cuts the other way when a field *does* have a source. `/proc/diskstats` was easy to read
 as two columns of transferred sectors, but the Storage tab's headline numbers and every sparkline on it

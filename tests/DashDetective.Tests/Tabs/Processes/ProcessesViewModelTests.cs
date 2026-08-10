@@ -54,6 +54,32 @@ public class ProcessesViewModelTests {
         Assert.Empty(viewModel.WindowsProcesses);
     }
 
+    /// <summary>The third group's caption and breakdown word come from <see cref="ProcessGroupNames"/>, so
+    /// a Linux desktop reads "System processes" rather than "Windows processes". Asserted against the host's
+    /// own arm so the test states the wiring, not the platform.</summary>
+    [Fact]
+    public async Task LoadAsync_CaptionsTheThirdGroupForThisPlatform() {
+        var (viewModel, _) = Create(
+            Proc(300, 0, "svchost.exe", ProcessCategory.Windows),
+            Proc(301, 0, "lsass.exe", ProcessCategory.Windows));
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal($"{ProcessGroupNames.SystemHeader} · 2", viewModel.WindowsHeader);
+        Assert.EndsWith($"2 {ProcessGroupNames.SystemLabel}", viewModel.ProcessBreakdownText, StringComparison.Ordinal);
+    }
+
+    /// <summary>The failure path resets to the same caption the constructor used, so a soft-failed poll
+    /// cannot leave a Linux desktop showing the Windows wording.</summary>
+    [Fact]
+    public async Task LoadAsync_EmptySnapshot_ResetsToThePlatformCaption() {
+        var (viewModel, _) = Create();
+
+        await viewModel.LoadAsync();
+
+        Assert.StartsWith(ProcessGroupNames.SystemHeader, viewModel.WindowsHeader, StringComparison.Ordinal);
+    }
+
     /// <summary>The dialog needs the owning window handle, which only the view can fetch — so the view
     /// model forwards rather than the code-behind reaching an interop directly.</summary>
     [Fact]
