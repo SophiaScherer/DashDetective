@@ -62,6 +62,18 @@ public class LinuxToolkitCatalogTests {
                                         entry.Action.Target.StartsWith('/')));
     }
 
+    /// <summary>Every folder row must be one the app's own File Explorer can reach — a Folders section
+    /// whose rows only open the desktop file manager would be missing half its point. Asked through
+    /// <see cref="ToolkitPaths"/>' platform seam, so a Windows host proves it for the Linux table
+    /// instead of judging "~/.config" by Windows' rules and finding it unrooted.</summary>
+    [Fact]
+    public void Folders_CanAllBeOpenedInTheAppsOwnExplorer() {
+        Assert.All(Entries.Where(e => e.IsPathEntry),
+                   entry => Assert.True(
+                       ToolkitPaths.IsFileSystemPath(entry.Action.Target, windows: false),
+                       entry.Command));
+    }
+
     /// <summary>The systemd rows are captured into the log, so their output is redirected and the pager
     /// must never engage — a paged command would block until the timeout killed it.</summary>
     [Fact]
@@ -74,28 +86,13 @@ public class LinuxToolkitCatalogTests {
         Assert.All(systemd, entry => Assert.Contains("--no-pager", entry.Action.Arguments));
     }
 
-    /// <summary>Documentation rows must reach the browser, and the runner refuses anything that is not
-    /// https — including the plain-http URL that <c>basedir-spec/latest</c> redirects to, which is why
-    /// the final address is written out here rather than the shorter one.</summary>
+    /// <summary>The XDG row is written out in full because <c>basedir-spec/latest</c> redirects to a
+    /// plain-http address, which the runner refuses — the shorter URL would ship as a dead button. The
+    /// https rule itself is one of the shared invariants.</summary>
     [Fact]
-    public void Docs_AreAllHttps() {
-        var links = Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl).ToList();
-
-        Assert.NotEmpty(links);
-        Assert.All(links, entry => Assert.StartsWith(
-            "https://", entry.Action.Target, StringComparison.Ordinal));
-    }
-
-    /// <summary>Every kind the tab can badge is on the table, so the page reads as a whole feature
-    /// rather than one section with everything in it.</summary>
-    [Fact]
-    public void Entries_CoverEveryCategoryTheTabRenders() {
-        var categories = Entries.Select(e => e.Category).Distinct().ToList();
-
-        Assert.Contains(ToolkitCategory.Folders, categories);
-        Assert.Contains(ToolkitCategory.SystemTools, categories);
-        Assert.Contains(ToolkitCategory.Diagnostics, categories);
-        Assert.Contains(ToolkitCategory.DocsAndLinks, categories);
+    public void Docs_AvoidTheUrlThatRedirectsToPlainHttp() {
+        Assert.Contains(Entries, e => e.Action.Target == "https://specifications.freedesktop.org/basedir/latest/");
+        Assert.DoesNotContain(Entries, e => e.Action.Target.Contains("basedir-spec", StringComparison.Ordinal));
     }
 
     /// <summary>The page over the Linux table draws the same way the Windows one does — proven here

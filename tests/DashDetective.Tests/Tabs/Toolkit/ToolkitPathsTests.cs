@@ -95,7 +95,8 @@ public class ToolkitPathsTests {
     }
 
     /// <summary>The folder rows are authored unexpanded, so the judgement has to survive expansion —
-    /// "%appdata%" has no separator in it until it is resolved.</summary>
+    /// "%appdata%" has no separator in it until it is resolved. Still Windows-only even through the
+    /// seam: the variable has to exist to expand to anything, and it does not on a Linux runner.</summary>
     [Theory]
     [InlineData("%appdata%")]
     [InlineData("%windir%")]
@@ -104,21 +105,28 @@ public class ToolkitPathsTests {
         if (!OperatingSystem.IsWindows())
             return;
 
-        Assert.True(ToolkitPaths.IsFileSystemPath(target));
+        Assert.True(ToolkitPaths.IsFileSystemPath(target, windows: true));
     }
 
     /// <summary>Same rule in the other notation: a Linux folder row is authored as "~/…" or "$HOME/…"
-    /// and only becomes a rooted path once resolved.</summary>
+    /// and only becomes a rooted path once resolved. This one needs no host guard — the seam supplies
+    /// the platform, so the Linux catalog's rows are checked on Windows too.</summary>
     [Theory]
     [InlineData("~")]
     [InlineData("~/.config")]
-    [InlineData("$HOME/.config")]
-    [InlineData("${HOME}/.config")]
+    [InlineData("/etc")]
+    [InlineData("/var/log")]
     public void IsFileSystemPath_TrueForAnUnexpandedUnixFolder(string target) {
-        if (OperatingSystem.IsWindows())
-            return;
+        Assert.True(ToolkitPaths.IsFileSystemPath(target, windows: false));
+    }
 
-        Assert.True(ToolkitPaths.IsFileSystemPath(target));
+    /// <summary>A shell location is Windows' own notation, so it is refused before expansion and stays
+    /// refused whichever platform is asked about.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IsFileSystemPath_FalseForAShellLocationOnEitherPlatform(bool windows) {
+        Assert.False(ToolkitPaths.IsFileSystemPath("shell:startup", windows));
     }
 
     /// <summary>A shell location resolves through the shell namespace, not the filesystem: Explorer

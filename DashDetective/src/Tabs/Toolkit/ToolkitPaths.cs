@@ -36,12 +36,22 @@ public static class ToolkitPaths {
     /// <c>shell:</c> location, or a bare command resolved off the PATH. Judged on the *resolved* value,
     /// so <c>%appdata%</c> counts and <c>regedit</c> does not.
     /// </summary>
-    public static bool IsFileSystemPath(string? target) {
+    public static bool IsFileSystemPath(string? target) =>
+        IsFileSystemPath(target, OperatingSystem.IsWindows());
+
+    /// <summary>Test seam, the <see cref="Expand"/> shape: takes the platform explicitly so a catalog
+    /// authored for one can be checked from the other. Rootedness is still the host's rule, which is
+    /// enough — <c>~/…</c> and <c>/…</c> are rooted on both.
+    ///
+    /// It carries the platform <b>one way only</b>: <c>windows: false</c> answers correctly anywhere,
+    /// because the Unix notation is expanded here in managed code, but <c>windows: true</c> still needs
+    /// the environment variable to exist, and <c>%appdata%</c> does not on Linux.</summary>
+    internal static bool IsFileSystemPath(string? target, bool windows) {
         if (string.IsNullOrWhiteSpace(target) ||
             target.StartsWith(ShellPrefix, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        return Path.IsPathRooted(Resolve(target));
+        return Path.IsPathRooted(Expand(target, windows));
     }
 
     // The home shorthand is split off the front before variables are expanded, so an expanded value that
