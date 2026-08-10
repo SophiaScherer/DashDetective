@@ -18,6 +18,8 @@ public class ToolkitCatalogSeamTests {
 
         if (OperatingSystem.IsWindows())
             Assert.IsType<WindowsToolkitCatalog>(catalog);
+        else if (OperatingSystem.IsLinux())
+            Assert.IsType<LinuxToolkitCatalog>(catalog);
         else
             Assert.IsType<UnsupportedToolkitCatalog>(catalog);
     }

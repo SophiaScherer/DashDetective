@@ -22,7 +22,7 @@ internal interface IToolkitCatalog {
     /// empty tab falls back to the page's own "no commands" state and the user can still author their
     /// own rows, which is a better answer than thirty rows that can only fail.</summary>
     static IToolkitCatalog ForCurrentPlatform() =>
-        OperatingSystem.IsWindows()
-            ? WindowsToolkitCatalog.Instance
-            : UnsupportedToolkitCatalog.Instance;
+        OperatingSystem.IsWindows() ? WindowsToolkitCatalog.Instance
+        : OperatingSystem.IsLinux() ? LinuxToolkitCatalog.Instance
+        : UnsupportedToolkitCatalog.Instance;
 }
