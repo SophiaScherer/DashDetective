@@ -16,6 +16,10 @@ public class ProcNetParserTests {
 
     private static IReadOnlyList<ProcNetSocket> Tcp6() => Parse(ProcFixtures.ProcNetTcp6);
 
+    private static IReadOnlyList<ProcNetSocket> Udp() => Parse(ProcFixtures.ProcNetUdp);
+
+    private static IReadOnlyList<ProcNetSocket> Udp6() => Parse(ProcFixtures.ProcNetUdp6);
+
     /// <summary>The trap the parser exists for: the kernel prints each 32-bit word in HOST byte order, so
     /// <c>0100007F</c> is 127.0.0.1. Read as network order it is 1.0.0.127 — still a valid-looking
     /// address, which is why nothing downstream would catch it.</summary>
@@ -97,6 +101,50 @@ public class ProcNetParserTests {
         Assert.Equal("::ffff:192.168.1.100", mapped.LocalAddress.ToString());
         Assert.Equal("::ffff:142.250.187.238", mapped.RemoteAddress.ToString());
         Assert.Equal(443, mapped.RemotePort);
+    }
+
+    /// <summary>The UDP tables carry the same ten leading columns as the TCP ones, which is why one parser
+    /// serves all four. Here the <c>sl</c> values are wide enough to close up the leading space, so the
+    /// split has to tolerate the column drifting rather than reading fixed offsets.</summary>
+    [Fact]
+    public void Parse_ReadsTheUdpTableWithTheSameColumns() {
+        var rows = Udp();
+
+        Assert.Equal(3, rows.Count);
+        Assert.Equal("0.0.0.0", rows[0].LocalAddress.ToString());
+        Assert.Equal(68, rows[0].LocalPort);
+        Assert.Equal("127.0.0.53", rows[1].LocalAddress.ToString());
+        Assert.Equal(53, rows[1].LocalPort);
+        Assert.Equal(21335, rows[1].Inode);
+    }
+
+    /// <summary>A UDP socket that has called <c>connect</c> has a real peer and a real state, and the parser
+    /// reports both. Blanking them is a display rule that belongs to the interop — putting it here would
+    /// make the parser lie about the file, and would leave the interop no way to tell an unconnected
+    /// listener from a connected socket if it ever needed to.</summary>
+    [Fact]
+    public void Parse_ConnectedUdpRow_KeepsItsRemoteAndState() {
+        var connected = Udp()[2];
+
+        Assert.Equal("8.8.8.8", connected.RemoteAddress.ToString());
+        Assert.Equal(53, connected.RemotePort);
+        Assert.Equal(0x01, connected.State);
+
+        // The unconnected listeners report the kernel's CLOSE, not a zero the interop could confuse
+        // with "no state".
+        Assert.Equal(0x07, Udp()[0].State);
+    }
+
+    /// <summary>A link-local address, the everyday IPv6 shape on a LAN. Its four words are all distinct, so
+    /// a whole-16-byte reversal yields a wrong address that still reads as a plausible fe80 neighbour.</summary>
+    [Fact]
+    public void Parse_DecodesLinkLocalIpv6() {
+        var rows = Udp6();
+
+        Assert.Equal("::", rows[0].LocalAddress.ToString());
+        Assert.Equal(5353, rows[0].LocalPort);
+        Assert.Equal("fe80::a00:27ff:fe4e:66a1", rows[1].LocalAddress.ToString());
+        Assert.Equal(547, rows[1].LocalPort);
     }
 
     /// <summary>A hex group of any other length is not an address — the guard that stops the header's

@@ -371,6 +371,34 @@ internal static class ProcFixtures {
            2: 0000000000000000FFFF00006401A8C0:8AE2 0000000000000000FFFF0000EEBBFA8E:01BB 01 00000000:00000000 02:00000B85 00000000  1000        0 51003 2 0000000000000000 22 4 30 10 -1
         """;
 
+    /// <summary>
+    /// A stock Ubuntu <c>/proc/net/udp</c> — the same column layout as the TCP tables, with a shorter
+    /// trailer. The <c>sl</c> values are wide enough to swallow the leading space, which is what proves the
+    /// split tolerates the column drifting rather than reading at fixed offsets. Rows 1–2 are unconnected
+    /// listeners (<c>st</c> 07, the CLOSE the kernel reports for a socket with no peer); <b>row 3 is a
+    /// CONNECTED UDP socket</b>, with a real peer and <c>st</c> 01, which is the row that proves the parser
+    /// reports what the file says and leaves the "UDP has no remote or state" rule to the interop.
+    /// </summary>
+    public const string ProcNetUdp =
+        """
+           sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops
+          308: 00000000:0044 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 25309 2 0000000000000000 0
+         5030: 3500007F:0035 00000000:0000 07 00000000:00000000 00:00000000 00000000   101        0 21335 2 0000000000000000 0
+         6112: 6500A8C0:E7B5 08080808:0035 01 00000000:00000000 00:00000000 00000000  1000        0 52847 2 0000000000000000 0
+        """;
+
+    /// <summary>
+    /// The IPv6 companion. The second row is a <b>link-local</b> address — the everyday IPv6 shape on a LAN,
+    /// and the one whose four words are all distinct, so a decode that reverses the whole 16 bytes produces
+    /// a wrong address that still looks like a plausible fe80 neighbour.
+    /// </summary>
+    public const string ProcNetUdp6 =
+        """
+           sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops
+          742: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000  1000        0 34893 2 0000000000000000 0
+          918: 000080FE00000000FF27000AA1664EFE:0223 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 28104 2 0000000000000000 0
+        """;
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
