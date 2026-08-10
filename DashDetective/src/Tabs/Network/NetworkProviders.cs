@@ -17,13 +17,9 @@ internal sealed record NetworkProviders(
     IAdapterInfoProvider Adapters, IConnectionsProvider Connections, IDnsLookupProvider Dns) {
 
     /// <summary>The provider set for this machine. The adapter and DNS readers are portable; only the
-    /// connection tables differ, falling back to "no connections" — what the old inline
-    /// <c>OperatingSystem.IsWindows()</c> guards in the interop produced.</summary>
+    /// connection tables differ, and which one is <see cref="IConnectionsInterop"/>'s own choice.</summary>
     public static NetworkProviders ForCurrentPlatform() =>
-        Create(OperatingSystem.IsWindows() ? WindowsInterop() : new UnsupportedConnectionsInterop());
-
-    [SupportedOSPlatform("windows")]
-    private static IConnectionsInterop WindowsInterop() => new WindowsConnectionsInterop();
+        Create(IConnectionsInterop.ForCurrentPlatform());
 
     private static NetworkProviders Create(IConnectionsInterop interop) => new(
         new AdapterInfoProvider(), new ConnectionsProvider(interop), new DnsLookupProvider());

@@ -49,6 +49,30 @@ public class ConnectionsProviderTests {
         Assert.Equal("—", row.State);
     }
 
+    /// <summary>IPv6 addresses contain colons, so an unbracketed endpoint is ambiguous — "::1:631" gives no
+    /// way to tell the port from another hextet. The identity key is built from these strings too, so the
+    /// brackets also keep two different endpoints from colliding into one key.</summary>
+    [Fact]
+    public async Task GetAsync_Ipv6Endpoint_IsBracketed() {
+        var row = new RawConnection(
+            "TCP", IPAddress.Parse("::1"), 631, IPAddress.Parse("2001:db8::1"), 443, 5, SystemPid);
+
+        var snapshot = await SnapshotAsync(tcp: [row]);
+
+        var connection = Assert.Single(snapshot.Rows);
+        Assert.Equal("[::1]:631", connection.LocalEndpoint);
+        Assert.Equal("[2001:db8::1]:443", connection.RemoteEndpoint);
+    }
+
+    /// <summary>IPv4 keeps its bare form — the brackets are an IPv6 convention, and adding them everywhere
+    /// would change every existing Windows row.</summary>
+    [Fact]
+    public async Task GetAsync_Ipv4Endpoint_IsNotBracketed() {
+        var snapshot = await SnapshotAsync(tcp: [Tcp("10.0.0.1", 80, "10.0.0.2", 443)]);
+
+        Assert.Equal("10.0.0.1:80", Assert.Single(snapshot.Rows).LocalEndpoint);
+    }
+
     [Theory]
     [InlineData(2u, "Listening")]
     [InlineData(5u, "Established")]

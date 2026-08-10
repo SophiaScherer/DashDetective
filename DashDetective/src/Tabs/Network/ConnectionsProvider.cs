@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -73,8 +74,13 @@ internal sealed class ConnectionsProvider(IConnectionsInterop interop) : IConnec
         }
     }
 
-    private static string Endpoint(IPAddress address, int port) =>
-        $"{address}:{port.ToString(CultureInfo.InvariantCulture)}";
+    /// <summary>Formats an endpoint. IPv6 addresses are bracketed, because they contain colons themselves —
+    /// unbracketed, <c>::1</c> port 631 reads as "::1:631", where the port is indistinguishable from another
+    /// hextet. Also keeps <see cref="ConnectionInfo.Key"/> unambiguous, which the UI's keyed diff relies on.</summary>
+    private static string Endpoint(IPAddress address, int port) {
+        var host = address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]" : address.ToString();
+        return $"{host}:{port.ToString(CultureInfo.InvariantCulture)}";
+    }
 
     /// <summary>Resolves a PID to "name.exe", using well-known ids and a cache. Inaccessible (elevated/
     /// protected) or already-exited processes fall back to "PID n" rather than throwing.</summary>
