@@ -12,7 +12,7 @@ namespace DashDetective.Tests.Tabs.Network;
 /// identity de-duplication, the UDP substitutions, the TCP state table, sort order, and the row cap
 /// reporting an honest pre-cap total.</summary>
 public class ConnectionsProviderTests {
-    // PID 4 resolves to "System" from the well-known table, so these rows never touch a real process.
+    // Any PID will do: the name resolver is a seam here, so no test touches a real process.
     private const int SystemPid = 4;
 
     private static RawConnection Tcp(string local, int localPort, string remote, int remotePort,
@@ -24,7 +24,7 @@ public class ConnectionsProviderTests {
 
     private static Task<ConnectionsSnapshot> SnapshotAsync(
         IReadOnlyList<RawConnection>? tcp = null, IReadOnlyList<RawConnection>? udp = null) =>
-        new ConnectionsProvider(new FakeInterop(tcp, udp)).GetAsync();
+        new ConnectionsProvider(new FakeInterop(tcp, udp), new FakeNames()).GetAsync();
 
     /// <summary>Two rows sharing Protocol|Local|Remote|Pid must collapse to one: the UI keys rows by
     /// that identity, and a duplicate breaks the keyed diff with an out-of-range Move.</summary>
@@ -117,10 +117,49 @@ public class ConnectionsProviderTests {
     /// <summary>A throwing interop is contained: the panel blanks rather than the page faulting.</summary>
     [Fact]
     public async Task GetAsync_InteropThrows_SoftFailsToEmpty() {
-        var snapshot = await new ConnectionsProvider(new ThrowingInterop()).GetAsync();
+        var snapshot = await new ConnectionsProvider(new ThrowingInterop(), new FakeNames()).GetAsync();
 
         Assert.Empty(snapshot.Rows);
         Assert.Equal(0, snapshot.Total);
+    }
+
+    /// <summary>A PID is resolved once and reused across rows and polls: the lookup costs a process handle
+    /// or a file read, and a busy machine repeats the same few PIDs across hundreds of sockets.</summary>
+    [Fact]
+    public async Task GetAsync_ResolvesEachPidOnce() {
+        var names = new FakeNames();
+        var provider = new ConnectionsProvider(
+            new FakeInterop([Tcp("10.0.0.1", 1, "10.0.0.2", 443), Tcp("10.0.0.1", 2, "10.0.0.3", 443)], null),
+            names);
+
+        await provider.GetAsync();
+        await provider.GetAsync();
+
+        Assert.Equal([SystemPid], names.Asked);
+    }
+
+    /// <summary>A PID that has left is dropped from the cache, because Linux and Windows both reuse PIDs —
+    /// a retained entry would eventually name a different process.</summary>
+    [Fact]
+    public async Task GetAsync_EvictsPidsThatHaveGone() {
+        var names = new FakeNames();
+        var provider = new ConnectionsProvider(new FakeInterop([Tcp("10.0.0.1", 1, "10.0.0.2", 443)], null), names);
+        await provider.GetAsync();
+
+        var reused = new ConnectionsProvider(new FakeInterop([Tcp("10.0.0.1", 1, "10.0.0.2", 443)], null), names);
+        await reused.GetAsync();
+
+        Assert.Equal([SystemPid, SystemPid], names.Asked);
+    }
+
+    /// <summary>Records which PIDs it was asked about, so the caching can be observed.</summary>
+    private sealed class FakeNames : IProcessNameResolver {
+        public List<int> Asked { get; } = [];
+
+        public string Resolve(int pid) {
+            Asked.Add(pid);
+            return $"proc{pid}";
+        }
     }
 
     private sealed class FakeInterop(

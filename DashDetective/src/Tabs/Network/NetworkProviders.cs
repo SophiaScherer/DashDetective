@@ -1,6 +1,3 @@
-using System;
-using System.Runtime.Versioning;
-
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
@@ -16,11 +13,11 @@ namespace DashDetective.Tabs.Network;
 internal sealed record NetworkProviders(
     IAdapterInfoProvider Adapters, IConnectionsProvider Connections, IDnsLookupProvider Dns) {
 
-    /// <summary>The provider set for this machine. The adapter and DNS readers are portable; only the
-    /// connection tables differ, and which one is <see cref="IConnectionsInterop"/>'s own choice.</summary>
+    /// <summary>The provider set for this machine. The adapter and DNS readers are portable; the connection
+    /// tables and the naming of their owners differ, and each seam chooses its own arm.</summary>
     public static NetworkProviders ForCurrentPlatform() =>
-        Create(IConnectionsInterop.ForCurrentPlatform());
+        Create(IConnectionsInterop.ForCurrentPlatform(), IProcessNameResolver.ForCurrentPlatform());
 
-    private static NetworkProviders Create(IConnectionsInterop interop) => new(
-        new AdapterInfoProvider(), new ConnectionsProvider(interop), new DnsLookupProvider());
+    private static NetworkProviders Create(IConnectionsInterop interop, IProcessNameResolver names) => new(
+        new AdapterInfoProvider(), new ConnectionsProvider(interop, names), new DnsLookupProvider());
 }
