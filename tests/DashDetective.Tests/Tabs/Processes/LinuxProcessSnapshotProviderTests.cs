@@ -162,16 +162,13 @@ public class LinuxProcessSnapshotProviderTests {
     public void ComputeCpuPercent_Cases(ulong ticks, double seconds, int processors, double expected) =>
         Assert.Equal(expected, LinuxProcessSnapshotProvider.ComputeCpuPercent(ticks, seconds, processors), 6);
 
-    /// <summary><c>cmdline</c> is NUL-separated, so argv[0] ends at the first NUL. Splitting on spaces would
-    /// mangle any path containing one.</summary>
+    /// <summary>The derivation itself now lives in <c>ProcPidName</c>, shared with the Network tab; what is
+    /// this tab's own is the placeholder for a process that names itself nowhere.</summary>
     [Theory]
     [InlineData("/usr/lib/firefox/firefox\0-contentproc\0", "comm", "firefox")]
-    [InlineData("/opt/My App/run\0--flag\0", "comm", "run")]
-    [InlineData("nautilus\0", "comm", "nautilus")]
     [InlineData("", "kworker/3:1H", "kworker/3:1H")]       // kernel thread: no cmdline at all
-    [InlineData(null, "gnome-shell", "gnome-shell")]
     [InlineData("", "", "Unknown")]
-    public void NameFrom_PrefersTheCommandLineBasename(string? cmdline, string comm, string expected) =>
+    public void NameFrom_FallsBackToThisTabsPlaceholder(string? cmdline, string comm, string expected) =>
         Assert.Equal(expected, LinuxProcessSnapshotProvider.NameFrom(cmdline, comm));
 
     /// <summary>Windows reports only "Running" and "Not responding", so states meaning the same thing there
