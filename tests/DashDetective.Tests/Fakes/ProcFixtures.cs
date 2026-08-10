@@ -250,6 +250,97 @@ internal static class ProcFixtures {
         "58 (kworker/3:1H-events_highpri) I 2 0 0 0 -1 69238880 0 0 0 0 0 8 0 0 0 -20 1 0 " +
         "112 0 0 18446744073709551615 0 0 0 0 0 0 0 2147483647 0 0 0 0 17 3 0 0 0 0 0 0 0 0 0 0 0\n";
 
+    /// <summary>
+    /// A <c>/proc/[pid]/status</c> for the same GNOME Shell process. Tab-separated like the real file (so
+    /// joined rather than written as a raw literal, as <see cref="ProcCpuInfo"/> is), and carrying the two
+    /// traps: <c>Uid</c> has <b>four</b> values and only the first is the owner, and <c>Threads</c>/
+    /// <c>PPid</c> are present but must be read from <c>stat</c> instead. VmRSS is 345678 kB.
+    /// </summary>
+    public static readonly string ProcPidStatus = string.Join('\n', [
+        "Name:\tgnome-shell",
+        "Umask:\t0002",
+        "State:\tS (sleeping)",
+        "Tgid:\t412",
+        "Pid:\t412",
+        "PPid:\t1",
+        "TracerPid:\t0",
+        "Uid:\t1000\t1000\t1000\t1000",
+        "Gid:\t1000\t1000\t1000\t1000",
+        "FDSize:\t256",
+        "VmPeak:\t 4194304 kB",
+        "VmSize:\t 3456789 kB",
+        "VmHWM:\t  456789 kB",
+        "VmRSS:\t  345678 kB",
+        "RssAnon:\t  123456 kB",
+        "Threads:\t14",
+        ""]);
+
+    /// <summary>
+    /// A kernel thread's <c>status</c>: owned by root, and with <b>no <c>VmRSS</c> line at all</b> — it has
+    /// no address space. A reader that requires the field, rather than treating its absence as zero, drops
+    /// every kernel thread from the list.
+    /// </summary>
+    public static readonly string ProcPidStatusKernelThread = string.Join('\n', [
+        "Name:\tkworker/3:1H-events_highpri",
+        "State:\tI (idle)",
+        "Tgid:\t58",
+        "Pid:\t58",
+        "PPid:\t2",
+        "Uid:\t0\t0\t0\t0",
+        "Gid:\t0\t0\t0\t0",
+        "Threads:\t1",
+        ""]);
+
+    /// <summary>A <c>/proc/[pid]/io</c>. Separated by a <b>space</b>, not the tab <c>status</c> uses.
+    /// <c>rchar</c> + <c>wchar</c> total 4 MiB; the far smaller <c>read_bytes</c>/<c>write_bytes</c> pair is
+    /// present precisely because reading those instead is the plausible-looking mistake.</summary>
+    public const string ProcPidIo =
+        """
+        rchar: 3145728
+        wchar: 1048576
+        syscr: 632687
+        syscw: 632675
+        read_bytes: 8192
+        write_bytes: 16384
+        cancelled_write_bytes: 0
+        """;
+
+    /// <summary>A desktop app's cgroup v2 line: GNOME launches each app into its own <c>app-*.scope</c>
+    /// under <c>app.slice</c>.</summary>
+    public const string ProcCgroupApp =
+        "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-firefox-3456.scope\n";
+
+    /// <summary>A system daemon's: <c>system.slice</c> is what every unit the boot brought up sits in.</summary>
+    public const string ProcCgroupSystem = "0::/system.slice/cron.service\n";
+
+    /// <summary>A user-level background unit — under <c>user@1000.service</c> but a <c>.service</c> leaf
+    /// rather than an <c>app-*.scope</c>, which is the Background/App boundary.</summary>
+    public const string ProcCgroupUserService =
+        "0::/user.slice/user-1000.slice/user@1000.service/gvfs-daemon.service\n";
+
+    /// <summary>
+    /// A <b>hybrid</b> v1/v2 host, as Ubuntu shipped before 21.10 and as some containers still present. A
+    /// dozen v1 controller lines surround the single unified line, so a reader that takes the first or last
+    /// line gets a v1 path. Only hierarchy <c>0</c> with an <b>empty</b> controller list is the v2 one —
+    /// note the <c>1:name=systemd:</c> line, which is numbered like a v1 hierarchy and is not it.
+    /// </summary>
+    public const string ProcCgroupHybrid =
+        """
+        12:pids:/user.slice/user-1000.slice/session-2.scope
+        11:memory:/user.slice/user-1000.slice/session-2.scope
+        4:cpu,cpuacct:/user.slice
+        1:name=systemd:/user.slice/user-1000.slice/session-2.scope
+        0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-gnome-nautilus-9012.scope
+        """;
+
+    /// <summary>A v1-only host: no unified line at all, so the classifier can learn nothing and must fall
+    /// through rather than guess.</summary>
+    public const string ProcCgroupV1Only =
+        """
+        12:pids:/user.slice/user-1000.slice/session-2.scope
+        1:name=systemd:/user.slice/user-1000.slice/session-2.scope
+        """;
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
