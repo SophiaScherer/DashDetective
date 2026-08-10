@@ -14,9 +14,11 @@ namespace DashDetective.Tabs.Processes;
 internal interface IProcessSnapshotProvider {
     Task<IReadOnlyList<ProcessInfo>> GetAsync();
 
-    /// <summary>The snapshot reader for this machine, or one that reports no processes.</summary>
+    /// <summary>The snapshot reader for this machine, or one that reports no processes. The Linux arm takes
+    /// no <paramref name="interop"/>: that seam is Windows-shaped (its I/O counters are read from a managed
+    /// <c>Process</c> handle), and <c>/proc/[pid]/io</c> supplies the same figure directly.</summary>
     static IProcessSnapshotProvider ForCurrentPlatform(IProcessInterop interop) =>
-        OperatingSystem.IsWindows()
-            ? new WindowsProcessSnapshotProvider(interop)
-            : new UnsupportedProcessSnapshotProvider();
+        OperatingSystem.IsWindows() ? new WindowsProcessSnapshotProvider(interop)
+        : OperatingSystem.IsLinux() ? new LinuxProcessSnapshotProvider()
+        : new UnsupportedProcessSnapshotProvider();
 }
