@@ -341,6 +341,36 @@ internal static class ProcFixtures {
         1:name=systemd:/user.slice/user-1000.slice/session-2.scope
         """;
 
+    /// <summary>
+    /// A stock Ubuntu <c>/proc/net/tcp</c>, carrying the traps of the real file: the <c>sl</c> header, which
+    /// has twelve fields and so survives a column-count check; leading spaces on every row; the
+    /// <c>0100007F</c> loopback address, which decodes to 1.0.0.127 if the host byte order is missed; a
+    /// TIME_WAIT row whose <b>inode is 0</b>, which no process owns; and a torn final line. The owners are a
+    /// system daemon (uid 101), a root listener (uid 0) and the desktop user (uid 1000).
+    /// </summary>
+    public const string ProcNetTcp =
+        """
+          sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+           0: 0100007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000   101        0 21344 1 0000000000000000 100 0 0 10 0
+           1: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 19788 1 0000000000000000 100 0 0 10 0
+           2: 6500A8C0:CB2A EEBBFA8E:01BB 01 00000000:00000000 02:00000B85 00000000  1000        0 48219 2 0000000000000000 22 4 30 10 -1
+           3: 6500A8C0:C1F4 EEBBFA8E:01BB 06 00000000:00000000 03:00000C1A 00000000     0        0 0 3 0000000000000000 0 0 0 10 -1
+           4: 6500A8C0:
+        """;
+
+    /// <summary>
+    /// The IPv6 companion. <c>::</c> and <c>::1</c> prove the four-word decode, and the third row is the
+    /// <c>::ffff:</c> v4-mapped form a dual-stack socket reports — its third word is <c>FFFF0000</c>, which
+    /// only lands in the right place if each word is reversed on its own rather than the whole 16 bytes.
+    /// </summary>
+    public const string ProcNetTcp6 =
+        """
+          sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+           0: 00000000000000000000000000000000:1F90 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 34512 1 0000000000000000 100 0 0 10 0
+           1: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 27650 1 0000000000000000 100 0 0 10 0
+           2: 0000000000000000FFFF00006401A8C0:8AE2 0000000000000000FFFF0000EEBBFA8E:01BB 01 00000000:00000000 02:00000B85 00000000  1000        0 51003 2 0000000000000000 22 4 30 10 -1
+        """;
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
