@@ -30,19 +30,19 @@ public class ToolkitCommandValidatorTests {
     [Fact]
     public void Validate_TitleAlreadyOnThePage_IsRefused() {
         Assert.Equal(ToolkitCommandValidator.TitleTaken,
-                     ToolkitCommandValidator.Validate(Folder("%temp%"), ToolkitCatalog.Entries));
+                     ToolkitCommandValidator.Validate(Folder("%temp%"), WindowsToolkitCatalog.Instance.Entries));
     }
 
     [Fact]
     public void Validate_TitleClashIsCaseInsensitive() {
         Assert.Equal(ToolkitCommandValidator.TitleTaken,
-                     ToolkitCommandValidator.Validate(Folder("REGEDIT"), ToolkitCatalog.Entries));
+                     ToolkitCommandValidator.Validate(Folder("REGEDIT"), WindowsToolkitCatalog.Instance.Entries));
     }
 
     [Fact]
     public void Validate_TitleWithSurroundingSpaceStillClashes() {
         Assert.Equal(ToolkitCommandValidator.TitleTaken,
-                     ToolkitCommandValidator.Validate(Folder("  regedit  "), ToolkitCatalog.Entries));
+                     ToolkitCommandValidator.Validate(Folder("  regedit  "), WindowsToolkitCatalog.Instance.Entries));
     }
 
     /// <summary>Editing a row without renaming it is not a clash with itself.</summary>

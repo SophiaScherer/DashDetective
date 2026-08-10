@@ -108,7 +108,7 @@ public class ToolkitCommandFactoryTests {
     /// by a category that could be set by hand.</summary>
     [Fact]
     public void IsCustom_IsFalseForEveryCatalogRow() {
-        Assert.All(ToolkitCatalog.Entries, entry => {
+        Assert.All(WindowsToolkitCatalog.Instance.Entries, entry => {
             Assert.False(entry.IsCustom);
             Assert.Null(entry.SecondaryCategory);
         });

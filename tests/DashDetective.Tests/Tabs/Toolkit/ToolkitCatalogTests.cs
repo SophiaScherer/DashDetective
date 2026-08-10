@@ -1,14 +1,21 @@
 using DashDetective.Tabs.Toolkit;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
 namespace DashDetective.Tests.Tabs.Toolkit;
 
-/// <summary>Covers <see cref="ToolkitCatalog"/>: the copy table stays complete (every category and
-/// every kind reads as something, and no two share a label) and the display order matches the enum's
-/// declaration order, so adding a category can't silently fall through to another one's text.</summary>
+/// <summary>Covers <see cref="ToolkitCatalog"/>'s copy (every category and every kind reads as
+/// something, no two share a label, and the display order matches the enum's declaration order, so
+/// adding a category can't silently fall through to another one's text) and the Windows command table.
+///
+/// The table is named rather than resolved through <see cref="IToolkitCatalog.ForCurrentPlatform"/>:
+/// these rules are about <see cref="WindowsToolkitCatalog"/>'s own rows, and asserting them against
+/// whatever the host happens to return would stop them running on the Linux CI leg.</summary>
 public class ToolkitCatalogTests {
+    private static IReadOnlyList<ToolkitEntry> Entries => WindowsToolkitCatalog.Instance.Entries;
+
     [Fact]
     public void Categories_ListEveryValueInDeclarationOrder() {
         Assert.Equal(Enum.GetValues<ToolkitCategory>(), ToolkitCatalog.Categories);
@@ -34,8 +41,8 @@ public class ToolkitCatalogTests {
     /// half-drawn and, because the search provider matches on it, unreachable by intent.</summary>
     [Fact]
     public void Entries_AllCarryACommandAndADescription() {
-        Assert.NotEmpty(ToolkitCatalog.Entries);
-        Assert.All(ToolkitCatalog.Entries, entry => {
+        Assert.NotEmpty(Entries);
+        Assert.All(Entries, entry => {
             Assert.False(string.IsNullOrWhiteSpace(entry.Command));
             Assert.False(string.IsNullOrWhiteSpace(entry.Description));
         });
@@ -46,14 +53,14 @@ public class ToolkitCatalogTests {
     /// of the pair permanently unreachable.</summary>
     [Fact]
     public void Entries_HaveDistinctCommands() {
-        var commands = ToolkitCatalog.Entries.Select(entry => entry.Command).ToList();
+        var commands = Entries.Select(entry => entry.Command).ToList();
 
         Assert.Equal(commands.Count, commands.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]
     public void Entries_AllCarryAnActionWithATarget() {
-        Assert.All(ToolkitCatalog.Entries,
+        Assert.All(Entries,
                    entry => Assert.False(string.IsNullOrWhiteSpace(entry.Action.Target)));
     }
 
@@ -61,7 +68,7 @@ public class ToolkitCatalogTests {
     /// filed under it would be dropped by <see cref="ToolkitFilter.Group"/> and never appear.</summary>
     [Fact]
     public void Entries_OnlyUseCategoriesTheListRenders() {
-        Assert.All(ToolkitCatalog.Entries,
+        Assert.All(Entries,
                    entry => Assert.Contains(entry.Category, ToolkitCatalog.Categories));
     }
 
@@ -70,7 +77,7 @@ public class ToolkitCatalogTests {
     /// can legitimately ask for it.</summary>
     [Fact]
     public void Entries_OnlyConsoleCommandsEverRequireElevation() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.Action.RequiresElevation),
+        Assert.All(Entries.Where(e => e.Action.RequiresElevation),
                    entry => Assert.Equal(ToolkitEntryKind.Command, entry.Kind));
     }
 
@@ -78,7 +85,7 @@ public class ToolkitCatalogTests {
     /// a box must say so in its label. Either half alone is a row the user cannot use correctly.</summary>
     [Fact]
     public void Entries_PlaceholderInTheLabelMatchesHavingAParameter() {
-        Assert.All(ToolkitCatalog.Entries, entry => Assert.Equal(
+        Assert.All(Entries, entry => Assert.Equal(
             entry.Command.Contains('<', StringComparison.Ordinal),
             entry.Parameter is not null));
     }
@@ -87,7 +94,7 @@ public class ToolkitCatalogTests {
     /// whose command takes its target last — which in practice means a captured console command.</summary>
     [Fact]
     public void Entries_OnlyCapturedCommandsTakeAParameter() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.Parameter is not null),
+        Assert.All(Entries.Where(e => e.Parameter is not null),
                    entry => Assert.True(entry.Action.CapturesOutput));
     }
 
@@ -95,7 +102,7 @@ public class ToolkitCatalogTests {
     /// by name: adding another must be a deliberate edit here, not something that slips in.</summary>
     [Fact]
     public void Entries_ExactlyOneRowAsksForAdministrator() {
-        var elevated = ToolkitCatalog.Entries.Where(e => e.RequiresElevation).ToList();
+        var elevated = Entries.Where(e => e.RequiresElevation).ToList();
 
         Assert.Equal(["sfc /scannow"], elevated.Select(e => e.Command));
     }
@@ -104,7 +111,7 @@ public class ToolkitCatalogTests {
     /// process's streams, so a captured-and-elevated row would show an empty body forever.</summary>
     [Fact]
     public void Entries_ElevatedRowsDoNotCaptureOutput() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.RequiresElevation),
+        Assert.All(Entries.Where(e => e.RequiresElevation),
                    entry => Assert.False(entry.Action.CapturesOutput));
     }
 
@@ -112,7 +119,7 @@ public class ToolkitCatalogTests {
     /// not the explanation, and it is invisible to anyone reading the row through search.</summary>
     [Fact]
     public void Entries_ElevatedRowsSaySoInTheirDescription() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.RequiresElevation),
+        Assert.All(Entries.Where(e => e.RequiresElevation),
                    entry => Assert.Contains("administrator", entry.Description,
                                             StringComparison.OrdinalIgnoreCase));
     }
@@ -123,7 +130,7 @@ public class ToolkitCatalogTests {
     /// row that can only ever fail. Catching it here means it never ships as a dead button.</summary>
     [Fact]
     public void Entries_EveryDocumentationLinkIsHttps() {
-        var links = ToolkitCatalog.Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl).ToList();
+        var links = Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl).ToList();
 
         Assert.NotEmpty(links);
         Assert.All(links, entry => Assert.StartsWith(
@@ -134,13 +141,13 @@ public class ToolkitCatalogTests {
     /// It reaches the log through the action's command line, which is what puts it on the record.</summary>
     [Fact]
     public void Entries_DocumentationLinksCarryTheUrlOnTheirCommandLine() {
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl),
+        Assert.All(Entries.Where(e => e.Action.Kind == ToolkitActionKind.OpenUrl),
                    entry => Assert.Equal(entry.Action.Target, entry.Action.CommandLine));
     }
 
     [Fact]
     public void Entries_OpenUrlIsUsedOnlyByDocumentationLinks() {
-        Assert.All(ToolkitCatalog.Entries, entry => Assert.Equal(
+        Assert.All(Entries, entry => Assert.Equal(
             entry.Action.Kind == ToolkitActionKind.OpenUrl,
             entry.Category == ToolkitCategory.DocsAndLinks));
     }
