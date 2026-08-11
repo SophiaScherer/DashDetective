@@ -241,6 +241,17 @@
                     </Grid>
                 </Border>
 
+                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NvidiaGpuMetrics}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.NvidiaGpuMetrics.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.NvidiaGpuMetrics.Description}"/>
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding NvidiaGpuMetrics}"/>
+                    </Grid>
+                </Border>
+
                 <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ShowInTray}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">

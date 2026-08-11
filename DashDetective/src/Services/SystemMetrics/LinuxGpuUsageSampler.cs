@@ -34,23 +34,32 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
 
     private static readonly IReadOnlyDictionary<string, double> NoEngines = new Dictionary<string, double>();
 
+    /// <summary>PCI vendor id for NVIDIA — the only cards <c>nvidia-smi</c> can answer for, so a machine
+    /// without one never spawns it however the setting is left.</summary>
+    private const uint NvidiaVendorId = 0x10DE;
+
     private readonly IProcFileSystem _proc;
+    private readonly NvidiaSmiReader? _nvidiaSmi;
 
     // Key → the one file this sampler re-reads per tick, or null for a card that publishes none. Cards
     // with no source are kept so the adapter still appears, reporting a null utilisation.
     private readonly List<(string Key, string? BusyPath)> _cards = [];
 
-    public LinuxGpuUsageSampler() : this(new ProcFileSystem()) { }
+    private bool _hasNvidiaCard;
+
+    public LinuxGpuUsageSampler() : this(new ProcFileSystem(), new NvidiaSmiReader()) { }
 
     /// <summary>Test seam: injects the filesystem so the sysfs read can be exercised against canned
-    /// fixtures from any dev machine.</summary>
-    internal LinuxGpuUsageSampler(IProcFileSystem proc) {
+    /// fixtures from any dev machine, and the nvidia-smi reader so no process ever exists.</summary>
+    internal LinuxGpuUsageSampler(IProcFileSystem proc, NvidiaSmiReader? nvidiaSmi = null) {
         _proc = proc;
+        _nvidiaSmi = nvidiaSmi;
 
         try {
             foreach (var card in DrmCardFacts.Read(proc)) {
                 var path = card.DevicePath + BusyFile;
                 _cards.Add((card.Key, proc.Exists(path) ? path : null));
+                _hasNvidiaCard |= card.VendorId == NvidiaVendorId;
             }
         } catch (Exception e) {
             // A failed enumeration leaves _cards empty, so SampleAdapters returns nothing forever — the
@@ -59,16 +68,35 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         }
     }
 
+    /// <inheritdoc/>
+    public bool NvidiaMetricsEnabled { get; set; }
+
     public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() {
         if (_cards.Count == 0)
             return Empty;
 
+        var nvidia = NvidiaReadings();
+
         var samples = new Dictionary<string, GpuAdapterSample>(_cards.Count, StringComparer.Ordinal);
-        foreach (var (key, path) in _cards)
-            samples[key] = new GpuAdapterSample(
-                path is null ? null : ParsePercent(_proc.ReadAllText(path)), NoEngines);
+        foreach (var (key, path) in _cards) {
+            // sysfs first: it is free, current, and the only source for AMD. nvidia-smi fills in only the
+            // cards sysfs cannot answer for.
+            var percent = path is null ? null : ParsePercent(_proc.ReadAllText(path));
+            samples[key] = new GpuAdapterSample(percent ?? nvidia?.Utilisation(key), NoEngines);
+        }
 
         return samples;
+    }
+
+    /// <summary>The nvidia-smi reader to consult this tick, or <c>null</c> when it is switched off, absent,
+    /// or there is no NVIDIA card to ask about. Also nudges it to refresh, which it does on its own slow
+    /// cadence rather than per tick.</summary>
+    private NvidiaSmiReader? NvidiaReadings() {
+        if (!NvidiaMetricsEnabled || !_hasNvidiaCard || _nvidiaSmi is null)
+            return null;
+
+        _nvidiaSmi.RefreshIfDue();
+        return _nvidiaSmi;
     }
 
     /// <summary>Parses a <c>gpu_busy_percent</c> body into a clamped 0–100 reading, or <c>null</c> when the

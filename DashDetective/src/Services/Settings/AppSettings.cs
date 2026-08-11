@@ -34,6 +34,11 @@ public sealed record AppSettings {
     /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
     public bool ResourceAlerts { get; init; }
 
+    /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default: it is
+    /// the only metric in the app that costs a process launch, and the card reads "—" without it. No
+    /// effect on Windows, where the same figure comes from a performance counter.</summary>
+    public bool NvidiaGpuMetrics { get; init; }
+
     /// <summary>Performance tab: show every detected instance in the left rail ("All devices") rather than
     /// only the primary of each kind ("Primary"). Meaningful when a category has more than one instance.</summary>
     public bool PerformanceShowAllDevices { get; init; }

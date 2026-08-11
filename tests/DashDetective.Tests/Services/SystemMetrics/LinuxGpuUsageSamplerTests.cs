@@ -1,4 +1,5 @@
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Tabs.Toolkit;
 using DashDetective.Tests.Fakes;
 using System.Linq;
 using System.Threading.Tasks;
@@ -73,6 +74,59 @@ public class LinuxGpuUsageSamplerTests {
         // Set equality, not merely a non-empty overlap: every enumerated adapter must survive the
         // inventory's intersection, including the one with no utilisation to report.
         Assert.Equal(tokens.Order(), sampled.Order());
+    }
+
+    /// <summary>The whole justification for the setting: with it off, nothing is ever launched. Asserted on
+    /// a machine that <i>has</i> an NVIDIA card, since that is the only case where a spawn would be
+    /// tempting.</summary>
+    [Fact]
+    public void SampleAdapters_NvidiaDisabled_NeverLaunchesAnything() {
+        var launcher = new FakeProcessLauncher();
+        using var sampler = new LinuxGpuUsageSampler(
+            new FakeProcFileSystem().WithNvidiaCard(), new NvidiaSmiReader(launcher));
+
+        for (var i = 0; i < 5; i++)
+            _ = sampler.SampleAdapters();
+
+        Assert.Empty(launcher.Calls);
+        Assert.Null(Assert.Single(sampler.SampleAdapters()).Value.Overall);
+    }
+
+    /// <summary>An AMD-only box has nothing for nvidia-smi to say, so the opt-in must still not spawn
+    /// it.</summary>
+    [Fact]
+    public void SampleAdapters_NvidiaEnabledButNoNvidiaCard_StillLaunchesNothing() {
+        var launcher = new FakeProcessLauncher();
+        using var sampler = new LinuxGpuUsageSampler(
+            new FakeProcFileSystem().WithAmdgpuCard(), new NvidiaSmiReader(launcher)) {
+            NvidiaMetricsEnabled = true,
+        };
+
+        _ = sampler.SampleAdapters();
+
+        Assert.Empty(launcher.Calls);
+    }
+
+    [Fact]
+    public async Task SampleAdapters_NvidiaEnabled_FillsTheNvidiaCardFromTheHelper() {
+        var launcher = new FakeProcessLauncher {
+            NextCapture = new ProcessCapture(0, "00000000:01:00.0, 61\n", "", false),
+        };
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().WithNvidiaCard();
+        using var sampler = new LinuxGpuUsageSampler(proc, new NvidiaSmiReader(launcher)) {
+            NvidiaMetricsEnabled = true,
+        };
+
+        // The first tick starts the run and reports nothing for NVIDIA; a later one sees the result.
+        _ = sampler.SampleAdapters();
+        for (var i = 0; i < 200 && launcher.Calls.Count == 0; i++)
+            await Task.Delay(5);
+
+        var samples = sampler.SampleAdapters();
+
+        Assert.Equal(61, samples["0000:01:00.0"].Overall);
+        // sysfs still owns the AMD card — the helper never overrides a reading sysfs can give.
+        Assert.Equal(37, samples["0000:03:00.0"].Overall);
     }
 
     [Theory]

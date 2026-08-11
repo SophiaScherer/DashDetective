@@ -76,6 +76,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler = IGpuUsageSampler.ForCurrentPlatform();
 
+    /// <summary>Mirrors the "NVIDIA GPU utilization" setting onto this page's sampler. Only the Linux arm
+    /// acts on it; everywhere else it is inert. Pushed by the shell on load and whenever it changes.</summary>
+    public bool NvidiaGpuMetrics {
+        get => _gpuSampler.NvidiaMetricsEnabled;
+        set => _gpuSampler.NvidiaMetricsEnabled = value;
+    }
+
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
     [ObservableProperty] private string _cpuPercentText = "0%";

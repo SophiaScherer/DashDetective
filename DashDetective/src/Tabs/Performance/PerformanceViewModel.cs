@@ -70,6 +70,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         set => SetGpuDetailed(value, persist: false);
     }
 
+    /// <summary>Mirrors the "NVIDIA GPU utilization" setting onto this page's sampler. Only the Linux arm
+    /// acts on it; everywhere else it is inert. Pushed by the shell on load and whenever it changes.</summary>
+    public bool NvidiaGpuMetrics {
+        get => _gpuSampler.NvidiaMetricsEnabled;
+        set => _gpuSampler.NvidiaMetricsEnabled = value;
+    }
+
     /// <summary>Whether the CPU resource shows its per-logical-processor "Detailed" charts. Persisted by the shell.</summary>
     public bool CpuDetailedView {
         get => _cpuRow.IsDetailed;
