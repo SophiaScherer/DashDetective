@@ -5,22 +5,25 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
 /// Builds the Active Connections snapshot from <see cref="IConnectionsInterop"/> (TCP + UDP), resolves
-/// each owning PID to a process name, and returns a sorted, capped list. Runs off the UI thread via
-/// <see cref="GetAsync"/> and never throws (soft-fails to an empty list), matching the app's provider
-/// convention. PID→name results are cached because <see cref="Process.GetProcessById"/> is relatively
-/// costly and most PIDs recur across polls; the cache evicts PIDs no longer present (PIDs get reused).
+/// each owning PID to a process name through <see cref="IProcessNameResolver"/>, and returns a sorted,
+/// capped list. Runs off the UI thread via <see cref="GetAsync"/> and never throws (soft-fails to an empty
+/// list), matching the app's provider convention. PID→name results are cached because the lookup costs a
+/// process handle or a file read and most PIDs recur across polls; the cache evicts PIDs no longer present
+/// (PIDs get reused).
 ///
-/// Portable managed code — no platform prefix, because the only Windows-specific part of this tab is the
-/// interop it is handed. Not thread-safe by design (the cache is per-instance mutable state): the Network
-/// VM polls it from a single timer with an in-flight guard, so calls never overlap.
+/// Portable managed code — no platform prefix, because everything platform-specific about this tab is in
+/// the two seams it is handed. Not thread-safe by design (the cache is per-instance mutable state): the
+/// Network VM polls it from a single timer with an in-flight guard, so calls never overlap.
 /// </summary>
-internal sealed class ConnectionsProvider(IConnectionsInterop interop) : IConnectionsProvider {
+internal sealed class ConnectionsProvider(
+    IConnectionsInterop interop, IProcessNameResolver names) : IConnectionsProvider {
     /// <summary>Safety ceiling on rows returned, so a machine with a pathological number of sockets
     /// can't bloat memory. Well above the UI's max page size (150) — the VM pages the full set
     /// client-side, only ever binding one page at a time — so this is a backstop, not the display cap.</summary>
@@ -73,28 +76,22 @@ internal sealed class ConnectionsProvider(IConnectionsInterop interop) : IConnec
         }
     }
 
-    private static string Endpoint(IPAddress address, int port) =>
-        $"{address}:{port.ToString(CultureInfo.InvariantCulture)}";
+    /// <summary>Formats an endpoint. IPv6 addresses are bracketed, because they contain colons themselves —
+    /// unbracketed, <c>::1</c> port 631 reads as "::1:631", where the port is indistinguishable from another
+    /// hextet. Also keeps <see cref="ConnectionInfo.Key"/> unambiguous, which the UI's keyed diff relies on.</summary>
+    private static string Endpoint(IPAddress address, int port) {
+        var host = address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]" : address.ToString();
+        return $"{host}:{port.ToString(CultureInfo.InvariantCulture)}";
+    }
 
-    /// <summary>Resolves a PID to "name.exe", using well-known ids and a cache. Inaccessible (elevated/
-    /// protected) or already-exited processes fall back to "PID n" rather than throwing.</summary>
+    /// <summary>Resolves a PID to a display name through the platform's resolver, caching the result. The
+    /// cache lives here rather than in the resolver because this class owns the snapshot, so it is the only
+    /// one that knows when a PID has left.</summary>
     private string ResolveName(int pid) {
-        if (pid == 0)
-            return "System Idle";
-        if (pid == 4)
-            return "System";
         if (_nameCache.TryGetValue(pid, out var cached))
             return cached;
 
-        string name;
-        try {
-            using var process = Process.GetProcessById(pid);
-            name = process.ProcessName + ".exe";
-        } catch {
-            // ArgumentException (exited) or Win32Exception (access denied on a protected process).
-            name = $"PID {pid.ToString(CultureInfo.InvariantCulture)}";
-        }
-
+        var name = names.Resolve(pid);
         _nameCache[pid] = name;
         return name;
     }
