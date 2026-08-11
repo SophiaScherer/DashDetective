@@ -115,13 +115,19 @@ public class LinuxProcessSnapshotProviderTests {
         Assert.Equal(0, shell.DiskBytesPerSec);
     }
 
-    /// <summary>The second pass diffs against the first. The exact figures depend on the elapsed wall clock,
-    /// so this pins that a burning process is reported as busy at all; <see cref="ComputeCpuPercent_Cases"/>
-    /// pins the arithmetic.</summary>
+    /// <summary>
+    /// The second pass diffs against the first, over an interval the test <b>states</b> rather than
+    /// measures. Advancing an injected clock is what makes the figures exact and the result identical on
+    /// every host — see <see cref="TestClock"/> for why measuring cannot work here.
+    ///
+    /// +600 ticks over 8 seconds is 6 CPU-seconds, and +1 MiB over 8 seconds is 131072 B/s. The disk figure
+    /// is fully host-independent, so it alone pins that the interval reached the arithmetic as exactly 8.
+    /// </summary>
     [Fact]
     public async Task GetAsync_SecondSnapshot_ReportsRatesForAProcessThatMoved() {
         var proc = Desktop();
-        var provider = new LinuxProcessSnapshotProvider(proc);
+        var clock = new TestClock();
+        var provider = new LinuxProcessSnapshotProvider(proc, () => clock.Seconds);
         _ = await provider.GetAsync();
 
         // Same process, later counters: +600 ticks of CPU and +1 MiB through the syscall layer.
@@ -129,11 +135,52 @@ public class LinuxProcessSnapshotProviderTests {
             ProcFixtures.ProcPidStat.Replace(" 1200 340 ", " 1800 340 ", StringComparison.Ordinal),
             ProcFixtures.ProcPidStatus, "/usr/bin/gnome-shell\0", ProcFixtures.ProcCgroupApp,
             "rchar: 4194304\nwchar: 1048576\n");
+        clock.Advance(seconds: 8);
 
         var shell = Find(await provider.GetAsync(), 412);
 
-        Assert.True(shell.CpuPercent > 0, "a process that burned ticks must report CPU");
-        Assert.True(shell.DiskBytesPerSec > 0, "a process that moved bytes must report a disk rate");
+        // Only the core count is read from the host, and it is the one term that was never in doubt.
+        Assert.Equal(75.0 / Environment.ProcessorCount, shell.CpuPercent, 6);
+        Assert.Equal(131072d, shell.DiskBytesPerSec);
+    }
+
+    /// <summary>
+    /// Two polls with no time between them. Reporting 0 for that pass is correct — a rate over a zero
+    /// interval has no meaning — and the pass after it recovers, because the next interval is measured from
+    /// this instant rather than accumulated from the last useful one.
+    ///
+    /// This case is why the provider times with <c>Stopwatch</c>. It previously used
+    /// <c>DateTime.UtcNow</c>, which on Linux reads <c>CLOCK_REALTIME_COARSE</c> and only advances on the
+    /// kernel timer tick, so two snapshots over an in-memory filesystem genuinely shared one instant there
+    /// while differing on Windows — a green Windows run against a red Ubuntu leg.
+    /// </summary>
+    [Fact]
+    public async Task GetAsync_ZeroInterval_ReportsNoRatesAndRecoversNextPass() {
+        var proc = Desktop();
+        var clock = new TestClock();
+        var provider = new LinuxProcessSnapshotProvider(proc, () => clock.Seconds);
+        _ = await provider.GetAsync();
+
+        StageProcess(proc, 412,
+            ProcFixtures.ProcPidStat.Replace(" 1200 340 ", " 1800 340 ", StringComparison.Ordinal),
+            ProcFixtures.ProcPidStatus, "/usr/bin/gnome-shell\0", ProcFixtures.ProcCgroupApp,
+            "rchar: 4194304\nwchar: 1048576\n");
+
+        var stalled = Find(await provider.GetAsync(), 412);
+        Assert.Equal(0, stalled.CpuPercent);
+        Assert.Equal(0, stalled.DiskBytesPerSec);
+
+        // The very next pass reports normally: the stall costs one reading, not the counters. +800 ticks
+        // and +2 MiB on top of what the stalled pass already recorded, over 8 seconds.
+        StageProcess(proc, 412,
+            ProcFixtures.ProcPidStat.Replace(" 1200 340 ", " 2600 340 ", StringComparison.Ordinal),
+            ProcFixtures.ProcPidStatus, "/usr/bin/gnome-shell\0", ProcFixtures.ProcCgroupApp,
+            "rchar: 6291456\nwchar: 1048576\n");
+        clock.Advance(seconds: 8);
+
+        var recovered = Find(await provider.GetAsync(), 412);
+        Assert.Equal(100.0 / Environment.ProcessorCount, recovered.CpuPercent, 6);
+        Assert.Equal(262144d, recovered.DiskBytesPerSec);
     }
 
     /// <summary>A process you do not own denies <c>io</c>, which is a blank rate rather than an error — the
@@ -209,4 +256,16 @@ public class LinuxProcessSnapshotProviderTests {
     [Fact]
     public async Task UnsupportedProvider_ReportsNoProcesses() =>
         Assert.Empty(await new UnsupportedProcessSnapshotProvider().GetAsync());
+
+    /// <summary>
+    /// An elapsed-seconds clock the test advances by hand, so a rate interval is stated rather than
+    /// measured. Measuring cannot work here: two snapshots over an in-memory filesystem are microseconds
+    /// apart, which is below the resolution of any real-time clock on some hosts, and sleeping between them
+    /// would only trade that for slowness and flakiness on a loaded VM.
+    /// </summary>
+    private sealed class TestClock {
+        public double Seconds { get; private set; }
+
+        public void Advance(double seconds) => Seconds += seconds;
+    }
 }
