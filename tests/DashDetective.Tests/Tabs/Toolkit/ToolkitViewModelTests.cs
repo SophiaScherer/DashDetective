@@ -20,7 +20,11 @@ public class ToolkitViewModelTests {
     // on the Linux CI leg instead of silently asserting against a table that has none of them.
     private static IReadOnlyList<ToolkitEntry> Catalog => WindowsToolkitCatalog.Instance.Entries;
 
-    private static ToolkitViewModel Page() => new(WindowsToolkitCatalog.Instance);
+    // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
+    // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
+    // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
+    private static ToolkitViewModel Page(string search = "") =>
+        new(WindowsToolkitCatalog.Instance) { Search = search };
 
     // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
     // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
@@ -47,7 +51,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Search_NarrowsTheSectionsAndTheCount() {
-        var vm = new ToolkitViewModel { Search = "appdata" };
+        var vm = Page("appdata");
 
         var shown = vm.Groups.SelectMany(g => g.Items).ToList();
 
@@ -59,7 +63,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Search_MatchingNothing_LeavesTheEmptyState() {
-        var vm = new ToolkitViewModel { Search = "zzzz-no-such-command" };
+        var vm = Page("zzzz-no-such-command");
 
         Assert.False(vm.HasCommands);
         Assert.Empty(vm.Groups);
@@ -475,7 +479,7 @@ public class ToolkitViewModelTests {
     /// section it was filed under.</summary>
     [Fact]
     public void RemoveCommand_ALabelledCommand_LeavesBothOfItsSections() {
-        var vm = new ToolkitViewModel { Search = "zzz-my-own" };
+        var vm = Page("zzz-my-own");
         vm.AddCommand(new ToolkitCommand(
             "zzz-my-own", "", ToolkitCommandType.Launch, "thing.exe", "", ToolkitCategory.Folders));
         Assert.Equal(2, vm.Groups.Count);
@@ -825,7 +829,7 @@ public class ToolkitViewModelTests {
     /// otherwise be hiding the very row universal search just navigated to.</summary>
     [Fact]
     public void Reveal_ClearsTheFilterSoTheRowIsOnThePage() {
-        var vm = new ToolkitViewModel { Search = "zzzz-no-such-command" };
+        var vm = Page("zzzz-no-such-command");
 
         vm.Reveal("%temp%");
 
