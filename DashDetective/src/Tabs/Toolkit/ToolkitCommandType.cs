@@ -4,8 +4,8 @@ namespace DashDetective.Tabs.Toolkit;
 /// The kinds of command a user may author for themselves, as the "+ Add command" form offers them.
 ///
 /// Deliberately narrower than <see cref="ToolkitActionKind"/>: there is **no elevated member**, so a
-/// user-authored row can never raise a UAC prompt. Elevation stays authored in
-/// <see cref="ToolkitCatalog"/>, where it can be reasoned about one row at a time — it is the one
+/// user-authored row can never raise a UAC prompt. Elevation stays authored in a platform's
+/// <see cref="IToolkitCatalog"/>, where it can be reasoned about one row at a time — it is the one
 /// privilege boundary the form does not help cross.
 /// </summary>
 public enum ToolkitCommandType {

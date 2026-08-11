@@ -34,8 +34,8 @@ public sealed partial class ToolkitEntry : ObservableObject {
     public ToolkitCategory Category { get; }
     public ToolkitEntryKind Kind { get; }
 
-    /// <summary>What running this row does. Authored in <see cref="ToolkitCatalog"/> and carried out by
-    /// <see cref="ToolkitRunner"/> — the row itself never touches a process.</summary>
+    /// <summary>What running this row does. Authored in a platform's <see cref="IToolkitCatalog"/> and
+    /// carried out by <see cref="ToolkitRunner"/> — the row itself never touches a process.</summary>
     public ToolkitAction Action { get; }
 
     /// <summary>The row's editable slot, or null for the rows that take no input (nearly all of them).

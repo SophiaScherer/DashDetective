@@ -5,8 +5,8 @@ namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
 /// What running an entry actually does: a target plus the arguments it takes, and the path it runs down.
-/// Only ever built through the static factories below — by <see cref="ToolkitCatalog"/> for the built-in
-/// rows, and by <see cref="ToolkitCommandFactory"/> for the user's own. This is the type that makes the
+/// Only ever built through the static factories below — by a platform's <see cref="IToolkitCatalog"/>
+/// for the built-in rows, and by <see cref="ToolkitCommandFactory"/> for the user's own. This is the type that makes the
 /// Toolkit's safety property structural rather than a convention: <see cref="Arguments"/> is a **list**,
 /// and <see cref="ToolkitRunner"/> passes it to <c>ProcessStartInfo.ArgumentList</c>, so nothing is ever
 /// concatenated into a command line and there is no quoting or interpolation to get wrong.

@@ -12,9 +12,10 @@ DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
 today Linux builds and launches with CPU, memory, the whole Network tab — throughput, adapters and the
-active TCP/UDP connections with their owning processes — the whole Storage surface (drives, partitions and
-per-disk activity), the Processes tab, plus the machine's static identity (OS, kernel, BIOS, board) and the
-Processor, Motherboard and Storage Devices spec cards, while the remaining panels read "—".
+active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions
+and per-disk activity — the Processes tab, the Toolkit tab's own command set, plus the machine's static
+identity (OS, kernel, BIOS, board) and the Processor, Motherboard and Storage Devices spec cards, while the
+remaining panels read "—".
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -247,6 +248,26 @@ know which it is running on:
 
 Environment expansion is per-platform and belongs to `ToolkitPaths.Resolve` — `%VAR%` on Windows, `$VAR`,
 `${VAR}` and a leading `~` elsewhere — never to a direct `Environment.ExpandEnvironmentVariables` call.
+`Resolve` and `IsFileSystemPath` each keep an `internal` overload taking the platform as a flag, so a table
+authored for one platform can be checked from the other.
+
+### Copy is shared; content is not
+
+Most seams answer "what is true of this machine". The Toolkit's answers something different — "what is
+worth offering on this machine" — and it splits along a line worth naming, because the same line shows up
+wherever a feature has both wording and data.
+
+`IToolkitCatalog` carries only the **command set**, which is genuinely per-platform: `%appdata%` and
+`taskschd.msc` mean nothing on Linux, and `journalctl` means nothing on Windows. The **copy** — the section
+names, the badge labels, the display order — reads identically everywhere and stayed on the static
+`ToolkitCatalog`, reached directly by the row model, the group model and the filter. Splitting it too would
+have put a catalog reference on every row and bought nothing.
+
+Two consequences worth knowing. The third arm, `UnsupportedToolkitCatalog`, is **empty rather than a
+fallback to Windows'**: a platform with no table gets the page's own empty state and can still author its
+own commands, which is more honest than thirty rows that can only fail. And the rules a table must satisfy
+live in one place, `ToolkitCatalogInvariants`, asserted against **every** catalog rather than whichever the
+host resolves — the tables are string literals, so a Windows run checks the Linux one too.
 
 ### Reading `/proc` and `/sys`
 

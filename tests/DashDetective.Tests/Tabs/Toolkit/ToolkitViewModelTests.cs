@@ -15,6 +15,17 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// view-model → runner → launcher chain runs for real without anything being started.
 /// </summary>
 public class ToolkitViewModelTests {
+    // The Windows table by name rather than whichever ForCurrentPlatform() resolves: the assertions
+    // below are written against its rows (%temp%, regedit, %appdata%), so naming it keeps them running
+    // on the Linux CI leg instead of silently asserting against a table that has none of them.
+    private static IReadOnlyList<ToolkitEntry> Catalog => WindowsToolkitCatalog.Instance.Entries;
+
+    // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
+    // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
+    // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
+    private static ToolkitViewModel Page(string search = "") =>
+        new(WindowsToolkitCatalog.Instance) { Search = search };
+
     // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
     // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
     private static ToolkitEntry MissingTool(string command = "not-a-real-tool-xyz.exe") =>
@@ -23,7 +34,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Constructor_ShowsTheAuthoredCommandsWithAllSelected() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         Assert.True(vm.HasCommands);
         Assert.NotEmpty(vm.Groups);
@@ -32,7 +43,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Constructor_StartsWithAnEmptyLog() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         Assert.Empty(vm.Log);
         Assert.False(vm.HasLog);
@@ -40,7 +51,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Search_NarrowsTheSectionsAndTheCount() {
-        var vm = new ToolkitViewModel { Search = "appdata" };
+        var vm = Page("appdata");
 
         var shown = vm.Groups.SelectMany(g => g.Items).ToList();
 
@@ -52,7 +63,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void Search_MatchingNothing_LeavesTheEmptyState() {
-        var vm = new ToolkitViewModel { Search = "zzzz-no-such-command" };
+        var vm = Page("zzzz-no-such-command");
 
         Assert.False(vm.HasCommands);
         Assert.Empty(vm.Groups);
@@ -60,7 +71,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public async Task Run_RecordsOneStanzaCarryingTheCommandAndTheOutcome() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var entry = MissingTool();
 
         await vm.RunCommand.ExecuteAsync(entry);
@@ -76,7 +87,7 @@ public class ToolkitViewModelTests {
     /// panel renders in — index 0 is the first stanza on screen.</summary>
     [Fact]
     public async Task Run_Twice_PutsTheNewerRunFirst() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(MissingTool("first"));
         await vm.RunCommand.ExecuteAsync(MissingTool("second"));
@@ -86,7 +97,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public async Task Run_NoEntry_DoesNothing() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(null);
 
@@ -97,7 +108,7 @@ public class ToolkitViewModelTests {
     /// the result replaces it rather than adding a second stanza.</summary>
     [Fact]
     public async Task Run_ShowsAPendingStanzaThenReplacesItInPlace() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var entry = MissingTool();
 
         var running = vm.RunCommand.ExecuteAsync(entry);
@@ -118,7 +129,7 @@ public class ToolkitViewModelTests {
     /// a log the user just emptied.</summary>
     [Fact]
     public async Task Run_LogClearedWhileInFlight_DropsTheResult() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         var running = vm.RunCommand.ExecuteAsync(MissingTool());
         vm.ClearLogCommand.Execute(null);
@@ -132,7 +143,7 @@ public class ToolkitViewModelTests {
     /// CanExecute false for the duration, so there is no separate flag to drift out of step.</summary>
     [Fact]
     public async Task Run_WhileOneIsInFlight_TheRowsReportThemselvesUnavailable() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         var running = vm.RunCommand.ExecuteAsync(MissingTool());
         Assert.False(vm.RunCommand.CanExecute(MissingTool()));
@@ -157,7 +168,7 @@ public class ToolkitViewModelTests {
     [InlineData("example.com && calc")]
     [InlineData("")]
     public async Task Run_ParameterisedRowWithARefusedHost_LogsWhyAndRunsNothing(string typed) {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(Parameterised(typed));
 
@@ -170,7 +181,7 @@ public class ToolkitViewModelTests {
     /// transcript would read "ping &lt;host&gt;" and never say which host.</summary>
     [Fact]
     public async Task Run_ParameterisedRow_LogsTheResolvedCommandLineNotTheLabel() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(Parameterised("example.com"));
 
@@ -183,7 +194,7 @@ public class ToolkitViewModelTests {
     /// own text — the log does not start paraphrasing ordinary commands.</summary>
     [Fact]
     public async Task Run_PlainRow_LogsTheRowsOwnText() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(MissingTool("regedit-not-real"));
 
@@ -192,7 +203,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public async Task Run_ParameterisedRow_TrimsTheTypedHostBeforePassingItOn() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         await vm.RunCommand.ExecuteAsync(Parameterised("  example.com  "));
 
@@ -203,7 +214,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public async Task BuildLogText_CarriesEveryStanzaWithItsTimeAndOutput() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
         await vm.RunCommand.ExecuteAsync(MissingTool("second-command"));
 
@@ -219,7 +230,7 @@ public class ToolkitViewModelTests {
     /// on the way out.</summary>
     [Fact]
     public async Task BuildLogText_KeepsTheOrderTheLogIsShownIn() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         await vm.RunCommand.ExecuteAsync(MissingTool("older"));
         await vm.RunCommand.ExecuteAsync(MissingTool("newer"));
 
@@ -232,7 +243,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void BuildLogText_EmptyLog_IsStillAWellFormedHeader() {
-        var text = new ToolkitViewModel().BuildLogText();
+        var text = Page().BuildLogText();
 
         Assert.Contains("DashDetective", text, System.StringComparison.Ordinal);
         Assert.False(string.IsNullOrWhiteSpace(text));
@@ -245,13 +256,13 @@ public class ToolkitViewModelTests {
     // the order they run in.
 
     private static ToolkitViewModel Unpinned() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.LoadPins("");
         return vm;
     }
 
     private static ToolkitEntry Row(string command) =>
-        ToolkitCatalog.Entries.First(e => e.Command == command);
+        Catalog.First(e => e.Command == command);
 
     /// <summary>Pins are applied by command text, so a persisted pin still finds its row.</summary>
     [Fact]
@@ -264,7 +275,7 @@ public class ToolkitViewModelTests {
         Assert.False(Row("%appdata%").IsPinned);
 
         vm.LoadPins("");
-        Assert.All(ToolkitCatalog.Entries, entry => Assert.False(entry.IsPinned));
+        Assert.All(Catalog, entry => Assert.False(entry.IsPinned));
     }
 
     /// <summary>A settings file naming a command the catalog no longer carries must not fault the page
@@ -321,7 +332,7 @@ public class ToolkitViewModelTests {
         vm.LoadPins(encoded);
 
         Assert.Equal(["%temp%", "regedit"],
-                     ToolkitCatalog.Entries.Where(e => e.IsPinned).Select(e => e.Command));
+                     Catalog.Where(e => e.IsPinned).Select(e => e.Command));
         vm.LoadPins("");
     }
 
@@ -332,7 +343,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void AddCommand_PutsTheRowOnThePageAndAnnouncesIt() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var announced = 0;
         vm.CommandsChanged += () => announced++;
 
@@ -348,18 +359,18 @@ public class ToolkitViewModelTests {
     /// list, so a command that is not in it may as well not exist.</summary>
     [Fact]
     public void AllEntries_IsTheCatalogPlusTheUsersOwn() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         vm.AddCommand(Mine());
 
-        Assert.Equal(ToolkitCatalog.Entries.Count + 1, vm.AllEntries.Count);
+        Assert.Equal(Catalog.Count + 1, vm.AllEntries.Count);
         Assert.Contains(vm.AllEntries, e => e.Command == "My folder");
-        Assert.All(ToolkitCatalog.Entries, e => Assert.Contains(e, vm.AllEntries));
+        Assert.All(Catalog, e => Assert.Contains(e, vm.AllEntries));
     }
 
     [Fact]
     public void AddCommand_IsFoundByTheSearchBoxLikeAnyOtherRow() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine("zzz-my-own-command"));
 
         vm.Search = "zzz-my-own";
@@ -370,14 +381,14 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void EncodeCommands_RoundTripsThroughLoadCommands() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine("First"));
         vm.AddCommand(new ToolkitCommand(
             "Ports", "Listening sockets", ToolkitCommandType.Capture, "netstat", "-an",
             ToolkitCategory.Diagnostics));
 
         var encoded = vm.EncodeCommands();
-        var restored = new ToolkitViewModel();
+        var restored = Page();
         restored.LoadCommands(encoded);
 
         Assert.Equal(["First", "Ports"], restored.Custom.Select(e => e.Command));
@@ -388,7 +399,7 @@ public class ToolkitViewModelTests {
     /// startup write the settings file straight back out.</summary>
     [Fact]
     public void LoadCommands_ReplacesWhatIsThereWithoutAnnouncingAChange() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine("Old"));
         var announced = 0;
         vm.CommandsChanged += () => announced++;
@@ -401,7 +412,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void LoadCommands_NothingStored_LeavesNoCustomRows() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine());
 
         vm.LoadCommands("");
@@ -413,7 +424,7 @@ public class ToolkitViewModelTests {
     /// pins exactly like a catalog row — which is why the shell loads commands before pins.</summary>
     [Fact]
     public void Pins_ApplyToTheUsersOwnCommandsToo() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.LoadPins("");
         vm.AddCommand(Mine("Pinnable"));
         var entry = vm.Custom[0];
@@ -423,7 +434,7 @@ public class ToolkitViewModelTests {
 
         Assert.Contains("Pinnable", ToolkitPins.Decode(encoded));
 
-        var restored = new ToolkitViewModel();
+        var restored = Page();
         restored.LoadCommands(vm.EncodeCommands());
         restored.LoadPins(encoded);
 
@@ -435,7 +446,7 @@ public class ToolkitViewModelTests {
     /// nothing and is silently dropped.</summary>
     [Fact]
     public void LoadPins_BeforeLoadCommands_LosesThePinOnACustomRow() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var pins = ToolkitPins.Encode(["Pinnable"]);
 
         vm.LoadPins(pins);
@@ -452,7 +463,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void RemoveCommand_TakesTheRowOffThePageAndAnnouncesIt() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine());
         var announced = 0;
         vm.CommandsChanged += () => announced++;
@@ -468,7 +479,7 @@ public class ToolkitViewModelTests {
     /// section it was filed under.</summary>
     [Fact]
     public void RemoveCommand_ALabelledCommand_LeavesBothOfItsSections() {
-        var vm = new ToolkitViewModel { Search = "zzz-my-own" };
+        var vm = Page("zzz-my-own");
         vm.AddCommand(new ToolkitCommand(
             "zzz-my-own", "", ToolkitCommandType.Launch, "thing.exe", "", ToolkitCategory.Folders));
         Assert.Equal(2, vm.Groups.Count);
@@ -483,7 +494,7 @@ public class ToolkitViewModelTests {
     /// quietly succeeding somewhere else.</summary>
     [Fact]
     public void DeleteCustom_ACatalogRow_DoesNothing() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var announced = 0;
         vm.CommandsChanged += () => announced++;
 
@@ -495,7 +506,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void UpdateCommand_ReplacesTheRowInPlaceAndAnnouncesIt() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var original = Mine("Before");
         vm.AddCommand(original);
         vm.AddCommand(Mine("After it"));
@@ -513,7 +524,7 @@ public class ToolkitViewModelTests {
     /// — which is why no separate identity field is needed for a custom command.</summary>
     [Fact]
     public void UpdateCommand_RenamingAPinnedRow_KeepsThePinUnderTheNewTitle() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.LoadPins("");
         var original = Mine("Before");
         vm.AddCommand(original);
@@ -530,7 +541,7 @@ public class ToolkitViewModelTests {
     /// ToolkitCommand is what gets persisted rather than the action derived from it.</summary>
     [Fact]
     public void EditCustom_OpensTheFormOnThatCommand() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(new ToolkitCommand(
             "Ports", "Listening sockets", ToolkitCommandType.Capture, "netstat", "-an"));
 
@@ -544,7 +555,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public void EditCustom_ACatalogRow_DoesNotOpenTheForm() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         vm.EditCustomCommand.Execute(Row("%temp%"));
 
@@ -554,7 +565,7 @@ public class ToolkitViewModelTests {
     /// <summary>The whole round trip the user sees: edit a row, and the change is what gets saved.</summary>
     [Fact]
     public void EditThenSave_ReplacesTheCommandAndPersistsTheNewVersion() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(Mine("Before"));
 
         vm.EditCustomCommand.Execute(vm.Custom[0]);
@@ -563,7 +574,7 @@ public class ToolkitViewModelTests {
 
         Assert.Equal("After", Assert.Single(vm.Custom).Command);
 
-        var restored = new ToolkitViewModel();
+        var restored = Page();
         restored.LoadCommands(vm.EncodeCommands());
         Assert.Equal("After", Assert.Single(restored.Custom).Command);
     }
@@ -572,7 +583,7 @@ public class ToolkitViewModelTests {
     /// the count beside the chips is of commands, not of places to click one.</summary>
     [Fact]
     public void CountLabel_CountsALabelledCustomCommandOnceDespiteItsTwoRows() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(new ToolkitCommand(
             "zzz-my-own", "", ToolkitCommandType.Launch, "thing.exe", "", ToolkitCategory.Folders));
 
@@ -587,7 +598,7 @@ public class ToolkitViewModelTests {
     /// row, which is the whole point of building it through the same action factories.</summary>
     [Fact]
     public async Task Run_AUsersOwnCaptureCommand_IsLoggedLikeAnyOther() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         vm.AddCommand(new ToolkitCommand(
             "Mine", "", ToolkitCommandType.Capture, "not-a-real-tool-xyz.exe", "-an"));
 
@@ -604,14 +615,14 @@ public class ToolkitViewModelTests {
     /// clicking the row.</summary>
     [Fact]
     public void CopyTextFor_PlainRow_IsTheCommandItself() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         Assert.Equal("regedit-not-real", vm.CopyTextFor(MissingTool("regedit-not-real")));
     }
 
     [Fact]
     public void CopyTextFor_ParameterisedRow_IncludesTheTypedHost() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         Assert.Equal("not-a-real-tool-xyz.exe example.com",
                      vm.CopyTextFor(Parameterised("example.com")));
@@ -624,7 +635,7 @@ public class ToolkitViewModelTests {
     [InlineData("   ")]
     [InlineData("-t")]
     public void CopyTextFor_ParameterisedRowWithNothingUsable_OmitsTheArgument(string typed) {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         Assert.Equal("not-a-real-tool-xyz.exe", vm.CopyTextFor(Parameterised(typed)));
     }
@@ -633,8 +644,8 @@ public class ToolkitViewModelTests {
     /// "sfc reference" would be useless in a browser.</summary>
     [Fact]
     public void CopyTextFor_DocumentationRow_IsTheUrlNotTheTitle() {
-        var vm = new ToolkitViewModel();
-        var doc = ToolkitCatalog.Entries.First(e => e.Kind == ToolkitEntryKind.Link);
+        var vm = Page();
+        var doc = Catalog.First(e => e.Kind == ToolkitEntryKind.Link);
 
         var copied = vm.CopyTextFor(doc);
 
@@ -660,7 +671,7 @@ public class ToolkitViewModelTests {
     /// nothing is reported as having gone wrong.</summary>
     [Fact]
     public async Task Run_ElevatedRowDeclinedAtThePrompt_ReadsAsCancelled() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var entry = new ToolkitEntry(
             "cancelled", "Declined at the prompt", ToolkitCategory.Diagnostics,
             ToolkitEntryKind.Command, ToolkitAction.Elevated("not-a-real-tool-xyz.exe"));
@@ -698,7 +709,7 @@ public class ToolkitViewModelTests {
     /// completion would put a time in the log that is well after the click that caused it.</summary>
     [Fact]
     public async Task Run_TimestampsTheStartNotTheFinish() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
 
         var running = vm.RunCommand.ExecuteAsync(MissingTool());
         var startedAt = vm.Log[0].Time;
@@ -709,7 +720,7 @@ public class ToolkitViewModelTests {
 
     [Fact]
     public async Task ClearLog_EmptiesItAndDisablesItsButton() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         await vm.RunCommand.ExecuteAsync(MissingTool());
 
         vm.ClearLogCommand.Execute(null);
@@ -735,7 +746,7 @@ public class ToolkitViewModelTests {
     /// path to the shell, so nothing is started and nothing lands in the transcript.</summary>
     [Fact]
     public async Task Run_PathRow_RevealsInTheAppAndRunsNothing() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var revealed = new List<string>();
         vm.FileExplorerRevealRequested += revealed.Add;
 
@@ -749,7 +760,7 @@ public class ToolkitViewModelTests {
     /// "$HOME".</summary>
     [Fact]
     public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         string? revealed = null;
         vm.FileExplorerRevealRequested += path => revealed = path;
 
@@ -763,7 +774,7 @@ public class ToolkitViewModelTests {
     /// for the in-app one anyway is refused rather than sending a path Explorer would reject.</summary>
     [Fact]
     public void OpenInApp_ShellLocation_IsNotOfferedAndDoesNothing() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var shellRow = PathRow("shell:startup");
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
@@ -779,7 +790,7 @@ public class ToolkitViewModelTests {
     /// — it is the one folder row whose click behaviour is unchanged.</summary>
     [Fact]
     public async Task Run_ShellLocationRow_StillGoesToTheShellAndIsLogged() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
 
@@ -793,7 +804,7 @@ public class ToolkitViewModelTests {
     /// leaving the app is exactly the kind of thing the transcript is for.</summary>
     [Fact]
     public async Task OpenExternally_RunsThroughTheNormalPathAndIsLogged() {
-        var vm = new ToolkitViewModel();
+        var vm = Page();
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
 
@@ -810,7 +821,7 @@ public class ToolkitViewModelTests {
     public void IsPathEntry_IsFalseForEverythingThatIsNotALocation() {
         Assert.False(MissingTool().IsPathEntry);
         Assert.False(MissingTool().CanOpenInApp);
-        Assert.All(ToolkitCatalog.Entries.Where(e => e.CanOpenInApp),
+        Assert.All(Catalog.Where(e => e.CanOpenInApp),
                    entry => Assert.Equal(ToolkitActionKind.OpenPath, entry.Action.Kind));
     }
 
@@ -818,7 +829,7 @@ public class ToolkitViewModelTests {
     /// otherwise be hiding the very row universal search just navigated to.</summary>
     [Fact]
     public void Reveal_ClearsTheFilterSoTheRowIsOnThePage() {
-        var vm = new ToolkitViewModel { Search = "zzzz-no-such-command" };
+        var vm = Page("zzzz-no-such-command");
 
         vm.Reveal("%temp%");
 

@@ -9,8 +9,8 @@ namespace DashDetective.Shell.Search.Providers;
 
 /// <summary>
 /// Finds Toolkit commands by the command itself or by what it does, so "flush dns" reaches the command
-/// that does it without the user knowing its name. Both fields come from <see cref="ToolkitCatalog"/>,
-/// which the rows themselves bind to, so the copy searched is the copy displayed.
+/// that does it without the user knowing its name. Both fields come from the rows the page is holding
+/// — this platform's built-in ones plus the user's own — so the copy searched is the copy displayed.
 ///
 /// Picking one navigates to the Toolkit tab, clears its filter so the row is definitely on the page,
 /// and flashes it — the <see cref="SettingSearchProvider"/> pattern.

@@ -11,7 +11,7 @@ namespace DashDetective.Tabs.Toolkit;
 ///
 /// **The safety boundary.** This takes a <see cref="ToolkitAction"/> — never a string — and its arguments
 /// reach the OS as a list rather than a command line (see <see cref="SystemProcessLauncher"/>). That holds
-/// whether the action was authored in <see cref="ToolkitCatalog"/> or built from what a user typed into
+/// whether the action was authored in a platform's <see cref="IToolkitCatalog"/> or built from what a user typed into
 /// the "+ Add command" form: no shell is ever involved, so there is nothing to inject into. The
 /// <c>https</c> check below applies the same way, wherever the URL came from.
 ///

@@ -54,7 +54,7 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   stanza to the Execution Log. A row that names a place on disk is the exception: it opens the in-app File
   Explorer instead (`ToolkitViewModel.OpenInApp` → `FileExplorerRevealRequested` → the shell's existing
   `RevealFile`), with Windows Explorer on the row's other icon.
-- **The safety invariants.** `ToolkitCatalog.Entries` used to be an allow-list, and the Toolkit had no
+- **The safety invariants.** The built-in table used to be an allow-list, and the Toolkit had no
   free-form entry at all. That changed when users gained the ability to author their own commands
   (`ToolkitCommand` + the "+ Add command" form). What was actually load-bearing is kept, and **these four
   are the rules — do not weaken them**:
@@ -65,9 +65,10 @@ de-duplication / composition refactor) — write-ups in the Appendix.
      to interpret them. `ToolkitAction.CommandLine` is display-only and nothing is ever run from it.
   2. **Elevation is catalog-only.** `ToolkitCommandType` (the form's types: `FolderPath`, `Launch`,
      `Capture`, `Url`) has **no elevated member**, so no form input can produce a row that raises UAC.
-     `sfc /scannow` remains the one elevated entry. Elevation is its own `ToolkitActionKind` (not a flag)
-     because Windows refuses to redirect a `runas` process's streams, so "elevated *and* captured" is not
-     expressible.
+     `sfc /scannow` remains the one elevated entry on Windows, and the Linux table has none at all.
+     Elevation is its own `ToolkitActionKind` (not a flag) because Windows refuses to redirect a `runas`
+     process's streams, so "elevated *and* captured" is not expressible. Both halves are asserted per
+     catalog, and `ToolkitCatalogInvariants` asks every table that only a console command may elevate.
   3. **`OpenUrl` is https-only**, refused in `ToolkitRunner.RunAsync` regardless of where the action was
      authored — which covers user URLs for free. `ToolkitCommandValidator` says the same thing earlier, in
      the form, where it is still fixable.
@@ -80,9 +81,32 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   already write `shell:startup` — and it cannot fire without a click.
 - **Catalog:** four authored categories — Folders, System Tools, Diagnostics (parameterised ping/tracert
   and the elevated `sfc /scannow`) and Docs & Links — plus **My Commands** (`ToolkitCategory.Custom`),
-  which holds what the user authored. Adding a *built-in* row still means editing `ToolkitCatalog.Entries`
-  and nothing else. What everything downstream reads is `ToolkitViewModel.AllEntries` (catalog + custom),
-  **not** `ToolkitCatalog.Entries` — filter, grouping, pins and the search provider all go through it.
+  which holds what the user authored. Adding a *built-in* row means editing that platform's table and
+  nothing else. What everything downstream reads is `ToolkitViewModel.AllEntries` (catalog + custom),
+  **not** the catalog — filter, grouping, pins and the search provider all go through it.
+- **The command set is per-platform; the copy is not.** `IToolkitCatalog.ForCurrentPlatform()` resolves
+  `WindowsToolkitCatalog`, `LinuxToolkitCatalog` or the empty `UnsupportedToolkitCatalog`; `ToolkitCatalog`
+  kept `Categories`/`HeaderFor`/`LabelFor`, which read identically everywhere and are reached statically
+  by `ToolkitEntry.BadgeLabel`, `ToolkitGroup` and `ToolkitFilter`. `ToolkitViewModel` takes the catalog
+  through an internal ctor (`FileExplorerViewModel`'s shape); the shell still builds it with `new()`.
+  **The catalogs are singletons on purpose** — `IsPinned` is live state on the rows, so a fresh list per
+  call would give each reader its own unpinned copy.
+- **The Linux table is not a translation of the Windows one.** Folders are `~`, `~/.config`,
+  `~/.local/share`, `~/.config/autostart`, `/etc`, `/var/log`, `/tmp`; tools are GNOME's; diagnostics are
+  coreutils, iproute2 and systemd. Three decisions worth not re-litigating: **no row elevates** (`Elevated`
+  means the `runas` verb, and `pkexec` is a later milestone's), **`dmesg` is deliberately absent** because
+  Ubuntu and Debian set `kernel.dmesg_restrict` and a non-root run only ever prints a permission error
+  (`journalctl -k` is the row that works), and **`ping` carries `-c 4`** because Linux ping runs until
+  interrupted and would otherwise end at the timeout on every run. A program that is not installed is a
+  **run-time** answer — filtering the table at startup would mean shelling out once per row before the
+  page could draw.
+- **Catalog rules are asserted against every table at once.** `ToolkitCatalogInvariants` is an abstract
+  class with one subclass per catalog, so a rule added there is asked of all of them **and runs on both CI
+  legs** — the tables are string literals, so nothing about them needs a Linux host to check. Only what is
+  genuinely one platform's stays in its own class (the `sfc /scannow` set pinned by name, the
+  "administrator" wording, `dmesg`'s absence). A catalog test that branched on `OperatingSystem.IsLinux()`
+  would leave the other table unchecked wherever it ran; there is exactly one such branch in the feature,
+  in `ToolkitCatalogSeamTests`, and it only maps host → catalog type.
 - **User-authored commands.** `ToolkitCommand` is what the user typed; `ToolkitCommandFactory` turns it
   into an ordinary `ToolkitEntry` through the catalog's own `ToolkitAction` factories, so `ToolkitRunner`
   cannot tell a user's row from an authored one and there is no second execution path to keep safe. The
@@ -106,9 +130,9 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   also why renaming a custom command keeps its pin without any identity field: `EncodePins` reads current
   state, so the next persist writes the new title. A pinned row is **lifted** into the Pinned section, not
   copied there — it is the one row the user asked to be able to find in a fixed place. The chip and search
-  term still apply to pinned rows. Note `IsPinned` lives on the shared `ToolkitCatalog` entries (there is
-  exactly one Toolkit page, so they *are* its rows) — tests that touch pins must reset them rather than
-  assume a clean slate.
+  term still apply to pinned rows. Note `IsPinned` lives on the catalog's shared entries (there is
+  exactly one Toolkit page, so they *are* its rows, and that is why each catalog is a singleton) — tests
+  that touch pins must reset them rather than assume a clean slate.
 - **Docs & Links rows are labelled by title, not URL** (a Learn URL ellipsizes to nothing in the row's
   mono label); the URL still reaches the Execution Log through `ToolkitAction.CommandLine`, so what was
   opened is on the record. Every URL was **fetched and confirmed live** when authored — one candidate
@@ -746,9 +770,27 @@ currently exist.
                                 ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)
                                 ToolkitLogEntry.cs      (record: Time / Command / Output — one console
                                                          stanza in the Execution Log)
-                                ToolkitCatalog.cs       (static copy table + the command set. Entries is
-                                                         also the app's ALLOW-LIST — the runner only ever
-                                                         runs an action authored here)
+                                ToolkitCatalog.cs       (static COPY table only — categories, section
+                                                         headers, badge labels. Reads the same on every
+                                                         platform, which is why it stayed static when the
+                                                         command set did not)
+                                IToolkitCatalog.cs      (the per-platform command set, three arms:
+                                                         WindowsToolkitCatalog / LinuxToolkitCatalog /
+                                                         UnsupportedToolkitCatalog. NO
+                                                         [SupportedOSPlatform] on any of them — they are
+                                                         string literals with no platform API surface,
+                                                         and Instance is a static field initialised
+                                                         outside the guard anyway)
+                                WindowsToolkitCatalog.cs, LinuxToolkitCatalog.cs,
+                                UnsupportedToolkitCatalog.cs
+                                                        (the tables. Unsupported is EMPTY on purpose:
+                                                         a platform with no table gets the page's own
+                                                         empty state and can still author its own rows,
+                                                         which beats thirty rows that can only fail)
+                                ToolkitRows.cs          (the shared row factories — Folder/Tool/Panel/
+                                                         Diagnostic/Doc. Both tables build through them,
+                                                         so a category cannot drift away from the kind
+                                                         and action it is supposed to pair with)
                                 ToolkitActionKind.cs    (enum: OpenPath / OpenUrl / Launch / Capture /
                                                          Elevated — how a row is carried out. An enum,
                                                          not flags, so "elevated AND captured" cannot be
@@ -1078,6 +1120,14 @@ into one guarded `ForCurrentPlatform()`, and only then could the class be rename
 Removing that guard now fails the build — which is the check worth running when adding an attribute, since a
 decorative one and a load-bearing one look identical in a passing build.
 
+**The converse case, from M12: a `Windows*` class that must *not* be annotated.** `WindowsToolkitCatalog`
+sits behind `IToolkitCatalog.ForCurrentPlatform()` exactly like the samplers do, but it reaches no platform
+API at all — it is a table of string literals — so `[SupportedOSPlatform("windows")]` would fail the
+delete-the-guard test outright. It also could not be honoured: `Instance` is a `static` field, initialised on
+class load *outside* any `IsWindows()` guard, which is the field-initialiser trap M8 hit from the other
+direction. **A `Windows*` name is not on its own a reason to annotate** — ask what annotated API the class
+touches, and if the answer is none, leave it off and say why in the class doc.
+
 **M5 annotated its four on the *constructor*, not the type, and later milestones should copy that.** A PDH
 sampler's `Sample()` and `Dispose()` are guarded by its own `Ready`/`_ready` flag and are genuinely callable
 anywhere, as are pure statics like `WindowsLogicalProcessorSampler.TryParseInstance`. Annotating the type
@@ -1105,7 +1155,14 @@ that keep them from coming back:
 - **`ToolkitPaths.Resolve` owns environment expansion**, because the notation is per-platform (`%VAR%` on
   Windows; `$VAR`, `${VAR}` and a leading `~` elsewhere). Never call
   `Environment.ExpandEnvironmentVariables` directly — off Windows it is an identity function. Its
-  `internal Expand(target, windows)` seam is how both arms stay testable from either dev machine.
+  `internal Expand(target, windows)` seam is how both arms stay testable from either dev machine, and
+  `IsFileSystemPath(target, windows)` carries the same shape one level up, so the Linux catalog's folder
+  rows can be proven reachable by the in-app File Explorer from Windows. **That seam only carries one
+  way.** `windows: false` answers correctly on any host, because the Unix notation is expanded here in
+  managed code; `windows: true` still needs the variable to *exist*, and `%appdata%` does not on a Linux
+  runner. A test asserting the Windows notation keeps its `IsWindows()` guard — passing the flag does not
+  remove the need for it, and M12 shipped that mistake briefly before the `OperatingSystem.IsLinux` grep
+  caught it.
 - **Tests whose subject calls `Path.*` build paths through `Fakes/TestPaths`** (`Root`, `Of(...)`,
   `Dir(...)`), never from drive-letter literals. Where a path is only an opaque token being round-tripped
   — `NavigationHistory`, `RecentSearches` — the literals are clearer and stay.
@@ -1395,7 +1452,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     A provider that throws costs its own category and nothing else.
   - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
     `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Toolkit (over
-    `ToolkitCatalog.Entries`, ranking the command text above its description), Processes (over the
+    `ToolkitViewModel.AllEntries`, ranking the command text above its description), Processes (over the
     Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
     row), and Files.
   - **Jumping.** There is **no routing layer**. Each provider takes a "go there" callback built in

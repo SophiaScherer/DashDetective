@@ -207,7 +207,7 @@ public class ToolkitCommandFormViewModelTests {
 
     [Fact]
     public void Save_TitleAlreadyOnThePage_IsRefused() {
-        _existing.AddRange(ToolkitCatalog.Entries);
+        _existing.AddRange(WindowsToolkitCatalog.Instance.Entries);
         var form = Form();
         Filled(form, ToolkitCommandType.FolderPath, "%temp%", @"C:\work");
 
@@ -379,7 +379,7 @@ public class ToolkitCommandFormViewModelTests {
     /// is refused a second time for the title it now holds.</summary>
     [Fact]
     public void PageForm_SavesOntoThePageAndThenGuardsItsOwnTitle() {
-        var vm = new ToolkitViewModel();
+        var vm = new ToolkitViewModel(WindowsToolkitCatalog.Instance);
         var announced = 0;
         vm.CommandsChanged += () => announced++;
 

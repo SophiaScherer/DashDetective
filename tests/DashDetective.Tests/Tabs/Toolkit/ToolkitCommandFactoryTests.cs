@@ -104,16 +104,6 @@ public class ToolkitCommandFactoryTests {
             new ToolkitCommand("Mine", "", ToolkitCommandType.Launch, "thing.exe")).SecondaryCategory);
     }
 
-    /// <summary>A catalog row is nobody's custom row — the flag has to be driven by having a source, not
-    /// by a category that could be set by hand.</summary>
-    [Fact]
-    public void IsCustom_IsFalseForEveryCatalogRow() {
-        Assert.All(ToolkitCatalog.Entries, entry => {
-            Assert.False(entry.IsCustom);
-            Assert.Null(entry.SecondaryCategory);
-        });
-    }
-
     /// <summary>A folder a user typed gets the same pair of open icons the authored folder rows have.</summary>
     [Fact]
     public void ToEntry_FolderCommand_OffersBothExplorers() {

@@ -19,14 +19,22 @@ namespace DashDetective.Tabs.Toolkit;
 /// The list is narrowed by a category chip and a search box together, through
 /// <see cref="ToolkitFilter"/>. Picking a row runs its <see cref="ToolkitEntry.Action"/> through
 /// <see cref="ToolkitRunner"/> and prepends what happened to the log; the view model never touches a
-/// process itself, and only ever runs actions authored in <see cref="ToolkitCatalog"/>.
+/// process itself, and only ever runs actions authored in an <see cref="IToolkitCatalog"/> or built
+/// from what the user typed into the form.
 /// </summary>
 public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
     private readonly ToolkitRunner _runner = new();
+    private readonly IToolkitCatalog _catalog;
     private ToolkitCategory? _category;
     private string? _pendingReveal;
 
-    public ToolkitViewModel() {
+    public ToolkitViewModel() : this(IToolkitCatalog.ForCurrentPlatform()) { }
+
+    /// <summary>Test seam: the same page over an explicit command set. The public ctor resolves this
+    /// machine's, so the shell still builds this with <c>new()</c>.</summary>
+    internal ToolkitViewModel(IToolkitCatalog catalog) {
+        _catalog = catalog;
+
         var options = new List<ToolkitCategoryOption> {
             new("All", null, SelectCategory),
         };
@@ -48,9 +56,9 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// convenience the design asks for, and nothing more: the box stays editable, and a value the user
     /// has already typed is never overwritten. Adapter enumeration is slow enough to keep off the UI
     /// thread.</summary>
-    private static async Task SeedParameterDefaultsAsync() {
+    private async Task SeedParameterDefaultsAsync() {
         var gateway = await Task.Run(ToolkitDefaults.PrimaryGateway).ConfigureAwait(true);
-        foreach (var entry in ToolkitCatalog.Entries)
+        foreach (var entry in _catalog.Entries)
             entry.Parameter?.SeedIfEmpty(gateway);
     }
 
@@ -67,14 +75,14 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// opened.</summary>
     public ToolkitCommandFormViewModel Form { get; }
 
-    /// <summary>Every row the page knows about — the catalog's, then the user's. This, not
-    /// <see cref="ToolkitCatalog.Entries"/>, is what the filter, the pins and universal search work
-    /// off. Rebuilt on read: the list is small, and a cached copy would be one more thing to keep in
-    /// step with <see cref="Custom"/>.</summary>
+    /// <summary>Every row the page knows about — this platform's built-in rows, then the user's. This,
+    /// not <see cref="IToolkitCatalog.Entries"/>, is what the filter, the pins and universal search
+    /// work off. Rebuilt on read: the list is small, and a cached copy would be one more thing to keep
+    /// in step with <see cref="Custom"/>.</summary>
     public IReadOnlyList<ToolkitEntry> AllEntries {
         get {
-            var all = new List<ToolkitEntry>(ToolkitCatalog.Entries.Count + Custom.Count);
-            all.AddRange(ToolkitCatalog.Entries);
+            var all = new List<ToolkitEntry>(_catalog.Entries.Count + Custom.Count);
+            all.AddRange(_catalog.Entries);
             all.AddRange(Custom);
             return all;
         }

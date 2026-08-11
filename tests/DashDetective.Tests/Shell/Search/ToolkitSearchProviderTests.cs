@@ -96,7 +96,7 @@ public class ToolkitSearchProviderTests {
     /// from the toolbar without the provider being told about it.</summary>
     [Fact]
     public async Task QueryAsync_RealCatalog_FindsAnAuthoredCommand() {
-        var results = await Query("appdata", entries: ToolkitCatalog.Entries);
+        var results = await Query("appdata", entries: WindowsToolkitCatalog.Instance.Entries);
 
         Assert.Contains(results, r => r.Title == "%appdata%");
     }
@@ -105,7 +105,7 @@ public class ToolkitSearchProviderTests {
     /// command the user authored is findable from the toolbar exactly like an authored one.</summary>
     [Fact]
     public async Task QueryAsync_PageEntries_FindTheUsersOwnCommandsToo() {
-        var page = new ToolkitViewModel();
+        var page = new ToolkitViewModel(WindowsToolkitCatalog.Instance);
         page.AddCommand(new ToolkitCommand(
             "zzz-my-own", "Something only I have", ToolkitCommandType.Launch, "thing.exe"));
 
@@ -122,7 +122,7 @@ public class ToolkitSearchProviderTests {
     /// findable without anything having to re-register it.</summary>
     [Fact]
     public async Task QueryAsync_ACommandAddedAfterwards_IsFoundWithoutRewiring() {
-        var page = new ToolkitViewModel();
+        var page = new ToolkitViewModel(WindowsToolkitCatalog.Instance);
         var provider = new ToolkitSearchProvider(() => page.AllEntries, _ => { });
 
         Assert.Empty(await provider.QueryAsync(new SearchQuery("zzz-later"), CancellationToken.None));
