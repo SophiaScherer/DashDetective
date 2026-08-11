@@ -97,7 +97,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
             var cgroup = ProcCgroupParser.Parse(_proc.ReadAllLines(root + "cgroup"));
 
             var category = LinuxProcessClassifier.Classify(
-                pid, stat.ParentPid, stat.State, status.Uid, HasCommandLine(cmdline), cgroup);
+                pid, stat.ParentPid, stat.State, status.Uid, ProcPidName.HasCommandLine(cmdline), cgroup);
 
             result.Add(new ProcessInfo(
                 pid,
@@ -154,38 +154,10 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
         return percent > 100 ? 100 : percent;
     }
 
-    /// <summary>
-    /// The process name: the basename of <c>cmdline</c>'s first NUL-separated argument, falling back to the
-    /// kernel's <c>comm</c>. <c>cmdline</c> is preferred because <c>comm</c> truncates at 15 characters.
-    /// <b>No <c>.exe</c> is appended</b> — that suffix is the Windows provider's, and nothing outside it
-    /// depends on the extension.
-    /// </summary>
-    internal static string NameFrom(string? cmdline, string comm) {
-        var name = Basename(FirstArgument(cmdline));
-        if (name.Length > 0)
-            return name;
-
-        return comm.Length > 0 ? comm : "Unknown";
-    }
-
-    /// <summary>Whether the process has a user-space command line at all. Empty means a kernel thread or a
-    /// zombie, which is one of the classifier's inputs.</summary>
-    internal static bool HasCommandLine(string? cmdline) => FirstArgument(cmdline).Length > 0;
-
-    /// <summary><c>cmdline</c> holds NUL-separated arguments, so argv[0] ends at the first NUL — splitting
-    /// on spaces would mangle any path containing one.</summary>
-    private static string FirstArgument(string? cmdline) {
-        if (string.IsNullOrEmpty(cmdline))
-            return "";
-
-        var nul = cmdline.IndexOf('\0');
-        return (nul < 0 ? cmdline : cmdline[..nul]).Trim();
-    }
-
-    private static string Basename(string path) {
-        var slash = path.LastIndexOf('/');
-        return slash < 0 ? path : path[(slash + 1)..];
-    }
+    /// <summary>This tab's placeholder for a process that names itself nowhere. <see cref="ProcPidName"/>
+    /// reports "" rather than substituting, because the Network tab's placeholder differs.</summary>
+    internal static string NameFrom(string? cmdline, string comm) =>
+        ProcPidName.From(cmdline, comm) is { Length: > 0 } name ? name : "Unknown";
 
     /// <summary>The run state as the column's text. Windows reports only "Running" or "Not responding", so
     /// the states that mean the same thing there collapse to "Running" — that string is also what tints the

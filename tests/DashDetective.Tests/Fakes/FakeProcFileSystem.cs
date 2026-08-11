@@ -36,6 +36,13 @@ internal sealed class FakeProcFileSystem : IProcFileSystem {
         return this;
     }
 
+    /// <summary>Removes a staged symlink — how a test models a descriptor closing between two reads, which
+    /// under <c>/proc</c> is the ordinary case rather than the exceptional one.</summary>
+    public FakeProcFileSystem WithoutLink(string path) {
+        _links.Remove(path);
+        return this;
+    }
+
     public bool Exists(string path) =>
         _files.ContainsKey(path) || _links.ContainsKey(path) || ChildrenOf(path).Any();
 

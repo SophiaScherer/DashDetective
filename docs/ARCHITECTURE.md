@@ -11,7 +11,8 @@ Build, run and test instructions live in the [README](../README.md).
 DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10.0`, using the MVVM
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
-today Linux builds and launches with CPU, memory, network, the whole Storage surface — drives, partitions
+today Linux builds and launches with CPU, memory, the whole Network tab — throughput, adapters and the
+active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions
 and per-disk activity — the Processes tab, the Toolkit tab's own command set, plus the machine's static
 identity (OS, kernel, BIOS, board) and the Processor, Motherboard and Storage Devices spec cards, while the
 remaining panels read "—".
@@ -285,9 +286,10 @@ concatenation with forward-slash literals**, never `Path.Combine`, which on Wind
 `/proc\stat`.
 
 **Format knowledge lives in a parser beside the seam** — `ProcStatParser`, `ProcMeminfoParser`,
-`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader`, `ProcMountsParser`, `ProcDiskstatsParser`, and the
-four per-PID parsers behind the Processes tab — rather than in any one provider, so a file read by two
-consumers is understood in exactly one place. One file gets one parser and the file is in the name:
+`ProcCpuinfoParser`, `OsReleaseParser`, `DmiIdReader`, `ProcMountsParser`, `ProcDiskstatsParser`,
+`ProcNetParser`, and the four per-PID parsers behind the Processes tab — rather than in any one provider,
+so a file read by two consumers is understood in exactly one place. One file gets one parser and the file
+is in the name:
 `ProcStatParser` reads `/proc/stat`, `ProcPidStatParser` reads `/proc/[pid]/stat`, and they are unrelated
 formats. They parse
 defensively, each against its own trap: by index with a length check, because the kernel has appended
@@ -298,15 +300,28 @@ is a shell fragment mixing quoted and bare values; by expanding octal escapes, b
 separates its fields with the space a mount point may itself contain; by splitting on the *last* `)`,
 because a process's `comm` is parenthesised and may hold spaces and parentheses of its own; and by taking
 only hierarchy `0` with an empty controller list, because a hybrid host's `/proc/[pid]/cgroup` surrounds the
-unified v2 line with a dozen v1 ones.
+unified v2 line with a dozen v1 ones; and by decoding each 32-bit word of an address separately, because
+`/proc/net/tcp` prints them in *host* byte order rather than network order.
+
+**The `/proc/net` byte order is the sharpest of those traps, because getting it wrong still produces
+addresses.** `0100007F` is `127.0.0.1`, not `1.0.0.127`, and an IPv6 address is four words each reversed on
+its own — reverse all sixteen bytes instead and a `::ffff:` mapping marker lands at the wrong end, giving a
+wrong address that is still routable-looking. Nothing downstream can catch that, so it is pinned by
+fixtures with known values, including a link-local address whose four words are all distinct.
 
 Where two surfaces need the same *derived* numbers rather than the same file, the derivation is shared as
 well: `CpuFacts` sits on `ProcCpuinfoParser` and feeds both the Dashboard's CPU tile and the Hardware tab's
 Processor card, so the two cannot report different core counts for the same machine. `SysBlockFacts` does
 the same for `/sys/block`, feeding the Storage tab's drive cards, its partitions table and the Hardware
-tab's Storage Devices card. `ProcPids` is the smallest of the three — just the all-digit entries under
+tab's Storage Devices card. `ProcPids` is the smallest of these — just the all-digit entries under
 `/proc` — but it is shared for the same reason: the Performance tab counts processes and the Processes tab
-walks them, and only one of them should get to decide what a process is.
+walks them, and only one of them should get to decide what a process is. `ProcPidName` was extracted for
+that reason after the fact: the Processes tab names every process and the Network tab names each
+connection's owner, and a second copy would have shown `systemd-resolved` on one tab and the 15-character
+truncated `systemd-resolve` on the other. **These shared derivations report `""` and `0` honestly and let
+each consumer apply its own placeholder**, because the placeholders genuinely differ — the Processes tab
+wants "Unknown" where the Network tab wants "PID 1234", and a derivation that substituted early would have
+destroyed the information needed to tell them apart.
 
 **Reporting "not known" as `0` is only safe when `0` is impossible as a real reading.** That is the usual
 case, and `CpuFacts` leans on it. It fails for the owner of a process: `/proc/[pid]/status`'s `Uid` is `0`
@@ -357,6 +372,15 @@ as two columns of transferred sectors, but the Storage tab's headline numbers an
 render *active time* — for which `io_ticks`, the milliseconds with at least one request outstanding, is the
 exact analogue of the Windows counter. Reading only the obvious fields would have left the page rendering a
 confident, permanent zero.
+
+**A platform's value can need translating rather than reading.** Both platforms report a TCP connection's
+state as a small integer, and the two numberings are unrelated: Linux `0x0A` is LISTEN where the Windows
+`MIB_TCP_STATE` 10 is Last-ack, and Linux `0x01` is ESTABLISHED where MIB 1 is Closed. Since the display
+table is keyed by the Windows numbering, the Linux interop translates into it rather than widening the
+record — every row would otherwise carry a wrong but entirely plausible label, which no downstream check
+could catch. The connections table is also where an unprivileged reader's limits show most plainly: a socket
+belonging to another user cannot be attributed to a process at all, so its owner column shows "—" rather
+than guessing.
 
 ## Shared control inventory
 

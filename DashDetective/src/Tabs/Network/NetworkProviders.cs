@@ -1,6 +1,3 @@
-using System;
-using System.Runtime.Versioning;
-
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
@@ -16,15 +13,11 @@ namespace DashDetective.Tabs.Network;
 internal sealed record NetworkProviders(
     IAdapterInfoProvider Adapters, IConnectionsProvider Connections, IDnsLookupProvider Dns) {
 
-    /// <summary>The provider set for this machine. The adapter and DNS readers are portable; only the
-    /// connection tables differ, falling back to "no connections" — what the old inline
-    /// <c>OperatingSystem.IsWindows()</c> guards in the interop produced.</summary>
+    /// <summary>The provider set for this machine. The adapter and DNS readers are portable; the connection
+    /// tables and the naming of their owners differ, and each seam chooses its own arm.</summary>
     public static NetworkProviders ForCurrentPlatform() =>
-        Create(OperatingSystem.IsWindows() ? WindowsInterop() : new UnsupportedConnectionsInterop());
+        Create(IConnectionsInterop.ForCurrentPlatform(), IProcessNameResolver.ForCurrentPlatform());
 
-    [SupportedOSPlatform("windows")]
-    private static IConnectionsInterop WindowsInterop() => new WindowsConnectionsInterop();
-
-    private static NetworkProviders Create(IConnectionsInterop interop) => new(
-        new AdapterInfoProvider(), new ConnectionsProvider(interop), new DnsLookupProvider());
+    private static NetworkProviders Create(IConnectionsInterop interop, IProcessNameResolver names) => new(
+        new AdapterInfoProvider(), new ConnectionsProvider(interop, names), new DnsLookupProvider());
 }

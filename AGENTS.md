@@ -498,6 +498,35 @@ currently exist.
                                  drive's physical sector size. DiskNumbers() is the cheap half, for the
                                  sampler, which runs every tick and only needs to tell a disk from a
                                  partition)
+          ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
+                                 LinuxConnectionsInterop. ONE parser for all four files: they share the ten
+                                 leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
+                                 timeout, inode), so only the trailer differs. ADDRESSES ARE HEX 32-BIT
+                                 WORDS IN HOST BYTE ORDER, NOT NETWORK ORDER — 0100007F is 127.0.0.1, and
+                                 an IPv6 address is FOUR such words reversed INDEPENDENTLY; reversing all
+                                 sixteen bytes instead puts a ::ffff: marker at the wrong end and yields a
+                                 plausible but wrong global address. Ports sit in the same field and must
+                                 NOT be swapped. State passes through as the KERNEL's code — translation is
+                                 the interop's job. The sl header survives a column count (twelve fields)
+                                 and is dropped by failing to decode as an address)
+          SocketInodeMap.cs     (socket inode → owning PID by walking /proc/[pid]/fd for socket:[N] — the
+                                 only rootless attribution, since /proc/net names an inode and never a PID.
+                                 STATEFUL AND CACHED on purpose: the walk is a readlink per descriptor
+                                 across every process and the connections table polls at 2.5 s, so it only
+                                 walks when asked about an unseen inode. A SHARED SOCKET RESOLVES TO THE
+                                 LOWEST PID, not the first one walked — /proc listing order is unspecified,
+                                 and the row's identity key carries the PID, so an unstable choice would
+                                 break the UI's keyed diff. Reads the inode by locating the socket:[ marker
+                                 ANYWHERE in the link target, because ResolveLink returns a full path
+                                 (/proc/1/fd/socket:[N]) rather than the bare target. An unlistable fd
+                                 directory is the natural other-user filter, at one call per process)
+          ProcPidName.cs        (the cmdline→comm name derivation, shared by the Processes tab and the
+                                 Network tab's connection owners — the CpuFacts shape applied to names, so
+                                 the same process cannot read systemd-resolved on one tab and the 15-char
+                                 truncated systemd-resolve on the other. cmdline holds NUL-separated args,
+                                 so argv[0] ends at the first NUL. Reports "" for a process that names
+                                 itself nowhere, because the consumers' placeholders differ — Processes
+                                 wants "Unknown", Network wants "PID 1234". No .exe is appended)
           IVolumeCapacityReader.cs
                                 (a mounted filesystem's total/free bytes by mount point, over DriveInfo —
                                  the managed statvfs. A seam of its own beside IProcFileSystem for the same
@@ -840,9 +869,11 @@ currently exist.
                                                          MonoFont + fixed console-colour resources live in
                                                          the view — promote to Shared if reused)
                                 NetworkProviders.cs     (the tab's provider bundle + ForCurrentPlatform();
-                                                         see Provider seams above. The ONLY platform choice
-                                                         here is which IConnectionsInterop — everything else
-                                                         is portable managed code)
+                                                         see Provider seams above. TWO platform choices here
+                                                         — which IConnectionsInterop and which
+                                                         IProcessNameResolver — and the bundle makes neither:
+                                                         each seam picks its own arm and the bundle takes
+                                                         what it is handed. Everything else is portable)
                                 IAdapterInfoProvider.cs (seam + the AdapterSnapshot record)
                                 AdapterInfoProvider.cs  (async snapshot: all adapters + primary IP config
                                                          via managed NetworkInterface; per-adapter/field
@@ -850,18 +881,54 @@ currently exist.
                                                          Windows-only field (DHCP) is guarded inline → "—")
                                 AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
-                                IConnectionsInterop.cs  (seam + the RawConnection struct)
+                                IConnectionsInterop.cs  (seam + ForCurrentPlatform() + the RawConnection
+                                                         struct. ADDRESS FAMILIES ARE WHATEVER THE PLATFORM
+                                                         CAN SUPPLY, not a fixed set — Linux includes IPv6,
+                                                         Windows is IPv4-only. State is a MIB_TCP_STATE value
+                                                         whatever the platform's own numbering is)
                                 WindowsConnectionsInterop.cs
                                                         (feature-local iphlpapi P/Invoke:
                                                          GetExtendedTcpTable/GetExtendedUdpTable, IPv4
                                                          OWNER_PID tables; port byte-order swap. IPv6
-                                                         deferred. Holds UnsupportedConnectionsInterop —
-                                                         reports no connections off Windows)
+                                                         deferred — the OWNER_PID tables use different
+                                                         16-byte-address structs. Holds
+                                                         UnsupportedConnectionsInterop — reports none)
+                                LinuxConnectionsInterop.cs
+                                                        (/proc/net/{tcp,tcp6,udp,udp6} over ProcNetParser,
+                                                         owners via SocketInodeMap. TRANSLATES THE KERNEL'S
+                                                         TCP STATE CODES TO THE MIB NUMBERING — the two
+                                                         tables are unrelated (Linux LISTEN 0x0A is MIB
+                                                         Last-ack, Linux ESTABLISHED 0x01 is MIB Closed), so
+                                                         passing them through labels every row wrongly AND
+                                                         plausibly. 8→8 is a coincidence, not a shared code.
+                                                         Reports UDP as connectionless to match the Windows
+                                                         row shape, even for a socket the kernel tracks as
+                                                         connected. No [SupportedOSPlatform] — portable
+                                                         managed reads over IProcFileSystem)
+                                IProcessNameResolver.cs (seam + ForCurrentPlatform() + the shared Unnamed(pid)
+                                                         wording. Naming a process is NOT portable even
+                                                         though looking one up is)
+                                WindowsProcessNameResolver.cs
+                                                        (Process.GetProcessById + ".exe"; 0 → "System Idle",
+                                                         4 → "System". Holds UnsupportedProcessNameResolver.
+                                                         [SupportedOSPlatform] ON THE CTOR even though it
+                                                         calls no Windows-only API: what it ENCODES is
+                                                         Windows-only, and off Windows it would mislabel real
+                                                         rows rather than fail. Verified load-bearing —
+                                                         removing the factory guard fails the build)
+                                LinuxProcessNameResolver.cs
+                                                        (over the shared ProcPidName. No .exe and NO
+                                                         WELL-KNOWN PIDS — PID 4 is an ordinary kernel thread
+                                                         on Linux. A socket with no visible owner shows "—",
+                                                         not PID 0, which is not a process)
                                 IConnectionsProvider.cs (seam + the ConnectionsSnapshot record)
                                 ConnectionsProvider.cs  (TCP+UDP snapshot off the UI thread; PID→name cache
                                                          with stale eviction; de-dupe by key; sort; cap 1000.
-                                                         Takes IConnectionsInterop by ctor. SINGLE-CONSUMER:
-                                                         the name cache is per-instance mutable state)
+                                                         Takes BOTH seams by ctor. IPv6 endpoints are
+                                                         BRACKETED — "::1:631" gives no way to tell the port
+                                                         from another hextet, and the identity key is built
+                                                         from these strings. SINGLE-CONSUMER: the name cache
+                                                         is per-instance mutable state)
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
@@ -997,8 +1064,12 @@ does not catch* below. The idiom, established by `IStartupRegistration` (`src/Se
   only an interface — naming it `Windows*` when it would run fine anywhere is a lie, and writing an
   `Unsupported*` twin for it would either duplicate the portable body or silently blank a panel that used
   to work. The Network tab is the worked example: `AdapterInfoProvider`, `ConnectionsProvider` and
-  `DnsLookupProvider` stay unprefixed; only `IConnectionsInterop` (the `iphlpapi` P/Invoke) gets the pair,
-  and `NetworkProviders.ForCurrentPlatform()` chooses between them alone.
+  `DnsLookupProvider` stay unprefixed, while `IConnectionsInterop` and `IProcessNameResolver` each get the
+  full set of arms. **`IProcessNameResolver` is the case worth studying** — its lookup is portable managed
+  code (`Process.GetProcessById` runs anywhere), so by the API test it needed no seam at all. It gets one
+  because of what it *encodes*: the `.exe` suffix and PIDs 0/4 are Windows facts, and off Windows they
+  mislabel real rows rather than failing. **A class can be platform-specific by its knowledge rather than
+  by its API surface, and CA1416 cannot see that kind at all.**
 - One `ForCurrentPlatform()` picking between them — on the interface for a lone provider, on a bundle
   record (the `MetricSamplers` shape) for a set. That is the **only** place the platform is decided.
 - **A view code-behind has no injection point** — `ViewLocator` builds views by name with a parameterless
@@ -1550,12 +1621,16 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
     `NetworkUsageSampler` instance on a 1 Hz timer.
   - **Active Connections** — netstat-style TCP+UDP table (Process · Remote · State · Protocol) with
-    owning process names, via feature-local `iphlpapi` P/Invoke (`ConnectionsInterop` →
-    `GetExtendedTcpTable`/`GetExtendedUdpTable`, IPv4 OWNER_PID tables) on a 2.5 s timer. Rows are
-    **keyed-diffed** in place (no flicker); de-duplicated by identity key in `ConnectionsProvider`
-    (two UDP sockets can share PID+local endpoint, which would otherwise break the diff), sorted,
-    **capped at 100** with an honest "N active · showing 100" caption. PID→name is cached with
-    stale-PID eviction; inaccessible/exited PIDs fall back to "PID n"; 0/4 → "System Idle"/"System".
+    owning process names, on a 2.5 s timer. Windows reads the IPv4 `OWNER_PID` tables via feature-local
+    `iphlpapi` P/Invoke (`GetExtendedTcpTable`/`GetExtendedUdpTable`); **Linux reads
+    `/proc/net/{tcp,tcp6,udp,udp6}` and so includes IPv6**, attributing each socket by walking
+    `/proc/[pid]/fd` for its inode. Rows are **keyed-diffed** in place (no flicker); de-duplicated by
+    identity key in `ConnectionsProvider` (two UDP sockets can share PID+local endpoint, which would
+    otherwise break the diff), sorted, **capped at 100** with an honest "N active · showing 100" caption.
+    IPv6 endpoints are bracketed so the port is not mistaken for a hextet. PID→name is cached with
+    stale-PID eviction and resolved per platform: Windows appends `.exe` and names 0/4 "System
+    Idle"/"System"; Linux does neither (PID 4 there is a kernel thread) and shows "—" for a socket whose
+    owner an unprivileged reader cannot see. Either way an unnameable process falls back to "PID n".
   - **Ping** — continuous ping to a fixed `8.8.8.8` (in-box `Ping`, 2 s timer, 1.5 s timeout,
     in-flight-guarded), console-style last-3 replies + rolling avg-RTT / loss summary (`PingMonitor`).
   - **DNS Lookup** — one-shot resolve of a fixed `example.com` (in-box `Dns.GetHostEntryAsync`, 3 s
