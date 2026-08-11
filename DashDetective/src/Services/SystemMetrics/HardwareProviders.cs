@@ -65,8 +65,8 @@ internal sealed record HardwareProviders(
     /// <summary>
     /// The <c>/proc</c> and <c>/sys</c> readers, filled in one milestone at a time — a member with no Linux
     /// implementation yet keeps its <c>Unsupported*</c> instance and renders "—", which is the whole point
-    /// of the degrade-first port. GPU adapters and disk temperature arrive with the GPU milestone; per-DIMM
-    /// memory facts need <c>dmidecode</c> with root and stay unsupported for good.
+    /// of the degrade-first port. Disk temperature arrives later in the GPU milestone; per-DIMM memory
+    /// facts need <c>dmidecode</c> with root and stay unsupported for good.
     ///
     /// Unlike <see cref="Windows"/> this carries no <see cref="SupportedOSPlatformAttribute"/>: the Linux
     /// readers are portable managed code over <c>IProcFileSystem</c>, so there is no annotated API for
@@ -81,7 +81,7 @@ internal sealed record HardwareProviders(
             new LinuxCpuInfoProvider(),
             new UnsupportedMemoryInfoProvider(),
             new LinuxSystemInfoProvider(),
-            new UnsupportedGpuAdapterProvider(),
+            new LinuxGpuAdapterProvider(),
             new LinuxPhysicalDiskProvider(temperature),
             new LinuxVolumeProvider(),
             temperature);

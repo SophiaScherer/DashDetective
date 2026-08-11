@@ -9,11 +9,18 @@ namespace DashDetective.Services.SystemMetrics;
 /// <see cref="VendorId"/> also selects which vendor reader — if any — applies to the adapter.</summary>
 public sealed record GpuPciId(uint VendorId, uint DeviceId, uint SubSysId, uint Revision);
 
-/// <summary>One graphics adapter as DXGI reports it: the PDH-style <see cref="LuidToken"/> that joins to
-/// the <c>\GPU Engine(*)</c> counter instances, the friendly <see cref="Name"/> (DXGI's description),
-/// whether it is a software/basic-render adapter (<see cref="IsSoftware"/>, to be filtered out), its
-/// dedicated VRAM in bytes (carried onto <see cref="DeviceInstance.VramBytes"/> for the Performance tab's
-/// GPU VRAM tile), and its <see cref="Pci"/> identity (which vendor sensor readings join on).</summary>
+/// <summary>One graphics adapter: <see cref="LuidToken"/>, the platform's own stable identity for it, the
+/// friendly <see cref="Name"/>, whether it is a placeholder rather than a real adapter
+/// (<see cref="IsSoftware"/>, to be filtered out), its dedicated VRAM in bytes (carried onto
+/// <see cref="DeviceInstance.VramBytes"/> for the Performance tab's GPU VRAM tile), and its
+/// <see cref="Pci"/> identity (which vendor sensor readings join on).
+///
+/// <b><see cref="LuidToken"/> is named for Windows but is not always a LUID.</b> It is whatever this
+/// platform uses to say "the same adapter" across independent readers: the PDH-style
+/// <c>luid_0x…_0x…</c> token that joins to the <c>\GPU Engine(*)</c> counter instances on Windows, and the
+/// card's PCI address on Linux, which has no LUID. What matters is that the enumeration and the
+/// utilisation sampler derive it identically — the inventory intersects the two, so a mismatch yields no
+/// GPU at all rather than a wrong one.</summary>
 public sealed record GpuAdapter(
     string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory, GpuPciId? Pci = null) {
     /// <summary>Formats a LUID's high/low parts into the PDH instance-name token
