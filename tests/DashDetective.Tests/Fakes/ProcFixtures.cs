@@ -399,6 +399,103 @@ internal static class ProcFixtures {
           918: 000080FE00000000FF27000AA1664EFE:0223 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 28104 2 0000000000000000 0
         """;
 
+    /// <summary>
+    /// Stages a discrete AMD card (Radeon RX 6800 XT, <c>1002:73df</c>) as the amdgpu driver exposes it:
+    /// the PCI id files, the two symlinks an adapter is identified by, the utilisation and VRAM
+    /// attributes, and the card's own hwmon. Values follow <c>Documentation/ABI/testing/sysfs-driver-amdgpu</c>
+    /// and <c>sysfs-class-hwmon</c> — <c>gpu_busy_percent</c> is a bare 0–100 integer,
+    /// <c>mem_info_vram_total</c> is <b>bytes</b>, <c>temp1_input</c> is <b>millidegrees</b> and
+    /// <c>power1_average</c> is <b>microwatts</b>. The three unit scales are the point: each is a
+    /// different divisor, and a reader that picks the wrong one still produces a plausible-looking number.
+    /// <c>renderD128</c> is staged so a walk that does not skip render nodes double-counts the card.
+    /// </summary>
+    public static FakeProcFileSystem WithAmdgpuCard(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/drm/card0/device/vendor", "0x1002\n")
+            .WithFile("/sys/class/drm/card0/device/device", "0x73df\n")
+            .WithFile("/sys/class/drm/card0/device/subsystem_vendor", "0x1002\n")
+            .WithFile("/sys/class/drm/card0/device/subsystem_device", "0x0e3b\n")
+            .WithFile("/sys/class/drm/card0/device/revision", "0xc7\n")
+            .WithFile("/sys/class/drm/card0/device/class", "0x030000\n")
+            .WithLink("/sys/class/drm/card0/device", "/sys/devices/pci0000:00/0000:00:01.1/0000:03:00.0")
+            .WithLink("/sys/class/drm/card0/device/driver", "/sys/bus/pci/drivers/amdgpu")
+            .WithFile("/sys/class/drm/card0/device/gpu_busy_percent", "37\n")
+            .WithFile("/sys/class/drm/card0/device/mem_info_vram_total", "17179869184\n")
+            .WithFile("/sys/class/drm/card0/device/mem_info_vram_used", "1073741824\n")
+            .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/name", "amdgpu\n")
+            .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/temp1_input", "52000\n")
+            .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/temp1_label", "edge\n")
+            .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/power1_average", "45000000\n")
+            .WithFile("/sys/class/drm/renderD128/dev", "226:128\n");
+
+    /// <summary>
+    /// Stages a discrete NVIDIA card (<c>10de:2504</c>, an RTX 3060) as the proprietary driver exposes it —
+    /// the complement to <see cref="WithAmdgpuCard"/>. The PCI id files are the same kernel-generic set, but
+    /// there is <b>no <c>gpu_busy_percent</c>, no <c>mem_info_vram_total</c> and no hwmon</b>: the blob
+    /// publishes none of them, which is why utilisation needs <c>nvidia-smi</c> and why this card must
+    /// degrade to "—" rather than to zero. <c>driver/module/version</c> is present, as the NVIDIA module's
+    /// is; amdgpu's is not, so the pair covers both branches of the driver-version read.
+    /// </summary>
+    public static FakeProcFileSystem WithNvidiaCard(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/drm/card1/device/vendor", "0x10de\n")
+            .WithFile("/sys/class/drm/card1/device/device", "0x2504\n")
+            .WithFile("/sys/class/drm/card1/device/subsystem_vendor", "0x1458\n")
+            .WithFile("/sys/class/drm/card1/device/subsystem_device", "0x4067\n")
+            .WithFile("/sys/class/drm/card1/device/revision", "0xa1\n")
+            .WithFile("/sys/class/drm/card1/device/class", "0x030000\n")
+            .WithLink("/sys/class/drm/card1/device", "/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0")
+            .WithLink("/sys/class/drm/card1/device/driver", "/sys/bus/pci/drivers/nvidia")
+            .WithFile("/sys/class/drm/card1/device/driver/module/version", "550.107.02\n");
+
+    /// <summary>
+    /// Stages an NVMe drive's hwmon, the <b>controller-to-namespace</b> shape that makes the disk-temperature
+    /// walk two hops rather than one: the hwmon's <c>device</c> link resolves to the <i>controller</i>
+    /// (<c>nvme0</c>), and the block device is a namespace <i>child</i> of it (<c>nvme0n1</c>, 259:0). A
+    /// reader that treats the link target as the block device finds nothing here. Sourced from
+    /// <c>Documentation/ABI/testing/sysfs-class-hwmon</c> plus the NVMe driver's layout; <c>temp1_input</c>
+    /// is millidegrees, so 42850 is 42.85 °C.
+    /// </summary>
+    public static FakeProcFileSystem WithNvmeHwmon(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/hwmon/hwmon2/name", "nvme\n")
+            .WithFile("/sys/class/hwmon/hwmon2/temp1_input", "42850\n")
+            .WithFile("/sys/class/hwmon/hwmon2/temp1_label", "Composite\n")
+            .WithLink("/sys/class/hwmon/hwmon2/device",
+                      "/sys/devices/pci0000:00/0000:00:1d.0/0000:02:00.0/nvme/nvme0")
+            .WithFile("/sys/devices/pci0000:00/0000:00:1d.0/0000:02:00.0/nvme/nvme0/model",
+                      "Samsung SSD 990 PRO 2TB\n")
+            .WithFile("/sys/devices/pci0000:00/0000:00:1d.0/0000:02:00.0/nvme/nvme0/nvme0n1/dev", "259:0\n");
+
+    /// <summary>
+    /// Stages a SATA drive's <c>drivetemp</c> hwmon — the <i>other</i> mapping shape. Here the
+    /// <c>device</c> link resolves to a SCSI target whose block device hangs off a <c>block/</c>
+    /// subdirectory, so the walk differs from <see cref="WithNvmeHwmon"/>'s in both depth and shape. The
+    /// device number matches <see cref="WithVirtualBoxBlockTree"/>'s <c>sda</c> (8:0), so the two fixtures
+    /// compose into one machine.
+    ///
+    /// <c>drivetemp</c> is a module most distros do not load by default; a machine where this finds nothing
+    /// is the common case, not a broken read.
+    /// </summary>
+    public static FakeProcFileSystem WithDrivetempHwmon(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/hwmon/hwmon3/name", "drivetemp\n")
+            .WithFile("/sys/class/hwmon/hwmon3/temp1_input", "38000\n")
+            .WithFile("/sys/class/hwmon/hwmon3/temp1_label", "Temperature\n")
+            .WithLink("/sys/class/hwmon/hwmon3/device",
+                      "/sys/devices/pci0000:00/0000:00:1f.2/ata1/host0/target0:0:0/0:0:0:0")
+            .WithFile("/sys/devices/pci0000:00/0000:00:1f.2/ata1/host0/target0:0:0/0:0:0:0/block/sda/dev",
+                      "8:0\n");
+
+    /// <summary>
+    /// Stages the two hwmon entries that are <b>not</b> a drive — a CPU package sensor and a chipset one.
+    /// Every real machine has several, they are numbered ahead of the interesting ones as often as not, and
+    /// hwmon numbering is not stable across boots. A reader that indexes instead of matching on <c>name</c>
+    /// reports the CPU's temperature as a disk's.
+    /// </summary>
+    public static FakeProcFileSystem WithNonDriveHwmon(this FakeProcFileSystem proc) =>
+        proc.WithFile("/sys/class/hwmon/hwmon0/name", "coretemp\n")
+            .WithFile("/sys/class/hwmon/hwmon0/temp1_input", "45000\n")
+            .WithFile("/sys/class/hwmon/hwmon0/temp1_label", "Package id 0\n")
+            .WithFile("/sys/class/hwmon/hwmon1/name", "acpitz\n")
+            .WithFile("/sys/class/hwmon/hwmon1/temp1_input", "27800\n");
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>
