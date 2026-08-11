@@ -67,7 +67,7 @@ public class SamplerSoftFailTests {
 
     [Fact]
     public void GpuUsageSampler_Inert_SamplesZeroAndEmptyMaps() {
-        using var sampler = new GpuUsageSampler(SamplerInit.Inert);
+        using var sampler = new WindowsGpuUsageSampler(SamplerInit.Inert);
 
         Assert.Equal(0.0, sampler.Sample());
         Assert.Empty(sampler.SampleEngines());
@@ -123,15 +123,13 @@ public class SamplerSoftFailTests {
     [Fact]
     public void RealConstructorsAndSamples_NeverThrow_OnThisHost() {
         using var cpu = new CpuUsageSampler();
-        using var gpu = new GpuUsageSampler();
+        using var gpu = IGpuUsageSampler.ForCurrentPlatform();
         using var disk = IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
         using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
         var memory = IMemoryUsageSampler.ForCurrentPlatform();
 
         _ = cpu.Sample();
-        _ = gpu.Sample();
-        _ = gpu.SampleEngines();
         _ = gpu.SampleAdapters();
         _ = disk.Sample();
         _ = frequency.Sample();
@@ -150,10 +148,14 @@ public class SamplerSoftFailTests {
         using var utility = new ProcessorUtilityCpuSampler();
         using var logical = new WindowsLogicalProcessorSampler();
         using var frequency = new WindowsProcessorFrequencySampler();
+        // Sample/SampleEngines are off the seam, so the real-constructor check for them lives here.
+        using var gpu = new WindowsGpuUsageSampler();
 
         _ = utility.Sample();
         _ = logical.Sample();
         _ = frequency.Sample();
+        _ = gpu.Sample();
+        _ = gpu.SampleEngines();
         _ = new SystemTimesCpuSampler().Sample();
         _ = new WindowsMemoryUsageSampler().Sample();
     }

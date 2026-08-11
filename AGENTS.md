@@ -1105,13 +1105,20 @@ no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating tho
 busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
 from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
 
-Four classes still reach native Windows APIs unannotated, because annotating them today would land the
+Three classes still reach native Windows APIs unannotated, because annotating them today would land the
 attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
 already scheduled. Each gets its attribute when its seam lands:
 
 | Class | Seam lands in |
 |---|---|
-| `GpuUsageSampler`, `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 |
+| `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 (the GPU sensor seam) |
+
+**M13 cleared `GpuUsageSampler`**, the same way M8 cleared its own: two view models held
+`private readonly GpuUsageSampler _gpuSampler = new()` and `DeviceInventory` constructed a third inline, so
+`IGpuUsageSampler.ForCurrentPlatform()` had to own the construction before the class could be renamed
+`WindowsGpuUsageSampler` and annotated. `Sample()` and `SampleEngines()` were deliberately left off that
+seam — no consumer calls them since the multi-GPU split — which keeps them callable by the inert-contract
+tests on both legs.
 
 **M8 cleared the fifth**, and it is the worked example of why the seam has to come first: three view models
 held `private readonly PhysicalDiskThroughputSampler _throughputSampler = new()`, and there is nowhere on a

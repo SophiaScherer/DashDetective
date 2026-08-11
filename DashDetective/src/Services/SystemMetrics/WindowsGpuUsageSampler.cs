@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
@@ -16,9 +17,14 @@ public sealed record GpuAdapterSample(double Overall, IReadOnlyDictionary<string
 ///
 /// Shared: the Dashboard and the Performance tab each own an instance. Moved here from
 /// src/Tabs/Dashboard with sign-off when the Performance tab was activated — the same precedent as
-/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>.
+/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>. The platform check lives in
+/// <see cref="IGpuUsageSampler.ForCurrentPlatform"/>.
+///
+/// <see cref="Sample"/> and <see cref="SampleEngines"/> are not on the seam: the multi-GPU split moved
+/// every consumer onto <see cref="SampleAdapters"/>, and they survive only as the inert-contract tests'
+/// entry points.
 /// </summary>
-public sealed class GpuUsageSampler : IDisposable {
+internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;
@@ -59,7 +65,8 @@ public sealed class GpuUsageSampler : IDisposable {
     private readonly IntPtr _counter;
     private readonly bool _ready;
 
-    public GpuUsageSampler() {
+    [SupportedOSPlatform("windows")]
+    public WindowsGpuUsageSampler() {
         // A failure to stand up the query leaves _ready false; Sample() then returns 0 forever and
         // the caller stops its timer — the same soft-fail contract as the CPU/Memory samplers. The
         // catch covers pdh.dll failing to load or bind, which a return-code check can't see.
@@ -80,13 +87,13 @@ public sealed class GpuUsageSampler : IDisposable {
             _ready = true;
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
-            NativeLoadFailure.Report(nameof(GpuUsageSampler), ex);
+            NativeLoadFailure.Report(nameof(WindowsGpuUsageSampler), ex);
         }
     }
 
     /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
     /// a healthy host, where the real constructor always succeeds.</summary>
-    internal GpuUsageSampler(SamplerInit _) { }
+    internal WindowsGpuUsageSampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns total GPU utilisation (0–100) at the moment of the call: the busiest engine type's
@@ -266,4 +273,15 @@ public sealed class GpuUsageSampler : IDisposable {
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
+}
+
+/// <summary>The no-readings sampler — what a platform with no utilisation source gets. An empty map leaves
+/// every GPU card at the value it was built with, which is the same "—" the old guard produced.</summary>
+internal sealed class UnsupportedGpuUsageSampler : IGpuUsageSampler {
+    private static readonly IReadOnlyDictionary<string, GpuAdapterSample> Empty =
+        new Dictionary<string, GpuAdapterSample>();
+
+    public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() => Empty;
+
+    public void Dispose() { }
 }

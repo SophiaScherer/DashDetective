@@ -132,7 +132,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // toggle expands or collapses; the Detailed flag is shared across every GPU row.
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
-    private readonly GpuUsageSampler _gpuSampler = new();
+    private readonly IGpuUsageSampler _gpuSampler = IGpuUsageSampler.ForCurrentPlatform();
     // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
     // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
     private readonly GpuSensorProvider _gpuSensors = new();

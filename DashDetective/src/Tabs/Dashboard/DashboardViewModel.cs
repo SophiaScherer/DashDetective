@@ -74,7 +74,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
     private readonly Dictionary<string, DashboardCard> _gpuCards = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
-    private readonly GpuUsageSampler _gpuSampler = new();
+    private readonly IGpuUsageSampler _gpuSampler = IGpuUsageSampler.ForCurrentPlatform();
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";

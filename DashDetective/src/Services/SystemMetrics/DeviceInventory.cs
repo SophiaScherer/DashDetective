@@ -85,7 +85,7 @@ public sealed class DeviceInventory {
     /// duplicate LUIDs (DXGI can list one GPU under several) are dropped. Soft-fails to an empty set.</summary>
     private static IReadOnlySet<string> SampleActiveGpuLuids() {
         try {
-            using var sampler = new GpuUsageSampler();
+            using var sampler = IGpuUsageSampler.ForCurrentPlatform();
             return sampler.SampleAdapters().Keys.ToHashSet(StringComparer.Ordinal);
         } catch {
             return new HashSet<string>(StringComparer.Ordinal);
