@@ -15,9 +15,7 @@ public class GpuUsageSamplerSeamTests {
         if (OperatingSystem.IsWindows()) {
             Assert.IsType<WindowsGpuUsageSampler>(sampler);
         } else if (OperatingSystem.IsLinux()) {
-            // Spelled out rather than folded into the else so the `OperatingSystem.IsLinux` grep finds
-            // this file when the Linux sampler lands — a Windows run never executes this branch.
-            Assert.IsType<UnsupportedGpuUsageSampler>(sampler);
+            Assert.IsType<LinuxGpuUsageSampler>(sampler);
         } else {
             Assert.IsType<UnsupportedGpuUsageSampler>(sampler);
         }
@@ -33,15 +31,14 @@ public class GpuUsageSamplerSeamTests {
         sampler.Dispose();
     }
 
-    /// <summary>The inventory intersects this sampler's keys with the adapter enumeration's, so an empty
-    /// map has to mean "no GPU cards" rather than throwing or blanking the page.</summary>
+    /// <summary>Whatever this host resolves to, sampling it must not throw — the inventory calls it during
+    /// startup composition, where an exception would blank the whole device list. Asserts no values, only
+    /// that nothing escapes, so it stays true on a host with a GPU and one without.</summary>
     [Fact]
-    public void Unsupported_YieldsNoActiveAdapterKeys() {
-        if (OperatingSystem.IsWindows())
-            return;
-
+    public void ForCurrentPlatform_SamplingNeverThrows() {
         using var sampler = IGpuUsageSampler.ForCurrentPlatform();
 
-        Assert.Empty(sampler.SampleAdapters().Keys);
+        _ = sampler.SampleAdapters();
+        _ = sampler.SampleAdapters();
     }
 }

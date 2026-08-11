@@ -64,6 +64,11 @@ internal sealed record DrmCardFacts(
     /// string.</summary>
     internal string Key => PciAddress.Length > 0 ? PciAddress : Name;
 
+    /// <summary>The card's sysfs device directory, where its per-tick attributes live. Exposed so a
+    /// sampler can re-read one file without rebuilding the whole derivation, and so the path literal stays
+    /// in the one file that owns it.</summary>
+    internal string DevicePath => DrmRoot + "/" + Name + "/device";
+
     /// <summary>Whether this is a placeholder DRM device rather than a real adapter — see
     /// <see cref="SoftwareDrivers"/>.</summary>
     internal bool IsSoftware => Array.IndexOf(SoftwareDrivers, Driver) >= 0;

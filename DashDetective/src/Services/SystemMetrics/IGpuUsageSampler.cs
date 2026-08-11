@@ -27,6 +27,9 @@ internal interface IGpuUsageSampler : IDisposable {
         if (OperatingSystem.IsWindows())
             return new WindowsGpuUsageSampler();
 
+        if (OperatingSystem.IsLinux())
+            return new LinuxGpuUsageSampler();
+
         return new UnsupportedGpuUsageSampler();
     }
 }
