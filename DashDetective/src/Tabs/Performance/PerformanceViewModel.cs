@@ -639,16 +639,17 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Samples every physical GPU and refreshes each row in place, keyed by adapter LUID: the rail value
     /// + chart + 3D tile show the adapter's busiest-engine % (its overall utilisation), and the Detailed grid is
-    /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged.</summary>
+    /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged — including an
+    /// adapter whose driver publishes no utilisation at all, whose row keeps the "—" it was built with.</summary>
     private void UpdateGpuAdapters() {
         var adapters = _gpuSampler.SampleAdapters();
         if (adapters.Count == 0)
             return;
 
         foreach (var (luid, sample) in adapters) {
-            if (!_gpusByLuid.TryGetValue(luid, out var gpu))
+            if (!_gpusByLuid.TryGetValue(luid, out var gpu) || sample.Overall is not { } reading)
                 continue;
-            var overall = Math.Clamp(sample.Overall, 0, 100);
+            var overall = Math.Clamp(reading, 0, 100);
             MetricChannel.PushHistory(gpu.History, overall);
             var rounded = Math.Round(overall);
             gpu.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);

@@ -5,9 +5,15 @@ using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
-/// <summary>One physical GPU's reading, keyed by adapter LUID: its overall utilisation (the busiest engine
-/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).</summary>
-public sealed record GpuAdapterSample(double Overall, IReadOnlyDictionary<string, double> Engines);
+/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine
+/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).
+///
+/// <b><see cref="Overall"/> is null when the adapter exists but its utilisation cannot be read</b> — the
+/// state Linux needs for a card whose driver publishes no figure (the proprietary NVIDIA blob, Intel's
+/// i915). It is not the same as absent: the inventory builds a GPU card only for an adapter this sampler
+/// reports at all, so returning nothing hides the hardware, while returning 0 would show a real GPU as
+/// permanently idle. Windows always fills it.</summary>
+public sealed record GpuAdapterSample(double? Overall, IReadOnlyDictionary<string, double> Engines);
 
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>

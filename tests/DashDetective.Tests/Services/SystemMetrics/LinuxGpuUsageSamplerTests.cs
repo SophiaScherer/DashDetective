@@ -29,21 +29,29 @@ public class LinuxGpuUsageSamplerTests {
         Assert.Empty(Assert.Single(sampler.SampleAdapters()).Value.Engines);
     }
 
-    /// <summary>An idle GPU and one whose driver cannot report utilisation must not look alike, so the
-    /// NVIDIA card is absent from the reading rather than sitting at 0%.</summary>
+    /// <summary>An idle GPU and one whose driver cannot report utilisation must not look alike — but the
+    /// adapter is still named, because the inventory drops any GPU this sampler does not report and the
+    /// card would vanish entirely.</summary>
     [Fact]
-    public void SampleAdapters_OmitsCardsThatPublishNoUtilisation() {
+    public void SampleAdapters_ReportsCardsWithNoUtilisationAsUnknownNotIdle() {
         using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem().WithNvidiaCard());
 
-        Assert.Empty(sampler.SampleAdapters());
+        var (key, sample) = Assert.Single(sampler.SampleAdapters());
+
+        Assert.Equal("0000:01:00.0", key);
+        Assert.Null(sample.Overall);
     }
 
     [Fact]
-    public void SampleAdapters_MixedMachine_ReportsOnlyTheReportingCard() {
+    public void SampleAdapters_MixedMachine_NamesBothCardsAndValuesOnlyTheReportingOne() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard().WithNvidiaCard();
         using var sampler = new LinuxGpuUsageSampler(proc);
 
-        Assert.Equal(["0000:03:00.0"], sampler.SampleAdapters().Keys);
+        var samples = sampler.SampleAdapters();
+
+        Assert.Equal(["0000:01:00.0", "0000:03:00.0"], samples.Keys.Order());
+        Assert.Equal(37, samples["0000:03:00.0"].Overall);
+        Assert.Null(samples["0000:01:00.0"].Overall);
     }
 
     /// <summary>
@@ -61,7 +69,10 @@ public class LinuxGpuUsageSamplerTests {
         var sampled = sampler.SampleAdapters().Keys.ToHashSet();
 
         var tokens = adapters.Select(a => a.LuidToken).ToHashSet();
-        Assert.Equal(["0000:03:00.0"], tokens.Intersect(sampled));
+
+        // Set equality, not merely a non-empty overlap: every enumerated adapter must survive the
+        // inventory's intersection, including the one with no utilisation to report.
+        Assert.Equal(tokens.Order(), sampled.Order());
     }
 
     [Theory]

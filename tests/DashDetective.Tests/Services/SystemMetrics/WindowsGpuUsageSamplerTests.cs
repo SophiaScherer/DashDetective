@@ -45,6 +45,18 @@ public class WindowsGpuUsageSamplerTests {
         Assert.Equal(55, result[Amd].Engines["VideoDecode"]);
     }
 
+    /// <summary><c>Overall</c> is nullable so Linux can say "this adapter exists but publishes no
+    /// utilisation". PDH always produces a figure, so a null here would blank a Windows GPU card that used
+    /// to show a number.</summary>
+    [Fact]
+    public void AggregateAdapters_AlwaysFillsOverall() {
+        var items = new (string?, double)[] {
+            ("pid_1000_luid_0x00000000_0x0000E54B_phys_0_eng_0_engtype_3D", 0),
+        };
+
+        Assert.NotNull(WindowsGpuUsageSampler.AggregateAdapters(items)[Nvidia].Overall);
+    }
+
     [Fact]
     public void AggregateAdapters_ClampsOverallTo100ButKeepsRawEngineSums() {
         var items = new (string?, double)[] {

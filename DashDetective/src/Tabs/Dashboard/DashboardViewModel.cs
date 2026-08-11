@@ -416,20 +416,34 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         if (adapters.Count == 0)
             return;
 
-        double overall = 0;
+        double? overall = null;
         foreach (var (luid, sample) in adapters) {
-            var value = Math.Clamp(sample.Overall, 0, 100);
-            if (value > overall)
-                overall = value;
             if (!_gpuHistories.TryGetValue(luid, out var history) || !_gpuCards.TryGetValue(luid, out var card))
                 continue;
+
+            // An adapter with no readable utilisation still has a card — it shows "—" rather than a 0 that
+            // would read as idle. The unit goes with it, so the card says "—" and not "— %".
+            if (sample.Overall is not { } reading) {
+                card.Value = "—";
+                card.Unit = "";
+                continue;
+            }
+
+            var value = Math.Clamp(reading, 0, 100);
+            if (value > overall || overall is null)
+                overall = value;
             MetricChannel.PushHistory(history, value);
             card.Value = Math.Round(value).ToString(CultureInfo.InvariantCulture);
+            card.Unit = "%";
             card.Points = SparklinePoints.Build(history, 100);
         }
 
-        MetricChannel.PushHistory(_gpuHistory, overall);
-        GpuValueText = Math.Round(overall).ToString(CultureInfo.InvariantCulture);
+        // The single overall figure the CSV export and text report read. Left untouched when no adapter
+        // reported one, so it holds its last value rather than dropping to a false zero.
+        if (overall is { } busiest) {
+            MetricChannel.PushHistory(_gpuHistory, busiest);
+            GpuValueText = Math.Round(busiest).ToString(CultureInfo.InvariantCulture);
+        }
     }
 
     /// <summary>

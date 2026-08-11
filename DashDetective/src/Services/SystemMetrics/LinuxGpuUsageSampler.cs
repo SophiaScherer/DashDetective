@@ -16,9 +16,11 @@ namespace DashDetective.Services.SystemMetrics;
 /// empty map leaves the Detailed toggle hidden rather than showing an empty grid — that is the intended
 /// outcome, not an unfinished one.
 ///
-/// <b>A card whose driver publishes no <c>gpu_busy_percent</c> is absent from the reading</b> rather than
-/// reported as 0%: an idle GPU and an unreportable one must not look alike. Today that means the
-/// proprietary NVIDIA driver and Intel's i915, neither of which exposes a rootless utilisation figure.
+/// <b>Every adapter is reported; a card whose driver publishes no <c>gpu_busy_percent</c> gets a null
+/// reading</b> rather than 0%. Both halves matter: the inventory builds a GPU card only for an adapter this
+/// sampler names, so omitting one hides real hardware, while a zero would show it as permanently idle.
+/// Today the null case is the proprietary NVIDIA driver and Intel's i915, neither of which exposes a
+/// rootless utilisation figure.
 ///
 /// The card list is resolved once, at construction: the adapters are static hardware, and re-deriving the
 /// whole <see cref="DrmCardFacts"/> picture every tick would re-read a dozen files per card to learn
@@ -34,8 +36,9 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
 
     private readonly IProcFileSystem _proc;
 
-    // Key → the one file this sampler re-reads per tick, for the cards that publish it at all.
-    private readonly List<(string Key, string BusyPath)> _cards = [];
+    // Key → the one file this sampler re-reads per tick, or null for a card that publishes none. Cards
+    // with no source are kept so the adapter still appears, reporting a null utilisation.
+    private readonly List<(string Key, string? BusyPath)> _cards = [];
 
     public LinuxGpuUsageSampler() : this(new ProcFileSystem()) { }
 
@@ -47,8 +50,7 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         try {
             foreach (var card in DrmCardFacts.Read(proc)) {
                 var path = card.DevicePath + BusyFile;
-                if (proc.Exists(path))
-                    _cards.Add((card.Key, path));
+                _cards.Add((card.Key, proc.Exists(path) ? path : null));
             }
         } catch (Exception e) {
             // A failed enumeration leaves _cards empty, so SampleAdapters returns nothing forever — the
@@ -63,8 +65,8 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
 
         var samples = new Dictionary<string, GpuAdapterSample>(_cards.Count, StringComparer.Ordinal);
         foreach (var (key, path) in _cards)
-            if (ParsePercent(_proc.ReadAllText(path)) is { } percent)
-                samples[key] = new GpuAdapterSample(percent, NoEngines);
+            samples[key] = new GpuAdapterSample(
+                path is null ? null : ParsePercent(_proc.ReadAllText(path)), NoEngines);
 
         return samples;
     }
