@@ -1,6 +1,7 @@
 using DashDetective.Services.Platform.Linux;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 
@@ -37,22 +38,45 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
     private static readonly int LogicalProcessors = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : 1;
 
     private readonly IProcFileSystem _proc;
+    private readonly Func<double> _elapsedSeconds;
     private readonly Dictionary<int, ulong> _prevCpuTicks = new();
     private readonly Dictionary<int, ulong> _prevIoBytes = new();
-    private DateTime _prevSampledAt;
+
+    /// <summary>Elapsed seconds at the previous snapshot; <c>null</c> until there has been one. Nullable
+    /// rather than a sentinel value, because 0 is a legitimate reading from a clock that starts at 0.</summary>
+    private double? _previousSeconds;
 
     public LinuxProcessSnapshotProvider() : this(new ProcFileSystem()) { }
 
-    /// <summary>Test seam: injects the filesystem so the whole walk runs against canned fixtures from any
-    /// dev machine.</summary>
-    internal LinuxProcessSnapshotProvider(IProcFileSystem proc) => _proc = proc;
+    /// <summary>Test seam: injects the filesystem so the whole walk runs against canned fixtures, and the
+    /// clock so a rate interval can be stated rather than measured. Same shape as
+    /// <c>LinuxPhysicalDiskThroughputSampler</c>, the other Linux sampler that reports a rate.</summary>
+    internal LinuxProcessSnapshotProvider(IProcFileSystem proc, Func<double>? elapsedSeconds = null) {
+        _proc = proc;
+        _elapsedSeconds = elapsedSeconds ?? StartClock();
+    }
+
+    /// <summary>
+    /// A monotonic elapsed-seconds clock, as <c>LinuxPhysicalDiskThroughputSampler</c> uses.
+    ///
+    /// <b><c>Stopwatch</c> rather than <c>DateTime.UtcNow</c>, and the difference is load-bearing.</b>
+    /// <c>Stopwatch</c> is <c>CLOCK_MONOTONIC</c> on Linux — nanosecond resolution — whereas
+    /// <c>DateTime.UtcNow</c> reads <c>CLOCK_REALTIME_COARSE</c>, which advances only on the kernel timer
+    /// tick (1 ms at <c>CONFIG_HZ=1000</c>, 4 ms at 250) against <c>GetSystemTimePreciseAsFileTime</c>'s
+    /// ~100 ns on Windows. Being monotonic also means an NTP correction or a DST step cannot make an
+    /// interval negative or absurd.
+    /// </summary>
+    private static Func<double> StartClock() {
+        var clock = Stopwatch.StartNew();
+        return () => clock.Elapsed.TotalSeconds;
+    }
 
     public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
 
     private IReadOnlyList<ProcessInfo> Snapshot() {
-        var now = DateTime.UtcNow;
+        var now = _elapsedSeconds();
         // First snapshot has no prior point, so every rate reads 0 this pass and real next pass.
-        var wallSeconds = _prevSampledAt == default ? 0 : (now - _prevSampledAt).TotalSeconds;
+        var wallSeconds = _previousSeconds is { } previous ? now - previous : 0;
 
         var pids = ProcPids.List(_proc);
         var result = new List<ProcessInfo>(pids.Count);
@@ -90,7 +114,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
 
         Swap(_prevCpuTicks, nextCpuTicks);
         Swap(_prevIoBytes, nextIoBytes);
-        _prevSampledAt = now;
+        _previousSeconds = now;
 
         return result;
     }
