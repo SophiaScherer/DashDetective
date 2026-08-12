@@ -34,8 +34,8 @@ public class HardwareProvidersTests {
             Assert.IsType<LinuxGpuAdapterProvider>(providers.GpuAdapters);
             Assert.IsType<LinuxPhysicalDiskProvider>(providers.Disks);
             Assert.IsType<LinuxVolumeProvider>(providers.Volumes);
+            Assert.IsType<LinuxDiskTemperatureProvider>(providers.DiskTemperature);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
-            Assert.IsType<UnsupportedDiskTemperatureProvider>(providers.DiskTemperature);
         } else {
             Assert.IsType<UnsupportedCpuInfoProvider>(providers.Cpu);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);

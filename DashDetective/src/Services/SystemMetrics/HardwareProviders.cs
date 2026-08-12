@@ -65,17 +65,17 @@ internal sealed record HardwareProviders(
     /// <summary>
     /// The <c>/proc</c> and <c>/sys</c> readers, filled in one milestone at a time — a member with no Linux
     /// implementation yet keeps its <c>Unsupported*</c> instance and renders "—", which is the whole point
-    /// of the degrade-first port. Disk temperature arrives later in the GPU milestone; per-DIMM memory
-    /// facts need <c>dmidecode</c> with root and stay unsupported for good.
+    /// of the degrade-first port. Per-DIMM memory facts need <c>dmidecode</c> with root and stay
+    /// unsupported for good.
     ///
     /// Unlike <see cref="Windows"/> this carries no <see cref="SupportedOSPlatformAttribute"/>: the Linux
     /// readers are portable managed code over <c>IProcFileSystem</c>, so there is no annotated API for
     /// CA1416 to see and the attribute would be decoration rather than enforcement.
     /// </summary>
     private static HardwareProviders Linux() {
-        // The disk provider takes the temperature reader the way the Windows arm does, so the milestone
-        // that lands a real one is a single swap here.
-        var temperature = new UnsupportedDiskTemperatureProvider();
+        // One temperature reader, shared by the Storage page and the disk enumeration, exactly as the
+        // Windows arm shares its own.
+        var temperature = new LinuxDiskTemperatureProvider();
 
         return new HardwareProviders(
             new LinuxCpuInfoProvider(),
