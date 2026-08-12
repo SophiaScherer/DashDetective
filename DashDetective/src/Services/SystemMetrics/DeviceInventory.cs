@@ -65,11 +65,12 @@ public sealed class DeviceInventory {
     /// <paramref name="providers"/> must be thread-safe — see the note on <see cref="HardwareProviders"/>.
     /// The GPU-LUID and network reads still reach page-local samplers directly, so this is not fully
     /// fakeable; tests that need composed devices should drive <see cref="Compose"/> instead.</remarks>
-    internal static async Task<DeviceInventory> LoadAsync(HardwareProviders providers) {
+    internal static async Task<DeviceInventory> LoadAsync(
+        HardwareProviders providers, Func<IGpuUsageSampler>? gpuSampler = null) {
         var cpuTask = providers.Cpu.GetAsync();
         var memoryTask = providers.Memory.GetAsync();
         var gpusTask = providers.GpuAdapters.GetAsync();
-        var gpuLuidsTask = Task.Run(SampleActiveGpuLuids);
+        var gpuLuidsTask = Task.Run(() => SampleActiveGpuLuids(gpuSampler));
         var disksTask = providers.Disks.GetAsync();
         var volumesTask = providers.Volumes.GetAsync();
         var networkTask = Task.Run(ReadNetwork);
@@ -80,12 +81,18 @@ public sealed class DeviceInventory {
                        disksTask.Result, volumesTask.Result, networkName, networkSpec);
     }
 
-    /// <summary>The LUID tokens present in the PDH GPU-engine counters right now — the adapters actually
-    /// backed by a driver. <see cref="Compose"/> intersects the DXGI adapter list with this set so phantom
-    /// duplicate LUIDs (DXGI can list one GPU under several) are dropped. Soft-fails to an empty set.</summary>
-    private static IReadOnlySet<string> SampleActiveGpuLuids() {
+    /// <summary>
+    /// The adapter tokens the utilisation sampler reports right now — the adapters actually backed by a
+    /// driver. <see cref="Compose"/> intersects the enumerated adapter list with this set so phantom
+    /// duplicate LUIDs (DXGI can list one GPU under several) are dropped. Soft-fails to an empty set.
+    ///
+    /// Builds its own sampler rather than borrowing a page's: the Windows one owns a PDH query handle that
+    /// is not safe to collect from two threads, and this runs concurrently with the page's own tick. The
+    /// factory exists so a test can supply a fake without a driver.
+    /// </summary>
+    private static IReadOnlySet<string> SampleActiveGpuLuids(Func<IGpuUsageSampler>? factory) {
         try {
-            using var sampler = IGpuUsageSampler.ForCurrentPlatform();
+            using var sampler = (factory ?? IGpuUsageSampler.ForCurrentPlatform)();
             return sampler.SampleAdapters().Keys.ToHashSet(StringComparer.Ordinal);
         } catch {
             return new HashSet<string>(StringComparer.Ordinal);

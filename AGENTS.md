@@ -625,10 +625,10 @@ currently exist.
                                  so only the one arm with a spawn-costing source pays for the setting)
         WindowsGpuUsageSampler.cs
                                 (live GPU % via PDH GPU Engine counters; owns a PDH query handle.
-                                 SampleAdapters() = per-physical-GPU split keyed by adapter LUID token.
-                                 Sample() and SampleEngines() are OFF THE SEAM — no consumer has called them
-                                 since the multi-GPU split; they survive as inert-contract test entry points.
-                                 Page-local per tab — the Dashboard cards + Performance rows each own one)
+                                 SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
+                                 the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
+                                 split replaced has been removed. Page-local per tab — the Dashboard cards +
+                                 Performance rows each own one)
         LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
                                  EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
                                  no figure — omitting one would delete its card entirely, and a 0 would show
@@ -1192,9 +1192,9 @@ a static class, annotate whatever must be constructed to reach it.**
 **M13 cleared `GpuUsageSampler`**, the same way M8 cleared its own: two view models held
 `private readonly GpuUsageSampler _gpuSampler = new()` and `DeviceInventory` constructed a third inline, so
 `IGpuUsageSampler.ForCurrentPlatform()` had to own the construction before the class could be renamed
-`WindowsGpuUsageSampler` and annotated. `Sample()` and `SampleEngines()` were deliberately left off that
-seam — no consumer calls them since the multi-GPU split — which keeps them callable by the inert-contract
-tests on both legs.
+`WindowsGpuUsageSampler` and annotated. The combined `Sample()` / `SampleEngines()` pair was left off that
+seam — no consumer had called either since the multi-GPU split — and then deleted outright once the seam
+made it plain they were unreachable.
 
 **M8 cleared the fifth**, and it is the worked example of why the seam has to come first: three view models
 held `private readonly PhysicalDiskThroughputSampler _throughputSampler = new()`, and there is nowhere on a
