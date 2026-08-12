@@ -17,11 +17,25 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 public class LinuxToolkitCatalogTests {
     private static IReadOnlyList<ToolkitEntry> Entries => LinuxToolkitCatalog.Instance.Entries;
 
-    /// <summary>Elevation means the Windows <c>runas</c> verb; there is no Linux equivalent wired up,
-    /// so a row asking for it here would be a button that silently does the unelevated thing.</summary>
+    /// <summary>Elevation reaches the OS as <c>pkexec</c> here. Exactly one row asks for it, and it is
+    /// named: the shield badge warns before the click, so a row quietly gaining or losing elevation is
+    /// a change to what the user is promised.</summary>
     [Fact]
-    public void Entries_NoRowAsksForElevation() {
-        Assert.DoesNotContain(Entries, e => e.RequiresElevation);
+    public void Entries_OnlyTheFirmwareRefreshAsksForElevation() {
+        var elevated = Entries.Where(e => e.RequiresElevation).ToList();
+
+        Assert.Equal(["fwupdmgr refresh"], elevated.Select(e => e.Command));
+    }
+
+    /// <summary>A row that raises a polkit prompt has to say so in its own text — the shield is a
+    /// marker, not the explanation, and it is invisible to anyone reading the row through search. The
+    /// counterpart of the Windows table's rule, kept per-catalog because the wording is each
+    /// platform's own.</summary>
+    [Fact]
+    public void Entries_ElevatedRowsSaySoInTheirDescription() {
+        Assert.All(Entries.Where(e => e.RequiresElevation),
+                   entry => Assert.Contains("administrator", entry.Description,
+                                            StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Ubuntu and Debian set <c>kernel.dmesg_restrict</c>, so a non-root dmesg only ever

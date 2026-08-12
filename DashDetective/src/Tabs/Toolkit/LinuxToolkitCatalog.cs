@@ -9,10 +9,11 @@ namespace DashDetective.Tabs.Toolkit;
 /// everything in Diagnostics is either coreutils, iproute2 or systemd, so it is there on any modern
 /// distro.
 ///
-/// <b>Nothing here is elevated.</b> <see cref="ToolkitActionKind.Elevated"/> means the Windows
-/// <c>runas</c> verb, which has no meaning on Linux, and <c>pkexec</c> is a later milestone's decision.
-/// That keeps the Toolkit's privilege invariant trivially true here: no row on this table can raise a
-/// prompt, authored or otherwise.
+/// <b>Exactly one row is elevated</b>, and this table is the only place one can be:
+/// <see cref="ToolkitCommandType"/> has no elevated member, so no user-authored row can raise a prompt.
+/// <see cref="ToolkitActionKind.Elevated"/> reaches the OS as <c>pkexec</c> here rather than the Windows
+/// <c>runas</c> verb — see <see cref="SystemProcessLauncher.BuildLaunchInfo"/>. A declined polkit prompt
+/// is silent rather than worded, which is the one thing the Windows side does that this does not.
 ///
 /// <b>A missing program is a run-time answer, not a catalog-time one.</b> Distros disagree about what
 /// is installed, and filtering this table at startup would mean shelling out once per row before the
@@ -78,6 +79,13 @@ internal sealed class LinuxToolkitCatalog : IToolkitCatalog {
                    ToolkitAction.Capture("free", "-h")),
         Diagnostic("resolvectl status", "DNS servers and search domains, per link",
                    ToolkitAction.Capture("resolvectl", "status")),
+
+        // The one entry that needs root. Elevated rather than captured because pkexec's child does not
+        // inherit the redirected streams usefully, and the metadata download runs longer than a
+        // captured command's timeout allows. fwupd is preinstalled on Ubuntu and Fedora GNOME; where it
+        // is not, the row fails with the shell's own "not found" like every other tool row.
+        Diagnostic("fwupdmgr refresh", "Refreshes the firmware update metadata — needs administrator",
+                   ToolkitAction.Elevated("fwupdmgr", "refresh")),
 
         // The one row that takes input. "-c 4" is not cosmetic: Linux ping runs until interrupted, so
         // without it every run would end at the timeout instead of reporting. The typed host is
