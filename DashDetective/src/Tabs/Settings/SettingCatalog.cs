@@ -58,15 +58,17 @@ public sealed class SettingCatalog {
         "Show a banner when CPU or RAM exceeds 90%",
         Keywords: "notification warning banner threshold high usage");
 
+    // Kept and still searchable where the tray cannot be honoured — only its copy and its toggle change,
+    // so the setting does not vanish from search on one platform. See SettingDescriptions.
     public SettingEntry ShowInTray { get; } = new(
-        SettingId.ShowInTray, "Monitoring", "Show in system tray", "Keep console running in background",
+        SettingId.ShowInTray, "Monitoring", "Show in system tray", SettingDescriptions.ShowInTray,
         Keywords: "tray notification area minimise minimize close background");
 
     // The one description that names its mechanism rather than its effect, so it is the one that has to
     // vary by platform — see SettingDescriptions.
     public SettingEntry LaunchAtStartup { get; } = new(
         SettingId.LaunchAtStartup, "Monitoring", "Launch at startup", SettingDescriptions.LaunchAtStartup,
-        Keywords: "boot autostart auto start login run on startup session");
+        Keywords: "boot autostart auto start login run on startup");
 
     // ----- Export & Data -----
 

@@ -96,8 +96,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
 
     /// <summary>Whether the app should hide to the tray (rather than exit) when the window is closed.
-    /// Read by the window's close handler; kept in sync with the Settings toggle.</summary>
-    public bool ShowInTray => _settings.ShowInTray;
+    /// Read by the window's close handler; kept in sync with the Settings toggle.
+    ///
+    /// Gated on <see cref="TrayIntegration.HidesOnClose"/>, so a desktop with no tray to hide into
+    /// closes normally however the setting is left — hiding behind an icon that never appears would
+    /// leave the app running with no way to reach it.</summary>
+    public bool ShowInTray => _settings.ShowInTray && TrayIntegration.HidesOnClose;
 
     /// <summary>Whether the current page manages its own scrolling (e.g. File Explorer): such pages
     /// fill the viewport and scroll their own panes, so the shell hosts them in a bounded,

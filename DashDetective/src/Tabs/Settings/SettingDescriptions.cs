@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 
 namespace DashDetective.Tabs.Settings;
@@ -18,4 +19,14 @@ internal static class SettingDescriptions {
 
     internal static string LaunchAtStartupFor(bool windows) =>
         windows ? "Start with Windows" : "Start when you log in";
+
+    /// <summary>The "Show in system tray" explanation for this machine. Where the tray cannot be
+    /// honoured the row says what closing actually does instead, rather than describing a behaviour the
+    /// disabled toggle will never produce — see <see cref="TrayIntegration"/>.</summary>
+    internal static string ShowInTray { get; } = ShowInTrayFor(TrayIntegration.HidesOnClose);
+
+    internal static string ShowInTrayFor(bool hidesOnClose) =>
+        hidesOnClose
+            ? "Keep console running in background"
+            : "Not available on this desktop — closing exits the app";
 }

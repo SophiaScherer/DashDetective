@@ -248,7 +248,8 @@
                             <TextBlock Classes="settingName" Text="{Binding Catalog.ShowInTray.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.ShowInTray.Description}"/>
                         </StackPanel>
-                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"/>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"
+                                      IsEnabled="{Binding CanUseTray}"/>
                     </Grid>
                 </Border>
 
