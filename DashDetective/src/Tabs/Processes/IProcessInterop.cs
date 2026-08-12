@@ -19,5 +19,7 @@ internal interface IProcessInterop {
 
     /// <summary>The interop for this machine, or one that reports no I/O and shows no dialog.</summary>
     static IProcessInterop ForCurrentPlatform() =>
-        OperatingSystem.IsWindows() ? new WindowsProcessInterop() : new UnsupportedProcessInterop();
+        OperatingSystem.IsWindows() ? new WindowsProcessInterop()
+        : OperatingSystem.IsLinux() ? new LinuxProcessInterop()
+        : new UnsupportedProcessInterop();
 }
