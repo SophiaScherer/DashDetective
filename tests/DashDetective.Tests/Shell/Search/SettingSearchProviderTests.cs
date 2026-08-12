@@ -44,7 +44,7 @@ public class SettingSearchProviderTests {
     public async Task QueryAsync_FindsEverySettingInASection() {
         var results = await Query("Monitoring");
 
-        Assert.Equal(4, results.Count);
+        Assert.Equal(5, results.Count);
         Assert.All(results, r => Assert.Equal("Monitoring", r.Subtitle));
     }
 

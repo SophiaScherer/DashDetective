@@ -1,24 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
-/// <summary>One physical GPU's reading, keyed by adapter LUID: its overall utilisation (the busiest engine
-/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).</summary>
-public sealed record GpuAdapterSample(double Overall, IReadOnlyDictionary<string, double> Engines);
+/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine
+/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).
+///
+/// <b><see cref="Overall"/> is null when the adapter exists but its utilisation cannot be read</b> — the
+/// state Linux needs for a card whose driver publishes no figure (the proprietary NVIDIA blob, Intel's
+/// i915). It is not the same as absent: the inventory builds a GPU card only for an adapter this sampler
+/// reports at all, so returning nothing hides the hardware, while returning 0 would show a real GPU as
+/// permanently idle. Windows always fills it.</summary>
+public sealed record GpuAdapterSample(double? Overall, IReadOnlyDictionary<string, double> Engines);
 
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>
-/// performance counter — the same source Task Manager uses. Each <see cref="Sample"/> call returns
-/// the current GPU load as a percentage (0–100). No extra dependencies beyond the OS
-/// <c>pdh.dll</c>; comparable per-sample cost to the CPU/Memory samplers.
+/// performance counter — the same source Task Manager uses, reported per physical adapter. No extra
+/// dependencies beyond the OS <c>pdh.dll</c>; comparable per-sample cost to the CPU/Memory samplers.
 ///
 /// Shared: the Dashboard and the Performance tab each own an instance. Moved here from
 /// src/Tabs/Dashboard with sign-off when the Performance tab was activated — the same precedent as
-/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>.
+/// <c>CpuUsageSampler</c> / <c>NetworkUsageSampler</c>. The platform check lives in
+/// <see cref="IGpuUsageSampler.ForCurrentPlatform"/>.
+///
+/// <see cref="SampleAdapters"/> is the whole surface: the multi-GPU split moved every consumer onto it,
+/// and the combined <c>Sample()</c> / <c>SampleEngines()</c> pair it replaced has been removed.
 /// </summary>
-public sealed class GpuUsageSampler : IDisposable {
+internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     // PDH status codes and formatting flags (winperf.h / pdhmsg.h).
     private const uint ErrorSuccess = 0x00000000;
     private const uint PdhMoreData = 0x800007D2;
@@ -59,9 +69,10 @@ public sealed class GpuUsageSampler : IDisposable {
     private readonly IntPtr _counter;
     private readonly bool _ready;
 
-    public GpuUsageSampler() {
-        // A failure to stand up the query leaves _ready false; Sample() then returns 0 forever and
-        // the caller stops its timer — the same soft-fail contract as the CPU/Memory samplers. The
+    [SupportedOSPlatform("windows")]
+    public WindowsGpuUsageSampler() {
+        // A failure to stand up the query leaves _ready false; SampleAdapters() then returns an empty
+        // map forever — the same soft-fail contract as the CPU/Memory samplers. The
         // catch covers pdh.dll failing to load or bind, which a return-code check can't see.
         try {
             if (PdhOpenQuery(null, IntPtr.Zero, out _query) != ErrorSuccess)
@@ -73,69 +84,27 @@ public sealed class GpuUsageSampler : IDisposable {
                 return;
             }
 
-            // Seed one collect so the first Sample() reflects a real interval. The utilisation counter
+            // Seed one collect so the first sample reflects a real interval. The utilisation counter
             // is a rate that needs two data points, so priming here mirrors CpuUsageSampler seeding
             // GetSystemTimes in its constructor.
             PdhCollectQueryData(_query);
             _ready = true;
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             // An unwritten `out` leaves _query Zero, so Dispose stays a no-op.
-            NativeLoadFailure.Report(nameof(GpuUsageSampler), ex);
+            NativeLoadFailure.Report(nameof(WindowsGpuUsageSampler), ex);
         }
     }
 
     /// <summary>Test seam: skips native initialisation so the inert soft-fail contract can be exercised on
     /// a healthy host, where the real constructor always succeeds.</summary>
-    internal GpuUsageSampler(SamplerInit _) { }
-
-    /// <summary>
-    /// Returns total GPU utilisation (0–100) at the moment of the call: the busiest engine type's
-    /// utilisation, matching Task Manager's headline figure. Any failure yields 0.
-    /// </summary>
-    public double Sample() {
-        double max = 0;
-        foreach (var total in SampleEngines().Values)
-            if (total > max)
-                max = total;
-        return max < 0 ? 0 : max > 100 ? 100 : max;
-    }
-
-    /// <summary>
-    /// Returns per-engine-type utilisation at the moment of the call, keyed by engine type ("3D", "Copy",
-    /// "VideoDecode", "VideoEncode", "Compute", …): each is the sum across that engine's process instances.
-    /// Values are raw sums (they can exceed 100 under heavy multi-process load); callers clamp for display.
-    /// Drives the Performance tab's per-engine detail charts. Any failure yields an empty map.
-    /// </summary>
-    public IReadOnlyDictionary<string, double> SampleEngines() {
-        if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
-            return EmptyEngines;
-
-        // First call sizes the buffer (returns PDH_MORE_DATA); the second fills it.
-        uint bufferSize = 0;
-        var status = PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out _, IntPtr.Zero);
-        if (status != PdhMoreData || bufferSize == 0)
-            return EmptyEngines;
-
-        var buffer = Marshal.AllocHGlobal((int)bufferSize);
-        try {
-            if (PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out var itemCount, buffer) != ErrorSuccess)
-                return EmptyEngines;
-
-            return AggregateEngines(buffer, itemCount);
-        } finally {
-            Marshal.FreeHGlobal(buffer);
-        }
-    }
-
-    private static readonly IReadOnlyDictionary<string, double> EmptyEngines = new Dictionary<string, double>();
+    internal WindowsGpuUsageSampler(SamplerInit _) { }
 
     /// <summary>
     /// Returns per-physical-GPU utilisation at the moment of the call, keyed by adapter LUID token
-    /// (<c>luid_0x{High:x8}_0x{Low:x8}</c>, matching <see cref="GpuAdapterProvider"/>). Each
+    /// (<c>luid_0x{High:x8}_0x{Low:x8}</c>, matching <see cref="WindowsGpuAdapterProvider"/>). Each
     /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine type) and its
-    /// per-engine-type map — the multi-GPU split of the single combined <see cref="SampleEngines"/> reading.
-    /// Callers join the LUID keys against the inventory to attribute each reading to a named GPU. Any
-    /// failure yields an empty map.
+    /// per-engine-type map. Callers join the LUID keys against the inventory to attribute each reading to a
+    /// named GPU. Any failure yields an empty map.
     /// </summary>
     public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() {
         if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
@@ -224,33 +193,6 @@ public sealed class GpuUsageSampler : IDisposable {
         return instanceName[start..end].ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Sums utilisation across the instances of each engine type into a per-engine map. Instance names
-    /// look like <c>pid_1234_luid_0x0_0xC4C7_phys_0_eng_0_engtype_3D</c>; the <c>luid</c> token identifies
-    /// which physical adapter an instance belongs to and is what a future multi-GPU split will key on, but
-    /// a single combined reading needs only the <c>engtype</c> grouping.
-    /// </summary>
-    private static Dictionary<string, double> AggregateEngines(IntPtr buffer, uint itemCount) {
-        var itemSize = Marshal.SizeOf<CounterValueItem>();
-        var perEngine = new Dictionary<string, double>(StringComparer.Ordinal);
-
-        for (var i = 0; i < itemCount; i++) {
-            var item = Marshal.PtrToStructure<CounterValueItem>(buffer + i * itemSize);
-            if (item.Name == IntPtr.Zero)
-                continue;
-
-            var name = Marshal.PtrToStringUni(item.Name);
-            var engine = EngineType(name);
-            if (engine is null)
-                continue;
-
-            perEngine.TryGetValue(engine, out var running);
-            perEngine[engine] = running + item.Value;
-        }
-
-        return perEngine;
-    }
-
     /// <summary>Extracts the engine type after the trailing <c>engtype_</c> token, or null.</summary>
     private static string? EngineType(string? instanceName) {
         if (string.IsNullOrEmpty(instanceName))
@@ -266,4 +208,15 @@ public sealed class GpuUsageSampler : IDisposable {
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
+}
+
+/// <summary>The no-readings sampler — what a platform with no utilisation source gets. An empty map leaves
+/// every GPU card at the value it was built with, which is the same "—" the old guard produced.</summary>
+internal sealed class UnsupportedGpuUsageSampler : IGpuUsageSampler {
+    private static readonly IReadOnlyDictionary<string, GpuAdapterSample> Empty =
+        new Dictionary<string, GpuAdapterSample>();
+
+    public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() => Empty;
+
+    public void Dispose() { }
 }

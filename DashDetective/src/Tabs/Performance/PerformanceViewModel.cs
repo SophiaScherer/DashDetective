@@ -37,6 +37,9 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
+    /// <summary>The app-wide "no value" placeholder, for the tiles that can genuinely lack one.</summary>
+    private const string NoReading = "—";
+
     /// <summary>Floor for the network chart's auto-scaled axis, in Mbps: keeps an idle graph pinned flat
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
     /// Dashboard's network scale floor.</summary>
@@ -68,6 +71,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     public bool GpuDetailedView {
         get => _gpuDetailed;
         set => SetGpuDetailed(value, persist: false);
+    }
+
+    /// <summary>Mirrors the "NVIDIA GPU utilization" setting onto this page's sampler. Only the Linux arm
+    /// acts on it; everywhere else it is inert. Pushed by the shell on load and whenever it changes.</summary>
+    public bool NvidiaGpuMetrics {
+        get => _gpuSampler.NvidiaMetricsEnabled;
+        set => _gpuSampler.NvidiaMetricsEnabled = value;
     }
 
     /// <summary>Whether the CPU resource shows its per-logical-processor "Detailed" charts. Persisted by the shell.</summary>
@@ -132,10 +142,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     // toggle expands or collapses; the Detailed flag is shared across every GPU row.
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
-    private readonly GpuUsageSampler _gpuSampler = new();
+    private readonly IGpuUsageSampler _gpuSampler;
     // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
     // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
-    private readonly GpuSensorProvider _gpuSensors = new();
+    private readonly IGpuSensorProvider _gpuSensors = IGpuSensorProvider.ForCurrentPlatform();
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
@@ -152,10 +162,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     public PerformanceViewModel(SystemMetricsService service)
         : this(service, HardwareProviders.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
-    /// one, so the shell still builds this exactly as before.</summary>
-    internal PerformanceViewModel(SystemMetricsService service, HardwareProviders providers) {
+    /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
+    /// sampler — the one dependency the page resolves for itself, so without this a test cannot reach the
+    /// rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as
+    /// before.</summary>
+    internal PerformanceViewModel(
+        SystemMetricsService service, HardwareProviders providers, IGpuUsageSampler? gpuSampler = null) {
         _providers = providers;
+        _gpuSampler = gpuSampler ?? IGpuUsageSampler.ForCurrentPlatform();
 
         _service = service;
 
@@ -482,9 +496,9 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Enumerates the physical disks (off the UI thread) via the shared <see cref="DeviceInventory"/>
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
-    private async Task LoadInventoryAsync() {
+    internal async Task LoadInventoryAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync(_providers);
+            var inventory = await DeviceInventory.LoadAsync(_providers, () => _gpuSampler);
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
         } catch {
@@ -531,13 +545,16 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         foreach (var gpu in gpus) {
             var history = new double[WindowSeconds];
-            var threeDTile = new StatTile("3D", "0 %");
+            // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
+            // method fills in every adapter that can report, and one that cannot must not sit at a
+            // confident zero — the same rule the Dashboard's cards follow.
+            var threeDTile = new StatTile("3D", NoReading);
             // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
             // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
             // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
-            var tempTile = new StatTile("Temp", "—");
-            var powerTile = new StatTile("Power", "—");
-            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, "0", "%", Brush("#6ccb5f"),
+            var tempTile = new StatTile("Temp", NoReading);
+            var powerTile = new StatTile("Power", NoReading);
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", Brush("#6ccb5f"),
                                       SparklinePoints.Build(history, 100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
@@ -639,19 +656,23 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Samples every physical GPU and refreshes each row in place, keyed by adapter LUID: the rail value
     /// + chart + 3D tile show the adapter's busiest-engine % (its overall utilisation), and the Detailed grid is
-    /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged.</summary>
+    /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged — including an
+    /// adapter whose driver publishes no utilisation at all, whose row keeps the "—" it was built with.</summary>
     private void UpdateGpuAdapters() {
         var adapters = _gpuSampler.SampleAdapters();
         if (adapters.Count == 0)
             return;
 
         foreach (var (luid, sample) in adapters) {
-            if (!_gpusByLuid.TryGetValue(luid, out var gpu))
+            if (!_gpusByLuid.TryGetValue(luid, out var gpu) || sample.Overall is not { } reading)
                 continue;
-            var overall = Math.Clamp(sample.Overall, 0, 100);
+            var overall = Math.Clamp(reading, 0, 100);
             MetricChannel.PushHistory(gpu.History, overall);
             var rounded = Math.Round(overall);
             gpu.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+            // Restores the unit the row was seeded without, so a reporting adapter reads "37 %" while one
+            // that cannot stays a bare "—".
+            gpu.Row.Unit = "%";
             gpu.Row.Points = SparklinePoints.Build(gpu.History, 100);
             gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
             UpdateGpuEngines(gpu, sample.Engines);

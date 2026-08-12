@@ -12,10 +12,15 @@ namespace DashDetective.Services.SystemMetrics;
 /// Hardware tab's Storage Devices card cannot disagree about the same drives. Loop, ram and optical devices
 /// are filtered there; without that a stock Ubuntu GNOME install would render ~25 snap cards.
 ///
-/// <b>Health is always healthy and temperature always <c>null</c>.</b> Both need SMART, which is not
-/// readable without root, and neither has a rootless near-miss worth substituting. The temperature provider
-/// is taken by constructor exactly as the Windows arm takes it, so the GPU/temperature milestone is one line
-/// in <c>HardwareProviders.Linux()</c>.
+/// <b>Health is always healthy</b>: it needs SMART, which is not readable without root, and has no rootless
+/// near-miss worth substituting. Temperature comes from the injected provider, exactly as the Windows arm
+/// takes it.
+///
+/// <b>Temperature is asked for on every drive, not just NVMe ones</b> — unlike the Windows arm, whose
+/// health-log IOCTL only NVMe answers. On Linux the source is hwmon, and <c>drivetemp</c> publishes one for
+/// SATA and SAS drives too; gating on media kind here would make that path dead code. A drive with no
+/// sensor returns <c>null</c> and shows "—", which is the same result the gate produced but for the right
+/// reason.
 ///
 /// Stateless and never throws: any failure yields an empty list.
 /// </summary>
@@ -41,9 +46,7 @@ internal sealed class LinuxPhysicalDiskProvider : IPhysicalDiskProvider {
             var disks = new List<PhysicalDiskInfo>(facts.Disks.Count);
 
             foreach (var disk in facts.Disks) {
-                // Only NVMe drives have a readable composite temperature, matching the Windows arm; until
-                // the temperature milestone lands, the provider behind this returns null.
-                var celsius = disk.Kind == DriveKind.Nvme ? _temperature.ReadCelsius(disk.DiskNumber) : null;
+                var celsius = _temperature.ReadCelsius(disk.DiskNumber);
 
                 disks.Add(new PhysicalDiskInfo(
                     disk.DiskNumber,

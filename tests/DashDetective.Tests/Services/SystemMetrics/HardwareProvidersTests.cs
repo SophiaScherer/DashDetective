@@ -31,11 +31,11 @@ public class HardwareProvidersTests {
             // the ones whose milestone has not landed, and each moves here when it does.
             Assert.IsType<LinuxCpuInfoProvider>(providers.Cpu);
             Assert.IsType<LinuxSystemInfoProvider>(providers.System);
+            Assert.IsType<LinuxGpuAdapterProvider>(providers.GpuAdapters);
             Assert.IsType<LinuxPhysicalDiskProvider>(providers.Disks);
             Assert.IsType<LinuxVolumeProvider>(providers.Volumes);
+            Assert.IsType<LinuxDiskTemperatureProvider>(providers.DiskTemperature);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);
-            Assert.IsType<UnsupportedGpuAdapterProvider>(providers.GpuAdapters);
-            Assert.IsType<UnsupportedDiskTemperatureProvider>(providers.DiskTemperature);
         } else {
             Assert.IsType<UnsupportedCpuInfoProvider>(providers.Cpu);
             Assert.IsType<UnsupportedMemoryInfoProvider>(providers.Memory);

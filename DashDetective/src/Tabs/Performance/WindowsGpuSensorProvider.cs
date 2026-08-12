@@ -2,6 +2,7 @@ using DashDetective.Services.Diagnostics;
 using DashDetective.Services.SystemMetrics;
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Performance;
 
@@ -14,20 +15,26 @@ namespace DashDetective.Tabs.Performance;
 /// Page-local to the Performance tab, following the feature-local P/Invoke precedent of File Explorer's
 /// <c>ShellInterop</c> and the Network tab's
 /// <c>ConnectionsInterop</c>. Never throws: a reader that faults is logged once and dropped for the rest of
-/// the session, so a persistent fault can't flood the log at the sampling cadence.
+/// the session, so a persistent fault can't flood the log at the sampling cadence. The platform check lives
+/// in <see cref="IGpuSensorProvider.ForCurrentPlatform"/>.
 /// </summary>
-internal sealed class GpuSensorProvider : IDisposable {
+internal sealed class WindowsGpuSensorProvider : IGpuSensorProvider {
     private readonly List<IGpuSensorReader> _readers;
 
     /// <summary>Builds the provider over the vendor readers available on this machine.</summary>
-    public GpuSensorProvider() : this(CreateReaders()) { }
+    [SupportedOSPlatform("windows")]
+    public WindowsGpuSensorProvider() : this(CreateReaders()) { }
 
-    /// <summary>Test seam: the same routing over an explicit reader set.</summary>
-    internal GpuSensorProvider(IEnumerable<IGpuSensorReader> readers) => _readers = new List<IGpuSensorReader>(readers);
+    /// <summary>Test seam: the same routing over an explicit reader set. Deliberately unannotated — the
+    /// routing itself is portable, so every one of its tests runs on the Linux leg too.</summary>
+    internal WindowsGpuSensorProvider(IEnumerable<IGpuSensorReader> readers) =>
+        _readers = new List<IGpuSensorReader>(readers);
 
     /// <summary>The vendor readers to run on this machine. Intel is deferred — its adapters fall through to no
     /// reader and keep showing "—". Constructing a reader is cheap: each one initializes its libraries lazily,
-    /// on the first adapter it is actually asked about.</summary>
+    /// on the first adapter it is actually asked about. This is the Windows-only step, which is why the
+    /// public constructor above carries the attribute and this does the actual work.</summary>
+    [SupportedOSPlatform("windows")]
     private static IEnumerable<IGpuSensorReader> CreateReaders() =>
         [new NvidiaGpuSensorReader(), new AmdGpuSensorReader()];
 

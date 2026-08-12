@@ -81,14 +81,17 @@ public class LinuxPhysicalDiskProviderTests {
     public async Task GetAsync_ReportsHealthyWithoutSmart() =>
         Assert.True((await ReadAsync(VirtualBox())).Single().IsHealthy);
 
-    /// <summary>The temperature provider is wired in exactly as the Windows arm wires it, so the milestone
-    /// that lands a real one is a single swap — and only NVMe drives are asked, matching that arm.</summary>
+    /// <summary>
+    /// Every drive is asked, not just NVMe ones — deliberately unlike the Windows arm, whose health-log
+    /// IOCTL only NVMe answers. On Linux the source is hwmon, and <c>drivetemp</c> publishes one for SATA
+    /// and SAS drives too, so gating on media kind here would make that whole path dead code.
+    /// </summary>
     [Fact]
-    public async Task GetAsync_AsksForATemperatureOnlyForNvmeDrives() {
+    public async Task GetAsync_AsksForATemperatureOnEveryDriveNotJustNvme() {
         var spy = new SpyTemperatureProvider();
-        await ReadAsync(VirtualBox(), spy);
+        var disks = await ReadAsync(VirtualBox(), spy);
 
-        Assert.Empty(spy.Reads);
+        Assert.Equal(disks.Select(d => d.DeviceId), spy.Reads);
     }
 
     [Fact]
@@ -98,8 +101,8 @@ public class LinuxPhysicalDiskProviderTests {
         Assert.Equal(41.5, (await ReadAsync(Nvme(), spy)).Single().TemperatureCelsius);
     }
 
-    /// <summary>Until the temperature milestone lands, the unsupported reader means every card shows "—"
-    /// rather than a wrong number.</summary>
+    /// <summary>A drive with no sensor behind it shows "—" rather than a wrong number — the common case on
+    /// real hardware, where <c>drivetemp</c> is usually not loaded.</summary>
     [Fact]
     public async Task GetAsync_WithNoTemperatureReader_ReportsNoTemperature() =>
         Assert.Null((await ReadAsync(Nvme())).Single().TemperatureCelsius);

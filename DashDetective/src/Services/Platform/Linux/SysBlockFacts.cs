@@ -112,6 +112,18 @@ internal sealed record SysBlockFacts(
         return numbers;
     }
 
+    /// <summary>
+    /// The packed disk number of one named whole device, read straight from its own <c>dev</c> file — the
+    /// single-read path for a caller that already knows the name and does not need the rest of the picture
+    /// (the temperature reader, which arrives at a device name via a hwmon symlink). <c>null</c> when the
+    /// device has gone away or reports no number.
+    ///
+    /// Whole devices only: a partition's <c>dev</c> file carries the <i>partition's</i> number, so this
+    /// would not give sda's for sda1. Use <see cref="DiskNumberFor"/> on a full read for that.
+    /// </summary>
+    internal static int? DiskNumberOf(IProcFileSystem proc, string deviceName) =>
+        ParseDeviceNumber(proc.ReadAllText(BlockRoot + "/" + deviceName + "/dev"));
+
     /// <summary>Packs a <c>major:minor</c> pair the way the kernel's 32-bit <c>dev_t</c> does. Majors are
     /// 12 bits and minors 20, so every real block device lands in a positive <c>int</c>. Shared with
     /// <see cref="ProcDiskstatsParser"/>, whose first two columns are the same pair.</summary>

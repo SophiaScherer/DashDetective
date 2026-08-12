@@ -50,8 +50,8 @@ public class HardwareInfoProviderTests {
             Assert.IsType<LinuxProcessorInfoProvider>(ReaderOf<IProcessorInfoProvider>(provider));
             Assert.IsType<LinuxMotherboardInfoProvider>(ReaderOf<IMotherboardInfoProvider>(provider));
             Assert.IsType<LinuxStorageInfoProvider>(ReaderOf<IStorageInfoProvider>(provider));
+            Assert.IsType<LinuxGraphicsInfoProvider>(ReaderOf<IGraphicsInfoProvider>(provider));
             Assert.IsType<UnsupportedMemoryModulesProvider>(ReaderOf<IMemoryModulesProvider>(provider));
-            Assert.IsType<UnsupportedGraphicsInfoProvider>(ReaderOf<IGraphicsInfoProvider>(provider));
         }
     }
 
