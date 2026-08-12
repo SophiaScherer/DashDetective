@@ -497,7 +497,23 @@ currently exist.
                                  prefixes them with its name. size is in 512-BYTE SECTORS regardless of the
                                  drive's physical sector size. DiskNumbers() is the cheap half, for the
                                  sampler, which runs every tick and only needs to tell a disk from a
-                                 partition)
+                                 partition; DiskNumberOf() is the single-read name→number path, for a
+                                 caller that already knows the device name — WHOLE DEVICES ONLY, since a
+                                 partition's dev file carries the partition's number)
+          DrmCardFacts.cs       (the /sys/class/drm derivation, shared by the adapter enumeration, the
+                                 utilisation sampler, the sensor reader and the Hardware Graphics card —
+                                 the CpuFacts shape applied to GPUs. THE JOIN KEY FOR THE WHOLE GPU SURFACE
+                                 is Key = the card's PCI ADDRESS, standing in for a DXGI LUID: the inventory
+                                 keeps only adapters the enumeration AND the sampler both report, so two
+                                 readers deriving keys separately means no GPU card at all, silently.
+                                 COUNTS cardN ONLY — /sys/class/drm mixes cards with renderD* nodes and one
+                                 entry per connector (card0-DP-1), and counting those turns one GPU into
+                                 four. SKIPS a node with no PCI vendor: no ids, no name, nothing to show.
+                                 PCI id files carry an 0x PREFIX that NumberStyles.HexNumber REJECTS — miss
+                                 the strip and every id reads 0. IsSoftware flags ONLY simpledrm/vkms: unlike
+                                 DXGI's flag, a paravirtualised GPU IS the VM's real display adapter and
+                                 hiding it leaves the VM with no GPU card at all. Bundled vendor table +
+                                 driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
@@ -601,16 +617,39 @@ currently exist.
                                  /proc's numeric entries, one listing and no per-PID opens. HANDLES ARE
                                  PERMANENTLY "—": a Windows handle covers events, threads and registry keys
                                  too, so /proc/sys/fs/file-nr would mean something else under the label)
-        GpuUsageSampler.cs      (live GPU % via PDH GPU Engine counters; owns a PDH query handle. Sample()
-                                 = busiest engine overall, SampleEngines() = per-engine map, SampleAdapters()
-                                 = per-physical-GPU split keyed by adapter LUID token. Page-local per tab —
-                                 the Dashboard cards + Performance rows each own one for per-adapter readings)
+        IGpuUsageSampler.cs     (seam: SampleAdapters() only. ITS KEYS MUST MATCH IGpuAdapterProvider'S —
+                                 DeviceInventory intersects the two, so an arm that derives the adapter key
+                                 differently from its enumeration counterpart yields NO GPU AT ALL rather
+                                 than a wrong one, with every individual reading still looking fine. Also
+                                 carries NvidiaMetricsEnabled as a DEFAULT interface member (get => false),
+                                 so only the one arm with a spawn-costing source pays for the setting)
+        WindowsGpuUsageSampler.cs
+                                (live GPU % via PDH GPU Engine counters; owns a PDH query handle.
+                                 SampleAdapters() = per-physical-GPU split keyed by adapter LUID token.
+                                 Sample() and SampleEngines() are OFF THE SEAM — no consumer has called them
+                                 since the multi-GPU split; they survive as inert-contract test entry points.
+                                 Page-local per tab — the Dashboard cards + Performance rows each own one)
+        LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
+                                 EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
+                                 no figure — omitting one would delete its card entirely, and a 0 would show
+                                 real hardware as permanently idle. NO ENGINE BREAKDOWN: sysfs has one
+                                 scalar per card and the per-engine split is root-only debugfs, so the
+                                 Performance tab's Detailed toggle stays hidden. Card list resolved once at
+                                 construction; only the utilisation file is re-read per tick)
+        NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
+                                 publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
+                                 path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
+                                 the tick interval is a user setting), never overlapping, never blocking,
+                                 gated behind an off-by-default setting, and retired for the session on the
+                                 first failure. NORMALISES THE BUS ID: nvidia-smi writes an EIGHT-digit PCI
+                                 domain and uppercase hex where sysfs writes four and lowercase, so a raw
+                                 join matches nothing and every reading silently fails to find its card.
+                                 Runs over the Toolkit's IProcessLauncher seam, so tests spawn nothing)
         HardwareProviders.cs    (the "what hardware is in this machine" bundle + the single
                                  ForCurrentPlatform() that picks the Windows, Linux or unsupported set
-                                 for all SEVEN members. The Linux arm is filled in one milestone at a
-                                 time — today CPU, System, Disks and Volumes; GPU adapters and disk
-                                 temperature are still Unsupported*, and per-DIMM memory stays that way
-                                 for good (dmidecode needs root). It carries NO
+                                 for all SEVEN members. The Linux arm is now complete except for per-DIMM
+                                 memory, which stays Unsupported* for good (dmidecode needs root).
+                                 It carries NO
                                  [SupportedOSPlatform]: the Linux readers are portable managed code over
                                  IProcFileSystem, so there is no annotated API for CA1416 to see.
                                  Built by each consuming page's public ctor (Dashboard,
@@ -618,7 +657,14 @@ currently exist.
                                  EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
                                  members run concurrently; stateful providers are deliberately excluded)
         IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
-                                 pure, unit-tested — lives on the record, not the DXGI reader)
+                                 pure, unit-tested — lives on the record, not the DXGI reader.
+                                 GpuAdapter.LuidToken IS NAMED FOR WINDOWS BUT IS NOT ALWAYS A LUID: it is
+                                 whatever this platform uses to say "the same adapter" across independent
+                                 readers — the PDH luid token on Windows, the card's PCI address on Linux)
+        LinuxGpuAdapterProvider.cs
+                                (/sys/class/drm enumeration over the shared DrmCardFacts, taking its Key
+                                 rather than deriving one. Packs the two sysfs subsystem id files into the
+                                 single field DXGI reports, so a card reads the same on both platforms)
         WindowsGpuAdapterProvider.cs
                                 (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
                                  flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
@@ -628,10 +674,11 @@ currently exist.
                                 (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
                                  ForCurrentPlatform shares ONE reader with the Storage page)
         LinuxPhysicalDiskProvider.cs
-                                (the same cards from SysBlockFacts. Takes IDiskTemperatureProvider the same
-                                 way, so the temperature milestone is one swap. HEALTH IS ALWAYS HEALTHY and
-                                 TEMPERATURE ALWAYS NULL — both need SMART, which needs root, and neither
-                                 has a rootless near-miss worth substituting)
+                                (the same cards from SysBlockFacts, taking IDiskTemperatureProvider the same
+                                 way. HEALTH IS ALWAYS HEALTHY — SMART needs root and has no rootless
+                                 near-miss. Temperature IS read, and unlike the Windows arm it is asked for
+                                 on EVERY drive, not just NVMe: the source is hwmon, and drivetemp covers
+                                 SATA/SAS too, so a media-kind gate here would make that path dead code)
         IVolumeProvider.cs / WindowsVolumeProvider.cs
                                 (MSFT_Volume enumeration incl. unlettered Recovery/EFI. VolumeInfo carries
                                  BOTH DriveLetter and MountPoint — the platforms name the same thing
@@ -654,6 +701,15 @@ currently exist.
         IDiskTemperatureProvider.cs / WindowsDiskTemperatureProvider.cs
                                 (NVMe composite temp via non-admin IOCTL health log. SYNCHRONOUS by
                                  design — called per-disk on a slow sub-tick of a timer the caller owns)
+        LinuxDiskTemperatureProvider.cs
+                                (temp1_input from the drive's hwmon, in MILLIDEGREES. MATCHED ON THE
+                                 HWMON'S name, NEVER ITS INDEX — numbering is not stable across boots and
+                                 the low ones are usually coretemp/acpitz, so an index read reports the CPU
+                                 on a drive card. TWO WALKS reach the block device: an nvme hwmon hangs off
+                                 the CONTROLLER with the device a namespace child (nvme0 → nvme0n1), a
+                                 drivetemp one off a SCSI target with the device under block/. FINDING
+                                 NOTHING IS THE COMMON CASE — drivetemp is not loaded by default on most
+                                 distros; that is correct, not a bug. Stateless: re-walks per call)
         StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
                                  counters; owns a PDH query handle)
         IPhysicalDiskThroughputSampler.cs
@@ -1013,19 +1069,27 @@ currently exist.
                                                          exception is logged once, then latches it off)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
-                                IGpuSensorReader.cs     (GPU Temp/Power tiles — one swappable reader per GPU
-                                GpuSensorProvider.cs     vendor behind a common interface, plus the routing
-                                GpuPciMatcher.cs         + pure join/format helpers. Windows has no in-box GPU
-                                GpuSensorFormatter.cs    sensor API, so each vendor is served by the SDK its
-                                NvApiInterop.cs          own driver installs: NVIDIA temperature via NVAPI
-                                NvmlInterop.cs           (nvapi_QueryInterface function-id dispatch, the
-                                NvidiaGpuSensorReader.cs GpuAdapterProvider vtable technique) and power via
-                                AdlInterop.cs            NVML; AMD temperature via ADL's PMLOG snapshot.
-                                AmdGpuSensorReader.cs    Adapters are attributed by PCI identity, not LUID —
-                                PnpPciParser.cs          the vendor SDKs report no LUID. No packages, no
-                                                         admin. Every vendor and EVERY METRIC soft-fails to
-                                                         "—" independently. AMD power + Intel are deferred —
-                                                         see Deferred work above)
+                                IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
+                                WindowsGpuSensorProvider.cs OPPOSITE SHAPES. Windows has no in-box sensor
+                                IGpuSensorReader.cs      API, so it fans out to one reader per vendor SDK:
+                                GpuPciMatcher.cs         NVIDIA temperature via NVAPI (nvapi_QueryInterface
+                                GpuSensorFormatter.cs    function-id dispatch, the DXGI vtable technique) and
+                                NvApiInterop.cs          power via NVML; AMD temperature via ADL's PMLOG
+                                NvmlInterop.cs           snapshot. Those SDKs report NO LUID, which is the
+                                NvidiaGpuSensorReader.cs only reason GpuPciMatcher exists — adapters are
+                                AdlInterop.cs            joined by PCI identity instead.
+                                AmdGpuSensorReader.cs    LinuxGpuSensorProvider needs NEITHER: the kernel
+                                PnpPciParser.cs          nests each card's hwmon under the card, so the
+                                LinuxGpuSensorProvider.cs adapter key alone finds it and the pci argument is
+                                                         unused. temp1_input is MILLIDEGREES and
+                                                         power1_average MICROWATTS — two more scales, both
+                                                         range-checked, since a wrong divisor still looks
+                                                         plausible. No packages, no admin. Every vendor and
+                                                         EVERY METRIC soft-fails to "—" independently.
+                                                         The vendor readers' EMPTY ANNOTATED CONSTRUCTORS are
+                                                         what make the three static interop classes
+                                                         unreachable off Windows — see the CA1416 section.
+                                                         AMD power + Intel are deferred — see Deferred work)
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
                                 (LIVE — read-only drives/health view: a top row of DriveCard summary
                                  cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
