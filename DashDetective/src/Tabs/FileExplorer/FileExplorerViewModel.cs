@@ -87,6 +87,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // ----- Navigation history -----
 
     private readonly IShellInterop _shell;
+    private readonly IFileSystemRoots _roots;
     private readonly NavigationHistory _history = new();
 
     /// <summary>Whether Back has somewhere to return to.</summary>
@@ -193,12 +194,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // the user's selection; navigation leaves it null so selection clears as before).
     private string? _reselectPath;
 
-    public FileExplorerViewModel() : this(IShellInterop.ForCurrentPlatform()) { }
+    public FileExplorerViewModel()
+        : this(IShellInterop.ForCurrentPlatform(), IFileSystemRoots.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit shell. The public ctor resolves the real one,
-    /// so the shell still builds this with <c>new()</c>.</summary>
-    internal FileExplorerViewModel(IShellInterop shell) {
+    /// <summary>Test seam: the same page over an explicit shell and root set. The public ctor resolves
+    /// the real ones, so the shell still builds this with <c>new()</c>.</summary>
+    internal FileExplorerViewModel(IShellInterop shell, IFileSystemRoots roots) {
         _shell = shell;
+        _roots = roots;
 
         Filters = new ObservableCollection<FilterOption> {
             new FilterOption("All", null, OnFilterSelected),
@@ -227,7 +230,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     private async Task LoadRootsAsync() {
         IReadOnlyList<DriveEntry> drives;
         try {
-            drives = await DirectoryService.GetDrivesAsync();
+            drives = await DirectoryService.GetDrivesAsync(_roots);
         } catch {
             return;
         }
