@@ -40,8 +40,8 @@ internal interface IHardwareInfoProvider {
 
     /// <summary>
     /// The <c>/proc</c> and sysfs readers, filled in one milestone at a time — a card with no Linux reader
-    /// yet keeps its <c>Unsupported*</c> one and renders "—". Graphics arrives with the GPU milestone;
-    /// per-DIMM memory modules need <c>dmidecode</c> with root and stay unsupported for good.
+    /// yet keeps its <c>Unsupported*</c> one and renders "—". Per-DIMM memory modules need
+    /// <c>dmidecode</c> with root and stay unsupported for good.
     ///
     /// Unlike <see cref="Windows"/> this carries no <see cref="SupportedOSPlatformAttribute"/>: the Linux
     /// readers are portable managed code over <c>IProcFileSystem</c>, so there is no annotated API for
@@ -51,5 +51,5 @@ internal interface IHardwareInfoProvider {
         new HardwareInfoProvider(
             new LinuxProcessorInfoProvider(), new UnsupportedMemoryModulesProvider(),
             new LinuxStorageInfoProvider(), new LinuxMotherboardInfoProvider(),
-            new UnsupportedGraphicsInfoProvider());
+            new LinuxGraphicsInfoProvider());
 }
