@@ -62,9 +62,11 @@ public sealed class SettingCatalog {
         SettingId.ShowInTray, "Monitoring", "Show in system tray", "Keep console running in background",
         Keywords: "tray notification area minimise minimize close background");
 
+    // The one description that names its mechanism rather than its effect, so it is the one that has to
+    // vary by platform — see SettingDescriptions.
     public SettingEntry LaunchAtStartup { get; } = new(
-        SettingId.LaunchAtStartup, "Monitoring", "Launch at startup", "Start with Windows",
-        Keywords: "boot autostart auto start login run on startup");
+        SettingId.LaunchAtStartup, "Monitoring", "Launch at startup", SettingDescriptions.LaunchAtStartup,
+        Keywords: "boot autostart auto start login run on startup session");
 
     // ----- Export & Data -----
 

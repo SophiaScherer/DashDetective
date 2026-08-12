@@ -14,8 +14,11 @@ internal interface IStartupRegistration {
     /// <summary>Adds or removes the startup entry.</summary>
     void SetEnabled(bool enabled);
 
-    /// <summary>The registration for this machine — the real one on Windows, and one that reports
-    /// "not enabled" and ignores writes anywhere else (what the old inline platform guards did).</summary>
+    /// <summary>The registration for this machine — the <c>Run</c> key on Windows, an XDG autostart
+    /// entry on Linux, and one that reports "not enabled" and ignores writes anywhere else (what the old
+    /// inline platform guards did).</summary>
     static IStartupRegistration ForCurrentPlatform() =>
-        OperatingSystem.IsWindows() ? new WindowsStartupRegistration() : new UnsupportedStartupRegistration();
+        OperatingSystem.IsWindows() ? new WindowsStartupRegistration()
+        : OperatingSystem.IsLinux() ? new LinuxStartupRegistration()
+        : new UnsupportedStartupRegistration();
 }
