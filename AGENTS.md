@@ -1105,13 +1105,25 @@ no annotation, so a P/Invoke file is invisible to the analyzer.** Annotating tho
 busywork: the attribute is the only thing that makes them visible *at their call sites*. Never conclude
 from a clean build that the platform surface is covered — grep for `DllImport` and `LibraryImport`.
 
-Three classes still reach native Windows APIs unannotated, because annotating them today would land the
-attribute on a ViewModel field initialiser — which the rule above forbids — or on a call site whose seam is
-already scheduled. Each gets its attribute when its seam lands:
+**Every class that reaches a native Windows API is now covered.** The table that used to sit here is empty;
+M13 closed the last three rows, though not in the way it expected — see below.
 
-| Class | Seam lands in |
-|---|---|
-| `AdlInterop`, `NvmlInterop`, `NvApiInterop` | M13 (the GPU sensor seam) |
+**A `DllImport` class is covered by the constructor of the type that owns it, not necessarily its own.**
+`AdlInterop`, `NvmlInterop` and `NvApiInterop` are `static` classes, so there is no constructor to annotate
+and the only options are the type or each member. M13 measured what type-annotating all three costs:
+**38 CA1416 errors**, every one inside `AmdGpuSensorReader` and `NvidiaGpuSensorReader`. Two of them are
+*const* references (`AdlInterop.MaxSensors`, `NvApiInterop.MaxThermalSensors`) sitting in **field
+initialisers** — the one place the rule above says an attribute cannot go. Clearing them would mean
+annotating the two reader *types*, which drags their pure decode statics (`SelectTemperature`,
+`IsDiscrete`, `SelectGpuSensorIndex`, `PlausibleCelsius`, `PlausibleWatts` — around 30 assertions) behind an
+`IsWindows()` guard and costs the Linux leg all of it, for no added protection.
+
+So the attribute goes on the **two reader constructors** instead, which is the real boundary: the interops
+are `internal` and reachable only through a reader instance, and a reader can only be constructed inside
+`WindowsGpuSensorProvider.CreateReaders()`, which is itself only reachable behind the guard in
+`IGpuSensorProvider.ForCurrentPlatform()`. Verified by deleting `CreateReaders()`'s attribute and watching
+both reader constructors light up CA1416 individually. The lesson generalises: **when the P/Invoke lives in
+a static class, annotate whatever must be constructed to reach it.**
 
 **M13 cleared `GpuUsageSampler`**, the same way M8 cleared its own: two view models held
 `private readonly GpuUsageSampler _gpuSampler = new()` and `DeviceInventory` constructed a third inline, so

@@ -142,7 +142,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly IGpuUsageSampler _gpuSampler = IGpuUsageSampler.ForCurrentPlatform();
     // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
     // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
-    private readonly GpuSensorProvider _gpuSensors = new();
+    private readonly IGpuSensorProvider _gpuSensors = IGpuSensorProvider.ForCurrentPlatform();
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----

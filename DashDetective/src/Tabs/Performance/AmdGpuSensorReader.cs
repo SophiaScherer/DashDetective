@@ -2,6 +2,7 @@ using DashDetective.Services.Diagnostics;
 using DashDetective.Services.SystemMetrics;
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 
 namespace DashDetective.Tabs.Performance;
 
@@ -71,6 +72,14 @@ internal sealed class AmdGpuSensorReader : IGpuSensorReader {
 
     private bool _initialized;
     private bool _ready;
+
+    /// <summary>Empty, and annotated on purpose: this is the enforcement point for <see cref="AdlInterop"/>,
+    /// a hand-written <c>DllImport</c> class CA1416 cannot see. The attribute goes where the analyzer can
+    /// act on it — the only place this class comes into existence — which forces the guard all the way up in
+    /// <see cref="IGpuSensorProvider.ForCurrentPlatform"/>. It stays off the type so
+    /// <see cref="SelectTemperature"/> and <see cref="IsDiscrete"/> keep running on every CI leg.</summary>
+    [SupportedOSPlatform("windows")]
+    public AmdGpuSensorReader() { }
 
     public uint VendorId => AmdVendorId;
 

@@ -6,10 +6,11 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>Covers <see cref="GpuSensorProvider"/>: routing an adapter to the reader for its PCI vendor,
-/// reporting nothing for a vendor with no reader (how the AMD/Intel tiles stay "—"), and containing a reader
-/// that throws rather than letting it reach the sampling tick.</summary>
-public class GpuSensorProviderTests {
+/// <summary>Covers <see cref="WindowsGpuSensorProvider"/>: routing an adapter to the reader for its PCI
+/// vendor, reporting nothing for a vendor with no reader (how the AMD/Intel tiles stay "—"), and containing
+/// a reader that throws rather than letting it reach the sampling tick. Every case goes through the
+/// unannotated test-seam constructor, so all of it runs on the Linux leg too.</summary>
+public class WindowsGpuSensorProviderTests {
     private static readonly GpuPciId Nvidia = new(0x10DE, 0x2504, 0x397D1462, 0xA1);
     private static readonly GpuPciId Amd = new(0x1002, 0x164E, 0x7D731462, 0xC7);
 
@@ -17,23 +18,23 @@ public class GpuSensorProviderTests {
     public void SelectReader_MatchingVendor_ReturnsThatReader() {
         var nvidia = new FakeReader(0x10DE);
         var readers = new List<IGpuSensorReader> { new FakeReader(0x1002), nvidia };
-        Assert.Same(nvidia, GpuSensorProvider.SelectReader(0x10DE, readers));
+        Assert.Same(nvidia, WindowsGpuSensorProvider.SelectReader(0x10DE, readers));
     }
 
     [Fact]
     public void SelectReader_NoReaderForVendor_ReturnsNull() {
         var readers = new List<IGpuSensorReader> { new FakeReader(0x10DE) };
-        Assert.Null(GpuSensorProvider.SelectReader(0x1002, readers));
+        Assert.Null(WindowsGpuSensorProvider.SelectReader(0x1002, readers));
     }
 
     [Fact]
     public void SelectReader_NoReadersAtAll_ReturnsNull() {
-        Assert.Null(GpuSensorProvider.SelectReader(0x10DE, new List<IGpuSensorReader>()));
+        Assert.Null(WindowsGpuSensorProvider.SelectReader(0x10DE, new List<IGpuSensorReader>()));
     }
 
     [Fact]
     public void Read_VendorWithAReader_ReturnsItsSample() {
-        using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
+        using var provider = new WindowsGpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
         var sample = provider.Read("gpu-a", Nvidia);
 
@@ -45,7 +46,7 @@ public class GpuSensorProviderTests {
     /// built with.</summary>
     [Fact]
     public void Read_VendorWithoutAReader_ReportsNothing() {
-        using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
+        using var provider = new WindowsGpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
         Assert.Equal(GpuSensorSample.None, provider.Read("gpu-b", Amd));
     }
@@ -53,7 +54,7 @@ public class GpuSensorProviderTests {
     /// <summary>DXGI can fail to report a PCI identity; that must not be treated as a vendor.</summary>
     [Fact]
     public void Read_NoPciIdentity_ReportsNothing() {
-        using var provider = new GpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
+        using var provider = new WindowsGpuSensorProvider(new[] { new FakeReader(0x10DE, new GpuSensorSample(41, 16.42)) });
 
         Assert.Equal(GpuSensorSample.None, provider.Read("gpu-a", null));
     }
@@ -63,7 +64,7 @@ public class GpuSensorProviderTests {
     [Fact]
     public void Read_ReaderThrows_IsContainedAndNotRetried() {
         var reader = new ThrowingReader(0x10DE);
-        using var provider = new GpuSensorProvider(new[] { reader });
+        using var provider = new WindowsGpuSensorProvider(new[] { reader });
 
         Assert.Equal(GpuSensorSample.None, provider.Read("gpu-a", Nvidia));
         Assert.Equal(1, reader.Calls);
@@ -77,7 +78,7 @@ public class GpuSensorProviderTests {
     public void Dispose_DisposesEveryReader() {
         var first = new FakeReader(0x10DE);
         var second = new FakeReader(0x1002);
-        var provider = new GpuSensorProvider(new IGpuSensorReader[] { first, second });
+        var provider = new WindowsGpuSensorProvider(new IGpuSensorReader[] { first, second });
 
         provider.Dispose();
 
