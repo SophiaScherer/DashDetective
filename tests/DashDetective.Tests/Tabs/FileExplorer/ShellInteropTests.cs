@@ -18,6 +18,8 @@ public class ShellInteropTests {
 
         if (OperatingSystem.IsWindows())
             Assert.IsType<WindowsShellInterop>(shell);
+        else if (OperatingSystem.IsLinux())
+            Assert.IsType<LinuxShellInterop>(shell);
         else
             Assert.IsType<UnsupportedShellInterop>(shell);
     }
