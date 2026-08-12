@@ -18,9 +18,7 @@ public class GpuSensorProviderSeamTests {
         if (OperatingSystem.IsWindows()) {
             Assert.IsType<WindowsGpuSensorProvider>(provider);
         } else if (OperatingSystem.IsLinux()) {
-            // Spelled out rather than folded into the else so the `OperatingSystem.IsLinux` grep finds this
-            // file when the sysfs sensor reader lands — a Windows run never executes this branch.
-            Assert.IsType<UnsupportedGpuSensorProvider>(provider);
+            Assert.IsType<LinuxGpuSensorProvider>(provider);
         } else {
             Assert.IsType<UnsupportedGpuSensorProvider>(provider);
         }

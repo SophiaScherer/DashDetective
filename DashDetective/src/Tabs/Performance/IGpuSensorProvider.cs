@@ -24,6 +24,9 @@ internal interface IGpuSensorProvider : IDisposable {
         if (OperatingSystem.IsWindows())
             return new WindowsGpuSensorProvider();
 
+        if (OperatingSystem.IsLinux())
+            return new LinuxGpuSensorProvider();
+
         return new UnsupportedGpuSensorProvider();
     }
 }
