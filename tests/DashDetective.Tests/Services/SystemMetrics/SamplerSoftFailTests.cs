@@ -66,13 +66,11 @@ public class SamplerSoftFailTests {
     }
 
     [Fact]
-    public void GpuUsageSampler_Inert_SamplesZeroAndEmptyMaps() {
-        using var sampler = new GpuUsageSampler(SamplerInit.Inert);
+    public void GpuUsageSampler_Inert_SamplesAnEmptyMapForever() {
+        using var sampler = new WindowsGpuUsageSampler(SamplerInit.Inert);
 
-        Assert.Equal(0.0, sampler.Sample());
-        Assert.Empty(sampler.SampleEngines());
         Assert.Empty(sampler.SampleAdapters());
-        Assert.Equal(0.0, sampler.Sample());
+        Assert.Empty(sampler.SampleAdapters());
         sampler.Dispose();
     }
 
@@ -123,15 +121,13 @@ public class SamplerSoftFailTests {
     [Fact]
     public void RealConstructorsAndSamples_NeverThrow_OnThisHost() {
         using var cpu = new CpuUsageSampler();
-        using var gpu = new GpuUsageSampler();
+        using var gpu = IGpuUsageSampler.ForCurrentPlatform();
         using var disk = IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         using var frequency = IProcessorFrequencySampler.ForCurrentPlatform();
         using var logical = ILogicalProcessorSampler.ForCurrentPlatform();
         var memory = IMemoryUsageSampler.ForCurrentPlatform();
 
         _ = cpu.Sample();
-        _ = gpu.Sample();
-        _ = gpu.SampleEngines();
         _ = gpu.SampleAdapters();
         _ = disk.Sample();
         _ = frequency.Sample();

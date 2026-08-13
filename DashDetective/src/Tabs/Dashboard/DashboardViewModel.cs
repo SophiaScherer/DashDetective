@@ -25,6 +25,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
+    /// <summary>The app-wide "no value" placeholder, for the one metric that can genuinely lack one.</summary>
+    private const string NoReading = "—";
+
     /// <summary>
     /// Floor for the network throughput chart's shared vertical scale, in Mbps. Keeps an idle graph
     /// pinned flat near the bottom (rather than amplifying counter noise) and avoids a zero span.
@@ -74,7 +77,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
     private readonly Dictionary<string, DashboardCard> _gpuCards = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
-    private readonly GpuUsageSampler _gpuSampler = new();
+    private readonly IGpuUsageSampler _gpuSampler;
+
+    /// <summary>Mirrors the "NVIDIA GPU utilization" setting onto this page's sampler. Only the Linux arm
+    /// acts on it; everywhere else it is inert. Pushed by the shell on load and whenever it changes.</summary>
+    public bool NvidiaGpuMetrics {
+        get => _gpuSampler.NvidiaMetricsEnabled;
+        set => _gpuSampler.NvidiaMetricsEnabled = value;
+    }
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuValueText = "0";
@@ -92,7 +102,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     // Overall GPU % (busiest adapter) and the joined adapter names — used by the text report and the System
     // Information "GPU" row; the live per-GPU cards are collection-bound instead.
-    [ObservableProperty] private string _gpuValueText = "0";
+    /// <summary>The busiest adapter's utilisation, for the text report and the CSV export. Starts at the
+    /// neutral placeholder and stays there on a machine where no adapter can report one — a Linux box whose
+    /// only GPU is an NVIDIA or Intel part, say — rather than reading a confident 0%.</summary>
+    [ObservableProperty] private string _gpuValueText = "—";
     [ObservableProperty] private string _gpuModelText = "";
 
     // The system drive's activity + capacity. Not shown on a card of its own (the per-disk cards cover the
@@ -124,10 +137,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     public DashboardViewModel(SystemMetricsService service)
         : this(service, HardwareProviders.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
-    /// one, so the shell still builds this exactly as before.</summary>
-    internal DashboardViewModel(SystemMetricsService service, HardwareProviders providers) {
+    /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
+    /// sampler — the one dependency the page resolves for itself, so without this a test cannot reach the
+    /// cards' no-reading path. The public ctor resolves both, so the shell builds this exactly as
+    /// before.</summary>
+    internal DashboardViewModel(
+        SystemMetricsService service, HardwareProviders providers, IGpuUsageSampler? gpuSampler = null) {
         _providers = providers;
+        _gpuSampler = gpuSampler ?? IGpuUsageSampler.ForCurrentPlatform();
 
         _service = service;
 
@@ -229,7 +246,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         sb.AppendLine("Live metrics");
         AppendReportRow(sb, "CPU", $"{CpuValueText}%  ({CpuModelText})");
         AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
-        AppendReportRow(sb, "GPU", $"{GpuValueText}%  ({GpuModelText})");
+        // The only live metric that can have no reading at all, so the "%" has to be conditional — "—%"
+        // would read as a measured zero.
+        AppendReportRow(sb, "GPU", GpuValueText == NoReading
+            ? $"{NoReading}  ({GpuModelText})"
+            : $"{GpuValueText}%  ({GpuModelText})");
         AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
         AppendReportRow(sb, "Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})");
 
@@ -297,10 +318,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Enumerates the physical GPUs (off the UI thread) via the shared <see cref="DeviceInventory"/>
     /// and rebuilds the per-GPU cards + the System-Information "GPU" row. Soft-fails to no GPU cards on any
-    /// error.</summary>
-    private async Task LoadGpusAsync() {
+    /// error. Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
+    internal async Task LoadGpusAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync(_providers);
+            var inventory = await DeviceInventory.LoadAsync(_providers, () => _gpuSampler);
             RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
         } catch {
             // Leave the existing GPU cards in place on a transient failure.
@@ -416,20 +437,34 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         if (adapters.Count == 0)
             return;
 
-        double overall = 0;
+        double? overall = null;
         foreach (var (luid, sample) in adapters) {
-            var value = Math.Clamp(sample.Overall, 0, 100);
-            if (value > overall)
-                overall = value;
             if (!_gpuHistories.TryGetValue(luid, out var history) || !_gpuCards.TryGetValue(luid, out var card))
                 continue;
+
+            // An adapter with no readable utilisation still has a card — it shows "—" rather than a 0 that
+            // would read as idle. The unit goes with it, so the card says "—" and not "— %".
+            if (sample.Overall is not { } reading) {
+                card.Value = NoReading;
+                card.Unit = "";
+                continue;
+            }
+
+            var value = Math.Clamp(reading, 0, 100);
+            if (value > overall || overall is null)
+                overall = value;
             MetricChannel.PushHistory(history, value);
             card.Value = Math.Round(value).ToString(CultureInfo.InvariantCulture);
+            card.Unit = "%";
             card.Points = SparklinePoints.Build(history, 100);
         }
 
-        MetricChannel.PushHistory(_gpuHistory, overall);
-        GpuValueText = Math.Round(overall).ToString(CultureInfo.InvariantCulture);
+        // The single overall figure the CSV export and text report read. Left untouched when no adapter
+        // reported one, so it holds its last value rather than dropping to a false zero.
+        if (overall is { } busiest) {
+            MetricChannel.PushHistory(_gpuHistory, busiest);
+            GpuValueText = Math.Round(busiest).ToString(CultureInfo.InvariantCulture);
+        }
     }
 
     /// <summary>

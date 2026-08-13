@@ -19,7 +19,7 @@ public sealed class SettingCatalog {
         All = [
             Theme, Accent,
             NavPosition, NavCollapse,
-            RefreshInterval, ResourceAlerts, ShowInTray, LaunchAtStartup,
+            RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             ExportData,
         ];
     }
@@ -57,6 +57,13 @@ public sealed class SettingCatalog {
         SettingId.ResourceAlerts, "Monitoring", "Resource alerts",
         "Show a banner when CPU or RAM exceeds 90%",
         Keywords: "notification warning banner threshold high usage");
+
+    // Off by default because it is the one metric in the app that costs a process launch to read. The
+    // copy says what it costs rather than naming the tool, which means nothing to most people.
+    public SettingEntry NvidiaGpuMetrics { get; } = new(
+        SettingId.NvidiaGpuMetrics, "Monitoring", "NVIDIA GPU utilization",
+        "Runs a helper tool every 15 seconds; Linux only",
+        Keywords: "nvidia gpu graphics utilisation utilization nvidia-smi linux");
 
     // Kept and still searchable where the tray cannot be honoured — only its copy and its toggle change,
     // so the setting does not vanish from search on one platform. See SettingDescriptions.

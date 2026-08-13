@@ -12,6 +12,11 @@ DashDetective is an [Avalonia UI](https://avaloniaui.net/) desktop app on `net10
 pattern with `CommunityToolkit.Mvvm`. Its data sources are Windows-native (WMI, PDH performance
 counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out one milestone at a time —
 today Linux builds and launches with CPU, memory, the whole Network tab — throughput, adapters and the
+active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions,
+per-disk activity and drive temperature — the Processes tab, the Toolkit tab's own command set, the GPU
+surface — adapters, utilisation, temperature and power — plus the machine's static identity (OS, kernel,
+BIOS, board) and the Processor, Motherboard, Storage Devices and Graphics spec cards. Only per-DIMM memory
+detail still reads "—", and permanently: `dmidecode` needs root.
 active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions
 and per-disk activity — the Processes tab, the Toolkit tab's own command set, the desktop integration
 (File Explorer roots, "Launch at startup", friendly file types), plus the machine's static identity
@@ -341,7 +346,9 @@ Where two surfaces need the same *derived* numbers rather than the same file, th
 well: `CpuFacts` sits on `ProcCpuinfoParser` and feeds both the Dashboard's CPU tile and the Hardware tab's
 Processor card, so the two cannot report different core counts for the same machine. `SysBlockFacts` does
 the same for `/sys/block`, feeding the Storage tab's drive cards, its partitions table and the Hardware
-tab's Storage Devices card. `ProcPids` is the smallest of these — just the all-digit entries under
+tab's Storage Devices card, and `DrmCardFacts` for `/sys/class/drm`, feeding four consumers at once — the
+adapter enumeration, the utilisation sampler, the sensor reader and the Hardware tab's Graphics card.
+`ProcPids` is the smallest of these — just the all-digit entries under
 `/proc` — but it is shared for the same reason: the Performance tab counts processes and the Processes tab
 walks them, and only one of them should get to decide what a process is. `ProcPidName` was extracted for
 that reason after the fact: the Processes tab names every process and the Network tab names each
@@ -363,6 +370,23 @@ that fill them agree for free. Linux names disks `sda` and `nvme0n1`, and the an
 `/proc/diskstats`: three separately-sampled readers still derive the same key from the same authority. A
 positional index would have looked identical in a screenshot and drifted the moment a USB drive was plugged
 in mid-run.
+
+**The GPU surface is the same problem with a harsher failure mode.** Its records are keyed by a DXGI
+**LUID**, which Linux does not have, so `DrmCardFacts.Key` supplies the card's PCI address instead. What
+makes it harsher is `DeviceInventory`: it builds a GPU card only for an adapter that the enumeration *and*
+the utilisation sampler both report, an intersection that exists on Windows to drop the phantom duplicate
+LUIDs DXGI lists a single GPU under. If the two Linux readers derived that key separately and disagreed by
+so much as a leading zero, the intersection would be empty and **every GPU card would vanish with nothing
+logged**, while each reader's own output still looked perfectly correct. Both take the key from the one
+shared derivation, and a test drives the real enumeration and the real sampler over one fake filesystem and
+asserts their key sets match. The same trap is why `nvidia-smi`'s bus id is normalised before use: it
+writes an eight-digit PCI domain in uppercase where sysfs writes four in lowercase.
+
+**An adapter that cannot report a number is not the same as an adapter that is absent.** `GpuAdapterSample.
+Overall` is nullable for exactly that reason: Linux reports every card it finds, with a null utilisation for
+the drivers that publish none. Omitting those cards instead would delete real hardware from the UI, and
+reporting `0` would show an idle GPU — the same "never substitute a near-miss" rule that keeps the
+Performance tab's Handles tile blank on Linux.
 
 Filtering matters as much as parsing here, because the pseudo-filesystems describe far more devices than a
 user has. `/sys/block` lists every snap loop device — around 25 on a stock Ubuntu GNOME install — and
@@ -458,6 +482,28 @@ referenced, redistributed or shipped, and none of it needs admin rights:
 
 The three vendor GPU libraries are the reason a unified sensor library is not needed. If a machine
 lacks a given vendor's driver, the `DllImport` simply fails and that tile degrades to "—" on its own.
+
+**Linux needs none of this.** The kernel has already done the privileged reads and publishes the results
+as pseudo-files, so the entire GPU surface — adapter identity, utilisation, temperature and power — comes
+from `/sys/class/drm` and the hwmon nodes underneath each card, through the same `IProcFileSystem` seam as
+every other Linux reader. The one exception is NVIDIA utilisation: the proprietary driver publishes nothing
+in sysfs, so it needs `nvidia-smi`, which is a **process launch** — that reading is therefore the only one
+in the app behind an opt-in setting, off by default, capped at one run per 15 seconds and never on the
+sampling path.
+
+### What the GPU and temperature readers cannot verify
+
+Neither the VirtualBox VM nor `ubuntu-latest` has a discrete GPU or a SMART-capable disk, so on Linux:
+
+- **No temperature, power or utilisation *value* has been checked against real hardware.** The parsers are
+  tested against fixtures captured from the documented kernel sysfs ABI, and the plausibility windows
+  reject a wrong unit scale, but "42.85 °C is what this drive is actually at" is unverified.
+- What *is* verified on every CI run: that each file is parsed at the right scale (millidegrees,
+  microwatts, bytes, bare percent — four different ones), that an absent source degrades to "—" rather
+  than to zero, that hwmon is matched by name and not by index, and that the adapter key the enumeration
+  emits is the same one the sampler and the sensor reader look up.
+- `drivetemp` is not loaded by default on most distributions, so **finding no SATA drive temperature is the
+  expected outcome on real hardware too**, not a defect.
 
 ## Testing
 

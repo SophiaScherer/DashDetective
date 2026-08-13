@@ -64,6 +64,10 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
     [ObservableProperty] private bool _resourceAlerts;
 
+    /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default — the
+    /// only reading in the app that costs a process launch.</summary>
+    [ObservableProperty] private bool _nvidiaGpuMetrics;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -118,6 +122,7 @@ public partial class SettingsViewModel : ViewModelBase {
         _launchAtStartup = _startup.IsEnabled();
         _showInTray = settings.ShowInTray;
         _resourceAlerts = settings.ResourceAlerts;
+        _nvidiaGpuMetrics = settings.NvidiaGpuMetrics;
 
         _initializing = false;
     }
@@ -197,4 +202,6 @@ public partial class SettingsViewModel : ViewModelBase {
     partial void OnShowInTrayChanged(bool value) => Changed?.Invoke();
 
     partial void OnResourceAlertsChanged(bool value) => Changed?.Invoke();
+
+    partial void OnNvidiaGpuMetricsChanged(bool value) => Changed?.Invoke();
 }

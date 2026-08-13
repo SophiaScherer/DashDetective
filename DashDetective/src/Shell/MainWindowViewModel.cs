@@ -216,6 +216,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
+        ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
         _recents.Load(settings.RecentSearches);
     }
 
@@ -243,6 +244,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         LaunchAtStartup = _settings.LaunchAtStartup,
         ShowInTray = _settings.ShowInTray,
         ResourceAlerts = _settings.ResourceAlerts,
+        NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
@@ -258,6 +260,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Persist();
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
+        ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
+    }
+
+    /// <summary>Mirrors the NVIDIA opt-in onto both pages that own a GPU sampler. Pushed rather than read,
+    /// matching the other per-page toggles; the cards pick it up on their next tick, and the adapter list
+    /// itself does not depend on it.</summary>
+    private void ApplyNvidiaGpuMetrics(bool enabled) {
+        _dashboard.NvidiaGpuMetrics = enabled;
+        _performance.NvidiaGpuMetrics = enabled;
     }
 
     private void OnNavPropertyChanged(object? sender, PropertyChangedEventArgs e) {

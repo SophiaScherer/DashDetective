@@ -11,6 +11,7 @@ public enum SettingId {
     NavCollapse,
     RefreshInterval,
     ResourceAlerts,
+    NvidiaGpuMetrics,
     ShowInTray,
     LaunchAtStartup,
     ExportData,
