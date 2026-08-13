@@ -15,9 +15,40 @@ namespace DashDetective.Tabs.Toolkit;
 /// <c>Arguments</c> string, so nothing is concatenated into a command line: there is no quoting to get
 /// wrong and no interpolation to exploit. Exceptions are left to propagate — wording a failure is
 /// <see cref="ToolkitRunner"/>'s job, and swallowing here would cost it the reason.
+///
+/// <b>A declined prompt is silent on Linux, unlike Windows.</b> <c>runas</c> fails synchronously inside
+/// <c>Process.Start</c>, which is what lets <see cref="ToolkitRunner"/> word it; <c>pkexec</c> reports
+/// refusal as exit 126 after the launch returns. Waiting for that would hold <c>sfc /scannow</c>'s log
+/// entry open for the many minutes it runs, and 126 cannot be told apart from the program's own exit.
 /// </summary>
 internal sealed class SystemProcessLauncher : IProcessLauncher {
+    /// <summary>The program run to raise a privilege prompt on Linux. Resolved off the PATH like every
+    /// other target here; polkit installs it at <c>/usr/bin/pkexec</c>.</summary>
+    internal const string ElevationProgram = "pkexec";
+
     public void Launch(string fileName, IReadOnlyList<string> arguments, bool elevated) {
+        using var process = Process.Start(
+            BuildLaunchInfo(fileName, arguments, elevated, OperatingSystem.IsLinux()));
+    }
+
+    /// <summary>
+    /// How one launch reaches the OS. Takes the platform explicitly so both arms are exercised from
+    /// either dev machine — the <c>ToolkitPaths.Expand</c> seam shape. The platforms elevate through
+    /// different mechanisms rather than different flags: Windows has a shell verb, Linux has a wrapper
+    /// program, and <c>UseShellExecute</c> has to be off for the latter or the launch goes to
+    /// <c>xdg-open</c>, which cannot carry arguments.
+    /// </summary>
+    internal static ProcessStartInfo BuildLaunchInfo(
+        string fileName, IReadOnlyList<string> arguments, bool elevated, bool linux) {
+        if (elevated && linux) {
+            var elevatedInfo = new ProcessStartInfo(ElevationProgram) { UseShellExecute = false };
+            elevatedInfo.ArgumentList.Add(fileName);
+            foreach (var argument in arguments)
+                elevatedInfo.ArgumentList.Add(argument);
+
+            return elevatedInfo;
+        }
+
         var info = new ProcessStartInfo(fileName) { UseShellExecute = true };
         foreach (var argument in arguments)
             info.ArgumentList.Add(argument);
@@ -27,7 +58,7 @@ internal sealed class SystemProcessLauncher : IProcessLauncher {
         if (elevated)
             info.Verb = "runas";
 
-        using var process = Process.Start(info);
+        return info;
     }
 
     public async Task<ProcessCapture> CaptureAsync(

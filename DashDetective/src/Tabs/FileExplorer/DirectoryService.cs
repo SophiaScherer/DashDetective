@@ -28,9 +28,12 @@ public readonly record struct FileItem(
 
 /// <summary>
 /// Async, soft-failing filesystem enumeration for the File Explorer. Mirrors the Dashboard
-/// <c>*InfoProvider</c> pattern: work runs off the UI thread via <see cref="Task.Run"/>, guarded
-/// by <see cref="OperatingSystem.IsWindows"/>, and every entry is read defensively so a protected
-/// or disappearing folder yields a partial list instead of throwing.
+/// <c>*InfoProvider</c> pattern: work runs off the UI thread via <see cref="Task.Run"/>, and every
+/// entry is read defensively so a protected or disappearing folder yields a partial list instead of
+/// throwing.
+///
+/// Portable throughout — enumerating a folder is the same everywhere. The one per-platform question,
+/// what the tree's roots are, lives behind <see cref="IFileSystemRoots"/>.
 /// </summary>
 public static class DirectoryService {
     // Default hides OS hidden/system entries (as Explorer does); the "show hidden" toggle swaps in
@@ -46,7 +49,10 @@ public static class DirectoryService {
 
     private static EnumerationOptions Options(bool includeHidden) => includeHidden ? ShowAll : HideSpecial;
 
-    public static Task<IReadOnlyList<DriveEntry>> GetDrivesAsync() => Task.Run(ReadDrives);
+    /// <summary>Lists the tree's roots. Takes the roots seam because what counts as a root is the one
+    /// per-platform decision here; this class stays static and holds no state of its own.</summary>
+    internal static Task<IReadOnlyList<DriveEntry>> GetDrivesAsync(IFileSystemRoots roots) =>
+        Task.Run(roots.Read);
 
     public static Task<IReadOnlyList<DirEntry>> GetSubdirectoriesAsync(string path, bool includeHidden) =>
         Task.Run(() => ReadSubdirectories(path, includeHidden));
@@ -57,32 +63,10 @@ public static class DirectoryService {
         string path, bool includeHidden, IShellInterop shell) =>
         Task.Run(() => ReadEntries(path, includeHidden, shell));
 
-    private static IReadOnlyList<DriveEntry> ReadDrives() {
-        var drives = new List<DriveEntry>();
-        if (!OperatingSystem.IsWindows())
-            return drives;
-        try {
-            foreach (var d in DriveInfo.GetDrives()) {
-                try {
-                    if (!d.IsReady)
-                        continue;
-                    var label = string.IsNullOrWhiteSpace(d.VolumeLabel)
-                        ? DriveTypeLabel(d.DriveType)
-                        : d.VolumeLabel;
-                    var letter = d.Name.TrimEnd(Path.DirectorySeparatorChar);
-                    // Probe with the default (hidden-excluded) view — a ready drive effectively always
-                    // has a visible subfolder, so the chevron shows as expected.
-                    var root = d.RootDirectory.FullName;
-                    drives.Add(new DriveEntry($"{label} ({letter})", root, HasSubdirectory(root, HideSpecial)));
-                } catch {
-                    // Skip a drive that can't be described (e.g. removed mid-scan).
-                }
-            }
-        } catch {
-            // Return whatever we managed to collect.
-        }
-        return drives;
-    }
+    /// <summary>Whether a tree root has an expandable subfolder, probed with the default
+    /// (hidden-excluded) view. Shared by the roots providers so every platform's chevron rule is the
+    /// same one.</summary>
+    internal static bool RootHasChildren(string path) => HasSubdirectory(path, HideSpecial);
 
     private static IReadOnlyList<DirEntry> ReadSubdirectories(string path, bool includeHidden) {
         var dirs = new List<DirEntry>();
@@ -174,13 +158,4 @@ public static class DirectoryService {
         if ((attributes & FileAttributes.Archive) != 0) flags.Append('A');
         return flags.Length == 0 ? "—" : flags.ToString();
     }
-
-    private static string DriveTypeLabel(DriveType type) => type switch {
-        DriveType.Fixed => "Local Disk",
-        DriveType.Removable => "Removable Disk",
-        DriveType.Network => "Network Drive",
-        DriveType.CDRom => "CD Drive",
-        DriveType.Ram => "RAM Disk",
-        _ => "Disk",
-    };
 }

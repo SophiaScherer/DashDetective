@@ -87,6 +87,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // ----- Navigation history -----
 
     private readonly IShellInterop _shell;
+    private readonly IFileSystemRoots _roots;
     private readonly NavigationHistory _history = new();
 
     /// <summary>Whether Back has somewhere to return to.</summary>
@@ -193,12 +194,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // the user's selection; navigation leaves it null so selection clears as before).
     private string? _reselectPath;
 
-    public FileExplorerViewModel() : this(IShellInterop.ForCurrentPlatform()) { }
+    public FileExplorerViewModel()
+        : this(IShellInterop.ForCurrentPlatform(), IFileSystemRoots.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit shell. The public ctor resolves the real one,
-    /// so the shell still builds this with <c>new()</c>.</summary>
-    internal FileExplorerViewModel(IShellInterop shell) {
+    /// <summary>Test seam: the same page over an explicit shell and root set. The public ctor resolves
+    /// the real ones, so the shell still builds this with <c>new()</c>.</summary>
+    internal FileExplorerViewModel(IShellInterop shell, IFileSystemRoots roots) {
         _shell = shell;
+        _roots = roots;
 
         Filters = new ObservableCollection<FilterOption> {
             new FilterOption("All", null, OnFilterSelected),
@@ -224,18 +227,24 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _ = LoadRootsAsync();
     }
 
+    // Reconciled rather than rebuilt so a Refresh keeps every expanded branch and the selection: the
+    // roots are re-read on each one, and clearing would collapse the tree under the user. Keyed by path,
+    // so a relabelled volume — which is a new mount point — correctly replaces its node rather than
+    // keeping a stale caption (Name is get-only for exactly that reason).
     private async Task LoadRootsAsync() {
         IReadOnlyList<DriveEntry> drives;
         try {
-            drives = await DirectoryService.GetDrivesAsync();
+            drives = await DirectoryService.GetDrivesAsync(_roots);
         } catch {
             return;
         }
 
-        RootNodes.Clear();
-        foreach (var d in drives)
-            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren,
-                                             () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
+        CollectionReconciler.Reconcile(
+            RootNodes, drives,
+            node => node.FullPath, drive => drive.RootPath,
+            static (_, _) => { },
+            d => new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren,
+                                    () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
     }
 
     // Toggling "show hidden" reconciles each loaded tree branch in place (adding/removing hidden
@@ -248,14 +257,13 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             _ = LoadEntriesAsync(CurrentPath);
     }
 
-    /// <summary>Toolbar Refresh for the File Explorer: re-read the current folder (picking up files
-    /// added/removed on disk), or reload the drive roots if nothing is open yet. Reuses the same
-    /// load path as navigation, so the stale-load guard still applies.</summary>
+    /// <summary>Toolbar Refresh for the File Explorer: re-read the roots and the current folder. The
+    /// roots are re-read even with a folder open, because removable media appears and disappears while
+    /// the app runs — a stick plugged in after launch would otherwise need a restart to show up.</summary>
     public void Refresh() {
+        _ = LoadRootsAsync();
         if (!string.IsNullOrEmpty(CurrentPath))
             SetCurrentFolder(CurrentPath);
-        else
-            _ = LoadRootsAsync();
     }
 
     private void OnNodeSelected(FileSystemNode node) {

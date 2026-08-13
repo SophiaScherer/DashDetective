@@ -3,6 +3,7 @@ using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Settings;
 using DashDetective.Tests.Fakes;
@@ -51,6 +52,13 @@ public class SettingsViewModelTests {
 
         Assert.Equal(new[] { true }, startup.Writes);
     }
+
+    /// <summary>The tray toggle is shown disabled rather than removed where there is no tray to hide
+    /// into, so the row still explains itself and still turns up in search.</summary>
+    [Fact]
+    public void CanUseTray_FollowsWhetherTheDesktopHasATray() =>
+        Assert.Equal(TrayIntegration.HidesOnClose,
+                     Create(new FakeStartupRegistration(enabled: false)).CanUseTray);
 
     private sealed class FakeStartupRegistration(bool enabled) : IStartupRegistration {
         public List<bool> Writes { get; } = [];

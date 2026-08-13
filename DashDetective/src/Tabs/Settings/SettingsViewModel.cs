@@ -127,6 +127,10 @@ public partial class SettingsViewModel : ViewModelBase {
         _initializing = false;
     }
 
+    /// <summary>Whether the "Show in system tray" setting can be operated. Bound to the whole row, not
+    /// just the toggle, because a disabled toggle on its own is indistinguishable from an off one.</summary>
+    public bool CanUseTray => TrayIntegration.HidesOnClose;
+
     /// <summary>The currently selected refresh interval in seconds (for capturing into settings).</summary>
     public double SelectedIntervalSeconds {
         get {

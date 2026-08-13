@@ -14,9 +14,10 @@ counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out on
 today Linux builds and launches with CPU, memory, the whole Network tab — throughput, adapters and the
 active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions,
 per-disk activity and drive temperature — the Processes tab, the Toolkit tab's own command set, the GPU
-surface — adapters, utilisation, temperature and power — plus the machine's static identity (OS, kernel,
-BIOS, board) and the Processor, Motherboard, Storage Devices and Graphics spec cards. Only per-DIMM memory
-detail still reads "—", and permanently: `dmidecode` needs root.
+surface — adapters, utilisation, temperature and power — the desktop integration (File Explorer roots,
+"Launch at startup", friendly file types), plus the machine's static identity (OS, kernel, BIOS, board)
+and the Processor, Motherboard, Storage Devices and Graphics spec cards. Only per-DIMM memory detail
+still reads "—", and permanently: `dmidecode` needs root.
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
@@ -251,6 +252,33 @@ Environment expansion is per-platform and belongs to `ToolkitPaths.Resolve` — 
 `${VAR}` and a leading `~` elsewhere — never to a direct `Environment.ExpandEnvironmentVariables` call.
 `Resolve` and `IsFileSystemPath` each keep an `internal` overload taking the platform as a flag, so a table
 authored for one platform can be checked from the other.
+
+A third static, **`TrayIntegration`**, holds a capability rather than a path convention: whether closing
+the window may hide to a tray icon instead of exiting. Windows only — stock GNOME runs no
+StatusNotifierItem host, and since the setting is on by default, honouring it there would hide the window
+behind an icon that never appears. Nothing reliable can be asked at startup, so the app exits on close
+wherever a tray is not guaranteed, and the setting is shown disabled rather than removed.
+
+### Desktop integration
+
+Four seams cover the parts of the app that talk to the *desktop* rather than the kernel, and each answers
+the same question differently rather than degrading to nothing:
+
+- **`IFileSystemRoots`** — what the File Explorer tree starts from. Drive letters on Windows; `/`, `$HOME`
+  and removable mounts on Linux, the last derived from `/proc/mounts` by matching the `/media/`,
+  `/run/media/` and `/mnt/` prefixes, which avoids resolving a user name.
+- **`IStartupRegistration`** — the HKCU `Run` value on Windows, an XDG `.desktop` file under
+  `~/.config/autostart` on Linux.
+- **`IShellInterop`** / **`IProcessInterop`** — friendly type names and the Properties button. **No Linux
+  desktop exposes a Properties dialog to a foreign process**, so rather than leaving the button dead both
+  reveal the containing folder, where the desktop's own dialog is a right-click away.
+
+Two of these carry a lesson about where per-platform code belongs. `LinuxShellInterop`'s type-name table
+could not live on `FileTypeCatalog`, the obvious neighbour, because that class's static initialiser calls
+`Geometry.Parse` and needs a render backend the test project deliberately lacks — so a map living there
+would be untestable. And `LinuxProcessInterop` duplicates a few lines of `LinuxShellInterop` rather than
+sharing them, matching what the Windows pair already do: the self-contained-tab rule outranks a six-line
+saving.
 
 ### Copy is shared; content is not
 

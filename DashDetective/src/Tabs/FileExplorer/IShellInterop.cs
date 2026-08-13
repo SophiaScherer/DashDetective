@@ -21,5 +21,7 @@ internal interface IShellInterop {
     /// <summary>The shell for this machine, or one that still opens files (that part is portable) but has
     /// no type names or Properties dialog to offer.</summary>
     static IShellInterop ForCurrentPlatform() =>
-        OperatingSystem.IsWindows() ? new WindowsShellInterop() : new UnsupportedShellInterop();
+        OperatingSystem.IsWindows() ? new WindowsShellInterop()
+        : OperatingSystem.IsLinux() ? new LinuxShellInterop()
+        : new UnsupportedShellInterop();
 }
