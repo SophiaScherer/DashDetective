@@ -14,14 +14,10 @@ counters, registry, and Win32 P/Invoke), and a Linux port is being rolled out on
 today Linux builds and launches with CPU, memory, the whole Network tab — throughput, adapters and the
 active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions,
 per-disk activity and drive temperature — the Processes tab, the Toolkit tab's own command set, the GPU
-surface — adapters, utilisation, temperature and power — plus the machine's static identity (OS, kernel,
-BIOS, board) and the Processor, Motherboard, Storage Devices and Graphics spec cards. Only per-DIMM memory
-detail still reads "—", and permanently: `dmidecode` needs root.
-active TCP/UDP connections with their owning processes — the whole Storage surface — drives, partitions
-and per-disk activity — the Processes tab, the Toolkit tab's own command set, the desktop integration
-(File Explorer roots, "Launch at startup", friendly file types), plus the machine's static identity
-(OS, kernel, BIOS, board) and the Processor, Motherboard and Storage Devices spec cards, while the
-remaining panels read "—".
+surface — adapters, utilisation, temperature and power — the desktop integration (File Explorer roots,
+"Launch at startup", friendly file types), plus the machine's static identity (OS, kernel, BIOS, board)
+and the Processor, Motherboard, Storage Devices and Graphics spec cards. Only per-DIMM memory detail
+still reads "—", and permanently: `dmidecode` needs root.
 
 **Both projects target a single neutral `net10.0` TFM.** There is no multi-targeting, no `#if`, and no
 per-platform project split: the platform is decided **at runtime**, in exactly one place per seam — the
