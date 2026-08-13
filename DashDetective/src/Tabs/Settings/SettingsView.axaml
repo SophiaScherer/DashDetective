@@ -37,6 +37,11 @@
         <Style Selector="Border.settingRow.highlighted">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
+        <!-- A setting this platform cannot honour. The whole row dims, not just its control: a disabled
+             toggle alone is indistinguishable from one that is merely off. -->
+        <Style Selector="Border.settingRow:disabled">
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
 
         <!-- Chrome-less button wrapper so a whole segment / swatch is clickable. -->
         <Style Selector="Button.pick">
@@ -242,14 +247,14 @@
                 </Border>
 
                 <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ShowInTray}"
+                        IsEnabled="{Binding CanUseTray}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.ShowInTray.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.ShowInTray.Description}"/>
                         </StackPanel>
-                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"
-                                      IsEnabled="{Binding CanUseTray}"/>
+                        <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ShowInTray}"/>
                     </Grid>
                 </Border>
 

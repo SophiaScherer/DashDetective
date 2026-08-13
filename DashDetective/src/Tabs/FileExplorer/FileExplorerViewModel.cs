@@ -227,6 +227,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _ = LoadRootsAsync();
     }
 
+    // Reconciled rather than rebuilt so a Refresh keeps every expanded branch and the selection: the
+    // roots are re-read on each one, and clearing would collapse the tree under the user. Keyed by path,
+    // so a relabelled volume — which is a new mount point — correctly replaces its node rather than
+    // keeping a stale caption (Name is get-only for exactly that reason).
     private async Task LoadRootsAsync() {
         IReadOnlyList<DriveEntry> drives;
         try {
@@ -235,10 +239,12 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
         }
 
-        RootNodes.Clear();
-        foreach (var d in drives)
-            RootNodes.Add(new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren,
-                                             () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
+        CollectionReconciler.Reconcile(
+            RootNodes, drives,
+            node => node.FullPath, drive => drive.RootPath,
+            static (_, _) => { },
+            d => new FileSystemNode(d.DisplayName, d.RootPath, true, d.HasChildren,
+                                    () => ShowHidden, () => CollapseChildrenWithParent, OnNodeSelected));
     }
 
     // Toggling "show hidden" reconciles each loaded tree branch in place (adding/removing hidden
@@ -251,14 +257,13 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             _ = LoadEntriesAsync(CurrentPath);
     }
 
-    /// <summary>Toolbar Refresh for the File Explorer: re-read the current folder (picking up files
-    /// added/removed on disk), or reload the drive roots if nothing is open yet. Reuses the same
-    /// load path as navigation, so the stale-load guard still applies.</summary>
+    /// <summary>Toolbar Refresh for the File Explorer: re-read the roots and the current folder. The
+    /// roots are re-read even with a folder open, because removable media appears and disappears while
+    /// the app runs — a stick plugged in after launch would otherwise need a restart to show up.</summary>
     public void Refresh() {
+        _ = LoadRootsAsync();
         if (!string.IsNullOrEmpty(CurrentPath))
             SetCurrentFolder(CurrentPath);
-        else
-            _ = LoadRootsAsync();
     }
 
     private void OnNodeSelected(FileSystemNode node) {
