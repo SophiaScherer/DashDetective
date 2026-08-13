@@ -5,14 +5,9 @@ using System.IO;
 namespace DashDetective.Services.Startup;
 
 /// <summary>
-/// Registers (or clears) the app in the XDG autostart directory — a <c>.desktop</c> file under
-/// <c>~/.config/autostart</c>, which is what every desktop environment reads at login and what GNOME's
-/// own "Startup Applications" lists. The per-user counterpart of the Windows <c>Run</c> key, and just as
-/// soft-failing: a read-only home degrades to "not enabled" rather than crashing.
-///
-/// Portable managed <c>System.IO</c>, so it carries no <c>[SupportedOSPlatform]</c> — the platform is
-/// decided in <see cref="IStartupRegistration.ForCurrentPlatform"/>, and on a host with no autostart
-/// directory this simply finds nothing.
+/// Registers (or clears) the app in the XDG autostart directory, the per-user counterpart of the Windows
+/// <c>Run</c> key and just as soft-failing: a read-only home degrades to "not enabled" rather than
+/// crashing. Portable managed <c>System.IO</c>, so no <c>[SupportedOSPlatform]</c>.
 /// </summary>
 internal sealed class LinuxStartupRegistration : IStartupRegistration {
     private const string FileName = "DashDetective.desktop";
@@ -63,11 +58,8 @@ internal sealed class LinuxStartupRegistration : IStartupRegistration {
         File.WriteAllText(EntryPath, DesktopEntry.Build(exe));
     }
 
-    /// <summary>
-    /// <c>$XDG_CONFIG_HOME/autostart</c>, falling back to the spec's own default of
-    /// <c>~/.config/autostart</c>. A relative <c>XDG_CONFIG_HOME</c> is ignored rather than resolved
-    /// against the working directory — the spec says it must be absolute or treated as unset.
-    /// </summary>
+    /// <summary>A relative <c>XDG_CONFIG_HOME</c> is ignored rather than resolved against the working
+    /// directory: the spec says it must be absolute or be treated as unset.</summary>
     private static string DefaultDirectory() {
         var config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
         if (string.IsNullOrEmpty(config) || !Path.IsPathRooted(config))

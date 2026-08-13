@@ -5,13 +5,11 @@ using System.IO;
 namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
-/// The ready drives, labelled as Explorer labels them — "Local Disk (C:)", "Removable Disk (E:)". A
-/// drive that can't be described (removed mid-scan, not ready) is skipped rather than failing the list.
+/// The ready drives, labelled as Explorer labels them — "Local Disk (C:)", "Removable Disk (E:)".
 ///
 /// Carries no <c>[SupportedOSPlatform]</c>: <c>DriveInfo</c>, the <c>VolumeLabel</c> getter and
-/// <see cref="DriveType"/> are all portable, unannotated API, so the attribute would be decorative —
-/// the <c>WindowsToolkitCatalog</c> case in AGENTS.md. The name says who authored the labels, not that
-/// it touches native Windows.
+/// <see cref="DriveType"/> are all unannotated portable API, so the attribute would be decorative — the
+/// <c>WindowsToolkitCatalog</c> case in AGENTS.md. The name says who authored the labels.
 /// </summary>
 internal sealed class WindowsFileSystemRoots : IFileSystemRoots {
     public IReadOnlyList<DriveEntry> Read() {

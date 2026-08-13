@@ -6,13 +6,10 @@ using System.Collections.Generic;
 namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
-/// The places a Linux desktop user starts from: the filesystem root, their home folder, and whatever
-/// removable or hand-mounted media is attached. There is no drive-letter list to enumerate, so the third
-/// group is derived from <c>/proc/mounts</c>.
-///
-/// <b>Not every mount is a root.</b> A Linux machine has dozens (cgroup, tmpfs, one squashfs per
-/// installed snap), and listing them would bury the two entries anyone wants. Only the mount points a
-/// desktop actually puts removable media under are offered — see <see cref="RemovableMountPoints"/>.
+/// The places a Linux desktop user starts from: the filesystem root, home, and any removable media.
+/// There is no drive-letter list to enumerate, so the third group comes from <c>/proc/mounts</c> — but
+/// a machine has dozens of mounts (cgroup, tmpfs, one squashfs per snap), and listing them would bury
+/// the two entries anyone wants. See <see cref="RemovableMountPoints"/> for what survives.
 /// </summary>
 internal sealed class LinuxFileSystemRoots : IFileSystemRoots {
     // Concatenated forward-slash literal, never Path.Combine — see IProcFileSystem.
@@ -51,10 +48,8 @@ internal sealed class LinuxFileSystemRoots : IFileSystemRoots {
 
     /// <summary>
     /// The mount points that count as removable media, deduplicated and in a stable order. Pure, so the
-    /// rule is testable from a Windows dev box against a canned <c>/proc/mounts</c>.
-    ///
-    /// The prefix match requires a trailing segment, so a mount at <c>/mnt</c> itself is not offered —
-    /// that is the empty parent directory, not a volume.
+    /// rule is testable against a canned <c>/proc/mounts</c>. The prefix match requires a trailing
+    /// segment, so <c>/mnt</c> itself is not offered — that is the empty parent, not a volume.
     /// </summary>
     internal static IReadOnlyList<string> RemovableMountPoints(IReadOnlyList<MountEntry> mounts) {
         var points = new List<string>();
@@ -80,9 +75,8 @@ internal sealed class LinuxFileSystemRoots : IFileSystemRoots {
         return false;
     }
 
-    /// <summary>The last path segment, which under <c>/media/$USER</c> is the volume label udisks named
-    /// the mount after — the direct analogue of a Windows <c>VolumeLabel</c>. Falls back to the whole
-    /// path for anything that ends in a separator.</summary>
+    /// <summary>The last path segment. Under <c>/media/$USER</c> that is the volume label udisks named
+    /// the mount after — the direct analogue of a Windows <c>VolumeLabel</c>.</summary>
     internal static string LeafName(string mountPoint) {
         var cut = mountPoint.LastIndexOf('/');
         return cut >= 0 && cut < mountPoint.Length - 1 ? mountPoint[(cut + 1)..] : mountPoint;

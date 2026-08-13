@@ -103,10 +103,17 @@ de-duplication / composition refactor) — write-ups in the Appendix.
 - **Catalog rules are asserted against every table at once.** `ToolkitCatalogInvariants` is an abstract
   class with one subclass per catalog, so a rule added there is asked of all of them **and runs on both CI
   legs** — the tables are string literals, so nothing about them needs a Linux host to check. Only what is
-  genuinely one platform's stays in its own class (the `sfc /scannow` set pinned by name, the
+  genuinely one platform's stays in its own class (each table's elevated row pinned by name, the
   "administrator" wording, `dmesg`'s absence). A catalog test that branched on `OperatingSystem.IsLinux()`
   would leave the other table unchecked wherever it ran; there is exactly one such branch in the feature,
   in `ToolkitCatalogSeamTests`, and it only maps host → catalog type.
+- **Elevation is one authored row per table** (`sfc /scannow`, `fwupdmgr refresh`) and reaches the OS
+  through a different mechanism on each: the `runas` verb on Windows, `pkexec` as the launched program on
+  Linux. **A declined prompt is worded on Windows and silent on Linux, deliberately.** `runas` fails
+  synchronously inside `Process.Start`, so `ToolkitRunner` can catch `ERROR_CANCELLED`; `pkexec` reports
+  refusal as exit 126 only after the launch returns. Waiting for it would hold `sfc /scannow`'s log entry
+  open for the many minutes it runs, and 126 is indistinguishable from the program's own exit code — so
+  the launcher does not wait, and the Linux side loses only the wording.
 - **User-authored commands.** `ToolkitCommand` is what the user typed; `ToolkitCommandFactory` turns it
   into an ordinary `ToolkitEntry` through the catalog's own `ToolkitAction` factories, so `ToolkitRunner`
   cannot tell a user's row from an authored one and there is no second execution path to keep safe. The
@@ -354,6 +361,11 @@ currently exist.
       CollectionReconciler.cs  (generic keyed diff of an ordered snapshot into an ObservableCollection —
                                 drop/update/move/insert in place, no flicker; shared by the Network
                                 connections table + the Processes list)
+      TrayIntegration.cs       (whether closing may hide to a tray icon rather than exit. WINDOWS ONLY:
+                                stock GNOME runs no StatusNotifierItem host, and the setting is ON BY
+                                DEFAULT, so honouring it there hides the window behind an icon that never
+                                appears. Nothing can be asked at startup, and guessing wrong strands the
+                                app — read by MainWindowViewModel.ShowInTray and the Settings toggle)
       /Charts
         SparklinePoints.cs      (renders a rolling metric history to a Sparkline "x,y" points string on a
                                  fixed 0–100 axis; percentage metrics pass valueMax 100, unbounded ones a
@@ -388,6 +400,14 @@ currently exist.
                                 (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
                                  soft-failing. Holds UnsupportedStartupRegistration too — reports
                                  "not enabled" and ignores writes off Windows)
+        LinuxStartupRegistration.cs
+                                (the XDG counterpart: ~/.config/autostart/DashDetective.desktop, honouring
+                                 XDG_CONFIG_HOME when it is absolute. IsEnabled READS THE FILE, not just
+                                 its existence — the spec disables an entry with Hidden=true, and some
+                                 desktop tools write that instead of deleting)
+        DesktopEntry.cs         (the .desktop body as pure statics. Exec is QUOTED and its four reserved
+                                 characters escaped: unquoted, a path under /home/My User/ parses as two
+                                 arguments and launches the wrong thing)
       /Diagnostics
         Log.cs                  (minimal soft-failing logger → Debug output + a per-day rolling file in
                                  %LocalAppData%/DashDetective/logs; never throws. The sampler / provider /
@@ -786,7 +806,11 @@ currently exist.
                                                         (the tables. Unsupported is EMPTY on purpose:
                                                          a platform with no table gets the page's own
                                                          empty state and can still author its own rows,
-                                                         which beats thirty rows that can only fail)
+                                                         which beats thirty rows that can only fail.
+                                                         EACH TABLE HAS EXACTLY ONE ELEVATED ROW —
+                                                         sfc /scannow, fwupdmgr refresh — pinned by name
+                                                         in that catalog's own tests, because a table is
+                                                         the only place elevation can be authored at all)
                                 ToolkitRows.cs          (the shared row factories — Folder/Tool/Panel/
                                                          Diagnostic/Doc. Both tables build through them,
                                                          so a category cannot drift away from the kind
@@ -815,7 +839,14 @@ currently exist.
                                                          never the joined string. Both output streams are
                                                          drained CONCURRENTLY and WITHOUT the timeout
                                                          token, or a command that floods its pipe
-                                                         deadlocks and a killed one loses what it printed)
+                                                         deadlocks and a killed one loses what it printed.
+                                                         BuildLaunchInfo takes the platform as a parameter
+                                                         so both elevation arms are testable from either
+                                                         host: runas verb on Windows, pkexec as the file
+                                                         name with the target as its first argument on
+                                                         Linux — and UseShellExecute MUST be off there or
+                                                         the launch goes to xdg-open, which cannot carry
+                                                         arguments)
                                 ToolkitFilter.cs        (pure statics: Matches (chip AND term, over the
                                                          command and its description) + Group (buckets
                                                          into catalog order, dropping emptied sections).
@@ -829,19 +860,30 @@ currently exist.
                                 ThemeOption.cs, AccentOption.cs, IntervalOption.cs
                                                         (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
+                                SettingDescriptions.cs  (the descriptions that name a MECHANISM rather
+                                                         than an effect, so cannot be shared — "Start with
+                                                         Windows", and the tray row's. Each is the label
+                                                         the page shows AND the text search matches, so a
+                                                         wrong one is both misleading and unfindable.
+                                                         Takes the platform as a parameter, the
+                                                         ProcessGroupNames shape. KEYWORDS ARE NOT
+                                                         per-platform: they are shared, so editing them
+                                                         changes the Windows search index too)
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
                                                         (VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
                                                          auto-refresh + scroll-to-top-on-navigation)
-                                DirectoryService.cs     (async System.IO enumeration: drives, lazy
-                                                         subdirectories, folder entries; per-entry
-                                                         soft-fail, Task.Run off the UI thread; takes
-                                                         includeHidden to reveal hidden/system entries.
-                                                         FileItem carries raw Size/Modified sort keys.
-                                                         GetEntriesAsync also takes IShellInterop — each row
-                                                         carries the shell's type name. Still static: it
-                                                         holds no state and is in no bundle)
+                                DirectoryService.cs     (async System.IO enumeration: lazy subdirectories,
+                                                         folder entries; per-entry soft-fail, Task.Run off
+                                                         the UI thread; takes includeHidden to reveal
+                                                         hidden/system entries. FileItem carries raw
+                                                         Size/Modified sort keys. GetEntriesAsync takes
+                                                         IShellInterop and GetDrivesAsync takes
+                                                         IFileSystemRoots — both per-platform questions are
+                                                         asked of a seam. Still static: it holds no state
+                                                         and is in no bundle. RootHasChildren is the one
+                                                         chevron probe both roots providers share)
                                 DirectoryWatcher.cs     (debounced FileSystemWatcher over the open folder;
                                                          raises Changed → VM auto-refreshes the list + tree.
                                                          Windows-guarded, soft-failing, app-lifetime)
@@ -853,7 +895,13 @@ currently exist.
                                 SortColumn.cs           (clickable-header VM: Key + SortCommand + IsActive
                                                          + Arrow — same shape as FilterOption)
                                 FileSizeFormatter.cs    (humanize bytes KB/MB/GB/TB; folders → "—")
-                                FileTypeCatalog.cs      (extension → vector glyph + fixed colour)
+                                FileTypeCatalog.cs      (extension → vector glyph + fixed colour. TOUCHES
+                                                         AVALONIA — its Geometry.Parse initialiser needs a
+                                                         render backend, so nothing testable may live here)
+                                FileTypeDescriptions.cs (extension → friendly name, render-free precisely
+                                                         because FileTypeCatalog is not. A table rather
+                                                         than xdg-mime, which costs a subprocess per row.
+                                                         Treats a leading dot as hidden, not an extension)
                                 IShellInterop.cs        (seam + ForCurrentPlatform())
                                 WindowsShellInterop.cs  (feature-local shell32 P/Invoke:
                                                          SHGetFileInfo type name + SHObjectProperties.
@@ -861,6 +909,26 @@ currently exist.
                                                          ShellFallback. NOTE Open() stays live in BOTH —
                                                          it is managed Process.Start with UseShellExecute
                                                          and was never platform-guarded)
+                                LinuxShellInterop.cs    (no interop at all: names from the table above,
+                                                         Open via ShellFallback. NO PROPERTIES DIALOG
+                                                         EXISTS — no desktop offers one to a foreign
+                                                         process — so it reveals the containing folder
+                                                         instead. RevealTarget is split from the launch so
+                                                         it is testable without starting a file manager)
+                                IFileSystemRoots.cs     (seam + ForCurrentPlatform(): what the tree's roots
+                                                         are is the one per-platform question here)
+                                WindowsFileSystemRoots.cs
+                                                        (ready drives via DriveInfo, "Local Disk (C:)".
+                                                         Holds UnsupportedFileSystemRoots — an EMPTY list,
+                                                         which is what the old IsWindows() guard returned.
+                                                         NO [SupportedOSPlatform]: DriveInfo, the
+                                                         VolumeLabel getter and DriveType are unannotated,
+                                                         so it would be decorative)
+                                LinuxFileSystemRoots.cs (/, $HOME, and removable mounts from /proc/mounts
+                                                         via ProcMountsParser. Matches the /media/,
+                                                         /run/media/ and /mnt/ PREFIXES so no user name is
+                                                         resolved — udisks2 uses the first on Ubuntu and
+                                                         the second on Fedora/Arch)
       /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
                                                         (VM implements IRefreshablePage + ILiveSamplingPage;
                                                          always-on like Dashboard. Owns the throughput
@@ -1035,6 +1103,20 @@ currently exist.
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
                                  from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
                                  ILiveSamplingPage/IDisposable.)
+      /Processes                (the tab itself is described under Feature notes; only its platform seam
+                                 is mapped here)
+                                IProcessInterop.cs      (seam + ForCurrentPlatform())
+                                WindowsProcessInterop.cs
+                                                        (kernel32 I/O counters + shell32 Properties sheet.
+                                                         Holds UnsupportedProcessInterop. Duplicated from
+                                                         File Explorer's shell interop ON PURPOSE — the
+                                                         self-contained-tab rule)
+                                LinuxProcessInterop.cs  (resolves /proc/[pid]/exe and reveals its folder,
+                                                         since no desktop offers a Properties dialog for
+                                                         a foreign process. TryGetIoBytes reports nothing
+                                                         and that costs the tab NOTHING: the Linux
+                                                         snapshot provider does not take this seam and
+                                                         reads /proc/[pid]/io itself)
 ```
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
@@ -1165,7 +1247,11 @@ that keep them from coming back:
   caught it.
 - **Tests whose subject calls `Path.*` build paths through `Fakes/TestPaths`** (`Root`, `Of(...)`,
   `Dir(...)`), never from drive-letter literals. Where a path is only an opaque token being round-tripped
-  — `NavigationHistory`, `RecentSearches` — the literals are clearer and stay.
+  — `NavigationHistory`, `RecentSearches` — the literals are clearer and stay. **A forward-slash literal
+  is not a safe shortcut either**: `Path.GetDirectoryName` normalises its *result* to the running host's
+  separator, so asserting `/home/sophia` fails with `\home\sophia` on a Windows box even when the reader
+  is correct. M11 hit exactly that. `Path.GetFileName` does not rewrite anything, so `/`-shaped inputs
+  are fine there — the distinction is whether the method returns a path or a segment.
 
 Two traps worth knowing, both found the hard way: a literal reaches `Path.*` **transitively** far more often
 than a grep suggests (`ToolkitCommandFactory.ToEntry` → `CanOpenInApp` → `IsPathRooted` was the one that got
@@ -1322,9 +1408,23 @@ The **Settings persistence** work (settings store + "Launch at startup" + system
 ## Testing conventions
 
 Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0`, referenced by `DashDetective.sln`).
-CI builds and format-checks on `windows-latest` **and** `ubuntu-latest`, but runs the tests and collects
-coverage on Windows only for now — the suite still asserts on drive-letter paths. `dotnet format` gates
-the test code on both legs, so keep usings alphabetical (`System` is **not** sorted first).
+CI builds, format-checks, tests **and** collects coverage on `windows-latest` and `ubuntu-latest`, in
+Debug and Release — four legs, none of them guarded. `dotnet format` gates the test code on both, so keep
+usings alphabetical (`System` is **not** sorted first).
+
+**A green Windows run proves nothing about the Linux leg.** Reader-identity tests branch on the host, so
+the arm asserting Linux never executes locally. Before calling any work that touches a
+`ForCurrentPlatform()` green, grep the test project for **both**:
+
+- `OperatingSystem.IsLinux` — the tests that already know about three platforms.
+- `IsType<Unsupported` — **the one that actually catches it.** A two-arm test reads
+  `if (IsWindows()) … else Assert.IsType<Unsupported…>` and contains no `IsLinux` at all, so the first
+  grep walks straight past it. M11 added a Linux arm to `IShellInterop` and only this second grep found
+  `ShellInteropTests`, which would have failed the Ubuntu leg.
+
+To prove a fix without CI, invoke the private factory by reflection from a throwaway test
+(`typeof(HardwareProviders).GetMethod("Linux", BindingFlags.Static | BindingFlags.NonPublic)`), assert the
+types on Windows, then delete it.
 
 - **Layout mirrors the app.** A test file sits under the same relative path as its subject
   (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`),

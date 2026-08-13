@@ -4,16 +4,13 @@ using System.IO;
 namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
-/// Friendly type descriptions from a file's name — the table that stands in for the shell lookup Linux
-/// has no cheap equivalent of. <c>xdg-mime query filetype</c> would be authoritative, but it is a
-/// subprocess per row and this is called once for every entry in a folder.
+/// Friendly type descriptions from a file's name. A table rather than <c>xdg-mime query filetype</c>,
+/// which is authoritative but costs a subprocess per row — and this runs once per entry in a folder.
 ///
-/// <b>Deliberately not on <see cref="FileTypeCatalog"/></b>, which is the obvious home: that class's
-/// static initialiser calls <c>Geometry.Parse</c> and needs a render backend the test project does not
-/// have, so a map living there could not be unit-tested at all. Nothing here touches Avalonia.
-///
-/// The wording follows the desktop's own convention ("PNG image", "JSON document"), which is why this
-/// does not reuse <c>ShellFallback.TypeName</c> — that produces Windows' "JSON File" casing.
+/// <b>Deliberately not on <see cref="FileTypeCatalog"/></b>, the obvious home: its static initialiser
+/// calls <c>Geometry.Parse</c> and needs a render backend the test project does not have, so a map
+/// living there could not be tested. It does not reuse <c>ShellFallback.TypeName</c> either, which
+/// produces Windows' "JSON File" casing rather than the desktop's "JSON document".
 /// </summary>
 internal static class FileTypeDescriptions {
     /// <summary>The description for a file, always something. A name with no usable extension is

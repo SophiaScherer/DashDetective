@@ -4,17 +4,12 @@ using System.IO;
 namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
-/// The desktop shell on Linux. There is no native interop here at all: opening is already portable
-/// (<c>UseShellExecute</c> hands the path to <c>xdg-open</c>), and type names come from a static table
-/// rather than a <c>xdg-mime</c> subprocess per row.
+/// The desktop shell on Linux. No native interop at all — opening is already portable
+/// (<c>UseShellExecute</c> reaches <c>xdg-open</c>) and type names come from a static table.
 ///
-/// <b>There is no Properties dialog to show.</b> No desktop environment exposes one to a foreign
-/// process, so rather than leave the button dead this opens the containing folder in the desktop's file
-/// manager — where the user's own Properties dialog is one right-click away. The
-/// <paramref name="owner"/> handle every other implementation needs is unused for the same reason.
-///
-/// Carries no <c>[SupportedOSPlatform]</c>: it is portable managed code, and the platform is decided in
-/// <see cref="IShellInterop.ForCurrentPlatform"/>.
+/// <b>There is no Properties dialog to show</b>; no desktop exposes one to a foreign process. Rather
+/// than leave the button dead it opens the containing folder, where the desktop's own Properties is one
+/// right-click away. Portable managed code, so no <c>[SupportedOSPlatform]</c>.
 /// </summary>
 internal sealed class LinuxShellInterop : IShellInterop {
     public string GetTypeName(string path, bool isDirectory) =>
@@ -30,11 +25,8 @@ internal sealed class LinuxShellInterop : IShellInterop {
 
     /// <summary>
     /// Which folder to open to reveal <paramref name="path"/>, or <c>null</c> when there is nothing to
-    /// reveal. Split out from the launch so the decision is unit-tested without starting a file manager
-    /// on the machine running the suite.
-    ///
-    /// A path with no parent is the filesystem root, which reveals itself — the closest thing to
-    /// "show me where this is".
+    /// reveal. Split from the launch so the decision is unit-tested without starting a file manager. A
+    /// path with no parent is the filesystem root, which reveals itself.
     /// </summary>
     internal static string? RevealTarget(string path) {
         if (string.IsNullOrWhiteSpace(path))

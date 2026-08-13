@@ -17,11 +17,9 @@ namespace DashDetective.Tabs.Toolkit;
 /// <see cref="ToolkitRunner"/>'s job, and swallowing here would cost it the reason.
 ///
 /// <b>A declined prompt is silent on Linux, unlike Windows.</b> <c>runas</c> fails synchronously inside
-/// <c>Process.Start</c> with <c>ERROR_CANCELLED</c>, which is why <see cref="ToolkitRunner"/> can word
-/// it. <c>pkexec</c> forks and reports refusal as exit code 126 *after* the launch returns, and this
-/// method deliberately does not wait: the one elevated Windows row (<c>sfc /scannow</c>) runs for many
-/// minutes, and waiting would hold its Execution Log entry open for all of it. Reading 126 would also
-/// not be conclusive — it cannot be told apart from the elevated program itself exiting 126.
+/// <c>Process.Start</c>, which is what lets <see cref="ToolkitRunner"/> word it; <c>pkexec</c> reports
+/// refusal as exit 126 after the launch returns. Waiting for that would hold <c>sfc /scannow</c>'s log
+/// entry open for the many minutes it runs, and 126 cannot be told apart from the program's own exit.
 /// </summary>
 internal sealed class SystemProcessLauncher : IProcessLauncher {
     /// <summary>The program run to raise a privilege prompt on Linux. Resolved off the PATH like every
@@ -35,16 +33,10 @@ internal sealed class SystemProcessLauncher : IProcessLauncher {
 
     /// <summary>
     /// How one launch reaches the OS. Takes the platform explicitly so both arms are exercised from
-    /// either dev machine — the <c>ToolkitPaths.Expand</c> seam shape.
-    ///
-    /// <b>The two platforms elevate through different mechanisms, not different flags.</b> Windows has a
-    /// shell verb, so the target stays the target and <c>UseShellExecute</c> stays on. Linux has a
-    /// wrapper program: <c>pkexec</c> becomes the file name and the real target becomes its first
-    /// argument, with <c>UseShellExecute</c> off — left on, the launch would go to <c>xdg-open</c>,
-    /// which cannot carry arguments at all.
-    ///
-    /// Arguments still go through <see cref="ProcessStartInfo.ArgumentList"/> on both paths, so nothing
-    /// is concatenated into a command line and the safety boundary is unchanged.
+    /// either dev machine — the <c>ToolkitPaths.Expand</c> seam shape. The platforms elevate through
+    /// different mechanisms rather than different flags: Windows has a shell verb, Linux has a wrapper
+    /// program, and <c>UseShellExecute</c> has to be off for the latter or the launch goes to
+    /// <c>xdg-open</c>, which cannot carry arguments.
     /// </summary>
     internal static ProcessStartInfo BuildLaunchInfo(
         string fileName, IReadOnlyList<string> arguments, bool elevated, bool linux) {

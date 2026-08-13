@@ -4,14 +4,11 @@ using System;
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// The setting descriptions that cannot be shared across platforms, because they name the mechanism
-/// rather than the effect. "Start with Windows" is wrong on a machine that has no Windows to start with,
-/// and it is the line the toggle shows <i>and</i> the line universal search matches on, so leaving it
-/// would make the setting both wrong and hard to find.
-///
-/// Only the varying strings live here; everything else stays a literal on <see cref="SettingCatalog"/>.
-/// The platform arrives as an explicit <c>windows</c> parameter so both are testable from either host —
-/// the <c>ProcessGroupNames</c> shape.
+/// The setting descriptions that name a mechanism rather than an effect, so cannot be shared. "Start
+/// with Windows" is both the line the toggle shows and the line universal search matches, so leaving it
+/// elsewhere would make the setting wrong and hard to find at once. Only the varying strings live here;
+/// the platform arrives as a parameter so both arms are testable from either host, the
+/// <c>ProcessGroupNames</c> shape.
 /// </summary>
 internal static class SettingDescriptions {
     /// <summary>The "Launch at startup" explanation for this machine.</summary>
@@ -20,9 +17,8 @@ internal static class SettingDescriptions {
     internal static string LaunchAtStartupFor(bool windows) =>
         windows ? "Start with Windows" : "Start when you log in";
 
-    /// <summary>The "Show in system tray" explanation for this machine. Where the tray cannot be
-    /// honoured the row says what closing actually does instead, rather than describing a behaviour the
-    /// disabled toggle will never produce — see <see cref="TrayIntegration"/>.</summary>
+    /// <summary>Where the tray cannot be honoured the row says what closing actually does, rather than
+    /// describing a behaviour its disabled toggle will never produce.</summary>
     internal static string ShowInTray { get; } = ShowInTrayFor(TrayIntegration.HidesOnClose);
 
     internal static string ShowInTrayFor(bool hidesOnClose) =>
