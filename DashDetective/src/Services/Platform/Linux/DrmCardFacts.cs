@@ -32,7 +32,8 @@ internal sealed record DrmCardFacts(
     uint SubsystemDeviceId,
     uint Revision,
     ulong VramBytes,
-    string HwmonPath) {
+    string HwmonPath,
+    string ProductName = "") {
 
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string DrmRoot = "/sys/class/drm";
@@ -73,8 +74,11 @@ internal sealed record DrmCardFacts(
     /// <see cref="SoftwareDrivers"/>.</summary>
     internal bool IsSoftware => Array.IndexOf(SoftwareDrivers, Driver) >= 0;
 
-    /// <summary>This card's display name, e.g. "AMD amdgpu (1002:73df)".</summary>
-    internal string AdapterName => FormatAdapterName(VendorId, DeviceId, Driver);
+    /// <summary>This card's display name — its product name when <see cref="ReadNamed"/> resolved one
+    /// ("VMware SVGA II Adapter"), otherwise the identity sysfs alone can compose
+    /// ("AMD amdgpu (1002:73df)").</summary>
+    internal string AdapterName =>
+        ProductName.Length > 0 ? ProductName : FormatAdapterName(VendorId, DeviceId, Driver);
 
     /// <summary>Reads and derives every card. Never throws: an unreadable source yields an empty
     /// list.</summary>
@@ -98,6 +102,58 @@ internal sealed record DrmCardFacts(
             result.Add(card);
 
         return result;
+    }
+
+    /// <summary>
+    /// Every card, with each one's marketing name resolved from the system's <c>pci.ids</c> table where it
+    /// carries one. The enrichment is a separate entry point rather than part of <see cref="Read"/> because
+    /// it costs a scan of a ~1.5 MB file: only the two readers that <i>display</i> a name — the Hardware
+    /// tab's Graphics card and the adapter enumeration behind the Dashboard — call it, while the
+    /// per-tick utilisation and sensor readers keep the free walk.
+    ///
+    /// A host with no <c>pci.ids</c>, or a card the table has never heard of, falls straight back to
+    /// <see cref="Read"/>'s behaviour. Never throws.
+    /// </summary>
+    internal static IReadOnlyList<DrmCardFacts> ReadNamed(IProcFileSystem proc) {
+        var cards = Read(proc);
+        if (cards.Count == 0)
+            return cards;
+
+        var wanted = new List<(uint Vendor, uint Device)>(cards.Count);
+        foreach (var card in cards)
+            wanted.Add((card.VendorId, card.DeviceId));
+
+        var names = PciIdDatabase.Read(proc, wanted);
+
+        var named = new List<DrmCardFacts>(cards.Count);
+        foreach (var card in cards)
+            named.Add(card with {
+                ProductName = FormatProductName(
+                    card.VendorId, names.Vendor(card.VendorId), names.Device(card.VendorId, card.DeviceId)),
+            });
+
+        return named;
+    }
+
+    /// <summary>
+    /// Composes the display name for a card the table named: "VMware SVGA II Adapter", "NVIDIA GA106
+    /// [GeForce RTX 3060]". <b>Keyed on the device name, not the vendor</b> — a table that names the vendor
+    /// but not the chip has told us nothing the ids did not already say, so that case returns "" and the
+    /// caller keeps its own composition.
+    ///
+    /// The <i>bundled</i> vendor word wins over the table's where there is one, because <c>pci.ids</c>
+    /// spells vendors out in full ("Advanced Micro Devices, Inc. [AMD/ATI]") and a card subtitle has no
+    /// room for it. Pure; unit-tested.
+    /// </summary>
+    internal static string FormatProductName(uint vendorId, string tableVendor, string deviceName) {
+        if (deviceName.Length == 0)
+            return "";
+
+        var vendor = VendorName(vendorId);
+        if (vendor.Length == 0)
+            vendor = tableVendor;
+
+        return vendor.Length > 0 ? $"{vendor} {deviceName}" : deviceName;
     }
 
     /// <summary>

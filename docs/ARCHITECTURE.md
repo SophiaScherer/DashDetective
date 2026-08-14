@@ -378,6 +378,18 @@ shared derivation, and a test drives the real enumeration and the real sampler o
 asserts their key sets match. The same trap is why `nvidia-smi`'s bus id is normalised before use: it
 writes an eight-digit PCI domain in uppercase where sysfs writes four in lowercase.
 
+**The kernel identifies hardware; it does not name it.** sysfs gives a graphics adapter's PCI ids and its
+driver module, never its marketing model, so `DrmCardFacts` can compose no more than
+`VMware vmwgfx (15ad:0405)` on its own. That names the right hardware but matches nothing in the bundled
+spec catalogue, whose keys are model tokens — which is why the Hardware tab's Graphics card had no CUDA
+count, boost clock or bus on Linux while the identical lookup filled them on Windows. `PciIdDatabase` reads
+the system's own `pci.ids` — the table `lspci` uses, shipped by `hwdata`/`pciutils` — and turns the ids
+into `NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]`, which the catalogue then matches. **The enrichment
+is a second entry point, `ReadNamed`, not part of `Read`:** the table is ~1.5 MB, so only the two readers
+that display a name pay for a scan, while the per-tick utilisation and sensor readers keep the free walk.
+It is scanned for the ids asked for rather than loaded whole, it never touches `DrmCardFacts.Key`, and a
+host without the table falls back to the identity sysfs alone can compose.
+
 **An adapter that cannot report a number is not the same as an adapter that is absent.** `GpuAdapterSample.
 Overall` is nullable for exactly that reason: Linux reports every card it finds, with a null utilisation for
 the drivers that publish none. Omitting those cards instead would delete real hardware from the UI, and
@@ -402,7 +414,7 @@ blank on Linux because a Windows handle covers events, threads and registry keys
 `/proc/cpuinfo`'s `cpu MHz` never fills a *maximum* clock, because it is the instantaneous one and a
 scaling governor would report an idle 800 MHz; the Motherboard card's PCIe slot count and the Processor
 card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root;
-drive health and temperature stay blank because both need SMART, which needs root; and the Processes tab's
+drive health stays blank because it needs SMART, which needs root; and the Processes tab's
 per-process GPU column is permanently zero, because Linux exposes no rootless per-process GPU accounting at
 all. All five are settled answers, not deferred work.
 

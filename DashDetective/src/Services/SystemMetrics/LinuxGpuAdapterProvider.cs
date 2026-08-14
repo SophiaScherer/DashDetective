@@ -33,7 +33,8 @@ internal sealed class LinuxGpuAdapterProvider : IGpuAdapterProvider {
 
     private IReadOnlyList<GpuAdapter> Read() {
         try {
-            var cards = DrmCardFacts.Read(_proc);
+            // Named, not the bare walk: this list is what labels the Dashboard and Performance GPU cards.
+            var cards = DrmCardFacts.ReadNamed(_proc);
             var adapters = new List<GpuAdapter>(cards.Count);
 
             foreach (var card in cards)

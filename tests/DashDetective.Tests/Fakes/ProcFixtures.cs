@@ -496,6 +496,44 @@ internal static class ProcFixtures {
             .WithFile("/sys/class/hwmon/hwmon1/name", "acpitz\n")
             .WithFile("/sys/class/hwmon/hwmon1/temp1_input", "27800\n");
 
+    /// <summary>
+    /// An excerpt of the system <c>pci.ids</c> table, in the real file's indent-significant shape: vendors
+    /// at column 0, their devices one <b>tab</b> in, and each device's subsystem variants two tabs in.
+    /// Built from escaped lines rather than a raw literal for the same reason
+    /// <see cref="BuildAmdBlocks"/> is — the tabs are the format, and a raw literal hides them.
+    ///
+    /// Names are the real table's for these ids. Note that only the NVIDIA one carries a token the bundled
+    /// GPU catalogue keys on ("RTX 3060"): AMD's <c>73df</c> is a multi-model Navi 22 string that matches
+    /// nothing, which is the ordinary outcome and is worth having a fixture for.
+    /// </summary>
+    public static readonly string PciIds = string.Join('\n', new[] {
+        "#\tList of PCI ID's",
+        "#",
+        "#\tVersion: 2024.05.08",
+        "",
+        "1002  Advanced Micro Devices, Inc. [AMD/ATI]",
+        "\t73df  Navi 22 [Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT]",
+        "\t\t1002 0e3b  Radeon RX 6700 XT",
+        "\t73ff  Navi 23 [Radeon RX 6600/6600 XT/6600M]",
+        "10de  NVIDIA Corporation",
+        "\t2504  GA106 [GeForce RTX 3060 Lite Hash Rate]",
+        "\t\t1458 4067  RTX 3060 GAMING OC 12G",
+        "15ad  VMware",
+        "\t0405  SVGA II Adapter",
+        "\t0710  SVGA Adapter",
+        "1af4  Red Hat, Inc.",
+        "\t1050  Virtio 1.0 GPU",
+        "C 00  Unclassified device",
+        "\t00  Non-VGA unclassified device",
+        "C 03  Display controller",
+        "\t00  VGA compatible controller",
+    });
+
+    /// <summary>Stages <see cref="PciIds"/> at the path Debian, Ubuntu, Fedora and Arch all populate.
+    /// A test that omits it models the minimal-container case, where every name lookup misses.</summary>
+    public static FakeProcFileSystem WithPciIds(this FakeProcFileSystem proc) =>
+        proc.WithFile("/usr/share/hwdata/pci.ids", PciIds);
+
     /// <summary>One <c>/proc/stat</c> line — <c>StatLine("cpu0", 250, 25, …)</c>. Lets a test state the
     /// exact jiffy deltas it wants to assert on instead of counting columns in a literal.</summary>
     public static string StatLine(string cpu, params long[] fields) =>

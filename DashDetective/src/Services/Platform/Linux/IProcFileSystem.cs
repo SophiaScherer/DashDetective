@@ -8,6 +8,10 @@ namespace DashDetective.Services.Platform.Linux;
 /// provider seam — the same shape and placement as <c>Services/Threading/IUiTimer</c>, which is why it
 /// lives in its own <c>Services</c> folder rather than a tab folder.
 ///
+/// <b>A few readers use it for ordinary files too</b> — <see cref="PciIdDatabase"/> reads the system's
+/// <c>pci.ids</c> under <c>/usr/share</c>. The contract below fits those exactly as well, and a second
+/// file-read seam would buy nothing but a second fake.
+///
 /// <b>Implementations must never throw.</b> A missing file, a permission denial or a torn read all
 /// degrade to the empty contract (<c>null</c> / empty list), because these files vanish and change shape
 /// under the reader constantly.

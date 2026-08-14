@@ -13,11 +13,13 @@ namespace DashDetective.Tabs.Hardware;
 /// card and the Dashboard's cannot disagree about the same adapter. The Linux counterpart to
 /// <see cref="WindowsGraphicsInfoProvider"/>'s <c>Win32_VideoController</c> query.
 ///
-/// <b>Most spec rows stay "—", and that is the honest result.</b> The kernel names an adapter by its PCI
-/// ids, not its marketing model, so <see cref="HardwareCatalog.LookupGpu"/> has nothing to match on and
-/// core counts, boost clocks and bus widths have no source — the lookup is still attempted, so a richer
-/// name source would light those rows up for free. VRAM is the exception: amdgpu publishes it exactly, and
-/// it is formatted with the same humanizer as the Performance tab's VRAM tile.
+/// <b>The spec rows depend on the adapter being named.</b> The kernel identifies an adapter by its PCI ids
+/// alone, so this reads through <see cref="DrmCardFacts.ReadNamed"/>, which resolves the marketing model
+/// from the system's <c>pci.ids</c> table — that name is what <see cref="HardwareCatalog.LookupGpu"/>
+/// matches on, and core counts, boost clocks and bus widths come from the catalogue entry it finds. A host
+/// with no <c>pci.ids</c>, or a part the catalogue does not list, leaves those rows "—". VRAM is
+/// independent of all that: amdgpu publishes it exactly, and it is formatted with the same humanizer as
+/// the Performance tab's VRAM tile.
 ///
 /// Stateless and never throws: any failure yields <see cref="GraphicsInfo.Unknown"/>.
 /// </summary>
@@ -36,7 +38,7 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
         try {
             var adapters = new List<GraphicsAdapterInfo>();
 
-            foreach (var card in DrmCardFacts.Read(_proc)) {
+            foreach (var card in DrmCardFacts.ReadNamed(_proc)) {
                 if (card.IsSoftware)
                     continue;
 
