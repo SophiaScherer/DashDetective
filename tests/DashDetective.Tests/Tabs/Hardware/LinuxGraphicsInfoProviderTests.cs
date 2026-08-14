@@ -21,16 +21,57 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("16 GB", adapter.Memory);
     }
 
-    /// <summary>The kernel names an adapter by its PCI ids, so the spec catalogue has nothing to match and
-    /// these rows have no source. "—" is the honest answer, and the point of checking it is that the card
-    /// still renders rather than being dropped for being mostly empty.</summary>
+    /// <summary>With no <c>pci.ids</c> on the host the kernel's PCI-id name is all there is, the spec
+    /// catalogue has nothing to match, and these rows have no source. "—" is the honest answer, and the
+    /// point of checking it is that the card still renders rather than being dropped for being mostly
+    /// empty.</summary>
     [Fact]
-    public async Task GetAsync_LeavesTheRowsSysfsCannotSupplyBlank() {
+    public async Task GetAsync_NoPciIds_LeavesTheCatalogueRowsBlank() {
         var adapter = Assert.Single((await Read(new FakeProcFileSystem().WithAmdgpuCard())).Adapters);
 
         Assert.Equal("—", adapter.CudaCores);
         Assert.Equal("—", adapter.BoostClock);
         Assert.Equal("—", adapter.Bus);
+    }
+
+    /// <summary>
+    /// The end of the chain this card exists for: <c>pci.ids</c> names the adapter, the name carries a
+    /// model token, and the bundled catalogue fills the three rows sysfs has no source for. Nothing else
+    /// changed to make that happen — the lookup was always attempted, it simply had nothing to match on.
+    /// </summary>
+    [Fact]
+    public async Task GetAsync_PciIdsNamesTheCard_FillsTheCatalogueRows() {
+        var adapter = Assert.Single(
+            (await Read(new FakeProcFileSystem().WithNvidiaCard().WithPciIds())).Adapters);
+
+        Assert.Equal("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", adapter.Name);
+        // The blob publishes no VRAM, so this card's Memory row is the catalogue's too.
+        Assert.Equal("12 GB GDDR6", adapter.Memory);
+        Assert.Equal("3,584", adapter.CudaCores);
+        Assert.Equal("1.78 GHz", adapter.BoostClock);
+        Assert.Equal("PCIe 4.0 x16", adapter.Bus);
+    }
+
+    /// <summary>A named card the catalogue does not list keeps its blanks. The name is a real improvement
+    /// on its own; it is not a promise that the spec rows follow.</summary>
+    [Fact]
+    public async Task GetAsync_NamedButUnlistedCard_KeepsTheCatalogueRowsBlank() {
+        var adapter = Assert.Single(
+            (await Read(new FakeProcFileSystem().WithAmdgpuCard().WithPciIds())).Adapters);
+
+        Assert.Equal("AMD Navi 22 [Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT]", adapter.Name);
+        Assert.Equal("—", adapter.CudaCores);
+        Assert.Equal("—", adapter.Bus);
+    }
+
+    /// <summary>VRAM comes from the driver, not the catalogue, so a named card must not lose the figure
+    /// sysfs published for it.</summary>
+    [Fact]
+    public async Task GetAsync_PciIdsPresent_KeepsTheDriverReportedVram() {
+        var adapter = Assert.Single(
+            (await Read(new FakeProcFileSystem().WithAmdgpuCard().WithPciIds())).Adapters);
+
+        Assert.Equal("16 GB", adapter.Memory);
     }
 
     /// <summary>An out-of-tree module publishes its own version; an in-tree one does not, and borrowing the
