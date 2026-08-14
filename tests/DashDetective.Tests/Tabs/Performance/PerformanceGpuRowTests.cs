@@ -87,4 +87,31 @@ public class PerformanceGpuRowTests {
         Assert.Equal("—", row.ValueText);
         Assert.Equal("", row.Unit);
     }
+
+    /// <summary>The dash gets a reason. Without it, a VM's paravirtual GPU — four dashes and an empty
+    /// chart — is indistinguishable from the tab being broken, which is exactly how it was reported.</summary>
+    [Fact]
+    public async Task LoadInventoryAsync_AdapterThatCannotReport_ExplainsTheDash() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Silent(Amd), Adapter(Amd, "VMware vmwgfx (15ad:0405)"));
+
+        viewModel.UpdateGpuAdapters();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.True(row.HasNote);
+        Assert.Equal("This GPU's driver publishes no utilization figure.", row.Note);
+    }
+
+    /// <summary>An adapter that reports carries no note, so the caption line stays out of the way.</summary>
+    [Fact]
+    public async Task LoadInventoryAsync_AdapterThatReports_CarriesNoNote() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37), Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        viewModel.UpdateGpuAdapters();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.False(row.HasNote);
+        Assert.Equal("", row.Note);
+    }
 }

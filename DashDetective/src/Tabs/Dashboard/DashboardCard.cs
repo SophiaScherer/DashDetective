@@ -30,6 +30,10 @@ public partial class DashboardCard : ObservableObject {
     [ObservableProperty] private string _sub = "";
     [ObservableProperty] private string _points = "";
 
+    /// <summary>Why this card shows "—" rather than a value, or "" when it has one. The card has no room for
+    /// a line of its own, so the template hangs it off the tooltip.</summary>
+    [ObservableProperty] private string _note = "";
+
     // Category flags the StatCard template binds to Classes.* so each card picks up its semantic accent brush
     // (ChartCpu / ChartMemory / …) via style setters, keeping the accents theme/accent-aware.
     public bool IsCpu => Category == DeviceCategory.Cpu;

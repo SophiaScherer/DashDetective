@@ -674,8 +674,17 @@ public partial class PerformanceViewModel : ViewModelBase,
             return;
 
         foreach (var (luid, sample) in adapters) {
-            if (!_gpusByLuid.TryGetValue(luid, out var gpu) || sample.Overall is not { } reading)
+            if (!_gpusByLuid.TryGetValue(luid, out var gpu))
                 continue;
+
+            if (sample.Overall is not { } reading) {
+                // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
+                // nothing rather than as a broken tab.
+                gpu.Row.Note = GpuNoReadingNote.For(gpu.Pci?.VendorId, _gpuSampler.NvidiaMetricsEnabled);
+                continue;
+            }
+
+            gpu.Row.Note = "";
             var overall = Math.Clamp(reading, 0, 100);
             MetricChannel.PushHistory(gpu.History, overall);
             var rounded = Math.Round(overall);

@@ -39,7 +39,8 @@
                                        Classes.gpu="{Binding IsGpu}" Classes.disk="{Binding IsDisk}"
                                        Classes.net="{Binding IsNetwork}"
                                        Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
-                                       Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"/>
+                                       Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"
+                                       ToolTip.Tip="{Binding Note}"/>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

@@ -77,6 +77,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
     private readonly Dictionary<string, DashboardCard> _gpuCards = new(StringComparer.Ordinal);
     private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
+
+    // PCI vendor per adapter, kept only to word the note on a card that reports no utilisation.
+    private readonly Dictionary<string, uint?> _gpuVendors = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler;
 
     /// <summary>Mints a sampler; kept so the inventory load can build one of its own. It must never be
@@ -346,6 +349,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             Cards.Remove(card);
         _gpuCards.Clear();
         _gpuHistories.Clear();
+        _gpuVendors.Clear();
 
         var insertAt = Cards.IndexOf(_memoryCard) + 1;
         foreach (var gpu in gpus) {
@@ -353,6 +357,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             Cards.Insert(insertAt++, card);
             _gpuCards[gpu.GpuLuid ?? gpu.Id] = card;
             _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new double[WindowSeconds];
+            _gpuVendors[gpu.GpuLuid ?? gpu.Id] = gpu.GpuPci?.VendorId;
         }
 
         GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : "Unknown GPU";
@@ -457,9 +462,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             if (sample.Overall is not { } reading) {
                 card.Value = NoReading;
                 card.Unit = "";
+                // Says why the dash is there, so a detected-but-silent adapter doesn't read as a broken card.
+                card.Note = GpuNoReadingNote.For(
+                    _gpuVendors.GetValueOrDefault(luid), _gpuSampler.NvidiaMetricsEnabled);
                 continue;
             }
 
+            card.Note = "";
             var value = Math.Clamp(reading, 0, 100);
             if (value > overall || overall is null)
                 overall = value;

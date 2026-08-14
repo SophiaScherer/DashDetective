@@ -53,7 +53,11 @@ public class DashboardGpuCardTests {
         return (viewModel, pageSampler!);
     }
 
-    private static GpuAdapter Adapter(string key, string name) => new(key, name, false, 0);
+    /// <summary>PCI vendor id for NVIDIA — carried only where a test needs the vendor-specific note.</summary>
+    private const uint NvidiaVendor = 0x10DE;
+
+    private static GpuAdapter Adapter(string key, string name, uint? vendorId = null) =>
+        new(key, name, false, 0, vendorId is { } id ? new GpuPciId(id, 0, 0, 0) : null);
 
     private static DashboardCard GpuCard(DashboardViewModel viewModel) =>
         viewModel.Cards.Single(c => c.Category == DeviceCategory.Gpu);
@@ -63,12 +67,24 @@ public class DashboardGpuCardTests {
     [Fact]
     public async Task LoadGpusAsync_AdapterThatCannotReport_ShowsThePlaceholder() {
         var viewModel = await LoadedAsync(
-            () => new FakeGpuUsageSampler().Silent(Nvidia), Adapter(Nvidia, "NVIDIA nvidia (10de:2504)"));
+            () => new FakeGpuUsageSampler().Silent(Nvidia),
+            Adapter(Nvidia, "NVIDIA nvidia (10de:2504)", NvidiaVendor));
 
         var card = GpuCard(viewModel);
         Assert.Equal("—", card.Value);
         // The unit goes with it, so the card reads "—" and not "— %".
         Assert.Equal("", card.Unit);
+        // …and the card can say why, since it has no room for a line of its own.
+        Assert.Equal("Turn on \"NVIDIA GPU utilization\" in Settings to read this card.", card.Note);
+    }
+
+    /// <summary>A card that reports carries no note — nothing to explain.</summary>
+    [Fact]
+    public async Task LoadGpusAsync_AdapterThatReports_CarriesNoNote() {
+        var viewModel = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37), Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        Assert.Equal("", GpuCard(viewModel).Note);
     }
 
     [Fact]
