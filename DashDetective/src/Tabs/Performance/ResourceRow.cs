@@ -85,6 +85,17 @@ public partial class ResourceRow : ObservableObject {
     /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>
     public IReadOnlyList<StatTile> Stats { get; }
 
+    /// <summary>Why this resource shows "—" rather than a value, or "" when it has one. Set per tick for a
+    /// GPU whose driver publishes no utilisation, so an honestly blank chart doesn't read as a broken one.
+    /// </summary>
+    [ObservableProperty] private string _note = "";
+
+    /// <summary>Whether <see cref="Note"/> has anything to say — the visibility the templates bind, so the
+    /// caption line takes no space on a resource that is reporting normally.</summary>
+    public bool HasNote => Note.Length > 0;
+
+    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
+
     public ICommand SelectCommand { get; }
 
     [ObservableProperty] private bool _isSelected;

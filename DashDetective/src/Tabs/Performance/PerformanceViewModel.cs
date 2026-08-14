@@ -143,6 +143,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler;
+
+    /// <summary>Mints a sampler; kept so the inventory load can build one of its own. It must never be
+    /// handed <see cref="_gpuSampler"/>: that load disposes what it is given, which on Windows closes this
+    /// page's PDH query and leaves every GPU readout dead for the rest of the session.</summary>
+    private readonly Func<IGpuUsageSampler> _gpuSamplerFactory;
     // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
     // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
     private readonly IGpuSensorProvider _gpuSensors = IGpuSensorProvider.ForCurrentPlatform();
@@ -163,13 +168,17 @@ public partial class PerformanceViewModel : ViewModelBase,
         : this(service, HardwareProviders.ForCurrentPlatform()) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
-    /// sampler — the one dependency the page resolves for itself, so without this a test cannot reach the
-    /// rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as
-    /// before.</summary>
+    /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
+    /// the rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
+    ///
+    /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
+    /// and the inventory load disposes one of its own.</summary>
     internal PerformanceViewModel(
-        SystemMetricsService service, HardwareProviders providers, IGpuUsageSampler? gpuSampler = null) {
+        SystemMetricsService service, HardwareProviders providers,
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null) {
         _providers = providers;
-        _gpuSampler = gpuSampler ?? IGpuUsageSampler.ForCurrentPlatform();
+        _gpuSamplerFactory = gpuSamplerFactory ?? IGpuUsageSampler.ForCurrentPlatform;
+        _gpuSampler = _gpuSamplerFactory();
 
         _service = service;
 
@@ -498,7 +507,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
     internal async Task LoadInventoryAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync(_providers, () => _gpuSampler);
+            var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
         } catch {
@@ -657,15 +666,25 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Samples every physical GPU and refreshes each row in place, keyed by adapter LUID: the rail value
     /// + chart + 3D tile show the adapter's busiest-engine % (its overall utilisation), and the Detailed grid is
     /// rebuilt from its per-engine map. GPUs without a current reading are left unchanged — including an
-    /// adapter whose driver publishes no utilisation at all, whose row keeps the "—" it was built with.</summary>
-    private void UpdateGpuAdapters() {
+    /// adapter whose driver publishes no utilisation at all, whose row keeps the "—" it was built with.
+    /// Internal rather than private so a test can drive one tick without the timer.</summary>
+    internal void UpdateGpuAdapters() {
         var adapters = _gpuSampler.SampleAdapters();
         if (adapters.Count == 0)
             return;
 
         foreach (var (luid, sample) in adapters) {
-            if (!_gpusByLuid.TryGetValue(luid, out var gpu) || sample.Overall is not { } reading)
+            if (!_gpusByLuid.TryGetValue(luid, out var gpu))
                 continue;
+
+            if (sample.Overall is not { } reading) {
+                // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
+                // nothing rather than as a broken tab.
+                gpu.Row.Note = GpuNoReadingNote.For(gpu.Pci?.VendorId, _gpuSampler.NvidiaMetricsEnabled);
+                continue;
+            }
+
+            gpu.Row.Note = "";
             var overall = Math.Clamp(reading, 0, 100);
             MetricChannel.PushHistory(gpu.History, overall);
             var rounded = Math.Round(overall);
