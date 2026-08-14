@@ -89,6 +89,10 @@ public sealed class DeviceInventory {
     /// Builds its own sampler rather than borrowing a page's: the Windows one owns a PDH query handle that
     /// is not safe to collect from two threads, and this runs concurrently with the page's own tick. The
     /// factory exists so a test can supply a fake without a driver.
+    ///
+    /// <b>The factory must mint a fresh sampler per call — this takes ownership and disposes it.</b> Handing
+    /// it a live page's instance closes that page's PDH query, after which every GPU readout on it stays at
+    /// its placeholder for the rest of the session while the adapter names still look correct.
     /// </summary>
     private static IReadOnlySet<string> SampleActiveGpuLuids(Func<IGpuUsageSampler>? factory) {
         try {

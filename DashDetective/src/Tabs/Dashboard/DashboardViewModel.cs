@@ -79,6 +79,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler;
 
+    /// <summary>Mints a sampler; kept so the inventory load can build one of its own. It must never be
+    /// handed <see cref="_gpuSampler"/>: that load disposes what it is given, which on Windows closes this
+    /// page's PDH query and leaves every GPU readout dead for the rest of the session.</summary>
+    private readonly Func<IGpuUsageSampler> _gpuSamplerFactory;
+
     /// <summary>Mirrors the "NVIDIA GPU utilization" setting onto this page's sampler. Only the Linux arm
     /// acts on it; everywhere else it is inert. Pushed by the shell on load and whenever it changes.</summary>
     public bool NvidiaGpuMetrics {
@@ -138,13 +143,17 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         : this(service, HardwareProviders.ForCurrentPlatform()) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
-    /// sampler — the one dependency the page resolves for itself, so without this a test cannot reach the
-    /// cards' no-reading path. The public ctor resolves both, so the shell builds this exactly as
-    /// before.</summary>
+    /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
+    /// the cards' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
+    ///
+    /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
+    /// and the inventory load disposes one of its own.</summary>
     internal DashboardViewModel(
-        SystemMetricsService service, HardwareProviders providers, IGpuUsageSampler? gpuSampler = null) {
+        SystemMetricsService service, HardwareProviders providers,
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null) {
         _providers = providers;
-        _gpuSampler = gpuSampler ?? IGpuUsageSampler.ForCurrentPlatform();
+        _gpuSamplerFactory = gpuSamplerFactory ?? IGpuUsageSampler.ForCurrentPlatform;
+        _gpuSampler = _gpuSamplerFactory();
 
         _service = service;
 
@@ -321,7 +330,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// error. Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
     internal async Task LoadGpusAsync() {
         try {
-            var inventory = await DeviceInventory.LoadAsync(_providers, () => _gpuSampler);
+            var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
             RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
         } catch {
             // Leave the existing GPU cards in place on a transient failure.
@@ -431,8 +440,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Samples every physical GPU (busiest-engine %) and refreshes each card's headline value +
     /// sparkline in place, keyed by adapter LUID. Also feeds the single overall history (busiest adapter) that
-    /// the CSV export + text report read. GPUs without a current reading are left unchanged.</summary>
-    private void UpdateGpuAdapters() {
+    /// the CSV export + text report read. GPUs without a current reading are left unchanged. Internal rather
+    /// than private so a test can drive one tick without the timer.</summary>
+    internal void UpdateGpuAdapters() {
         var adapters = _gpuSampler.SampleAdapters();
         if (adapters.Count == 0)
             return;

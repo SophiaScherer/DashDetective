@@ -74,6 +74,25 @@ public class SamplerSoftFailTests {
         sampler.Dispose();
     }
 
+    /// <summary>
+    /// A disposed GPU sampler reports nothing rather than collecting on a closed PDH query. This is the
+    /// contract behind a real regression: the inventory load disposed the sampler a live page was ticking
+    /// on, and because the closed handle only failed a return code, the tab looked like a machine with no
+    /// GPU — correct adapter names, no %, no chart, no engines. Windows-only; the constructor is annotated.
+    /// </summary>
+    [Fact]
+    public void WindowsGpuUsageSampler_AfterDispose_ReportsNothingAndDisposesAgainSafely() {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var sampler = new WindowsGpuUsageSampler();
+        sampler.Dispose();
+
+        Assert.Empty(sampler.SampleAdapters());
+        Assert.Empty(sampler.SampleAdapters());
+        sampler.Dispose();
+    }
+
     [Fact]
     public void WindowsPhysicalDiskThroughputSampler_Inert_SamplesEmpty() {
         using var sampler = new WindowsPhysicalDiskThroughputSampler(SamplerInit.Inert);

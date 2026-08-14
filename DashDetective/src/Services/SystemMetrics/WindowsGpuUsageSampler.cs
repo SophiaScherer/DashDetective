@@ -68,6 +68,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
     private readonly bool _ready;
+    private bool _disposed;
 
     [SupportedOSPlatform("windows")]
     public WindowsGpuUsageSampler() {
@@ -107,7 +108,10 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     /// named GPU. Any failure yields an empty map.
     /// </summary>
     public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() {
-        if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
+        // The disposed check comes first: collecting on a closed query would only fail its return code, so a
+        // sampler someone else disposed would look identical to one with no GPU. Empty here is honest, and a
+        // test can pin it.
+        if (_disposed || !_ready || PdhCollectQueryData(_query) != ErrorSuccess)
             return EmptyAdapters;
 
         // First call sizes the buffer (returns PDH_MORE_DATA); the second fills it.
@@ -203,8 +207,13 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
         return idx < 0 ? null : instanceName[(idx + token.Length)..];
     }
 
-    /// <summary>Closes the PDH query handle. Safe to call more than once.</summary>
+    /// <summary>Closes the PDH query handle and leaves the sampler inert. Safe to call more than once — the
+    /// flag also stops a second close on the same handle.</summary>
     public void Dispose() {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
