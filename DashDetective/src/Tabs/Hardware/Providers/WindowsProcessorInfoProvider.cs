@@ -10,8 +10,9 @@ namespace DashDetective.Tabs.Hardware;
 /// Processor facts from <c>Win32_Processor</c>. Core/thread counts are summed across sockets and the
 /// clock is the max, matching <c>CpuInfoProvider</c>; name/cache/socket come from the first package.
 /// Boost clock and TDP have no WMI source, so they come from <see cref="HardwareCatalog"/> by model name
-/// and stay "—" when it has no entry. The platform check lives in
-/// <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>.
+/// and stay "—" when it has no entry. Base clock, L3 size and socket <i>do</i> have a WMI source and keep
+/// it — the catalog fills those three only where the firmware left the field empty. The platform check
+/// lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
@@ -50,14 +51,20 @@ internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
 
             var spec = HardwareCatalog.LookupCpu(name);
 
+            // WMI's designation wins where the firmware filled it in: it names the board's own socket,
+            // which the catalog's rated socket for the part can only approximate.
+            var socketName = string.IsNullOrEmpty(socket)
+                ? ProcessorSpecFormatter.Spec(spec?.Socket)
+                : socket;
+
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 Cores: cores > 0 ? cores.ToString() : "—",
                 LogicalProcessors: threads.ToString(),
-                BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost),
-                CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb),
-                Tdp: spec?.Tdp ?? "—",
-                Socket: string.IsNullOrEmpty(socket) ? "—" : socket);
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost, spec?.Base),
+                CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb, spec?.CacheL3),
+                Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
+                Socket: socketName);
         } catch (Exception e) {
             Log.Warn("ProcessorInfoProvider read failed", e);
             return ProcessorInfo.Unknown;

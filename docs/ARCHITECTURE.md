@@ -413,10 +413,19 @@ Where a platform genuinely has no source for a value, the provider returns `null
 blank on Linux because a Windows handle covers events, threads and registry keys as well as files;
 `/proc/cpuinfo`'s `cpu MHz` never fills a *maximum* clock, because it is the instantaneous one and a
 scaling governor would report an idle 800 MHz; the Motherboard card's PCIe slot count and the Processor
-card's socket stay blank, because both live in SMBIOS tables the kernel does not surface without root;
-drive health stays blank because it needs SMART, which needs root; and the Processes tab's
+card's socket have no Linux source at all, because both live in SMBIOS tables the kernel does not surface
+without root; drive health stays blank because it needs SMART, which needs root; and the Processes tab's
 per-process GPU column is permanently zero, because Linux exposes no rootless per-process GPU accounting at
 all. All five are settled answers, not deferred work.
+
+**A bundled datasheet is not a near-miss, and it is not a substitute either.** `HardwareCatalog` carries
+the rated specs of a part the machine has already *identified by name* — the Processor card's TDP and boost
+have always been read that way, because no API on either platform reports them. Base clock, L3 size and
+socket now take the same fallback, and the ordering is what keeps it honest: **the machine's own reading
+always wins, and the datasheet fills only where the machine says nothing.** A down-binned or power-limited
+chip therefore still reports what it actually reports. What this buys is the VM case — a guest gets no
+`cpufreq` policy and no `cache/index*` tree, so three rows sat blank beside a processor the page had
+correctly named as a 7600X and could have described from its datasheet all along.
 
 The Processes tab is where the discipline gets tested hardest, because the Windows classifier's inputs
 simply do not exist: `EnumWindows` has no analogue on Wayland, where a client may not enumerate another
