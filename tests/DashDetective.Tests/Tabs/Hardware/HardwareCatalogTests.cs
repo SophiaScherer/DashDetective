@@ -139,4 +139,41 @@ public class HardwareCatalogTests {
     public void LookupGpu_UnknownModel_ReturnsNull() {
         Assert.Null(HardwareCatalog.LookupGpu("Definitely Not A Real GPU 9999"));
     }
+
+    /// <summary>The three columns added so a machine that reports none of them still fills the row. Read
+    /// from the shipped table on purpose: the point is that the data is there, not that Match works.</summary>
+    [Fact]
+    public void LookupCpu_KnownModel_CarriesTheFallbackColumnsToo() {
+        var spec = HardwareCatalog.LookupCpu("AMD Ryzen 5 7600X 6-Core Processor");
+
+        Assert.NotNull(spec);
+        Assert.Equal("4.7 GHz", spec!.Base);
+        Assert.Equal("32 MB", spec.CacheL3);
+        Assert.Equal("AM5", spec.Socket);
+    }
+
+    /// <summary>Every shipped entry carries all five columns. A half-filled row would render as a silent
+    /// "—" that looks exactly like a part the table has never heard of.</summary>
+    [Fact]
+    public void CpuCatalog_EveryEntry_FillsEveryColumn() {
+        foreach (var (key, spec) in CpuCatalog.Data) {
+            Assert.False(string.IsNullOrWhiteSpace(spec.Boost), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Tdp), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Base), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.CacheL3), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Socket), key);
+        }
+    }
+
+    /// <summary>A rated base clock below its own boost, on every part. Cheap, but it is the one check that
+    /// catches the two columns being transposed on a hand-entered row.</summary>
+    [Fact]
+    public void CpuCatalog_EveryEntry_RatesBaseBelowBoost() {
+        foreach (var (key, spec) in CpuCatalog.Data)
+            Assert.True(Ghz(spec.Base) < Ghz(spec.Boost), $"{key}: {spec.Base} / {spec.Boost}");
+    }
+
+    private static double Ghz(string clock) =>
+        double.Parse(
+            clock.Replace(" GHz", ""), System.Globalization.CultureInfo.InvariantCulture);
 }

@@ -2138,8 +2138,16 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          Windows file) cover any other platform, and memory
                                                          modules' is Linux's too, permanently.
                                                          LinuxProcessorInfoProvider — the shared CpuFacts
-                                                         plus its L3 read; SOCKET IS PERMANENTLY "—"
-                                                         (SMBIOS type 4 needs dmidecode as root).
+                                                         plus its L3 read; SOCKET HAS NO SYSFS SOURCE AT
+                                                         ALL (SMBIOS type 4 needs dmidecode as root), so
+                                                         that row is the catalog's rated socket or "—".
+                                                         Base clock and L3 take the same fallback, which is
+                                                         what fills them in a VM: no cpufreq policy and no
+                                                         cache/index* tree, but the model name is reported.
+                                                         THE LIVE READING ALWAYS WINS — the datasheet is a
+                                                         fallback, never an override, or a down-binned or
+                                                         power-limited chip would report someone else's
+                                                         numbers.
                                                          LinuxMotherboardInfoProvider — DmiIdReader +
                                                          HardwareCatalog, composing the same
                                                          "version (year)" BIOS string as the WMI arm; PCIE
