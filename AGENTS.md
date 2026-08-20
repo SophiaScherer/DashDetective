@@ -1787,6 +1787,41 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   launch** (no persistence, by choice, like Theming). This tab deliberately touched the shell + shared
   styles for the scroll seam; that's a cross-cutting concern (as Theming is), not a tab-local change.
 
+  **Large-folder responsiveness.** Opening `C:\Windows\System32` (5,033 entries) used to freeze the whole
+  app for **5.2 s**, and every sort click and filter chip paid it again. Two causes in the list itself and
+  two contributors found beside them, all fixed; the page now reports **zero** unresponsive samples through
+  a `System32` load, sort, filter or full-list scroll (measured with a `WM_NULL` `SendMessageTimeout`
+  round-trip, which fails only while the UI thread stops pumping).
+  - **The rows list virtualizes.** The rows `ItemsControl` carries a `VirtualizingStackPanel` items panel;
+    without it every row realized a `Border`, a nested `Grid` (whose `GridColumns.Definitions` binding runs
+    `ColumnDefinitions.Parse`), a `Path` and four `TextBlock`s up front. The named `FileListScroll`
+    `ScrollViewer` **stays** — an `ItemsControl` has no scroll of its own, and the panel takes its viewport
+    from `EffectiveViewportChanged`, which any ancestor scroller supplies.
+  - **`BulkObservableCollection<T>`** (tab-local) adds one `Reset(items)` that refills `Items` and raises a
+    single `Reset` notification; a `Clear()` plus a per-item `Add()` was ~10,000 notifications on the UI
+    thread for that folder. It backs **both** `VisibleEntries` and `FileSystemNode.Children`. Chosen over
+    reassigning an `IReadOnlyList` property for two reasons: the tree still needs in-place
+    `Insert`/`RemoveAt`, and a `Reset` clamps the `ScrollViewer` exactly as the old `Clear()` did, so scroll
+    behavior is unchanged. **`SyncChildrenAsync` still merges and must never be turned into a reset** —
+    it is what preserves node instances, expansion and selection across a "Show hidden" toggle or an
+    auto-refresh.
+  - **Loading and empty states.** A navigation **clears the list up front** (the previous folder's rows
+    outlived the breadcrumb by seconds, looking authoritative and staying clickable), then `IsLoading`
+    drives a centered "Loading…" placeholder plus an indeterminate `ProgressBar.loadStrip` on the header
+    hairline; `IsEmpty` says "This folder is empty" so a folder with nothing in it no longer looks like one
+    still being read. The busy flag is **grace-gated at 150 ms** so ordinary folders never flash it, and
+    `_activeLoadId` pairs with the existing `_pendingPath` guard: without it a load that finishes *before*
+    the grace timer fires would have the timer latch busy back on with nothing left to clear it.
+    `LoadEntriesAsync` takes `clearFirst` and `showBusy` so each caller says what it is — navigation clears
+    and reports, the "Show hidden" toggle reports without clearing, and the watcher's auto-refresh does
+    neither (nobody asked for it, and nothing is stale).
+  - **`ShellTypeNameCache`** memoizes the friendly type name **by extension** for one folder read. Both
+    shells derive that name from the extension and attributes alone — Windows asks with
+    `SHGFI_USEFILEATTRIBUTES`, which never opens the file — so one lookup answers every entry sharing an
+    extension, and directories share a single answer. Measured on `System32`: the per-entry calls were
+    **481 ms** of the read, which now completes in **30 ms**. Deliberately **per-read and unshared**:
+    nothing to invalidate, nothing to synchronize.
+
 - **Network** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
   Network page: six panels in two rows. The tab is always-on like the Dashboard (VM constructed once

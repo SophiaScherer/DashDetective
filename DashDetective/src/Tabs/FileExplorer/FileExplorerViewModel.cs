@@ -21,7 +21,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
     /// <summary>The current folder's entries after the active filter (folders first, then files).</summary>
-    public ObservableCollection<FileEntry> VisibleEntries { get; } = new();
+    public BulkObservableCollection<FileEntry> VisibleEntries { get; } = new();
 
     /// <summary>Breadcrumb segments for the current path, root → leaf.</summary>
     public ObservableCollection<Crumb> Crumbs { get; } = new();
@@ -49,7 +49,19 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanGoUp))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
     private string _currentPath = "";
+
+    // ----- Load state -----
+
+    /// <summary>Whether a folder read is in flight and has outlasted the grace period below.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    private bool _isLoading;
+
+    /// <summary>Whether the open folder has nothing to show — distinguishing a genuinely empty folder
+    /// from one still being read, which would otherwise look identical.</summary>
+    public bool IsEmpty => !IsLoading && CurrentPath.Length > 0 && VisibleEntries.Count == 0;
 
     // ----- Responsive table columns -----
 
@@ -185,6 +197,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // Guards against a slow folder load overwriting the list after the user has moved on.
     private string _pendingPath = "";
 
+    // Identifies the load whose busy state is live (0 = nothing in flight), so a load that has finished
+    // or been superseded can neither raise nor lower the flag on a newer one's behalf.
+    private int _loadSeq;
+    private int _activeLoadId;
+
+    // Ordinary folders read in a few milliseconds, so the busy state only appears once a read has
+    // outlasted this — otherwise every navigation would flash it.
+    private const int BusyGraceMs = 150;
+
     // Auto-refresh: one watcher, re-pointed at the open folder on each navigation, raises a debounced
     // event when items are added/removed on disk. The page is a long-lived singleton that's never
     // disposed, so the watcher simply lives for the app's lifetime — no teardown plumbing needed.
@@ -254,7 +275,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         foreach (var node in RootNodes)
             _ = node.SyncChildrenAsync();
         if (!string.IsNullOrEmpty(CurrentPath))
-            _ = LoadEntriesAsync(CurrentPath);
+            _ = LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: true);
     }
 
     /// <summary>Toolbar Refresh for the File Explorer: re-read the roots and the current folder. The
@@ -340,7 +361,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         CurrentPath = path;
         RebuildCrumbs(path);
         _watcher.Watch(path);
-        _ = LoadEntriesAsync(path);
+        // Only a move to a different folder clears the list: the rows already shown belong to the
+        // folder the breadcrumb has just stopped naming, and they are clickable.
+        _ = LoadEntriesAsync(path, clearFirst: isNavigation, showBusy: true);
 
         if (isNavigation) {
             SyncTreeSelection(path);
@@ -419,7 +442,8 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
 
         _reselectPath = SelectedEntry?.FullPath;
-        _ = LoadEntriesAsync(CurrentPath);
+        // Nobody asked for this one, so it stays silent — same folder, same rows, nothing stale.
+        _ = LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: false);
 
         if (FindNode(RootNodes, CurrentPath) is { } node)
             _ = node.SyncChildrenAsync();
@@ -436,23 +460,36 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         return null;
     }
 
-    private async Task LoadEntriesAsync(string path) {
+    private async Task LoadEntriesAsync(string path, bool clearFirst, bool showBusy) {
         _pendingPath = path;
+        var id = _activeLoadId = ++_loadSeq;
         // Consume the reselect request up front so only this load restores it (a navigation load,
         // which leaves it null, still clears the selection below).
         var reselect = _reselectPath;
         _reselectPath = null;
 
+        if (clearFirst) {
+            SelectedEntry = null;
+            _allEntries.Clear();
+            RebuildVisibleEntries();
+        }
+
+        if (showBusy)
+            _ = ShowBusyAfterGraceAsync(id);
+
         IReadOnlyList<FileItem> items;
         try {
             items = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
         } catch {
+            EndLoad(id);
             return;
         }
 
         // Ignore a stale load if the user has since selected another folder.
-        if (_pendingPath != path)
+        if (_pendingPath != path) {
+            EndLoad(id);
             return;
+        }
 
         SelectedEntry = null;
         _allEntries.Clear();
@@ -467,6 +504,24 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
                     entry.IsSelected = true;
                     break;
                 }
+
+        EndLoad(id);
+    }
+
+    // Raises the busy state only if this load is still the one in flight when the grace period is up.
+    private async Task ShowBusyAfterGraceAsync(int id) {
+        await Task.Delay(BusyGraceMs);
+        if (_activeLoadId == id)
+            IsLoading = true;
+    }
+
+    // Lowers it only for the load that owns it — a superseded load leaves the newer one's flag alone.
+    private void EndLoad(int id) {
+        if (_activeLoadId != id)
+            return;
+
+        _activeLoadId = 0;
+        IsLoading = false;
     }
 
     private void OnEntrySelected(FileEntry entry) {
@@ -526,12 +581,13 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         }
         filtered.Sort(Compare);
 
-        VisibleEntries.Clear();
-        foreach (var entry in filtered)
-            VisibleEntries.Add(entry);
+        // One Reset rather than a Clear plus an Add per row: a 5,000-entry folder is otherwise
+        // ~5,000 layout invalidations on the UI thread.
+        VisibleEntries.Reset(filtered);
+        OnPropertyChanged(nameof(IsEmpty));
 
         // Drop a selection that the filter just hid.
-        if (SelectedEntry is { } sel && !VisibleEntries.Contains(sel)) {
+        if (SelectedEntry is { } sel && !filtered.Contains(sel)) {
             sel.IsSelected = false;
             SelectedEntry = null;
         }
