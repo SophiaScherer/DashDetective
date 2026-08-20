@@ -94,6 +94,15 @@
             <Setter Property="TextAlignment" Value="Right"/>
         </Style>
 
+        <!-- Hairline-thin indeterminate strip under the column header while a folder is being read.
+             Track transparent so it rides the header's own hairline rather than drawing a second one. -->
+        <Style Selector="ProgressBar.loadStrip">
+            <Setter Property="Height" Value="3"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+
         <!-- ===== Breadcrumb + filter chips ===== -->
         <!-- Chrome-less button wrapper so a whole crumb / chip is clickable (as in Settings). -->
         <Style Selector="Button.pick">
@@ -418,49 +427,61 @@
                     </Grid>
                 </Border>
 
-                <!-- Rows -->
-                <ScrollViewer x:Name="FileListScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding VisibleEntries}">
-                        <!-- Virtualized: a large folder would otherwise realize every row's border,
-                             grid, glyph and four text blocks up front and freeze the UI for seconds. -->
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <VirtualizingStackPanel/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="fe:FileEntry">
-                                <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
-                                        Background="Transparent"
-                                        Tapped="OnEntryTapped" DoubleTapped="OnEntryDoubleTapped">
-                                    <!-- Columns come from the page view model, not the entry, so every
-                                         row and the header share one definition and stay aligned. -->
-                                    <Grid ColumnSpacing="8"
-                                          layout:GridColumns.Definitions="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ColumnLayout}">
-                                        <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
-                                            <Path Grid.Column="0" Data="{Binding Glyph}"
-                                                  Stroke="{Binding IconBrush}" StrokeThickness="1.3"
-                                                  StrokeLineCap="Round" StrokeJoin="Round"
-                                                  Width="15" Height="15" Stretch="Uniform"
-                                                  VerticalAlignment="Center" Margin="0,0,9,0"/>
-                                            <TextBlock Grid.Column="1" Classes="cellName"
-                                                       Text="{Binding Name}"/>
+                <!-- Rows. The list is cleared the moment a navigation starts, so the placeholders
+                     below are what stands in for it: the previous folder's rows are neither shown nor
+                     clickable while the new one is read. -->
+                <Panel Grid.Row="1">
+                    <ScrollViewer x:Name="FileListScroll" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding VisibleEntries}">
+                            <!-- Virtualized: a large folder would otherwise realize every row's border,
+                                 grid, glyph and four text blocks up front and freeze the UI for seconds. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="fe:FileEntry">
+                                    <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
+                                            Background="Transparent"
+                                            Tapped="OnEntryTapped" DoubleTapped="OnEntryDoubleTapped">
+                                        <!-- Columns come from the page view model, not the entry, so every
+                                             row and the header share one definition and stay aligned. -->
+                                        <Grid ColumnSpacing="8"
+                                              layout:GridColumns.Definitions="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ColumnLayout}">
+                                            <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
+                                                <Path Grid.Column="0" Data="{Binding Glyph}"
+                                                      Stroke="{Binding IconBrush}" StrokeThickness="1.3"
+                                                      StrokeLineCap="Round" StrokeJoin="Round"
+                                                      Width="15" Height="15" Stretch="Uniform"
+                                                      VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                                <TextBlock Grid.Column="1" Classes="cellName"
+                                                           Text="{Binding Name}"/>
+                                            </Grid>
+                                            <TextBlock Grid.Column="1" Classes="cellMeta"
+                                                       Text="{Binding TypeName}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowTypeColumn}"/>
+                                            <TextBlock Grid.Column="2" Classes="cellMeta"
+                                                       Text="{Binding ModifiedText}"
+                                                       IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowModifiedColumn}"/>
+                                            <TextBlock Grid.Column="3" Classes="cellSize"
+                                                       Text="{Binding SizeText}"/>
                                         </Grid>
-                                        <TextBlock Grid.Column="1" Classes="cellMeta"
-                                                   Text="{Binding TypeName}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowTypeColumn}"/>
-                                        <TextBlock Grid.Column="2" Classes="cellMeta"
-                                                   Text="{Binding ModifiedText}"
-                                                   IsVisible="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ShowModifiedColumn}"/>
-                                        <TextBlock Grid.Column="3" Classes="cellSize"
-                                                   Text="{Binding SizeText}"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding IsLoading}" Text="Loading…"/>
+                    <!-- An empty folder and one still being read would otherwise look identical. -->
+                    <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding IsEmpty}" Text="This folder is empty"/>
+                    <ProgressBar Classes="loadStrip" IsIndeterminate="True" VerticalAlignment="Top"
+                                 IsVisible="{Binding IsLoading}"/>
+                </Panel>
             </Grid>
         </Border>
 
