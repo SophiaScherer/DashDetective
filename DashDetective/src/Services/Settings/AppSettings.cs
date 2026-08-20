@@ -31,6 +31,11 @@ public sealed record AppSettings {
     /// <summary>Keep running in the tray when the window is closed. On by default (matches the mock).</summary>
     public bool ShowInTray { get; init; } = true;
 
+    /// <summary>Whether the "still running in the tray" notice has been shown. Not a preference and not on
+    /// the Settings page — it is the record that the app has disclosed, once, that closing the window does
+    /// not stop it.</summary>
+    public bool TrayNoticeShown { get; init; }
+
     /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
     public bool ResourceAlerts { get; init; }
 

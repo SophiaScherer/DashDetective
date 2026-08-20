@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
+using DashDetective.Shell.TrayNotice;
 using System;
 using System.ComponentModel;
 using System.IO;
@@ -54,12 +55,34 @@ public partial class MainWindow : Window {
     /// tray (the app keeps running) rather than exiting. A close driven by the tray "Exit" item, or a
     /// close while the setting is off, proceeds normally — the last window closing shuts the app down,
     /// which runs the composition root's disposal (flushing settings, releasing timers/PDH handles).
+    ///
+    /// The very first such hide says so first: an app that goes on sampling behind a closed window has
+    /// to disclose that at least once.
     /// </summary>
     private void OnClosing(object? sender, WindowClosingEventArgs e) {
-        if (!_exitRequested && DataContext is MainWindowViewModel { ShowInTray: true } vm) {
-            e.Cancel = true;
+        if (_exitRequested || DataContext is not MainWindowViewModel { ShowInTray: true } vm)
+            return;
+
+        e.Cancel = true;
+        if (vm.NeedsTrayNotice)
+            _ = ConfirmTrayAsync(vm);
+        else
             HideToTray(vm);
-        }
+    }
+
+    /// <summary>Shows the one-time tray notice and acts on the answer. Split out of
+    /// <see cref="OnClosing"/> because a closing handler cannot await — the same split
+    /// <see cref="ExportReportAsync"/> gets. The close is already cancelled, so this window stays on
+    /// screen underneath the dialog, which is the whole point of asking before hiding rather than after.
+    /// </summary>
+    private async Task ConfirmTrayAsync(MainWindowViewModel vm) {
+        var keepRunning = await TrayNoticeWindow.AskAsync(this);
+        vm.MarkTrayNoticeShown();
+
+        if (keepRunning)
+            HideToTray(vm);
+        else
+            ExitFromTray();
     }
 
     /// <summary>Hides the window and idles the pages behind it — nothing should sample while nobody can

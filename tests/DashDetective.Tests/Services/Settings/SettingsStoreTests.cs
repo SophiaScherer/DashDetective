@@ -38,6 +38,7 @@ public sealed class SettingsStoreTests : IDisposable {
             CpuDetailedView = true,
             GpuDetailedView = true,
             NvidiaGpuMetrics = true,
+            TrayNoticeShown = true,
             // Carries the ASCII record separator the pin encoder uses, so the round trip proves JSON
             // escapes and restores it rather than eating a control character.
             PinnedCommands = "%temp%\u001Eipconfig /all",
@@ -55,6 +56,15 @@ public sealed class SettingsStoreTests : IDisposable {
     [Fact]
     public void Load_MissingFile_ReturnsDefaults() {
         Assert.Equal(AppSettings.Defaults, new SettingsStore(_path).Load());
+    }
+
+    /// <summary>A fresh install has not been told the app keeps running in the tray, so the notice is
+    /// still owed. Pinned separately because the flag is a disclosure record, not a preference: a default
+    /// of true would silently skip the one time it is ever shown.</summary>
+    [Fact]
+    public void Defaults_StillOweTheTrayNotice() {
+        Assert.False(AppSettings.Defaults.TrayNoticeShown);
+        Assert.True(AppSettings.Defaults.ShowInTray);
     }
 
     [Fact]

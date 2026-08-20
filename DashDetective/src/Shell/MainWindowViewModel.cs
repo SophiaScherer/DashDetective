@@ -58,6 +58,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     // the process is meant to be idle there, not merely invisible.
     private bool _windowVisible = true;
 
+    // Whether the user has been told that closing the window leaves the app running. Persisted, so the
+    // notice appears exactly once per install rather than on every close.
+    private bool _trayNoticeShown;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage))]
     private ViewModelBase _currentPage;
@@ -215,6 +219,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
         _fileExplorer.ShowHidden = settings.ShowHiddenFiles;
+        _trayNoticeShown = settings.TrayNoticeShown;
 
         // Commands before pins: a pin naming one of the user's own commands has nothing to find until
         // that command is on the page.
@@ -251,6 +256,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         CustomCommands = _toolkit.EncodeCommands(),
         LaunchAtStartup = _settings.LaunchAtStartup,
         ShowInTray = _settings.ShowInTray,
+        TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
@@ -503,6 +509,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void OnNavSelected(NavItem item) {
         CurrentPage = item.Page;
         UpdatePageActivity();
+    }
+
+    /// <summary>Whether the user still has to be told that closing the window leaves the app running in
+    /// the tray. Read by the window, which owns the dialog (it needs a <c>TopLevel</c> to show one).</summary>
+    public bool NeedsTrayNotice => !_trayNoticeShown;
+
+    /// <summary>Records that the notice has been shown, so it never appears again.</summary>
+    public void MarkTrayNoticeShown() {
+        if (_trayNoticeShown)
+            return;
+
+        _trayNoticeShown = true;
+        Persist();
     }
 
     /// <summary>Reports whether the window is on screen — hiding to the tray idles every page, since a
