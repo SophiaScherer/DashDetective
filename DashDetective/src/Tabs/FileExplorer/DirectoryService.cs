@@ -106,12 +106,13 @@ public static class DirectoryService {
         var dirs = new List<FileItem>();
         var files = new List<FileItem>();
         var opts = Options(includeHidden);
+        var typeNames = new ShellTypeNameCache(shell);
         try {
             var di = new DirectoryInfo(path);
             foreach (var sub in di.EnumerateDirectories("*", opts)) {
                 try {
                     dirs.Add(new FileItem(sub.Name, sub.FullName, true,
-                        shell.GetTypeName(sub.FullName, true),
+                        typeNames.NameFor(sub.FullName, true),
                         FormatDate(sub.LastWriteTime), "—", "",
                         FormatDate(sub.CreationTime), FormatAttributes(sub.Attributes),
                         -1, sub.LastWriteTime));
@@ -122,7 +123,7 @@ public static class DirectoryService {
             foreach (var f in di.EnumerateFiles("*", opts)) {
                 try {
                     files.Add(new FileItem(f.Name, f.FullName, false,
-                        shell.GetTypeName(f.FullName, false),
+                        typeNames.NameFor(f.FullName, false),
                         FormatDate(f.LastWriteTime), FileSizeFormatter.Format(f.Length),
                         f.Extension,
                         FormatDate(f.CreationTime), FormatAttributes(f.Attributes),
