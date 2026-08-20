@@ -21,7 +21,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// by subscribing to the shared <see cref="SystemMetricsService"/> — the samplers are shared across
 /// pages; each surface keeps its own rolling history and rebuilds its chart in the subscription callback.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
+public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable {
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -36,7 +36,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     private readonly SystemMetricsService _service;
     private readonly HardwareProviders _providers;
-    private readonly IDisposable[] _subscriptions;
+    private readonly MetricSubscriptions _subscriptions;
+    private readonly SamplingGate _gate;
 
     // Per-view rolling histories (the samplers are shared; the histories are not).
     private readonly double[] _cpuHistory = new double[WindowSeconds];
@@ -164,13 +165,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         if (!string.IsNullOrWhiteSpace(service.NetworkAdapterName))
             NetworkAdapterName = service.NetworkAdapterName;
 
-        // Subscribe to the shared metrics. Each subscription immediately replays the latest cached
-        // sample, seeding the surface with real data on the first frame; ticks then shift in from the right.
-        _subscriptions = new[] {
-            service.SubscribeCpu(OnCpu, OnCpuFailed),
-            service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
-        };
+        // The shared-metric subscriptions, established on activation rather than here: the feeds are
+        // ref-counted, so a page that stays subscribed off screen keeps them sampling. Each subscription
+        // replays the latest cached sample when it attaches, seeding the surfaces with real data.
+        _subscriptions = new MetricSubscriptions(
+            () => service.SubscribeCpu(OnCpu, OnCpuFailed),
+            () => service.SubscribeMemory(OnMemory, OnMemoryFailed),
+            () => service.SubscribeNetwork(OnNetwork, OnNetworkFailed));
 
         // Seed the top stat row: the singleton cards show live data immediately; disk cards insert once
         // enumerated (before the Network card, keeping the CPU→Memory→GPU→Disks→Network grouping).
@@ -183,14 +184,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
         _uptimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _uptimeTimer.Tick += OnUptimeTick;
-        _uptimeTimer.Start();
 
         // Drive the per-disk and per-GPU card sparklines from the page-local samplers, at the same cadence as
         // the shared feeds so every sparkline on the page covers the same span of time.
         _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
-        _throughputTimer.Start();
         service.IntervalChanged += OnIntervalChanged;
+
+        // Neither timer is started here: the gate runs them only while the page is on screen and the Live
+        // pill is on.
+        _gate = new SamplingGate(ApplySampling);
 
         // Load static CPU hardware info off the UI thread; results are applied when ready.
         _ = LoadCpuInfoAsync();
@@ -222,14 +225,24 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     public void Refresh() => RefreshNow();
 
     /// <summary>
-    /// Pauses/resumes the Dashboard's own uptime + per-disk throughput timers for the shell's Live toggle. The
-    /// shared metric sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.
+    /// Pauses/resumes the Dashboard's sampling for the shell's Live toggle. The shared feeds are also paused
+    /// service-wide by the shell via <see cref="SystemMetricsService.Pause"/>; this page still drops its own
+    /// subscriptions so the feeds stop for good when nothing else wants them.
     /// </summary>
-    public void SetLive(bool live) {
-        if (live) {
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the page's sampling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts everything the page samples — the shared subscriptions plus its own uptime and
+    /// per-disk/GPU timers. The gate's composed answer, so it reflects the Live pill and visibility at once.</summary>
+    private void ApplySampling(bool running) {
+        if (running) {
+            _subscriptions.Attach();
             _uptimeTimer.Start();
             _throughputTimer.Start();
         } else {
+            _subscriptions.Detach();
             _uptimeTimer.Stop();
             _throughputTimer.Stop();
         }
@@ -667,8 +680,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// per-disk sampler. The shared feed's samplers are owned (and disposed) by the service. Safe to call more
     /// than once.</summary>
     public void Dispose() {
-        foreach (var subscription in _subscriptions)
-            subscription.Dispose();
+        _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _uptimeTimer.Stop();
         _uptimeTimer.Tick -= OnUptimeTick;

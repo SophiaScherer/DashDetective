@@ -56,16 +56,24 @@ public partial class MainWindow : Window {
     /// which runs the composition root's disposal (flushing settings, releasing timers/PDH handles).
     /// </summary>
     private void OnClosing(object? sender, WindowClosingEventArgs e) {
-        if (!_exitRequested && DataContext is MainWindowViewModel { ShowInTray: true }) {
+        if (!_exitRequested && DataContext is MainWindowViewModel { ShowInTray: true } vm) {
             e.Cancel = true;
-            Hide();
+            HideToTray(vm);
         }
     }
 
-    /// <summary>Restores and focuses the window from the tray.</summary>
+    /// <summary>Hides the window and idles the pages behind it — nothing should sample while nobody can
+    /// see it.</summary>
+    private void HideToTray(MainWindowViewModel vm) {
+        Hide();
+        vm.SetWindowVisible(false);
+    }
+
+    /// <summary>Restores and focuses the window from the tray, resuming the current page.</summary>
     public void ShowFromTray() {
         Show();
         Activate();
+        (DataContext as MainWindowViewModel)?.SetWindowVisible(true);
     }
 
     /// <summary>Really exits from the tray: closes the window (bypassing hide-to-tray).</summary>

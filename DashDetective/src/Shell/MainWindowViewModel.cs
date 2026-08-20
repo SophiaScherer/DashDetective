@@ -54,6 +54,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private bool _alertActive;
     private bool _alertDismissed;
 
+    // Whether the window is on screen. Hidden to the tray it is not, and no page should be sampling —
+    // the process is meant to be idle there, not merely invisible.
+    private bool _windowVisible = true;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage))]
     private ViewModelBase _currentPage;
@@ -165,6 +169,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _currentPage = Nav.SelectedNav.Page;
         Nav.SelectionChanged += OnNavSelected;
 
+        // Start the page the bar selected; every other page stays idle until it is navigated to.
+        UpdatePageActivity();
+
         // Built after the bar so the page provider can read the live nav items rather than a copy. Each
         // provider's "go there" callback is a closure over the page it targets, which is why search is
         // assembled here: this is the one class already holding every page instance.
@@ -217,6 +224,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
+        _metrics.AlertsEnabled = settings.ResourceAlerts;
         _recents.Load(settings.RecentSearches);
     }
 
@@ -261,6 +269,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
+
+        // The watcher holds the CPU and memory feeds open on its own, so it follows the setting rather
+        // than running unconditionally.
+        _metrics.AlertsEnabled = _settings.ResourceAlerts;
     }
 
     /// <summary>Mirrors the NVIDIA opt-in onto both pages that own a GPU sampler. Pushed rather than read,
@@ -487,8 +499,29 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Builds the rolling-history metrics CSV for the Settings "Export CSV" action.</summary>
     public string BuildMetricsCsv() => _dashboard.BuildMetricsCsv();
 
-    /// <summary>Hosts the page for whichever nav item the bar selected.</summary>
-    private void OnNavSelected(NavItem item) => CurrentPage = item.Page;
+    /// <summary>Hosts the page for whichever nav item the bar selected, and moves activation with it.</summary>
+    private void OnNavSelected(NavItem item) {
+        CurrentPage = item.Page;
+        UpdatePageActivity();
+    }
+
+    /// <summary>Reports whether the window is on screen — hiding to the tray idles every page, since a
+    /// process nobody can see should not be sampling. Called by the window, which owns hide/show.</summary>
+    public void SetWindowVisible(bool visible) {
+        if (visible == _windowVisible)
+            return;
+
+        _windowVisible = visible;
+        UpdatePageActivity();
+    }
+
+    /// <summary>Activates the visible page and deactivates every other, routed through the
+    /// <see cref="IActivatablePage"/> marker so no per-page wiring lives here. A page opts in by
+    /// implementing it; the rest (Hardware, Toolkit, Settings, File Explorer) have nothing to stop.</summary>
+    private void UpdatePageActivity() {
+        foreach (var item in Nav.NavItems)
+            (item.Page as IActivatablePage)?.SetActive(_windowVisible && item.Page == CurrentPage);
+    }
 
     // ----- Search jumps -----
     // Each is "switch to the page, then ask it to reveal the thing". Navigating first matters: a page

@@ -15,10 +15,10 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// The Network tab: adapters, throughput, connections and diagnostics. Like the Dashboard it is
-/// always-on — constructed once by the shell and left running for the app's lifetime — so it
-/// implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
-/// (toolbar Live pill) and <see cref="IDisposable"/>.
+/// The Network tab: adapters, throughput, connections and diagnostics. Constructed once by the shell,
+/// but it polls only while it is the visible tab: it implements <see cref="IRefreshablePage"/> (toolbar
+/// Refresh), <see cref="ILiveSamplingPage"/> (toolbar Live pill), <see cref="IActivatablePage"/> (on/off
+/// screen) and <see cref="IDisposable"/>. The last two are composed by a <see cref="SamplingGate"/>.
 ///
 /// Throughput mirrors the Dashboard's sampler + 1 Hz timer + 60-sample rolling-buffer pattern. The
 /// design comp shows download and upload as TWO stacked charts, but they share ONE dynamic scale
@@ -26,7 +26,7 @@ namespace DashDetective.Tabs.Network;
 /// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
-public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IShortcutTarget, IDisposable {
+public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable {
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -57,6 +57,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly DispatcherTimer _connectionsTimer;
     private readonly DispatcherTimer _pingTimer;
     private readonly PingMonitor _pingMonitor = new();
+    private readonly SamplingGate _gate;
     private bool _connectionsInFlight;
     private bool _pingInFlight;
 
@@ -136,28 +137,24 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
             () => _networkSampler.Sample(), static s => s.DownMbps, OnNetworkSample, OnNetworkFailed);
         UpdateThroughput(new NetworkSample(0, 0));
-        _networkChannel.Start();
 
-        // Adapters + IP config load once off the UI thread, then refresh on a coarse timer.
+        // Adapters + IP config load once off the UI thread, then refresh on a coarse timer. This load
+        // stays in the constructor because the shell's exported report reads the IP configuration from
+        // here whether or not the tab was ever opened.
         _ = LoadAdaptersAsync();
 
         _adapterTimer = new DispatcherTimer { Interval = AdapterInterval };
         _adapterTimer.Tick += OnAdapterTick;
-        _adapterTimer.Start();
-
-        // Connections load once, then refresh on their own (slower) timer.
-        _ = LoadConnectionsAsync();
 
         _connectionsTimer = new DispatcherTimer { Interval = ConnectionsInterval };
         _connectionsTimer.Tick += OnConnectionsTick;
-        _connectionsTimer.Start();
-
-        // Ping the fixed target continuously; kick one off now so the panel isn't blank on arrival.
-        _ = RunPingAsync();
 
         _pingTimer = new DispatcherTimer { Interval = PingInterval };
         _pingTimer.Tick += OnPingTick;
-        _pingTimer.Start();
+
+        // Nothing above is started here: the gate runs the timers only while the tab is on screen and
+        // the Live pill is on, so a tab that is never opened costs nothing.
+        _gate = new SamplingGate(ApplySampling);
 
         // DNS is a one-shot lookup (not a live loop): resolve once now, and again on Refresh.
         _ = LoadDnsAsync();
@@ -402,12 +399,23 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
     /// <see cref="Refresh"/> still works while paused.</summary>
-    public void SetLive(bool live) {
-        if (live) {
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the tab's polling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts every live timer on the page — the gate's composed answer, so it reflects
+    /// the Live pill and the tab's visibility at once.</summary>
+    private void ApplySampling(bool running) {
+        if (running) {
             _networkChannel.Start();
             _adapterTimer.Start();
             _connectionsTimer.Start();
             _pingTimer.Start();
+
+            // Any time away leaves the connections snapshot stale, so re-read it now rather than showing
+            // the old page until the first tick.
+            _ = LoadConnectionsAsync();
         } else {
             _networkChannel.Stop();
             _adapterTimer.Stop();

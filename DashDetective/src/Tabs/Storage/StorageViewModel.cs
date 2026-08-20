@@ -32,7 +32,7 @@ namespace DashDetective.Tabs.Storage;
 /// drive. Every disk's history is kept warm, so switching drives shows that drive's real recent activity
 /// rather than restarting the chart.
 /// </summary>
-public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IDisposable {
+public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable {
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
     // (≈ every 15 s at the default cadence) rather than every tick.
     private const int TemperatureRefreshTicks = 15;
@@ -48,6 +48,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly IPhysicalDiskThroughputSampler _throughputSampler =
         IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
+    private readonly SamplingGate _gate;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
     private readonly Dictionary<int, double[]> _historiesByDisk = new();
     private readonly Dictionary<int, DiskThroughputSample> _latestByDisk = new();
@@ -76,8 +77,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         // Settings cadence so this chart covers the same span as the other pages'.
         _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
-        _throughputTimer.Start();
         service.IntervalChanged += OnIntervalChanged;
+
+        // The timer is not started here: the gate runs it only while the page is on screen and the Live
+        // pill is on.
+        _gate = new SamplingGate(ApplySampling);
     }
 
     private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
@@ -364,10 +368,16 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         };
     }
 
-    /// <summary>Pauses/resumes the tab's per-disk throughput timer for the shell's Live pill. That timer now
-    /// drives every live surface on the page, so this is the whole of the tab's live sampling.</summary>
-    public void SetLive(bool live) {
-        if (live)
+    /// <summary>Pauses/resumes the tab's sampling for the shell's Live pill.</summary>
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the tab's sampling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts the per-disk throughput timer, which drives every live surface on the page —
+    /// the gate's composed answer, so it reflects the Live pill and the tab's visibility at once.</summary>
+    private void ApplySampling(bool running) {
+        if (running)
             _throughputTimer.Start();
         else
             _throughputTimer.Stop();

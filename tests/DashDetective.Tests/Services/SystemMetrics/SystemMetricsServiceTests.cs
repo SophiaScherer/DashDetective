@@ -9,10 +9,9 @@ namespace DashDetective.Tests.Services.SystemMetrics;
 
 /// <summary>Covers <see cref="SystemMetricsService"/> through the injected sampler bundle + fake timer
 /// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe, per-metric fault isolation, and
-/// the sustained-breach alert watcher.</summary>
+/// the sustained-breach alert watcher — including that the watcher costs nothing until it is enabled.</summary>
 public class SystemMetricsServiceTests {
-    // Feeds are constructed in this order, so the captured timers line up by index. Network is the
-    // no-auto-subscriber exemplar (CPU + Memory auto-subscribe for the alert watcher).
+    // Feeds are constructed in this order, so the captured timers line up by index.
     private const int Cpu = 0, Memory = 1, Network = 2;
 
     /// <summary>Mutable fake sampler values; the bundle closes over these so a test can change a reading
@@ -56,16 +55,47 @@ public class SystemMetricsServiceTests {
     }
 
     [Fact]
-    public void CpuAndMemory_AreAutoSubscribedForAlerts_AndStartAtConstruction() {
+    public void Construction_SubscribesNothing_SoNoFeedRuns() {
         var (_, timers) = Create(new FakeSamplers());
+        Assert.All(timers, t => Assert.False(t.IsRunning));
+    }
+
+    [Fact]
+    public void AlertsEnabled_StartsCpuAndMemory_AndStopsThemAgainWhenCleared() {
+        var (service, timers) = Create(new FakeSamplers());
+
+        service.AlertsEnabled = true;
         Assert.True(timers[Cpu].IsRunning);
         Assert.True(timers[Memory].IsRunning);
-        Assert.False(timers[Network].IsRunning);
+        Assert.False(timers[Network].IsRunning);   // the watcher wants neither
+
+        service.AlertsEnabled = false;
+        Assert.False(timers[Cpu].IsRunning);
+        Assert.False(timers[Memory].IsRunning);
+    }
+
+    [Fact]
+    public void AlertsEnabled_ClearedDuringABreach_ClearsTheAlert() {
+        var fakes = new FakeSamplers { Cpu = 95 };
+        var (service, _) = Create(fakes);
+        service.AlertsEnabled = true;
+        var transitions = new List<bool>();
+        service.AlertActiveChanged += active => transitions.Add(active);
+
+        for (var i = 0; i < 10; i++)
+            service.RefreshAll();
+        Assert.True(service.AlertActive);
+
+        // A banner must not outlive the setting that raised it.
+        service.AlertsEnabled = false;
+        Assert.False(service.AlertActive);
+        Assert.Equal(new[] { true, false }, transitions);
     }
 
     [Fact]
     public void PauseThenResume_StopsAllThenRestartsOnlySubscribed() {
         var (service, timers) = Create(new FakeSamplers());
+        service.AlertsEnabled = true;                                // CPU + Memory now have a subscriber
         var token = service.SubscribeNetwork(_ => { }, () => { });   // Network now has a subscriber
 
         service.Pause();
@@ -132,6 +162,7 @@ public class SystemMetricsServiceTests {
     public void Alert_RaisesTrueAfterSustainedCpuBreach_ThenFalseOnRecovery() {
         var fakes = new FakeSamplers();   // cpu starts at 50, below the threshold
         var (service, _) = Create(fakes);
+        service.AlertsEnabled = true;
         var transitions = new List<bool>();
         service.AlertActiveChanged += active => transitions.Add(active);
 
