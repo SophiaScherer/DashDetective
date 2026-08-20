@@ -21,7 +21,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public ObservableCollection<FileSystemNode> RootNodes { get; } = new();
 
     /// <summary>The current folder's entries after the active filter (folders first, then files).</summary>
-    public ObservableCollection<FileEntry> VisibleEntries { get; } = new();
+    public BulkObservableCollection<FileEntry> VisibleEntries { get; } = new();
 
     /// <summary>Breadcrumb segments for the current path, root → leaf.</summary>
     public ObservableCollection<Crumb> Crumbs { get; } = new();
@@ -526,12 +526,12 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         }
         filtered.Sort(Compare);
 
-        VisibleEntries.Clear();
-        foreach (var entry in filtered)
-            VisibleEntries.Add(entry);
+        // One Reset rather than a Clear plus an Add per row: a 5,000-entry folder is otherwise
+        // ~5,000 layout invalidations on the UI thread.
+        VisibleEntries.Reset(filtered);
 
         // Drop a selection that the filter just hid.
-        if (SelectedEntry is { } sel && !VisibleEntries.Contains(sel)) {
+        if (SelectedEntry is { } sel && !filtered.Contains(sel)) {
             sel.IsSelected = false;
             SelectedEntry = null;
         }

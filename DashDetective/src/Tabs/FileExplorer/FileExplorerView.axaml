@@ -421,6 +421,13 @@
                 <!-- Rows -->
                 <ScrollViewer x:Name="FileListScroll" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding VisibleEntries}">
+                        <!-- Virtualized: a large folder would otherwise realize every row's border,
+                             grid, glyph and four text blocks up front and freeze the UI for seconds. -->
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="fe:FileEntry">
                                 <Border Classes="fileRow" Classes.selected="{Binding IsSelected}"
