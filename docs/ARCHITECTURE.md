@@ -77,12 +77,13 @@ below).
 `ViewLocator` maps a `*ViewModel` to its `*View` by type name, so a tab's view and view-model must
 share a namespace.
 
-## Page lifecycle: always-on pages and marker interfaces
+## Page lifecycle: activation and marker interfaces
 
-Data-bearing tabs (Dashboard, Network, Processes, Performance, Storage) are **always-on singletons**: their
-view-models are constructed once by the shell and live for the app's lifetime, so their timers and
-rolling buffers keep running as you switch tabs. Rather than a common base class dictating behaviour, pages opt into shell
-behaviours by implementing small **marker interfaces** in `src/Shared`:
+Data-bearing tabs (Dashboard, Network, Processes, Performance, Storage) are **long-lived singletons**: their
+view-models are constructed once by the shell and live for the app's lifetime, keeping their rolling
+buffers across a tab switch. Their **timers do not** — a page samples only while it is the visible tab in a
+visible window. Rather than a common base class dictating behaviour, pages opt into shell behaviours by
+implementing small **marker interfaces** in `src/Shared`:
 
 - **`ISelfScrollingPage`** — the page fills the viewport and manages its own internal scrolling, so the
   shell must *not* wrap it in a page-level scroll region. The page host is a panel with two
@@ -97,6 +98,24 @@ behaviours by implementing small **marker interfaces** in `src/Shared`:
   routes a single toggle across every page that implements the interface, so one control governs all
   live sampling at once. Hardware is the one data tab that opts out: it reads static facts, so there is
   nothing to pause.
+- **`IActivatablePage`** — the page is on or off screen. `MainWindowViewModel.UpdatePageActivity` activates
+  the current page and deactivates every other, and the window reports hide-to-tray through
+  `SetWindowVisible`, so an app nobody can see is idle rather than merely invisible. The same five pages
+  implement it; the rest own no timer.
+
+Those last two are two answers to one question, and each page composes them with a **`SamplingGate`**:
+sampling runs when the pill is on *and* the page is on screen, and the gate calls back only on a
+transition, so a re-selected tab cannot churn the timers. It starts **live but inactive**, which is what
+makes a tab nobody opens cost nothing — and why a page constructor must build its timers *stopped*.
+
+A deactivated page also **drops its `SystemMetricsService` subscriptions** (`MetricSubscriptions`). That is
+not tidiness: the shared feeds are ref-counted, so a page that stayed subscribed and ignored its callbacks
+would keep them sampling. Re-attaching replays each feed's cached latest sample, so a page returning to
+screen seeds with real data rather than a blank frame. The service's own resource-alert watcher subscribes
+by the same rule, behind `AlertsEnabled`, which follows the user's setting.
+
+One-shot constructor loads stay in the constructor: the exported report and universal search read values
+from pages the user may never open.
 - **`IShortcutTarget`** — the page handles keyboard shortcuts of its own, and names the
   `ShortcutScope` its bindings belong to. Processes, File Explorer and Network implement it; see
   *Keyboard shortcuts* below.
@@ -220,7 +239,8 @@ User choices are persisted as JSON at `%AppData%/DashDetective/settings.json` by
 (`src/Services/Settings`). **`AppSettings`** is an immutable record holding the whole of that state —
 theme, accent name, nav orientation/collapse, refresh interval, show-hidden-files, launch-at-startup,
 tray, resource alerts, and the Performance tab's view toggles. The composition root applies it on load
-and captures a fresh snapshot to save whenever a control changes. `SettingsJsonContext` is a
+and captures a fresh snapshot to save whenever a control changes. One field is not a preference at all:
+`TrayNoticeShown` records that the app has told the user, once, that closing the window does not stop it. `SettingsJsonContext` is a
 source-generated `System.Text.Json` context, so serialization stays reflection-free and trim-friendly.
 
 Two conventions keep a bad file from being fatal:
@@ -258,6 +278,12 @@ the window may hide to a tray icon instead of exiting. Windows only — stock GN
 StatusNotifierItem host, and since the setting is on by default, honouring it there would hide the window
 behind an icon that never appears. Nothing reliable can be asked at startup, so the app exits on close
 wherever a tray is not guaranteed, and the setting is shown disabled rather than removed.
+
+Where it *is* honoured, the **first** hide says so. `TrayNoticeWindow` (`src/Shell/TrayNotice`) is a
+one-time dialog shown *before* hiding, over the window the user has just closed, offering "Keep running"
+or "Exit instead"; every later close hides silently. Asking before rather than notifying after avoids
+guessing where the tray is and cannot be missed. `MainWindow.OnClosing` cancels the close and awaits the
+dialog from a helper, since a closing handler cannot await.
 
 ### Desktop integration
 
@@ -517,8 +543,10 @@ hardware. Two seams do most of that work:
   waiting on wall-clock ticks. Production still uses a real `DispatcherTimer` by default.
 - **`InternalsVisibleTo("DashDetective.Tests")`** (in the app csproj) exposes a small number of
   `internal` constructors and widened members — `SystemMetricsService`'s sampler-bundle ctor,
-  `SettingsStore`'s explicit-path ctor — so the hardware samplers and the settings file can be faked.
-  These seams are additive: they never change production behaviour.
+  `SettingsStore`'s explicit-path ctor, `NetworkViewModel`'s `PingTargetSeeded` task (the async gateway
+  suggestion is the ping field's only other writer, so a test that sets it would otherwise race) — so the
+  hardware samplers, the settings file and the Network tab can be faked or awaited. These seams are
+  additive: they never change production behaviour.
 
 The consequence for new code is a convention: **pure logic belongs outside the view-models.** Formatters,
 catalogs, chart maths and paging maths are extracted as static helpers in `src/Shared` or the tab folder
