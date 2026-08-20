@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.FileExplorer;
@@ -46,7 +46,7 @@ public partial class FileSystemNode : ObservableObject {
     public Geometry Glyph => FileTypeCatalog.FolderGlyph;
     public IBrush IconBrush => FileTypeCatalog.FolderBrush;
 
-    public ObservableCollection<FileSystemNode> Children { get; } = new();
+    public BulkObservableCollection<FileSystemNode> Children { get; } = new();
 
     [ObservableProperty] private bool _isExpanded;
     [ObservableProperty] private bool _isSelected;
@@ -129,12 +129,12 @@ public partial class FileSystemNode : ObservableObject {
             return;
         }
 
-        // Runs back on the UI thread (the expand toggle originated there), so mutating the
-        // bound collection here is safe. Children inherit the same hidden accessor + selection callback.
-        Children.Clear();
-        foreach (var s in subs)
-            Children.Add(new FileSystemNode(s.Name, s.FullPath, true, s.HasChildren,
-                                            _includeHidden, _collapseChildren, _onSelected));
+        // Runs back on the UI thread (the expand toggle originated there), so mutating the bound
+        // collection here is safe. One Reset rather than an Add per node, so a wide branch doesn't
+        // invalidate the tree's layout once per child. Children inherit the same hidden accessor +
+        // selection callback.
+        Children.Reset(subs.Select(s => new FileSystemNode(s.Name, s.FullPath, true, s.HasChildren,
+                                                           _includeHidden, _collapseChildren, _onSelected)));
     }
 
     // Adds or removes the placeholder that drives the chevron on an unexpanded node, so an empty folder
