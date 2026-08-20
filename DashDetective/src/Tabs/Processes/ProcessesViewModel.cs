@@ -27,7 +27,7 @@ namespace DashDetective.Tabs.Processes;
 /// flicker. Sorting, filtering and expand/collapse all re-project the snapshot already in hand rather
 /// than re-enumerating, so they feel instant between polls.
 /// </summary>
-public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, ISelfScrollingPage, IShortcutTarget, IDisposable {
+public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IShortcutTarget, IDisposable {
     /// <summary>Poll cadence. Enumerating every process (with per-process window/responding probes) is
     /// heavier than a single counter, so it polls slower than the Dashboard's 1 Hz samplers — close to
     /// Task Manager's own refresh.</summary>
@@ -41,7 +41,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly SystemMetricsService _service;
     private readonly IProcessSnapshotProvider _snapshots;
     private readonly IProcessInterop _interop;
-    private readonly IDisposable[] _subscriptions;
+    private readonly MetricSubscriptions _subscriptions;
+    private readonly SamplingGate _gate;
 
     // Sort state: which column + direction. Sorting applies within each group; Apps stay above
     // Background. Defaults to Name ascending (matching the initial list order).
@@ -287,17 +288,23 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         };
         UpdateSortIndicators();
 
-        // The summary CPU%/Memory% come from the shared service (subscribe replays the latest value at
-        // once). The process list loads and polls on its own timer below.
-        _subscriptions = new[] {
-            _service.SubscribeCpu(OnCpuTotal, OnCpuTotalFailed),
-            _service.SubscribeMemory(OnMemoryTotal, OnMemoryTotalFailed),
-        };
+        // The summary CPU%/Memory% come from the shared service, subscribed on activation rather than here
+        // (the feeds are ref-counted, so staying subscribed off screen keeps them sampling); attaching
+        // replays the latest value at once.
+        _subscriptions = new MetricSubscriptions(
+            () => _service.SubscribeCpu(OnCpuTotal, OnCpuTotalFailed),
+            () => _service.SubscribeMemory(OnMemoryTotal, OnMemoryTotalFailed));
+
+        // One list load here even though the page is not on screen yet: universal search reads Snapshot,
+        // and a tab the user has not opened would otherwise offer no processes at all.
         _ = LoadAsync();
 
         _timer = new DispatcherTimer { Interval = SampleInterval };
         _timer.Tick += OnTick;
-        _timer.Start();
+
+        // The timer is not started here: the gate runs it only while the page is on screen and the Live
+        // pill is on.
+        _gate = new SamplingGate(ApplySampling);
     }
 
     private void OnTick(object? sender, EventArgs e) => _ = LoadAsync();
@@ -699,21 +706,34 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _ = LoadAsync();
     }
 
-    /// <summary>Pauses/resumes the list-polling timer, driven by the toolbar Live pill. The shared summary
-    /// sampling is paused separately by the shell via <see cref="SystemMetricsService.Pause"/>.</summary>
-    public void SetLive(bool live) {
-        if (live)
+    /// <summary>Pauses/resumes the page's sampling, driven by the toolbar Live pill. The shared summary feeds
+    /// are also paused service-wide by the shell via <see cref="SystemMetricsService.Pause"/>.</summary>
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the page's sampling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts the summary subscriptions and the list-polling timer — the gate's composed
+    /// answer, so it reflects the Live pill and the tab's visibility at once.</summary>
+    private void ApplySampling(bool running) {
+        if (running) {
+            _subscriptions.Attach();
             _timer.Start();
-        else
+
+            // Any time away leaves the list stale, so reload now rather than showing the old rows until
+            // the first tick.
+            _ = LoadAsync();
+        } else {
+            _subscriptions.Detach();
             _timer.Stop();
+        }
     }
 
     /// <summary>Stops the timer and unsubscribes from the shared metrics. Safe to call more than once.</summary>
     public void Dispose() {
         _timer.Stop();
         _timer.Tick -= OnTick;
-        foreach (var subscription in _subscriptions)
-            subscription.Dispose();
+        _subscriptions.Dispose();
     }
 
     /// <summary>Shows the native Properties dialog for the selected process. Lives here rather than in

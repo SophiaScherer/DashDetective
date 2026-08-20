@@ -261,7 +261,9 @@
                 <Border Classes="panel">
                     <StackPanel Spacing="10">
                         <TextBlock Classes="panelTitle" Text="Ping"/>
-                        <!-- Editable target: Enter or the button applies it (resets the rolling stats). -->
+                        <!-- Editable target, seeded with this machine's own gateway. The monitor is
+                             opt-in: the button starts and stops it, and Enter applies the target and
+                             starts. Nothing here sends a packet until it is pressed. -->
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                             <Border Grid.Column="0" Classes="field">
                                 <TextBox Text="{Binding PingTarget, Mode=TwoWay}"
@@ -271,8 +273,8 @@
                                     </TextBox.KeyBindings>
                                 </TextBox>
                             </Border>
-                            <Button Grid.Column="1" Classes="go" Content="Ping"
-                                    Command="{Binding ApplyPingTargetCommand}"/>
+                            <Button Grid.Column="1" Classes="go" Content="{Binding PingButtonText}"
+                                    Command="{Binding TogglePingCommand}"/>
                         </Grid>
                         <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
                             <StackPanel Spacing="3">

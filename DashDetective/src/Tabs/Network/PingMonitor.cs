@@ -8,19 +8,21 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// Continuously pings a user-supplied host via the in-box <see cref="Ping"/> API. One
-/// <see cref="Ping"/> instance is reused across sends — the owner must serialize calls (a
-/// <see cref="Ping"/> can't run two operations at once); the Network VM does this with an in-flight
-/// guard. Keeps a rolling window of results for an average-RTT / packet-loss summary and the last
-/// few reply lines for the console-style readout. Never throws: a failed send is recorded as a
-/// timeout. The target can be changed at runtime via <see cref="SetTarget"/>, which resets the window.
+/// Pings a host via the in-box <see cref="Ping"/> API. One <see cref="Ping"/> instance is reused across
+/// sends — the owner must serialize calls (a <see cref="Ping"/> can't run two operations at once); the
+/// Network VM does this with an in-flight guard. Keeps a rolling window of results for an average-RTT /
+/// packet-loss summary and the last few reply lines for the console-style readout. Never throws: a failed
+/// send is recorded as a timeout. The target can be changed at runtime via <see cref="SetTarget"/>, which
+/// resets the window.
+///
+/// There is deliberately NO default target. A monitor that names a host before the user has chosen one
+/// is how this class used to ping a public resolver from launch; the empty string means "nothing to send
+/// yet", and the Network tab suggests the machine's own gateway instead.
 /// </summary>
 public sealed class PingMonitor : IDisposable {
-    /// <summary>The default ping target, used until the user edits the field.</summary>
-    public const string DefaultTarget = "8.8.8.8";
-
-    /// <summary>The current ping target. Change via <see cref="SetTarget"/> so the window resets.</summary>
-    public string Target { get; private set; } = DefaultTarget;
+    /// <summary>The current ping target, empty until one is set. Change via <see cref="SetTarget"/> so
+    /// the window resets.</summary>
+    public string Target { get; private set; } = "";
 
     private const int TimeoutMs = 1500;
     private const int WindowSize = 20; // rolling window for avg RTT + loss %

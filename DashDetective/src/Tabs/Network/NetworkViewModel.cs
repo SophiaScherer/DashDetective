@@ -15,10 +15,10 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// The Network tab: adapters, throughput, connections and diagnostics. Like the Dashboard it is
-/// always-on — constructed once by the shell and left running for the app's lifetime — so it
-/// implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
-/// (toolbar Live pill) and <see cref="IDisposable"/>.
+/// The Network tab: adapters, throughput, connections and diagnostics. Constructed once by the shell,
+/// but it polls only while it is the visible tab: it implements <see cref="IRefreshablePage"/> (toolbar
+/// Refresh), <see cref="ILiveSamplingPage"/> (toolbar Live pill), <see cref="IActivatablePage"/> (on/off
+/// screen) and <see cref="IDisposable"/>. The last two are composed by a <see cref="SamplingGate"/>.
 ///
 /// Throughput mirrors the Dashboard's sampler + 1 Hz timer + 60-sample rolling-buffer pattern. The
 /// design comp shows download and upload as TWO stacked charts, but they share ONE dynamic scale
@@ -26,7 +26,7 @@ namespace DashDetective.Tabs.Network;
 /// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
-public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IShortcutTarget, IDisposable {
+public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable {
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -35,6 +35,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Fixed rows per connections page; users move through pages with the numbered pager.</summary>
     private const int PageSize = 100;
+
+    /// <summary>Shown in place of the ping stats while the monitor is off, so an empty panel reads as a
+    /// choice rather than a failure.</summary>
+    private const string PingIdleSummary = "Press Start to ping";
+
+    /// <summary>The DNS panel's counterpart: the lookup is user-initiated, so nothing has resolved yet.</summary>
+    private const string DnsIdleFooter = "Press Look up to resolve";
 
     /// <summary>Cadence for re-reading adapters + IP config. Adapters change rarely (plug/unplug,
     /// connect/disconnect), so a coarse tick is plenty — like the Dashboard's 30 s uptime timer.</summary>
@@ -57,6 +64,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly DispatcherTimer _connectionsTimer;
     private readonly DispatcherTimer _pingTimer;
     private readonly PingMonitor _pingMonitor = new();
+    private readonly SamplingGate _gate;
+    private readonly Task _pingSeed;
     private bool _connectionsInFlight;
     private bool _pingInFlight;
 
@@ -106,14 +115,24 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Whether to show the pager row (only when the list spans more than one page).</summary>
     [ObservableProperty] private bool _pagerVisible;
 
-    /// <summary>The ping target, editable in the Ping panel. Applied via <see cref="ApplyPingTargetCommand"/>.</summary>
-    [ObservableProperty] private string _pingTarget = PingMonitor.DefaultTarget;
+    /// <summary>The ping target, editable in the Ping panel. Seeded with the machine's own gateway.</summary>
+    [ObservableProperty] private string _pingTarget = "";
+
+    /// <summary>Whether the user has switched the ping monitor on. Off on every launch — the app must not
+    /// send ICMP nobody asked for — and it survives leaving the tab, so returning finds it as it was left.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PingButtonText))]
+    private bool _pingEnabled;
+
+    /// <summary>The Start/Stop button's label, which is also the only disclosure that the monitor sends
+    /// traffic at all.</summary>
+    public string PingButtonText => PingEnabled ? "Stop" : "Start";
 
     /// <summary>Console-style ping output (last few reply lines).</summary>
     [ObservableProperty] private string _pingConsole = "";
 
-    /// <summary>Rolling average-RTT / packet-loss summary line.</summary>
-    [ObservableProperty] private string _pingSummary = "";
+    /// <summary>Rolling average-RTT / packet-loss summary line, or the idle prompt while stopped.</summary>
+    [ObservableProperty] private string _pingSummary = PingIdleSummary;
 
     /// <summary>The DNS lookup host, editable in the DNS panel. Applied via <see cref="LookupDnsCommand"/>.</summary>
     [ObservableProperty] private string _dnsHost = DnsLookupProvider.DefaultHost;
@@ -122,7 +141,11 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     [ObservableProperty] private string _dnsConsole = "";
 
     /// <summary>DNS footer line (timing + record type, or a failure note).</summary>
-    [ObservableProperty] private string _dnsFooter = "";
+    [ObservableProperty] private string _dnsFooter = DnsIdleFooter;
+
+    /// <summary>Whether a lookup has been run this session, so Refresh re-resolves what the user asked
+    /// for rather than reaching out to a host they never requested.</summary>
+    private bool _dnsResolved;
 
     public NetworkViewModel() : this(NetworkProviders.ForCurrentPlatform()) { }
 
@@ -136,31 +159,43 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
             () => _networkSampler.Sample(), static s => s.DownMbps, OnNetworkSample, OnNetworkFailed);
         UpdateThroughput(new NetworkSample(0, 0));
-        _networkChannel.Start();
 
-        // Adapters + IP config load once off the UI thread, then refresh on a coarse timer.
+        // Adapters + IP config load once off the UI thread, then refresh on a coarse timer. This load
+        // stays in the constructor because the shell's exported report reads the IP configuration from
+        // here whether or not the tab was ever opened.
         _ = LoadAdaptersAsync();
 
         _adapterTimer = new DispatcherTimer { Interval = AdapterInterval };
         _adapterTimer.Tick += OnAdapterTick;
-        _adapterTimer.Start();
-
-        // Connections load once, then refresh on their own (slower) timer.
-        _ = LoadConnectionsAsync();
 
         _connectionsTimer = new DispatcherTimer { Interval = ConnectionsInterval };
         _connectionsTimer.Tick += OnConnectionsTick;
-        _connectionsTimer.Start();
-
-        // Ping the fixed target continuously; kick one off now so the panel isn't blank on arrival.
-        _ = RunPingAsync();
 
         _pingTimer = new DispatcherTimer { Interval = PingInterval };
         _pingTimer.Tick += OnPingTick;
-        _pingTimer.Start();
 
-        // DNS is a one-shot lookup (not a live loop): resolve once now, and again on Refresh.
-        _ = LoadDnsAsync();
+        // Nothing above is started here: the gate runs the timers only while the tab is on screen and
+        // the Live pill is on, so a tab that is never opened costs nothing. The ping timer additionally
+        // waits for the user to press Start, and the DNS panel for Look up — neither sends anything on
+        // its own.
+        _gate = new SamplingGate(ApplySampling);
+
+        _pingSeed = SeedPingTargetAsync();
+    }
+
+    /// <summary>Test seam: completes once the gateway suggestion has been written (or declined). The seed
+    /// is the only other writer of <see cref="PingTarget"/>, so a test that sets the field itself waits on
+    /// this first rather than racing it.</summary>
+    internal Task PingTargetSeeded => _pingSeed;
+
+    /// <summary>Suggests the machine's own gateway as the ping target — the one host the app can offer
+    /// without choosing somebody else's server on the user's behalf. Never written over a value already
+    /// typed, and left empty when there is no gateway, so Start simply has nothing to send until a host
+    /// is named. Adapter enumeration is slow enough to keep off the UI thread.</summary>
+    private async Task SeedPingTargetAsync() {
+        var gateway = await Task.Run(NetworkGateway.Primary).ConfigureAwait(true);
+        if (gateway is not null && string.IsNullOrWhiteSpace(PingTarget))
+            PingTarget = gateway;
     }
 
     /// <summary>Sampler-failure handler for the throughput channel: shows neutral placeholders.</summary>
@@ -346,6 +381,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Reads the DNS lookup off the UI thread and publishes the console + footer text. The
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
     private async Task LoadDnsAsync() {
+        _dnsResolved = true;
         try {
             var result = await _providers.Dns.GetAsync(DnsHost);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
@@ -357,30 +393,64 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
-    /// <summary>Re-runs the DNS lookup for the host currently in the field (Enter / the Look up button).</summary>
+    /// <summary>Runs the DNS lookup for the host currently in the field (Enter / the Look up button). The
+    /// only thing that ever resolves a name: the panel stays idle until the user asks.</summary>
     [RelayCommand]
     private void LookupDns() => _ = LoadDnsAsync();
 
-    /// <summary>Applies the ping target in the field: switches the monitor (resetting its rolling
-    /// window), clears the console readout, and sends one ping so the panel updates immediately.</summary>
+    /// <summary>The Ping panel's Start/Stop button.</summary>
     [RelayCommand]
-    private void ApplyPingTarget() {
+    private void TogglePing() {
+        if (PingEnabled)
+            StopPing();
+        else
+            StartPing();
+    }
+
+    /// <summary>Applies the target in the field (Enter / the field's key binding) and pings it. Starting
+    /// is the only outcome — Enter in a text box stopping the monitor would be a surprise.</summary>
+    [RelayCommand]
+    private void ApplyPingTarget() => StartPing();
+
+    /// <summary>Points the monitor at the field's target, resetting its rolling window, and sends one ping
+    /// so the panel updates immediately. A blank field is left alone: there is nothing to send, and
+    /// substituting a host of the app's own choosing is exactly what this panel no longer does.</summary>
+    private void StartPing() {
+        if (string.IsNullOrWhiteSpace(PingTarget))
+            return;
+
         _pingMonitor.SetTarget(PingTarget);
-        // Reflect any normalisation (trim/blank-ignored) back into the field.
+        // Reflect the trim back into the field.
         PingTarget = _pingMonitor.Target;
         PingConsole = "";
         PingSummary = "";
+        PingEnabled = true;
+
+        // Off-screen or paused, the gate keeps the timer stopped; the flag survives either way, so the
+        // monitor resumes on its own when the tab comes back.
+        if (_gate.IsRunning)
+            _pingTimer.Start();
         _ = RunPingAsync();
     }
 
-    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read, connections re-read, ping and
-    /// DNS re-lookup. Runs even while paused (a manual refresh should still update once), like the Dashboard.</summary>
+    /// <summary>Stops the monitor, leaving the last replies on screen with an idle summary.</summary>
+    private void StopPing() {
+        PingEnabled = false;
+        _pingTimer.Stop();
+        PingSummary = PingIdleSummary;
+    }
+
+    /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read and connections re-read. The ping
+    /// and DNS panels join in only once the user has started them — a refresh must not turn into the first
+    /// packet either one ever sent. Runs even while paused, like the Dashboard.</summary>
     public void Refresh() {
         _networkChannel.SampleNow();
         _ = LoadAdaptersAsync();
         _ = LoadConnectionsAsync();
-        _ = RunPingAsync();
-        _ = LoadDnsAsync();
+        if (PingEnabled)
+            _ = RunPingAsync();
+        if (_dnsResolved)
+            _ = LoadDnsAsync();
     }
 
     /// <summary>
@@ -402,12 +472,26 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Pauses/resumes all of the tab's live polling. Drives the shell's Live pill;
     /// <see cref="Refresh"/> still works while paused.</summary>
-    public void SetLive(bool live) {
-        if (live) {
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the tab's polling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts every live timer on the page — the gate's composed answer, so it reflects
+    /// the Live pill and the tab's visibility at once.</summary>
+    private void ApplySampling(bool running) {
+        if (running) {
             _networkChannel.Start();
             _adapterTimer.Start();
             _connectionsTimer.Start();
-            _pingTimer.Start();
+
+            // The ping loop is the user's to start, so visibility alone never resumes one they never began.
+            if (PingEnabled)
+                _pingTimer.Start();
+
+            // Any time away leaves the connections snapshot stale, so re-read it now rather than showing
+            // the old page until the first tick.
+            _ = LoadConnectionsAsync();
         } else {
             _networkChannel.Stop();
             _adapterTimer.Stop();

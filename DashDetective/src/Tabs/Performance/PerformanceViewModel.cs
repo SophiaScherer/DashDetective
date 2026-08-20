@@ -33,7 +33,7 @@ namespace DashDetective.Tabs.Performance;
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
 public partial class PerformanceViewModel : ViewModelBase,
-        IRefreshablePage, ILiveSamplingPage, ISelfScrollingPage, IDisposable {
+        IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IDisposable {
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -88,7 +88,8 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     private readonly SystemMetricsService _service;
     private readonly HardwareProviders _providers;
-    private readonly IDisposable[] _subscriptions;
+    private readonly MetricSubscriptions _subscriptions;
+    private readonly SamplingGate _gate;
 
     // ---- CPU (live) ----
     private readonly double[] _cpuHistory = new double[WindowSeconds];
@@ -247,21 +248,25 @@ public partial class PerformanceViewModel : ViewModelBase,
         // once the inventory load completes.
         RebuildResources();
 
-        // Subscribe to the shared metrics; each subscription immediately replays the latest cached sample,
-        // seeding the surfaces with real data on the first frame. Disks are driven by the page-local per-disk
-        // sampler instead — the shared storage feed reports only the _Total aggregate, not per drive.
-        _subscriptions = new[] {
-            service.SubscribeCpu(OnCpu, OnCpuFailed),
-            service.SubscribeMemory(OnMemory, OnMemoryFailed),
-            service.SubscribeNetwork(OnNetwork, OnNetworkFailed),
-        };
+        // The shared-metric subscriptions, established on activation rather than here: the feeds are
+        // ref-counted, so a page that stays subscribed off screen keeps them sampling. Each subscription
+        // replays the latest cached sample when it attaches, seeding the surfaces with real data. Disks are
+        // driven by the page-local per-disk sampler instead — the shared storage feed reports only the
+        // _Total aggregate, not per drive.
+        _subscriptions = new MetricSubscriptions(
+            () => service.SubscribeCpu(OnCpu, OnCpuFailed),
+            () => service.SubscribeMemory(OnMemory, OnMemoryFailed),
+            () => service.SubscribeNetwork(OnNetwork, OnNetworkFailed));
 
         // Drive the per-disk / per-GPU / per-core rows from the page-local samplers, at the same cadence as
         // the shared feeds so every chart on the page covers the same span of time.
         _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
-        _throughputTimer.Start();
         service.IntervalChanged += OnIntervalChanged;
+
+        // The timer is not started here: the gate runs it only while the page is on screen and the Live
+        // pill is on.
+        _gate = new SamplingGate(ApplySampling);
 
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready. The device
         // inventory enumerates the physical disks into their own rows.
@@ -361,11 +366,22 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Pauses/resumes the page-local per-disk throughput timer for the shell's Live toggle. The shared
     /// CPU/Memory/GPU/Network feeds are paused separately by the shell via
     /// <see cref="SystemMetricsService.Pause"/>.</summary>
-    public void SetLive(bool live) {
-        if (live)
+    public void SetLive(bool live) => _gate.Live = live;
+
+    /// <summary>Starts/stops the page's sampling as it comes on and off screen.</summary>
+    public void SetActive(bool active) => _gate.Active = active;
+
+    /// <summary>Runs or halts everything the page samples — the shared subscriptions plus its own per-disk /
+    /// per-GPU / per-core timer. The gate's composed answer, so it reflects the Live pill and visibility at
+    /// once.</summary>
+    private void ApplySampling(bool running) {
+        if (running) {
+            _subscriptions.Attach();
             _throughputTimer.Start();
-        else
+        } else {
+            _subscriptions.Detach();
             _throughputTimer.Stop();
+        }
     }
 
     /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
@@ -927,8 +943,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// samplers and the timer. The shared feed's samplers are owned (and disposed) by the service. Safe to
     /// call more than once.</summary>
     public void Dispose() {
-        foreach (var subscription in _subscriptions)
-            subscription.Dispose();
+        _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;

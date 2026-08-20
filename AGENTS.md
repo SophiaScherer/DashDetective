@@ -29,8 +29,8 @@ Not all of these exist yet. Only build what is listed below as "currently active
 **No feature is mid-build right now — every planned top-level feature is live.** Pick up only what a new
 task explicitly assigns, and do not modify a live feature without an explicit scope expansion.
 
-**Already-live features — read for consistency (shared styles, naming, the always-on / self-scrolling
-patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
+**Already-live features — read for consistency (shared styles, naming, the page-lifecycle /
+self-scrolling patterns)** (full write-ups in *Appendix — Completed Feature Details*): the shell **Navigation bar**,
 **Dashboard**, **Settings** (fully live — Appearance, Navigation, Monitoring and Export & Data),
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
 drives/health view; status below), **Toolkit** (live; status below) and **Keyboard shortcuts**
@@ -156,8 +156,10 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   it is checked. Injection is already impossible (the value becomes one `ArgumentList` element), so the
   validator's real job is that **an accepted value cannot be a flag** — a DNS label may not begin with a
   hyphen, so `-t` and friends are refused. The box is seeded with the primary adapter's gateway via
-  `ToolkitDefaults` (reusing `NetworkUsageSampler.SelectPrimary`), off the UI thread and **never over a
-  value already typed**. The log's `$` line shows `ToolkitAction.CommandLine` — the resolved target plus
+  `ToolkitDefaults`, off the UI thread and **never over a value already typed**. The lookup itself now
+  lives in `NetworkGateway` (`src/Services/Network`), shared with the Network tab's ping panel; what stays
+  in `ToolkitDefaults` is only this table's answer to "no gateway", which is the `8.8.8.8` literal — a
+  `ping <host>` row with an empty box would be a dead button. The Network tab answers it the other way. The log's `$` line shows `ToolkitAction.CommandLine` — the resolved target plus
   arguments — not the row's label, so a placeholder (`ping <host>`) and any flags the label omits
   (`tracert -h 20`) are both visible in the transcript.
 - **The page has no separate busy flag, on purpose.** Refusing concurrent runs makes the generated
@@ -250,9 +252,31 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   `IPhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
   card's **Temp** from `DiskTemperatureProvider` (non-admin `IOCTL_STORAGE_QUERY_PROPERTY` health-log read,
   refreshed on a slow ~15 s sub-cadence of the throughput timer). Wired to `IRefreshablePage` /
-  `ILiveSamplingPage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
+  `ILiveSamplingPage` / `IActivatablePage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
   (needs admin or vendor SDKs). No new packages, no new shared controls. (**GPU** temperature is no longer
   deferred — it is live on the Performance tab via per-vendor SDKs; see the write-up in the Appendix.)
+
+### Page lifecycle — SHIPPED (branch `backgroundBehavior`, 2026-08)
+
+**Pages no longer run while nobody is looking at them, and the app no longer touches the network unasked.**
+Three rules, and they are load-bearing — a page that breaks one is a regression, not a style choice:
+
+1. **A page's timers are built STOPPED.** `SamplingGate` (live ∧ on-screen) starts them; the shell moves
+   activation with navigation and with hide-to-tray. A constructor that calls `Start()` puts the page back
+   to sampling from launch on a tab nobody opened.
+2. **A deactivated page DROPS its `SystemMetricsService` subscriptions** (`MetricSubscriptions`). The feeds
+   are ref-counted, so a page that stays subscribed and merely ignores its callbacks still pays for them.
+   The service's own alert watcher follows the same rule, behind `AlertsEnabled`.
+3. **Nothing reaches the network on its own.** The Network tab's ping is opt-in and defaults to the
+   machine's own gateway; its DNS lookup runs only when asked. Neither may move back into a constructor.
+
+What stays in constructors is the **one-shot** loads, because the shell's exported report and universal
+search read them from pages the user may never open (`LoadAdaptersAsync`, the Processes list load, the
+hardware/inventory loads). Measured on the development machine: ~3 % of one core on a visible sampling tab
+→ ~0.2 % once another tab is selected, and 4.7 % → ~0.8 % hidden in the tray. The residue is the shell's
+own 1 Hz clock timer, which is not gated.
+
+Closing the window also **says so once** — see `/Shell/TrayNotice` in *Folder Structure*.
 
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
@@ -353,8 +377,19 @@ currently exist.
       IRefreshablePage.cs     (marker: a page the toolbar Refresh routes to; Refresh() re-reads its
                                data — Dashboard re-samples, File Explorer reloads the current folder)
       ILiveSamplingPage.cs    (marker: a page with live sampling the toolbar Live pill pauses/resumes;
-                               MainWindowViewModel.ToggleLive routes SetLive() over every nav page —
-                               Dashboard + Network)
+                               MainWindowViewModel.ToggleLive routes SetLive() over every nav page)
+      IActivatablePage.cs     (marker: a page that should only work while it is on screen.
+                               MainWindowViewModel.UpdatePageActivity routes SetActive() over every nav
+                               page — the current one when the window is visible, nothing otherwise, so
+                               hiding to the tray idles the app rather than merely hiding it. The five
+                               sampling pages implement it; Hardware/Toolkit/Settings/File Explorer own
+                               no timer and do not)
+      SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
+                               a page's timers care about, so the five do not each hand-roll the pair.
+                               STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
+                               opened cost nothing, and why page constructors must build their timers
+                               STOPPED. Fires its callback only on a TRANSITION, so a re-selected tab or
+                               a pill toggled off-screen cannot churn the timers)
       HardwareNameFormatter.cs (static: trims vendor/marketing decoration from CPU/GPU names for the
                                 compact captions; shared by Dashboard + Performance. Distinct from
                                 HardwareCatalog.Normalize — display trim, not a lookup key)
@@ -365,7 +400,8 @@ currently exist.
                                 stock GNOME runs no StatusNotifierItem host, and the setting is ON BY
                                 DEFAULT, so honouring it there hides the window behind an icon that never
                                 appears. Nothing can be asked at startup, and guessing wrong strands the
-                                app — read by MainWindowViewModel.ShowInTray and the Settings toggle)
+                                app — read by MainWindowViewModel.ShowInTray and the Settings toggle.
+                                The FIRST hide additionally shows the tray notice — see /Shell/TrayNotice)
       /Charts
         SparklinePoints.cs      (renders a rolling metric history to a Sparkline "x,y" points string on a
                                  fixed 0–100 axis; percentage metrics pass valueMax 100, unbounded ones a
@@ -764,8 +800,28 @@ currently exist.
                                  Processes SUBSCRIBE instead of owning these samplers. Per-GPU and per-disk
                                  readings are page-local instead (multi-instance; this feed carries only a
                                  single aggregate), as is the Network tab's own NetworkUsageSampler. Built in
-                                 the App composition root and disposed on shutdown.)
+                                 the App composition root and disposed on shutdown.
+                                 THE ALERT WATCHER IS OPT-IN (AlertsEnabled, mirroring the "Resource alerts"
+                                 setting and off by default like it): it subscribes to CPU + Memory, so left
+                                 on it holds both channels sampling with every page deactivated — which is
+                                 most of what the app used to cost hidden in the tray. Clearing it also
+                                 clears any active alert, so a banner cannot outlive its setting.)
+        MetricSubscriptions.cs  (a page's subscriptions as FACTORIES rather than tokens, with idempotent
+                                 Attach/Detach, so IActivatablePage can drop and re-establish them.
+                                 DROPPING THEM IS WHAT STOPS THE FEED — the service ref-counts subscribers,
+                                 so a deactivated page that merely ignored its callbacks would still be
+                                 paying for them. Re-attaching replays the cached latest sample, so a page
+                                 returning to screen seeds with real data instead of a blank frame)
       /Network
+        NetworkGateway.cs       (the machine's own IPv4 default gateway, over NetworkUsageSampler
+                                 .SelectPrimary. Shared because two features want it: the Toolkit's
+                                 parameterised ping/tracert boxes and the Network tab's ping panel.
+                                 REPORTS null RATHER THAN A FALLBACK HOST — the two callers answer "no
+                                 gateway" differently, and the lookup must not decide for them: the
+                                 Toolkit substitutes a literal (a `ping <host>` row with an empty box is
+                                 a dead button), while the Network tab leaves its box empty rather than
+                                 offering a host the user never asked to contact. Never throws; slow
+                                 enough that callers run it off the UI thread)
         NetworkUsageSampler.cs  (live down/up Mbps via managed NetworkInterface; samples ONE primary
                                  adapter — internet-facing, has a default gateway — NOT a sum of all
                                  adapters, see the gotcha below. Shared: Dashboard and the Network tab
@@ -781,6 +837,17 @@ currently exist.
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
                                  the viewport — see File Explorer)
+      /TrayNotice
+        TrayNoticeWindow.axaml(.cs) (the ONE-TIME "this app is still running" dialog, shown before the
+                                     FIRST hide-to-tray and never again (AppSettings.TrayNoticeShown).
+                                     Asked BEFORE hiding, over the window the user has just closed: a
+                                     toast afterwards would have to guess where the tray is, and can be
+                                     missed. MainWindow.OnClosing cancels the close and awaits it from a
+                                     helper, the ExportReportAsync split, since a closing handler cannot
+                                     await. AskAsync returns bool? ON PURPOSE — with a plain bool a
+                                     title-bar dismissal is default(bool) and would EXIT the app; the
+                                     safe answer is the one the setting already gives. No view model:
+                                     it holds no state but which button was pressed)
       /Navigation
         NavigationView.axaml(.cs)   (the collapsible/dockable nav-bar component; brand + item list +
         NavigationViewModel.cs       footer, with no permanent control chrome — collapse is the hover
@@ -986,10 +1053,13 @@ currently exist.
                                                          resolved — udisks2 uses the first on Ubuntu and
                                                          the second on Fedora/Arch)
       /Network                  NetworkView.axaml(.cs) + NetworkViewModel.cs
-                                                        (VM implements IRefreshablePage + ILiveSamplingPage;
-                                                         always-on like Dashboard. Owns the throughput
-                                                         sampler + adapter/connection/ping/DNS timers and
-                                                         the keyed-diff for the connections list. Tab-local
+                                                        (VM implements IRefreshablePage + ILiveSamplingPage
+                                                         + IActivatablePage; it polls only while it is the
+                                                         visible tab. Owns the throughput sampler +
+                                                         adapter/connection/ping timers and the keyed-diff
+                                                         for the connections list. THE PING AND DNS PANELS
+                                                         ARE USER-INITIATED and start nothing on their own —
+                                                         see the write-up in the Appendix. Tab-local
                                                          MonoFont + fixed console-colour resources live in
                                                          the view — promote to Shared if reused)
                                 NetworkProviders.cs     (the tab's provider bundle + ForCurrentPlatform();
@@ -1056,12 +1126,18 @@ currently exist.
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
-                                PingMonitor.cs          (reused in-box Ping to 8.8.8.8; rolling avg/loss +
-                                                         last-3 lines; soft-fails to a timeout)
+                                PingMonitor.cs          (reused in-box Ping; rolling avg/loss + last-3
+                                                         lines; soft-fails to a timeout. NO DEFAULT TARGET:
+                                                         Target starts EMPTY. It used to default to 8.8.8.8,
+                                                         which is how the app came to ping a public resolver
+                                                         from launch — and since SetTarget ignores a blank
+                                                         value, leaving the constant would let an empty box
+                                                         silently resolve back to it)
                                 IDnsLookupProvider.cs   (seam + the DnsResult record)
-                                DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync to example.com with a
-                                                         3 s CTS; record type by address family. No platform
-                                                         prefix — portable)
+                                DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync with a 3 s CTS;
+                                                         record type by address family. DefaultHost seeds
+                                                         the BOX only — nothing resolves until the user
+                                                         presses Look up. No platform prefix — portable)
       /Hardware                 HardwareView.axaml(.cs) + HardwareViewModel.cs
                                                         (spec grid; whole-page scroll like the Dashboard
                                                          — not self-scrolling. VM builds the six fixed
@@ -1128,7 +1204,8 @@ currently exist.
                                  Sparkline utilization chart + a 4-tile stat strip (StatTile item VMs).
                                  Fills the viewport via ISelfScrollingPage, like File Explorer. All five
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
-                                 SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IDisposable.)
+                                 SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IActivatablePage/
+                                 IDisposable.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 SystemCacheProvider.cs  (page-local psapi GetPerformanceInfo P/Invoke:
@@ -1166,7 +1243,7 @@ currently exist.
                                  VolumeProvider; Disk Activity + Queue from the shared StorageUsageSampler
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
                                  from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
-                                 ILiveSamplingPage/IDisposable.)
+                                 ILiveSamplingPage/IActivatablePage/IDisposable.)
       /Processes                (the tab itself is described under Feature notes; only its platform seam
                                  is mapped here)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
@@ -1696,6 +1773,8 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     source-gen, load-on-start with full soft-fail to defaults, debounced atomic save, `schemaVersion`).
     The composition root (`App` → `MainWindowViewModel`) applies a loaded snapshot through the seams and
     observes them to save; `ThemeService` stays the single theming applier — the store only observes.
+    `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
+    that the app has disclosed, once, that closing the window does not stop it.
     This **supersedes the "session-only" note** for Theming and Navigation (their choices now persist).
 
 - **File Explorer** — **live and functional** (built in phases; plan:
@@ -1824,8 +1903,9 @@ When a new feature becomes active, or an existing one is completed/paused, updat
 
 - **Network** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
-  Network page: six panels in two rows. The tab is always-on like the Dashboard (VM constructed once
-  in `MainWindowViewModel`), reuses the shared `Sparkline`, and adds **no new NuGet packages** (all
+  Network page: six panels in two rows. The VM is constructed once in `MainWindowViewModel` and follows
+  the shared page lifecycle (it samples only while it is the visible tab — see *Lifecycle* below), reuses
+  the shared `Sparkline`, and adds **no new NuGet packages** (all
   in-box: `System.Net.NetworkInformation`, `System.Net.NetworkInformation.Ping`, `System.Net.Dns`,
   and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File Explorer and
   Settings. Panels:
@@ -1849,11 +1929,26 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     stale-PID eviction and resolved per platform: Windows appends `.exe` and names 0/4 "System
     Idle"/"System"; Linux does neither (PID 4 there is a kernel thread) and shows "—" for a socket whose
     owner an unprivileged reader cannot see. Either way an unnameable process falls back to "PID n".
-  - **Ping** — continuous ping to a fixed `8.8.8.8` (in-box `Ping`, 2 s timer, 1.5 s timeout,
-    in-flight-guarded), console-style last-3 replies + rolling avg-RTT / loss summary (`PingMonitor`).
-  - **DNS Lookup** — one-shot resolve of a fixed `example.com` (in-box `Dns.GetHostEntryAsync`, 3 s
-    `CancellationTokenSource`), run at startup and on Refresh (not a live loop), console-style output
-    with record type (`DnsLookupProvider`).
+  - **Ping** — **opt-in**, and the target defaults to **the machine's own gateway** (`NetworkGateway`,
+    seeded off the UI thread and never over a value already typed; empty when there is no gateway).
+    The panel's button is **Start/Stop**; Enter in the field applies the target and starts, because a
+    text box that stops the monitor would surprise. Nothing sends until Start is pressed: this used to
+    be a continuous 2 s ping to a hard-coded `8.8.8.8` begun in the **constructor**, so the app pinged a
+    public resolver from launch — around 43,000 ICMP a day — whether or not the tab was ever opened,
+    with nothing in the UI disclosing it. Still in-box `Ping`, 2 s timer, 1.5 s timeout, in-flight
+    guarded; console-style last-3 replies + rolling avg-RTT / loss (`PingMonitor`). `ToolkitHostValidator`
+    is deliberately **not** reused here — the value reaches managed `Ping.SendPingAsync` as a host
+    string, with no process and no argument list, so there is no flag for it to become.
+  - **DNS Lookup** — **user-initiated**: one-shot resolve via in-box `Dns.GetHostEntryAsync` (3 s
+    `CancellationTokenSource`), console-style output with record type (`DnsLookupProvider`). The field is
+    seeded with `example.com` but **nothing resolves until Look up is pressed**, and Refresh re-resolves
+    only once a lookup has been run — a manual refresh must not become the first packet the panel ever
+    sent. It, too, used to fire from the constructor.
+  - **Lifecycle** — the tab is **no longer always-on**. `IActivatablePage` + `SamplingGate` start its
+    timers when it becomes the visible tab and stop them when it stops being one; the ping monitor
+    additionally waits for the user, and its on/off survives leaving the tab, so returning finds it as
+    it was left. Measured: ~3 % of one core with the tab visible and pinging, ~0.2 % once another tab
+    is selected.
 
   Cross-cutting seams this tab added (both signed-off): the throughput sampler was **moved** from
   `src/Tabs/Dashboard` to **`src/Services/Network`** (see *Folder Structure*) so Dashboard and Network
@@ -1910,8 +2005,8 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a
   permanent "—" the column was deleted outright: header, data cell, sort key and all. This is **not
   deferred work** — do not re-add the column or build toward it without an explicit task. The table is
-  7 columns. Follows the always-on tab pattern (constructed once in the shell; `IRefreshablePage` +
-  `ILiveSamplingPage` + `IDisposable` + `ISelfScrollingPage`), the Network tab's keyed-diff live table
+  7 columns. Follows the shared page-lifecycle pattern (constructed once in the shell; `IRefreshablePage` +
+  `ILiveSamplingPage` + `IActivatablePage` + `IDisposable` + `ISelfScrollingPage`), the Network tab's keyed-diff live table
   (via the shared `CollectionReconciler`, so rows are reused and the list doesn't flicker), and the
   File Explorer sortable-header + Properties patterns. The list polls on its own 2 s timer
   (enumerating every process is heavier than a single counter); the summary strip's system-wide
@@ -1929,7 +2024,8 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   (CPU / Memory / Storage / GPU / Network), keeps its own 60-sample rolling history rebuilt via
   `SparklinePoints`, and pushes into the selected row; static hardware labels load once via the
   `*InfoProvider` async-WMI providers. Implements `IRefreshablePage` (toolbar Refresh re-samples every
-  metric), `ILiveSamplingPage` (Live/Pause is the shared service's) and `IDisposable`. No new packages,
+  metric), `ILiveSamplingPage` (Live/Pause is the shared service's), `IActivatablePage` (it samples only
+  while it is the visible tab) and `IDisposable`. No new packages,
   no new shared controls. The CPU **Speed** tile is live: a page-local `IProcessorFrequencySampler`
   (`src/Services/SystemMetrics`, chosen by `ForCurrentPlatform()`). The Windows arm reads the PDH
   `\Processor Information(_Total)\% Processor Performance` ratio and `CpuSpeedFormatter` scales the WMI

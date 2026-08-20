@@ -31,8 +31,9 @@ public sealed class SystemMetricsService : IDisposable {
     private readonly MetricFeed[] _feeds;
 
     // Internal resource-alert watcher: consecutive-breach streaks per metric and the combined state.
-    private readonly IDisposable _cpuAlertSub;
-    private readonly IDisposable _memoryAlertSub;
+    // Its subscriptions are what would keep the CPU and memory feeds alive with no page on screen, so
+    // they are attached only while the user has resource alerts switched on (see AlertsEnabled).
+    private readonly MetricSubscriptions _alertWatchers;
     private int _cpuBreachStreak;
     private int _memoryBreachStreak;
     private bool _alertActive;
@@ -58,10 +59,11 @@ public sealed class SystemMetricsService : IDisposable {
         _network = new MetricFeed<NetworkSample>(DefaultInterval, samplers.Network, timerFactory);
         _feeds = new MetricFeed[] { _cpu, _memory, _network };
 
-        // Watch CPU + memory for a sustained breach. Subscribing keeps these two channels running, which
-        // the always-on Dashboard already does; Pause still halts them (the Live pill), holding the streaks.
-        _cpuAlertSub = _cpu.Subscribe(OnCpuAlertSample, static () => { });
-        _memoryAlertSub = _memory.Subscribe(OnMemoryAlertSample, static () => { });
+        // Watch CPU + memory for a sustained breach. Built detached: the setting is off by default, and
+        // subscribing would hold both channels open however little else is running.
+        _alertWatchers = new MetricSubscriptions(
+            () => _cpu.Subscribe(OnCpuAlertSample, static () => { }),
+            () => _memory.Subscribe(OnMemoryAlertSample, static () => { }));
     }
 
     // Builds the three shared real samplers, each wrapped in a Sample() delegate; the CPU instance is also
@@ -88,6 +90,28 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Whether a resource alert is currently active.</summary>
     public bool AlertActive => _alertActive;
+
+    /// <summary>Whether the resource-alert watcher is running — mirrors the user's "Resource alerts"
+    /// setting, and is off by default like it. The watcher subscribes to the CPU and memory feeds, so
+    /// leaving it on holds both open even with every page deactivated. Switching it off clears any
+    /// active alert, so a banner cannot outlive the setting that raised it.</summary>
+    public bool AlertsEnabled {
+        get => _alertWatchers.IsAttached;
+        set {
+            if (value == _alertWatchers.IsAttached)
+                return;
+
+            if (value) {
+                _alertWatchers.Attach();
+                return;
+            }
+
+            _alertWatchers.Detach();
+            _cpuBreachStreak = 0;
+            _memoryBreachStreak = 0;
+            EvaluateAlert();
+        }
+    }
 
     /// <summary>Friendly name of the sampled network adapter, for the throughput caption.</summary>
     public string NetworkAdapterName => _adapterName();
@@ -171,8 +195,7 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Stops all channels and disposes the sampler that owns a native query handle (CPU).</summary>
     public void Dispose() {
-        _cpuAlertSub.Dispose();
-        _memoryAlertSub.Dispose();
+        _alertWatchers.Dispose();
         foreach (var feed in _feeds)
             feed.Dispose();
         _cpuDisposable?.Dispose();
