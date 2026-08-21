@@ -49,19 +49,31 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanGoUp))]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
     private string _currentPath = "";
 
     // ----- Load state -----
 
     /// <summary>Whether a folder read is in flight and has outlasted the grace period below.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private bool _isLoading;
+    [ObservableProperty] private bool _isLoading;
 
-    /// <summary>Whether the open folder has nothing to show — distinguishing a genuinely empty folder
-    /// from one still being read, which would otherwise look identical.</summary>
-    public bool IsEmpty => !IsLoading && CurrentPath.Length > 0 && VisibleEntries.Count == 0;
+    /// <summary>Why the list is blank, or "" when it has rows. Six situations used to look identical —
+    /// see <see cref="FolderMessages"/>, which decides between them.</summary>
+    [ObservableProperty] private string _folderMessageTitle = "";
+    [ObservableProperty] private string _folderMessageHint = "";
+
+    partial void OnCurrentPathChanged(string value) => UpdateFolderMessage();
+    partial void OnIsLoadingChanged(bool value) => UpdateFolderMessage();
+
+    // Pushed rather than computed: it also depends on the read status and the unfiltered count,
+    // neither of which raises a change notification of its own.
+    private void UpdateFolderMessage() {
+        var message = FolderMessages.Resolve(
+            IsLoading || _activeLoadId != 0, CurrentPath.Length > 0, _readStatus,
+            _allEntries.Count, VisibleEntries.Count, _selectedFilter.Label);
+
+        FolderMessageTitle = message?.Title ?? "";
+        FolderMessageHint = message?.Hint ?? "";
+    }
 
     // ----- Responsive table columns -----
 
@@ -129,7 +141,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // character at a time doesn't re-enumerate the same folder once per keystroke.
     private readonly PathCompletion _pathCompletion = new();
 
-    partial void OnPathTextChanged(string value) => _ = UpdatePathCompletionAsync(value);
+    /// <summary>Why the typed path was refused, or "" when there is nothing to say. The box stays open
+    /// showing this rather than closing on a bad path, so a typo in a long path is fixable in place.</summary>
+    [ObservableProperty] private string _pathError = "";
+
+    partial void OnPathTextChanged(string value) {
+        // Editing is an answer to the complaint, so drop it rather than leaving it against new text.
+        PathError = "";
+        _ = UpdatePathCompletionAsync(value);
+    }
 
     private async Task UpdatePathCompletionAsync(string typed) {
         var completion = await _pathCompletion.CompleteAsync(typed, ShowHidden);
@@ -149,6 +169,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Swaps the breadcrumb for the path box, seeded with the current folder.</summary>
     [RelayCommand]
     private void BeginPathEdit() {
+        PathError = "";
         PathText = CurrentPath;
         IsPathEditing = true;
         PathEditRequested?.Invoke();
@@ -156,24 +177,37 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
     /// <summary>Leaves the path box without navigating (Esc, or clicking away).</summary>
     [RelayCommand]
-    private void CancelPathEdit() => IsPathEditing = false;
+    private void CancelPathEdit() {
+        PathError = "";
+        IsPathEditing = false;
+    }
 
-    /// <summary>Opens the typed folder. A path that doesn't name a reachable folder simply reverts to
-    /// the breadcrumb — a typo shouldn't throw at a keystroke, matching how the rest of the page
-    /// soft-fails on file-system errors.</summary>
+    /// <summary>Opens the typed folder. A path that doesn't name one leaves the box open with what was
+    /// typed and says why — closing it discarded the text, so a typo in a long path cost a full retype.
+    /// Esc and clicking away still leave without navigating.</summary>
     [RelayCommand]
     private void CommitPath() {
         var path = PathText.Trim().Trim('"');
-        IsPathEditing = false;
 
-        if (path.Length == 0)
+        if (path.Length == 0) {
+            CancelPathEdit();
             return;
+        }
 
         try {
-            if (Directory.Exists(path))
+            if (Directory.Exists(path)) {
+                PathError = "";
+                IsPathEditing = false;
                 SetCurrentFolder(Path.GetFullPath(path));
+                return;
+            }
+
+            PathError = File.Exists(path)
+                ? "That's a file, not a folder"
+                : $"Can't find \"{path}\"";
         } catch {
-            // Malformed path (bad characters, too long, no permission to resolve) — stay put.
+            // Malformed path: bad characters, too long, or no permission to resolve it.
+            PathError = $"\"{path}\" isn't a valid path";
         }
     }
 
@@ -211,6 +245,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // disposed, so the watcher simply lives for the app's lifetime — no teardown plumbing needed.
     private readonly DirectoryWatcher _watcher = new();
 
+    // Why the current folder listed as it did, so an empty list can say which reason it is. Only
+    // meaningful once a load has completed.
+    private FolderReadStatus _readStatus = FolderReadStatus.Ok;
+
     // When set, the next folder load re-selects this path if it still exists (auto-refresh preserves
     // the user's selection; navigation leaves it null so selection clears as before).
     private string? _reselectPath;
@@ -239,6 +277,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         SizeSort = new SortColumn(FileSortKey.Size, OnSort);
         _sortColumns = new[] { NameSort, TypeSort, ModifiedSort, SizeSort };
         UpdateSortIndicators();
+
+        // Nothing is open yet, so say so rather than showing a blank pane.
+        UpdateFolderMessage();
 
         // Fires on a timer thread — hop to the UI thread before touching bound collections.
         _watcher.Changed += () => Dispatcher.UIThread.Post(ReloadCurrentFolderPreservingState);
@@ -337,20 +378,25 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
                 return;
             }
 
-            if (Path.GetDirectoryName(fullPath) is not { } folder || !Directory.Exists(folder))
+            if (Path.GetDirectoryName(fullPath) is not { } folder || !Directory.Exists(folder)) {
+                PathError = $"Can't find \"{fullPath}\"";
                 return;
+            }
 
             _reselectPath = fullPath;
             SetCurrentFolder(Path.GetFullPath(folder));
         } catch {
-            // Malformed path, or one that vanished between the search and the jump — stay put, the same
-            // way a typo in the path box does.
+            // Malformed path, or one that vanished between the search and the jump. Say so rather than
+            // leaving the search result looking like a button that does nothing.
+            PathError = $"Can't find \"{fullPath}\"";
         }
     }
 
     /// <summary>Opens a folder. <paramref name="recordHistory"/> is false only when the move *is* a
     /// history step (Back/Forward), which must move between the stacks rather than push onto them.</summary>
     private void SetCurrentFolder(string path, bool recordHistory = true) {
+        PathError = "";
+
         // Navigating to a *different* folder resets the list scroll to the top; a same-path reload
         // (sort, filter, Refresh, auto-refresh) leaves the user where they were.
         var isNavigation = !string.Equals(path, CurrentPath, PathComparison.Comparison);
@@ -469,6 +515,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _reselectPath = null;
 
         if (clearFirst) {
+            _readStatus = FolderReadStatus.Ok;
             SelectedEntry = null;
             _allEntries.Clear();
             RebuildVisibleEntries();
@@ -477,10 +524,11 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         if (showBusy)
             _ = ShowBusyAfterGraceAsync(id);
 
-        IReadOnlyList<FileItem> items;
+        FolderRead read;
         try {
-            items = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
+            read = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
         } catch {
+            _readStatus = FolderReadStatus.Unreadable;
             EndLoad(id);
             return;
         }
@@ -491,9 +539,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
         }
 
+        _readStatus = read.Status;
         SelectedEntry = null;
         _allEntries.Clear();
-        foreach (var item in items)
+        foreach (var item in read.Items)
             _allEntries.Add(new FileEntry(item, OnEntrySelected));
         RebuildVisibleEntries();
 
@@ -522,6 +571,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         _activeLoadId = 0;
         IsLoading = false;
+
+        // Explicit: a read fast enough to never raise IsLoading leaves that setter silent, so the
+        // message would stay suppressed for a folder that has finished answering.
+        UpdateFolderMessage();
     }
 
     private void OnEntrySelected(FileEntry entry) {
@@ -584,7 +637,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         // One Reset rather than a Clear plus an Add per row: a 5,000-entry folder is otherwise
         // ~5,000 layout invalidations on the UI thread.
         VisibleEntries.Reset(filtered);
-        OnPropertyChanged(nameof(IsEmpty));
+        UpdateFolderMessage();
 
         // Drop a selection that the filter just hid.
         if (SelectedEntry is { } sel && !filtered.Contains(sel)) {

@@ -402,6 +402,13 @@ currently exist.
                                 appears. Nothing can be asked at startup, and guessing wrong strands the
                                 app — read by MainWindowViewModel.ShowInTray and the Settings toggle.
                                 The FIRST hide additionally shows the tray notice — see /Shell/TrayNotice)
+      GpuMetricsSupport.cs     (whether reading NVIDIA GPU utilization costs a helper process here.
+                                LINUX ONLY: there the figure exists solely through nvidia-smi, which is
+                                why the setting is opt-in at all; Windows takes it from a PDH counter it
+                                already polls, so the toggle has nothing to turn on and the sampler
+                                discards the write. The TrayIntegration shape — one named capability,
+                                read by SettingDescriptions.NvidiaGpuMetricsFor and by
+                                SettingsViewModel.CanUseNvidiaMetrics)
       /Charts
         SparklinePoints.cs      (renders a rolling metric history to a Sparkline "x,y" points string on a
                                  fixed 0–100 axis; percentage metrics pass valueMax 100, unbounded ones a
@@ -984,14 +991,25 @@ currently exist.
                                                         (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
                                 SettingDescriptions.cs  (the descriptions that name a MECHANISM rather
-                                                         than an effect, so cannot be shared — "Start with
-                                                         Windows", and the tray row's. Each is the label
-                                                         the page shows AND the text search matches, so a
-                                                         wrong one is both misleading and unfindable.
+                                                         than an effect, or a platform that cannot honor
+                                                         one, so cannot be shared — "Start with Windows",
+                                                         the tray row's, and the NVIDIA row's. Each is the
+                                                         label the page shows AND the text search matches,
+                                                         so a wrong one is both misleading and unfindable.
                                                          Takes the platform as a parameter, the
                                                          ProcessGroupNames shape. KEYWORDS ARE NOT
                                                          per-platform: they are shared, so editing them
-                                                         changes the Windows search index too)
+                                                         changes the Windows search index too. TWO rows are
+                                                         DISABLED-NOT-HIDDEN on a platform that cannot
+                                                         honor them (ShowInTray, NvidiaGpuMetrics): the
+                                                         search index must not vary by platform, the search
+                                                         reveal finds a row by its Tag IN THE VISUAL TREE
+                                                         so a collapsed one is a dead hit, SettingCatalog
+                                                         tests pin a catalog<->SettingId bijection, and a
+                                                         settings.json carried between machines has to
+                                                         survive. IsEnabled goes on the row BORDER, not the
+                                                         toggle — a disabled toggle alone reads as an off
+                                                         one)
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
                                                         (VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
@@ -1006,7 +1024,21 @@ currently exist.
                                                          IFileSystemRoots — both per-platform questions are
                                                          asked of a seam. Still static: it holds no state
                                                          and is in no bundle. RootHasChildren is the one
-                                                         chevron probe both roots providers share)
+                                                         chevron probe both roots providers share.
+                                                         GetEntriesAsync returns a FolderRead — the items
+                                                         PLUS a FolderReadStatus saying why an empty one is
+                                                         empty. IgnoreInaccessible suppresses the failure to
+                                                         open the FOLDER ITSELF, not just its children, so a
+                                                         denied folder is otherwise a successful empty list;
+                                                         Diagnose re-asks WITHOUT the suppression and ONLY
+                                                         when the listing produced nothing, which keeps the
+                                                         partial-list contract and costs an ordinary folder
+                                                         nothing. Do not just turn IgnoreInaccessible off)
+                                FolderMessages.cs       (why the file list is blank, worded: title + hint for
+                                                         denied / gone / unreadable / hidden-only / empty /
+                                                         filtered-to-nothing / no-folder-open. Pure and
+                                                         render-free BECAUSE FileExplorerViewModel cannot be
+                                                         tested — the FileExplorerPanes shape)
                                 DirectoryWatcher.cs     (debounced FileSystemWatcher over the open folder;
                                                          raises Changed → VM auto-refreshes the list + tree.
                                                          Windows-guarded, soft-failing, app-lifetime)
@@ -1844,6 +1876,25 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     event from `SetCurrentFolder` **only when the target path differs** from the current one; the view
     (which owns the named `FileListScroll` `ScrollViewer`) subscribes in `OnDataContextChanged` and calls
     `ScrollToHome()`.
+  - **Empty and error states.** Six situations used to render as the same blank pane, three of them as
+    the literal words "This folder is empty": a protected folder, one that has vanished, a filter that
+    hid everything, a folder holding only hidden entries, a genuinely empty folder, and the launch state
+    before anything is open. `FolderMessages.Resolve` decides between them and returns a title + hint;
+    the VM pushes the pair and the overlay renders it in the Toolkit empty state's shape. It is a
+    **pure, render-free static** for the usual reason — `FileExplorerViewModel` reaches `FileTypeCatalog`
+    and cannot be tested at all — so it follows `FileExplorerPanes` / `FileExplorerTableLayout`.
+    Two things not to undo: the message is suppressed while a read is **in flight** (`_activeLoadId != 0`),
+    not merely while `IsLoading` is set — that flag only rises after the 150 ms grace period, so gating on
+    it flashes the wrong wording on every navigation; and `EndLoad` calls `UpdateFolderMessage()`
+    explicitly, because a read fast enough never to raise `IsLoading` leaves that setter silent.
+  - **A bad typed path stays fixable.** `CommitPath` used to set `IsPathEditing = false` *before*
+    validating, so a typo silently reverted and cost a full retype. The box now closes **only on success**;
+    a file, a path that does not exist and one that will not resolve each set `PathError`, shown on a
+    second row under the address field (orange, the `ActionMessage` / `formError` convention). Cleared by
+    the next navigation and by the next keystroke. `Reveal` sets the same message rather than returning
+    silently, so a stale universal-search hit is not a dead button. The error row uses a `Margin`, **not**
+    the grid's `RowSpacing` — Avalonia applies row spacing even to a zero-height row, which would cost the
+    bar 4 px permanently.
 
   **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
   **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in

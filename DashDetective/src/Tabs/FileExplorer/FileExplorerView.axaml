@@ -136,6 +136,14 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
+        <!-- The path box's refusal. Orange rather than a theme brush, matching the app's other
+             transient failures (Processes' ActionMessage, the Toolkit form's field error). -->
+        <Style Selector="TextBlock.pathError">
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
         <!-- ===== View-option checkboxes ===== -->
         <!-- Recolours the Fluent CheckBox to the theme: hairline box, accent fill when checked.
              Shared by every checkbox in the Options flyout; promote to SharedStyles if reused
@@ -224,7 +232,10 @@
     <Grid RowDefinitions="Auto,*" RowSpacing="12">
 
         <!-- ===== Breadcrumb + filters ===== -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+        <!-- The second row carries the path box's complaint. It collapses out of the layout the rest of
+             the time, so the bar keeps its height. -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
+              ColumnSpacing="10">
 
             <!-- Back / forward / up. The keyboard drives the same commands (Alt+←, Alt+→,
                  Backspace / Alt+↑); these keep the navigation discoverable for the mouse. -->
@@ -284,6 +295,12 @@
                                                  EnterCommand="{Binding CommitPathCommand}"/>
                 </Panel>
             </Border>
+
+            <!-- Why the typed path was refused. The box stays open with the text, so this sits under
+                 the field it belongs to rather than over the file list. -->
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="pathError" Margin="2,4,0,0"
+                       Text="{Binding PathError}"
+                       IsVisible="{Binding PathError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12"
                         VerticalAlignment="Center">
@@ -476,9 +493,20 @@
 
                     <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoading}" Text="Loading…"/>
-                    <!-- An empty folder and one still being read would otherwise look identical. -->
-                    <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               IsVisible="{Binding IsEmpty}" Text="This folder is empty"/>
+                    <!-- Why the list is blank. A protected folder, one that has vanished, a filter that
+                         hid everything and a genuinely empty folder all used to read the same; the
+                         wording comes from FolderMessages so the pane can tell them apart. -->
+                    <StackPanel Spacing="6" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding FolderMessageTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding FolderMessageTitle}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding FolderMessageHint}" FontSize="11.5"
+                                   Foreground="{DynamicResource TextSubtle}"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
                     <ProgressBar Classes="loadStrip" IsIndeterminate="True" VerticalAlignment="Top"
                                  IsVisible="{Binding IsLoading}"/>
                 </Panel>

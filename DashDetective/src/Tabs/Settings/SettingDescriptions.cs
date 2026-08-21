@@ -4,11 +4,11 @@ using System;
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// The setting descriptions that name a mechanism rather than an effect, so cannot be shared. "Start
-/// with Windows" is both the line the toggle shows and the line universal search matches, so leaving it
-/// elsewhere would make the setting wrong and hard to find at once. Only the varying strings live here;
-/// the platform arrives as a parameter so both arms are testable from either host, the
-/// <c>ProcessGroupNames</c> shape.
+/// The setting descriptions that name a mechanism, or a platform that cannot honor one, so cannot be
+/// shared. "Start with Windows" is both the line the toggle shows and the line universal search
+/// matches, so leaving it elsewhere would make the setting wrong and hard to find at once. Only the
+/// varying strings live here; the platform arrives as a parameter so both arms are testable from
+/// either host, the <c>ProcessGroupNames</c> shape.
 /// </summary>
 internal static class SettingDescriptions {
     /// <summary>The "Launch at startup" explanation for this machine.</summary>
@@ -25,4 +25,13 @@ internal static class SettingDescriptions {
         hidesOnClose
             ? "Keep console running in background"
             : "Not available on this desktop — closing exits the app";
+
+    /// <summary>Where the reading costs nothing extra there is nothing to opt into, so the row says
+    /// that rather than describing a helper its disabled toggle will never run.</summary>
+    internal static string NvidiaGpuMetrics { get; } = NvidiaGpuMetricsFor(GpuMetricsSupport.NeedsHelperTool);
+
+    internal static string NvidiaGpuMetricsFor(bool needsHelperTool) =>
+        needsHelperTool
+            ? "Runs a helper tool every 15 seconds"
+            : "Not needed here — GPU utilization already reads without it";
 }

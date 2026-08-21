@@ -131,6 +131,11 @@ public partial class SettingsViewModel : ViewModelBase {
     /// just the toggle, because a disabled toggle on its own is indistinguishable from an off one.</summary>
     public bool CanUseTray => TrayIntegration.HidesOnClose;
 
+    /// <summary>Whether the "NVIDIA GPU utilization" setting can be operated. Bound to the whole row,
+    /// like <see cref="CanUseTray"/>: where the figure needs no helper tool there is nothing to opt into,
+    /// and the sampler discards the write anyway.</summary>
+    public bool CanUseNvidiaMetrics => GpuMetricsSupport.NeedsHelperTool;
+
     /// <summary>The currently selected refresh interval in seconds (for capturing into settings).</summary>
     public double SelectedIntervalSeconds {
         get {
