@@ -20,7 +20,15 @@ namespace DashDetective.Shared.Controls;
 /// their values are directly comparable. Set <see cref="Fill"/> to draw a translucent gradient
 /// area beneath each line. Set <see cref="ShowGrid"/> to draw a faint lattice behind the data
 /// (<see cref="GridRows"/> × <see cref="GridColumns"/>, coloured by <see cref="GridBrush"/>).
-/// These extras apply only to fixed-range mode; auto-fit mode is unchanged single-series behaviour.
+///
+/// Fixed-range mode also carries optional axis furniture: three value labels down the left
+/// (<see cref="AxisMaxLabel"/> / <see cref="AxisMidLabel"/> / <see cref="AxisMinLabel"/>), the ends of the
+/// time range along the bottom (<see cref="AxisStartLabel"/> / <see cref="AxisEndLabel"/>) and a
+/// <see cref="StatusText"/> line over the plot for a chart whose window is still filling. Each reserves
+/// room only when it is set, so an unlabelled chart — every stat-card mini, every per-core cell — measures
+/// and draws exactly as it did before.
+///
+/// All of these extras apply only to fixed-range mode; auto-fit mode is unchanged single-series behaviour.
 /// </summary>
 public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> StrokeProperty =
@@ -61,6 +69,31 @@ public partial class Sparkline : UserControl {
 
     public static readonly StyledProperty<double> AspectRatioProperty =
         AvaloniaProperty.Register<Sparkline, double>(nameof(AspectRatio), double.NaN);
+
+    public static readonly StyledProperty<string?> AxisMaxLabelProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisMaxLabel));
+
+    public static readonly StyledProperty<string?> AxisMidLabelProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisMidLabel));
+
+    public static readonly StyledProperty<string?> AxisMinLabelProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisMinLabel));
+
+    public static readonly StyledProperty<string?> AxisStartLabelProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisStartLabel));
+
+    public static readonly StyledProperty<string?> AxisEndLabelProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisEndLabel));
+
+    public static readonly StyledProperty<string?> StatusTextProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(StatusText));
+
+    public static readonly StyledProperty<IBrush?> AxisBrushProperty =
+        AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(AxisBrush));
+
+    /// <summary>Axis and status text size. Smaller than the surrounding captions on purpose: the labels are
+    /// a scale to read the chart against, not part of the page's copy.</summary>
+    private const double AxisFontSize = 10;
 
     private List<Point> _data = new();
     private List<Point> _data2 = new();
@@ -154,6 +187,49 @@ public partial class Sparkline : UserControl {
         set => SetValue(AspectRatioProperty, value);
     }
 
+    /// <summary>Value label at the top of the axis, e.g. "100%" or "12 Mbps". Empty draws no gutter.</summary>
+    public string? AxisMaxLabel {
+        get => GetValue(AxisMaxLabelProperty);
+        set => SetValue(AxisMaxLabelProperty, value);
+    }
+
+    /// <summary>Value label halfway up the axis, e.g. "50%".</summary>
+    public string? AxisMidLabel {
+        get => GetValue(AxisMidLabelProperty);
+        set => SetValue(AxisMidLabelProperty, value);
+    }
+
+    /// <summary>Value label at the foot of the axis, e.g. "0".</summary>
+    public string? AxisMinLabel {
+        get => GetValue(AxisMinLabelProperty);
+        set => SetValue(AxisMinLabelProperty, value);
+    }
+
+    /// <summary>Oldest end of the time range, e.g. "−60s". Empty draws no footer.</summary>
+    public string? AxisStartLabel {
+        get => GetValue(AxisStartLabelProperty);
+        set => SetValue(AxisStartLabelProperty, value);
+    }
+
+    /// <summary>Newest end of the time range, e.g. "now".</summary>
+    public string? AxisEndLabel {
+        get => GetValue(AxisEndLabelProperty);
+        set => SetValue(AxisEndLabelProperty, value);
+    }
+
+    /// <summary>A line drawn over the plot instead of leaving it to explain itself — a window still filling
+    /// says so here. Empty draws nothing.</summary>
+    public string? StatusText {
+        get => GetValue(StatusTextProperty);
+        set => SetValue(StatusTextProperty, value);
+    }
+
+    /// <summary>Axis and status text colour. Falls back to the themed <c>TextSubtle</c> resource.</summary>
+    public IBrush? AxisBrush {
+        get => GetValue(AxisBrushProperty);
+        set => SetValue(AxisBrushProperty, value);
+    }
+
     /// <summary>Derives the height from the measured width when <see cref="AspectRatio"/> is set, so the
     /// chart keeps its shape instead of flattening as its slot narrows. An explicit Height still wins:
     /// Avalonia's MeasureCore clamps this result to [MinHeight, MaxHeight], which a set Height pins to
@@ -179,7 +255,11 @@ public partial class Sparkline : UserControl {
             && (change.Property == StrokeProperty || change.Property == StrokeThicknessProperty
                 || change.Property == Stroke2Property || change.Property == FillProperty
                 || change.Property == ShowGridProperty || change.Property == GridRowsProperty
-                || change.Property == GridColumnsProperty || change.Property == GridBrushProperty))
+                || change.Property == GridColumnsProperty || change.Property == GridBrushProperty
+                || change.Property == AxisMaxLabelProperty || change.Property == AxisMidLabelProperty
+                || change.Property == AxisMinLabelProperty || change.Property == AxisStartLabelProperty
+                || change.Property == AxisEndLabelProperty || change.Property == StatusTextProperty
+                || change.Property == AxisBrushProperty))
             InvalidateVisual();
     }
 
@@ -192,10 +272,30 @@ public partial class Sparkline : UserControl {
         if (w <= 0 || h <= 0)
             return;
 
-        // The grid sits behind the data and shows even before any samples arrive.
-        if (ShowGrid)
-            DrawGrid(context, w, h);
+        // Axis text is measured before anything is drawn: what it needs decides how much room the plot has.
+        var brush = AxisBrush ?? ResolveResource("TextSubtle");
+        var top = Label(AxisMaxLabel, brush);
+        var middle = Label(AxisMidLabel, brush);
+        var bottom = Label(AxisMinLabel, brush);
+        var start = Label(AxisStartLabel, brush);
+        var end = Label(AxisEndLabel, brush);
 
+        var plot = ChartAxis.PlotRect(w, h,
+            ChartAxis.Gutter(TextWidth(top), TextWidth(middle), TextWidth(bottom)),
+            ChartAxis.Footer(Math.Max(TextHeight(start), TextHeight(end))));
+
+        // The grid and the axis labels sit behind the data and show even before any samples arrive, so an
+        // empty chart still says what its scale is.
+        if (ShowGrid)
+            DrawGrid(context, plot);
+        DrawAxisLabels(context, plot, top, middle, bottom, start, end);
+
+        DrawSeries(context, plot);
+        DrawStatus(context, plot);
+    }
+
+    /// <summary>Draws whichever series have enough points, all fills first so no line is occluded by one.</summary>
+    private void DrawSeries(DrawingContext context, Rect plot) {
         var hasSeries1 = _data.Count >= 2 && Stroke is not null;
         var hasSeries2 = _data2.Count >= 2 && Stroke2 is not null;
         if (!hasSeries1 && !hasSeries2)
@@ -212,24 +312,65 @@ public partial class Sparkline : UserControl {
         if (span <= 0)
             return;
 
-        // Draw all fills first, then all lines on top, so no line is occluded by a fill.
         if (Fill) {
             if (hasSeries1)
-                DrawArea(context, _data, Stroke, w, h, maxX, span);
+                DrawArea(context, _data, Stroke, plot, maxX, span);
             if (hasSeries2)
-                DrawArea(context, _data2, Stroke2, w, h, maxX, span);
+                DrawArea(context, _data2, Stroke2, plot, maxX, span);
         }
 
         if (hasSeries1)
-            DrawLine(context, _data, Stroke!, w, h, maxX, span);
+            DrawLine(context, _data, Stroke!, plot, maxX, span);
         if (hasSeries2)
-            DrawLine(context, _data2, Stroke2!, w, h, maxX, span);
+            DrawLine(context, _data2, Stroke2!, plot, maxX, span);
     }
+
+    /// <summary>Value labels down the left of the plot and the time-range ends beneath it. The outer two
+    /// value labels are pulled inside the plot's edges rather than centred on them, so neither is clipped.</summary>
+    private static void DrawAxisLabels(DrawingContext context, Rect plot, FormattedText? top,
+        FormattedText? middle, FormattedText? bottom, FormattedText? start, FormattedText? end) {
+        if (top is not null)
+            context.DrawText(top, new Point(plot.Left - ChartAxis.LabelGap - top.Width, plot.Top));
+        if (middle is not null)
+            context.DrawText(middle, new Point(plot.Left - ChartAxis.LabelGap - middle.Width,
+                plot.Center.Y - middle.Height / 2));
+        if (bottom is not null)
+            context.DrawText(bottom, new Point(plot.Left - ChartAxis.LabelGap - bottom.Width,
+                plot.Bottom - bottom.Height));
+
+        var footerTop = plot.Bottom + ChartAxis.FooterGap;
+        if (start is not null)
+            context.DrawText(start, new Point(plot.Left, footerTop));
+        if (end is not null)
+            context.DrawText(end, new Point(plot.Right - end.Width, footerTop));
+    }
+
+    /// <summary>Centres <see cref="StatusText"/> over the plot. Drawn last, so it reads over whatever few
+    /// samples have arrived rather than under them.</summary>
+    private void DrawStatus(DrawingContext context, Rect plot) {
+        var status = Label(StatusText, AxisBrush ?? ResolveResource("TextMuted"));
+        if (status is null)
+            return;
+
+        context.DrawText(status, new Point(
+            plot.Center.X - status.Width / 2, plot.Center.Y - status.Height / 2));
+    }
+
+    /// <summary>An axis label ready to measure and draw, or null when there is nothing to say.</summary>
+    private FormattedText? Label(string? value, IBrush? brush) =>
+        string.IsNullOrEmpty(value) || brush is null
+            ? null
+            : new FormattedText(value, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                                new Typeface(FontFamily), AxisFontSize, brush);
+
+    private static double TextWidth(FormattedText? text) => text?.Width ?? 0;
+
+    private static double TextHeight(FormattedText? text) => text?.Height ?? 0;
 
     /// <summary>Draws a faint lattice (<see cref="GridRows"/>+1 horizontal, <see cref="GridColumns"/>+1 vertical
     /// lines) behind the data. Coordinates are snapped to +0.5 device pixels for crisp 1px lines.</summary>
-    private void DrawGrid(DrawingContext context, double w, double h) {
-        var brush = GridBrush ?? ResolveGridBrush();
+    private void DrawGrid(DrawingContext context, Rect plot) {
+        var brush = GridBrush ?? ResolveResource("ChartGrid");
         if (brush is null)
             return;
 
@@ -237,35 +378,36 @@ public partial class Sparkline : UserControl {
 
         var rows = Math.Max(1, GridRows);
         for (var i = 0; i <= rows; i++) {
-            var y = Math.Round(h / rows * i) + 0.5;
-            context.DrawLine(pen, new Point(0, y), new Point(w, y));
+            var y = Math.Round(plot.Top + plot.Height / rows * i) + 0.5;
+            context.DrawLine(pen, new Point(plot.Left, y), new Point(plot.Right, y));
         }
 
         var cols = Math.Max(1, GridColumns);
         for (var i = 0; i <= cols; i++) {
-            var x = Math.Round(w / cols * i) + 0.5;
-            context.DrawLine(pen, new Point(x, 0), new Point(x, h));
+            var x = Math.Round(plot.Left + plot.Width / cols * i) + 0.5;
+            context.DrawLine(pen, new Point(x, plot.Top), new Point(x, plot.Bottom));
         }
     }
 
-    /// <summary>Themed fallback grid colour (the <c>ChartGrid</c> resource), resolved for the current theme variant.</summary>
-    private IBrush? ResolveGridBrush() =>
-        this.TryFindResource("ChartGrid", ActualThemeVariant, out var value) ? value as IBrush : null;
+    /// <summary>A themed fallback brush, resolved for the current theme variant. TryFindResource rather than
+    /// FindResource: the latter misses theme-dictionary brushes from code-behind and returns null.</summary>
+    private IBrush? ResolveResource(string key) =>
+        this.TryFindResource(key, ActualThemeVariant, out var value) ? value as IBrush : null;
 
-    /// <summary>Maps a data point to control pixels. Keeps "smaller y = top" so the axis floor is at the top.</summary>
-    private Point ToPixel(Point p, double w, double h, double maxX, double span) {
-        var px = maxX > 0 ? p.X / maxX * w : 0;
-        var py = (p.Y - _yMin) / span * h;
+    /// <summary>Maps a data point into the plot area. Keeps "smaller y = top" so the axis floor is at the top.</summary>
+    private Point ToPixel(Point p, Rect plot, double maxX, double span) {
+        var px = plot.Left + (maxX > 0 ? p.X / maxX * plot.Width : 0);
+        var py = plot.Top + (p.Y - _yMin) / span * plot.Height;
         return new Point(px, py);
     }
 
     private void DrawLine(DrawingContext context, List<Point> data, IBrush stroke,
-        double w, double h, double maxX, double span) {
+        Rect plot, double maxX, double span) {
         var geometry = new StreamGeometry();
         using (var ctx = geometry.Open()) {
             var first = true;
             foreach (var p in data) {
-                var point = ToPixel(p, w, h, maxX, span);
+                var point = ToPixel(p, plot, maxX, span);
                 if (first) {
                     ctx.BeginFigure(point, isFilled: false);
                     first = false;
@@ -284,20 +426,20 @@ public partial class Sparkline : UserControl {
     }
 
     private void DrawArea(DrawingContext context, List<Point> data, IBrush? stroke,
-        double w, double h, double maxX, double span) {
+        Rect plot, double maxX, double span) {
         var fill = MakeAreaBrush(stroke);
         if (fill is null)
             return;
 
         var geometry = new StreamGeometry();
         using (var ctx = geometry.Open()) {
-            var start = ToPixel(data[0], w, h, maxX, span);
-            ctx.BeginFigure(new Point(start.X, h), isFilled: true); // start on the bottom axis
+            var start = ToPixel(data[0], plot, maxX, span);
+            ctx.BeginFigure(new Point(start.X, plot.Bottom), isFilled: true); // start on the bottom axis
             ctx.LineTo(start);
             for (var i = 1; i < data.Count; i++)
-                ctx.LineTo(ToPixel(data[i], w, h, maxX, span));
-            var end = ToPixel(data[^1], w, h, maxX, span);
-            ctx.LineTo(new Point(end.X, h)); // drop back to the bottom axis
+                ctx.LineTo(ToPixel(data[i], plot, maxX, span));
+            var end = ToPixel(data[^1], plot, maxX, span);
+            ctx.LineTo(new Point(end.X, plot.Bottom)); // drop back to the bottom axis
             ctx.EndFigure(isClosed: true);
         }
 
