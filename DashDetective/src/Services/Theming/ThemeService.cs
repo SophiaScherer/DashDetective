@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Styling;
+using System;
 
 namespace DashDetective.Services.Theming;
 
@@ -13,8 +14,10 @@ namespace DashDetective.Services.Theming;
 /// <list type="bullet">
 ///   <item><b>Default</b> (multi-colour) — the highlight is blue and each dashboard graph keeps a
 ///     distinct colour. This is the startup look. <see cref="CurrentAccent"/> is <c>null</c>.</item>
-///   <item><b>Single accent</b> — the highlight becomes the chosen colour and every graph is
-///     recoloured to match it.</item>
+///   <item><b>Single accent</b> — the highlight becomes the chosen colour and the graphs take a
+///     palette <i>derived</i> from it (see <see cref="ChartPalette"/>). They are re-hued, never
+///     flattened: painting all six the one accent colour left download and upload indistinguishable
+///     on the same chart.</item>
 /// </list>
 ///
 /// This service applies but does not persist: it stays the single place that writes appearance to the
@@ -23,14 +26,15 @@ namespace DashDetective.Services.Theming;
 /// <c>src/Services/Settings</c>), so the earlier "session-only by design" note no longer holds.
 /// </summary>
 public sealed class ThemeService {
-    // Default per-graph colours for the multi-colour look (mirror the Chart* defaults in Palette.axaml).
-    private static readonly Color CpuDefault = Color.Parse("#4cc2ff");
-    private static readonly Color MemoryDefault = Color.Parse("#c58fff");
-    private static readonly Color GpuDefault = Color.Parse("#6ccb5f");
-    private static readonly Color StorageDefault = Color.Parse("#ffcf4d");
-    private static readonly Color NetUpDefault = Color.Parse("#ff8a5c");
-
     public AppTheme CurrentTheme { get; private set; } = AppTheme.Dark;
+
+    /// <summary>The series colours currently in the resource dictionary. Read by a page that resolves
+    /// its own brushes in code rather than through {DynamicResource} — the Performance tab.</summary>
+    public ChartSeriesColors CurrentSeries { get; private set; } = ChartPalette.Default;
+
+    /// <summary>Raised after the accent (and with it the chart palette) has been applied. A page that
+    /// holds brushes rather than resource references re-resolves them here.</summary>
+    public event Action<ChartSeriesColors>? SeriesChanged;
 
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
@@ -65,18 +69,17 @@ public sealed class ThemeService {
     public void ApplyDefaultAppearance() {
         CurrentAccent = null;
         SetAccent(AccentPreset.Default);
-        SetChartSeries(CpuDefault, MemoryDefault, GpuDefault, StorageDefault, CpuDefault, NetUpDefault);
+        SetChartSeries(ChartPalette.Default);
     }
 
     /// <summary>
-    /// Applies a single accent: the highlight becomes <paramref name="accent"/> and every graph is
-    /// recoloured to match it.
+    /// Applies a single accent: the highlight becomes <paramref name="accent"/> and the graphs take the
+    /// palette derived from it, so each metric keeps a hue of its own.
     /// </summary>
     public void ApplyAccent(AccentPreset accent) {
         CurrentAccent = accent;
         SetAccent(accent);
-        var c = accent.Color;
-        SetChartSeries(c, c, c, c, c, c);
+        SetChartSeries(ChartPalette.Derive(accent.Color));
     }
 
     /// <summary>
@@ -96,17 +99,22 @@ public sealed class ThemeService {
         res["AccentDeep"] = accent.Deep;                              // brand-gradient bottom stop
     }
 
-    /// <summary>Sets the per-graph chart brushes the dashboard binds to via {DynamicResource ...}.</summary>
-    private static void SetChartSeries(Color cpu, Color memory, Color gpu, Color storage, Color netDown, Color netUp) {
-        if (Application.Current is not { } app)
-            return;
+    /// <summary>Sets the per-graph chart brushes the dashboard binds to via {DynamicResource ...}, then
+    /// announces them for the pages that hold brushes instead of resource references.</summary>
+    private void SetChartSeries(ChartSeriesColors series) {
+        CurrentSeries = series;
 
-        var res = app.Resources;
-        res["ChartCpu"] = new SolidColorBrush(cpu);
-        res["ChartMemory"] = new SolidColorBrush(memory);
-        res["ChartGpu"] = new SolidColorBrush(gpu);
-        res["ChartStorage"] = new SolidColorBrush(storage);
-        res["ChartNetDown"] = new SolidColorBrush(netDown);
-        res["ChartNetUp"] = new SolidColorBrush(netUp);
+        if (Application.Current is { } app) {
+            var res = app.Resources;
+            res["ChartCpu"] = new SolidColorBrush(series.Cpu);
+            res["ChartMemory"] = new SolidColorBrush(series.Memory);
+            res["ChartGpu"] = new SolidColorBrush(series.Gpu);
+            res["ChartStorage"] = new SolidColorBrush(series.Storage);
+            res["ChartNetDown"] = new SolidColorBrush(series.NetDown);
+            res["ChartNetUp"] = new SolidColorBrush(series.NetUp);
+        }
+
+        // Raised even with no Application (headless tests): the palette itself has still changed.
+        SeriesChanged?.Invoke(series);
     }
 }
