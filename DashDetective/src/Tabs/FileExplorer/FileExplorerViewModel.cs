@@ -141,7 +141,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // character at a time doesn't re-enumerate the same folder once per keystroke.
     private readonly PathCompletion _pathCompletion = new();
 
-    partial void OnPathTextChanged(string value) => _ = UpdatePathCompletionAsync(value);
+    /// <summary>Why the typed path was refused, or "" when there is nothing to say. The box stays open
+    /// showing this rather than closing on a bad path, so a typo in a long path is fixable in place.</summary>
+    [ObservableProperty] private string _pathError = "";
+
+    partial void OnPathTextChanged(string value) {
+        // Editing is an answer to the complaint, so drop it rather than leaving it against new text.
+        PathError = "";
+        _ = UpdatePathCompletionAsync(value);
+    }
 
     private async Task UpdatePathCompletionAsync(string typed) {
         var completion = await _pathCompletion.CompleteAsync(typed, ShowHidden);
@@ -161,6 +169,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Swaps the breadcrumb for the path box, seeded with the current folder.</summary>
     [RelayCommand]
     private void BeginPathEdit() {
+        PathError = "";
         PathText = CurrentPath;
         IsPathEditing = true;
         PathEditRequested?.Invoke();
@@ -168,24 +177,37 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
     /// <summary>Leaves the path box without navigating (Esc, or clicking away).</summary>
     [RelayCommand]
-    private void CancelPathEdit() => IsPathEditing = false;
+    private void CancelPathEdit() {
+        PathError = "";
+        IsPathEditing = false;
+    }
 
-    /// <summary>Opens the typed folder. A path that doesn't name a reachable folder simply reverts to
-    /// the breadcrumb — a typo shouldn't throw at a keystroke, matching how the rest of the page
-    /// soft-fails on file-system errors.</summary>
+    /// <summary>Opens the typed folder. A path that doesn't name one leaves the box open with what was
+    /// typed and says why — closing it discarded the text, so a typo in a long path cost a full retype.
+    /// Esc and clicking away still leave without navigating.</summary>
     [RelayCommand]
     private void CommitPath() {
         var path = PathText.Trim().Trim('"');
-        IsPathEditing = false;
 
-        if (path.Length == 0)
+        if (path.Length == 0) {
+            CancelPathEdit();
             return;
+        }
 
         try {
-            if (Directory.Exists(path))
+            if (Directory.Exists(path)) {
+                PathError = "";
+                IsPathEditing = false;
                 SetCurrentFolder(Path.GetFullPath(path));
+                return;
+            }
+
+            PathError = File.Exists(path)
+                ? "That's a file, not a folder"
+                : $"Can't find \"{path}\"";
         } catch {
-            // Malformed path (bad characters, too long, no permission to resolve) — stay put.
+            // Malformed path: bad characters, too long, or no permission to resolve it.
+            PathError = $"\"{path}\" isn't a valid path";
         }
     }
 
@@ -356,20 +378,25 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
                 return;
             }
 
-            if (Path.GetDirectoryName(fullPath) is not { } folder || !Directory.Exists(folder))
+            if (Path.GetDirectoryName(fullPath) is not { } folder || !Directory.Exists(folder)) {
+                PathError = $"Can't find \"{fullPath}\"";
                 return;
+            }
 
             _reselectPath = fullPath;
             SetCurrentFolder(Path.GetFullPath(folder));
         } catch {
-            // Malformed path, or one that vanished between the search and the jump — stay put, the same
-            // way a typo in the path box does.
+            // Malformed path, or one that vanished between the search and the jump. Say so rather than
+            // leaving the search result looking like a button that does nothing.
+            PathError = $"Can't find \"{fullPath}\"";
         }
     }
 
     /// <summary>Opens a folder. <paramref name="recordHistory"/> is false only when the move *is* a
     /// history step (Back/Forward), which must move between the stacks rather than push onto them.</summary>
     private void SetCurrentFolder(string path, bool recordHistory = true) {
+        PathError = "";
+
         // Navigating to a *different* folder resets the list scroll to the top; a same-path reload
         // (sort, filter, Refresh, auto-refresh) leaves the user where they were.
         var isNavigation = !string.Equals(path, CurrentPath, PathComparison.Comparison);
