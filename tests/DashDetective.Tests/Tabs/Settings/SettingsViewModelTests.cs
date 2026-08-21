@@ -60,6 +60,13 @@ public class SettingsViewModelTests {
         Assert.Equal(TrayIntegration.HidesOnClose,
                      Create(new FakeStartupRegistration(enabled: false)).CanUseTray);
 
+    /// <summary>Likewise the NVIDIA toggle, which is inert where the figure needs no helper tool: the
+    /// sampler discards the write there, so an operable row would be a control that does nothing.</summary>
+    [Fact]
+    public void CanUseNvidiaMetrics_FollowsWhetherTheFigureNeedsAHelperTool() =>
+        Assert.Equal(GpuMetricsSupport.NeedsHelperTool,
+                     Create(new FakeStartupRegistration(enabled: false)).CanUseNvidiaMetrics);
+
     private sealed class FakeStartupRegistration(bool enabled) : IStartupRegistration {
         public List<bool> Writes { get; } = [];
         public bool IsEnabled() => enabled;
