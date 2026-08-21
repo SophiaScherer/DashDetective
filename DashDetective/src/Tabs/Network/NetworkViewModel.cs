@@ -58,7 +58,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly NetworkProviders _providers;
     private readonly NetworkUsageSampler _networkSampler = new();
     // The channel owns the download history; upload is a second rolling buffer pushed alongside it.
-    private readonly double[] _upHistory = new double[WindowSeconds];
+    private readonly MetricHistory _upHistory = new MetricHistory(WindowSeconds);
     private readonly MetricChannel<NetworkSample> _networkChannel;
     private readonly DispatcherTimer _adapterTimer;
     private readonly DispatcherTimer _connectionsTimer;
@@ -207,7 +207,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Throughput channel callback: the channel already pushed the download rate into its
     /// history, so append the upload rate to the second buffer, then refresh the readouts.</summary>
     private void OnNetworkSample(NetworkSample sample) {
-        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
+        _upHistory.Push(sample.UpMbps);
         UpdateThroughput(sample);
     }
 
@@ -222,12 +222,12 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         DownUnit = unit;
         UpUnit = unit;
 
-        var peak = ChartScale.Peak(_networkChannel.History, _upHistory);
+        var peak = ChartScale.Peak(_networkChannel.History.Values, _upHistory.Values);
         ThroughputYMax = ChartScale.FitPeak(peak, MinScaleMbps);
         ThroughputScaleText = $"peak {DataRateFormatter.Format(peak)}";
 
-        DownPoints = SparklinePoints.Build(_networkChannel.History, ThroughputYMax);
-        UpPoints = SparklinePoints.Build(_upHistory, ThroughputYMax);
+        DownPoints = _networkChannel.History.Points(ThroughputYMax);
+        UpPoints = _upHistory.Points(ThroughputYMax);
     }
 
     private void OnAdapterTick(object? sender, EventArgs e) => _ = LoadAdaptersAsync();

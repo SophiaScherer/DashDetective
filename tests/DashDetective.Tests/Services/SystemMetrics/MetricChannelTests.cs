@@ -20,7 +20,7 @@ public class MetricChannelTests {
         channel.SampleNow();
 
         Assert.Equal(42.0, received);
-        Assert.Equal(42.0, channel.History[^1]);
+        Assert.Equal(42.0, channel.History.Values[^1]);
         Assert.False(fake.IsRunning);   // SampleNow never starts the timer
     }
 
@@ -34,7 +34,7 @@ public class MetricChannelTests {
             channel.SampleNow();
         }
 
-        Assert.Equal(new[] { 2.0, 3.0, 4.0 }, channel.History.ToArray());
+        Assert.Equal(new[] { 2.0, 3.0, 4.0 }, channel.History.Values.ToArray());
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class MetricChannelTests {
         fake.RaiseTick();
 
         Assert.Equal(9.0, received);
-        Assert.Equal(9.0, channel.History[^1]);
+        Assert.Equal(9.0, channel.History.Values[^1]);
     }
 
     [Fact]
@@ -95,21 +95,7 @@ public class MetricChannelTests {
 
         channel.SampleNow();
 
-        Assert.True(channel.History.IsEmpty);
+        Assert.True(channel.History.Values.IsEmpty);
         Assert.Equal(5.0, received);
-    }
-
-    [Fact]
-    public void PushHistory_ShiftsLeftAndAppends() {
-        var buffer = new[] { 1.0, 2.0, 3.0 };
-        MetricChannel<double>.PushHistory(buffer, 4.0);
-        Assert.Equal(new[] { 2.0, 3.0, 4.0 }, buffer);
-    }
-
-    [Fact]
-    public void PushHistory_EmptyBuffer_IsNoOp() {
-        var empty = Array.Empty<double>();
-        MetricChannel<double>.PushHistory(empty, 5.0);
-        Assert.Empty(empty);
     }
 }

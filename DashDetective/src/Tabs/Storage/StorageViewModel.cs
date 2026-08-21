@@ -50,7 +50,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly DispatcherTimer _throughputTimer;
     private readonly SamplingGate _gate;
     private readonly Dictionary<int, DriveCard> _cardsByDisk = new();
-    private readonly Dictionary<int, double[]> _historiesByDisk = new();
+    private readonly Dictionary<int, MetricHistory> _historiesByDisk = new();
     private readonly Dictionary<int, DiskThroughputSample> _latestByDisk = new();
 
     /// <summary>Physical disk number the Disk Activity panel is showing, or −1 before the drives load.</summary>
@@ -161,7 +161,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             return;
         }
 
-        DiskPoints = SparklinePoints.Build(history, 100);
+        DiskPoints = history.Points(100);
         if (!_latestByDisk.TryGetValue(_selectedDisk, out var sample)) {
             DiskActive = "—";
             DiskResponse = "—";
@@ -304,8 +304,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             card.Write = FormatRate(sample.WriteBytesPerSec);
 
             if (!_historiesByDisk.TryGetValue(sample.DiskNumber, out var history))
-                _historiesByDisk[sample.DiskNumber] = history = new double[WindowSeconds];
-            MetricChannel.PushHistory(history, sample.ActivePercent);
+                _historiesByDisk[sample.DiskNumber] = history = new MetricHistory(WindowSeconds);
+            history.Push(sample.ActivePercent);
             _latestByDisk[sample.DiskNumber] = sample;
         }
 

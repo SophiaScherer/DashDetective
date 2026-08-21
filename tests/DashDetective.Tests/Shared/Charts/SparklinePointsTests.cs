@@ -42,4 +42,34 @@ public class SparklinePointsTests {
         // 66.666 / 100 → y = 100·(1−0.66666) = 33.334 → "0.##" → "33.33" (period, not comma).
         Assert.Equal("0,33.33", SparklinePoints.Build(new double[] { 66.666 }, 100));
     }
+
+    /// <summary>A partly-filled buffer must plot only the samples taken, at their real slot indices — the
+    /// newest still on the last one. Sparkline scales x by the data's own maximum, so this draws a short
+    /// trace against the right edge rather than a stretched one spanning the whole chart.</summary>
+    [Fact]
+    public void Build_PartialFill_KeepsTheSamplesOnTheirRealSlots() {
+        var history = new double[] { 0, 0, 0, 40, 100 };
+
+        Assert.Equal("3,60 4,0", SparklinePoints.Build(history, 100, filled: 2));
+    }
+
+    [Fact]
+    public void Build_NoFill_IsEmpty() {
+        Assert.Equal("", SparklinePoints.Build(new double[] { 1, 2, 3 }, 100, filled: 0));
+    }
+
+    /// <summary>One sample is a point, not a line, so the caller's "collecting" caption is what carries
+    /// the first tick — but it must still be emitted rather than dropped.</summary>
+    [Fact]
+    public void Build_SingleSample_EmitsTheLastSlotOnly() {
+        Assert.Equal("2,0", SparklinePoints.Build(new double[] { 0, 0, 100 }, 100, filled: 1));
+    }
+
+    /// <summary>A fill count beyond the window is clamped rather than reaching off the buffer.</summary>
+    [Fact]
+    public void Build_FillBeyondTheWindow_PlotsTheWholeBuffer() {
+        Assert.Equal(
+            SparklinePoints.Build(new double[] { 10, 20 }, 100),
+            SparklinePoints.Build(new double[] { 10, 20 }, 100, filled: 99));
+    }
 }

@@ -40,12 +40,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly SamplingGate _gate;
 
     // Per-view rolling histories (the samplers are shared; the histories are not).
-    private readonly double[] _cpuHistory = new double[WindowSeconds];
-    private readonly double[] _memoryHistory = new double[WindowSeconds];
-    private readonly double[] _gpuHistory = new double[WindowSeconds];
-    private readonly double[] _storageHistory = new double[WindowSeconds];
-    private readonly double[] _downHistory = new double[WindowSeconds];
-    private readonly double[] _upHistory = new double[WindowSeconds];
+    private readonly MetricHistory _cpuHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _memoryHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _gpuHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _storageHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _downHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _upHistory = new MetricHistory(WindowSeconds);
 
     private readonly DispatcherTimer _uptimeTimer;
 
@@ -63,7 +63,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // drives them (like the Storage tab). A disk card's value + chart show Task Manager's disk "Active time";
     // its caption shows capacity used.
     private readonly Dictionary<int, DashboardCard> _diskCards = new();
-    private readonly Dictionary<int, double[]> _diskHistories = new();
+    private readonly Dictionary<int, MetricHistory> _diskHistories = new();
     private readonly IPhysicalDiskThroughputSampler _throughputSampler =
         IPhysicalDiskThroughputSampler.ForCurrentPlatform();
     private readonly DispatcherTimer _throughputTimer;
@@ -77,7 +77,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // sampler on the same throughput timer (the shared GPU feed reports only one combined figure). One card per
     // physical GPU, inserted after Memory; its value + chart show the adapter's busiest-engine utilisation.
     private readonly Dictionary<string, DashboardCard> _gpuCards = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, double[]> _gpuHistories = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MetricHistory> _gpuHistories = new(StringComparer.Ordinal);
 
     // PCI vendor per adapter, kept only to word the note on a card that reports no utilisation.
     private readonly Dictionary<string, uint?> _gpuVendors = new(StringComparer.Ordinal);
@@ -298,12 +298,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         for (var i = 0; i < WindowSeconds; i++) {
             var offset = i - (WindowSeconds - 1);
             sb.Append(offset.ToString(CultureInfo.InvariantCulture)).Append(',')
-              .Append(Csv(_cpuHistory[i])).Append(',')
-              .Append(Csv(_memoryHistory[i])).Append(',')
-              .Append(Csv(_gpuHistory[i])).Append(',')
-              .Append(Csv(_storageHistory[i])).Append(',')
-              .Append(Csv(_downHistory[i])).Append(',')
-              .Append(Csv(_upHistory[i]))
+              .Append(Csv(_cpuHistory.Values[i])).Append(',')
+              .Append(Csv(_memoryHistory.Values[i])).Append(',')
+              .Append(Csv(_gpuHistory.Values[i])).Append(',')
+              .Append(Csv(_storageHistory.Values[i])).Append(',')
+              .Append(Csv(_downHistory.Values[i])).Append(',')
+              .Append(Csv(_upHistory.Values[i]))
               .Append('\n');
         }
         return sb.ToString();
@@ -369,7 +369,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var card = new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub };
             Cards.Insert(insertAt++, card);
             _gpuCards[gpu.GpuLuid ?? gpu.Id] = card;
-            _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new double[WindowSeconds];
+            _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new MetricHistory(WindowSeconds);
             _gpuVendors[gpu.GpuLuid ?? gpu.Id] = gpu.GpuPci?.VendorId;
         }
 
@@ -435,7 +435,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>CPU subscription callback: append to the history, then refresh the surface.</summary>
     private void OnCpu(double value) {
-        MetricChannel.PushHistory(_cpuHistory, value);
+        _cpuHistory.Push(value);
         UpdateCpu(value);
     }
 
@@ -451,7 +451,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuPercent = value;
         CpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
         CpuPercentText = $"{rounded}%";
-        CpuPoints = SparklinePoints.Build(_cpuHistory, 100);
+        CpuPoints = _cpuHistory.Points(100);
         _cpuCard.Value = CpuValueText;
         _cpuCard.Points = CpuPoints;
     }
@@ -485,16 +485,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var value = Math.Clamp(reading, 0, 100);
             if (value > overall || overall is null)
                 overall = value;
-            MetricChannel.PushHistory(history, value);
+            history.Push(value);
             card.Value = Math.Round(value).ToString(CultureInfo.InvariantCulture);
             card.Unit = "%";
-            card.Points = SparklinePoints.Build(history, 100);
+            card.Points = history.Points(100);
         }
 
         // The single overall figure the CSV export and text report read. Left untouched when no adapter
         // reported one, so it holds its last value rather than dropping to a false zero.
         if (overall is { } busiest) {
-            MetricChannel.PushHistory(_gpuHistory, busiest);
+            _gpuHistory.Push(busiest);
             GpuValueText = Math.Round(busiest).ToString(CultureInfo.InvariantCulture);
         }
     }
@@ -505,7 +505,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// export rather than a card of their own; the visible per-disk cards are driven separately above.
     /// </summary>
     private void UpdateSystemDiskActivity(double activePercent) {
-        MetricChannel.PushHistory(_storageHistory, activePercent);
+        _storageHistory.Push(activePercent);
         StorageValueText = Math.Round(activePercent).ToString(CultureInfo.InvariantCulture);
         UpdateStorageCapacity();
     }
@@ -543,7 +543,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
     private void OnMemory(MemorySample sample) {
-        MetricChannel.PushHistory(_memoryHistory, sample.LoadPercent);
+        _memoryHistory.Push(sample.LoadPercent);
         UpdateMemory(sample);
     }
 
@@ -567,7 +567,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         MemoryUtilizationText = totalGb > 0
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
-        MemoryPoints = SparklinePoints.Build(_memoryHistory, 100);
+        MemoryPoints = _memoryHistory.Points(100);
         _memoryCard.Value = MemoryValueText;
         _memoryCard.Sub = MemorySubText;
         _memoryCard.Points = MemoryPoints;
@@ -583,8 +583,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
     /// refresh the readouts.</summary>
     private void OnNetwork(NetworkSample sample) {
-        MetricChannel.PushHistory(_downHistory, sample.DownMbps);
-        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
+        _downHistory.Push(sample.DownMbps);
+        _upHistory.Push(sample.UpMbps);
         UpdateNetwork(sample);
     }
 
@@ -600,9 +600,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         NetworkUpUnit = unit;
         NetworkSubText = $"↑ {up} {unit}";
 
-        NetworkYMax = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
-        NetworkDownPoints = SparklinePoints.Build(_downHistory, NetworkYMax);
-        NetworkUpPoints = SparklinePoints.Build(_upHistory, NetworkYMax);
+        NetworkYMax = ChartScale.FitAxis(_downHistory.Values, _upHistory.Values, MinNetworkScaleMbps);
+        NetworkDownPoints = _downHistory.Points(NetworkYMax);
+        NetworkUpPoints = _upHistory.Points(NetworkYMax);
 
         _networkCard.Value = NetworkDownText;
         _networkCard.Unit = NetworkDownUnit;
@@ -643,7 +643,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             };
             Cards.Insert(insertAt++, card);
             _diskCards[drive.DiskNumber] = card;
-            _diskHistories[drive.DiskNumber] = new double[WindowSeconds];
+            _diskHistories[drive.DiskNumber] = new MetricHistory(WindowSeconds);
         }
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
@@ -670,9 +670,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             if (!_diskHistories.TryGetValue(sample.DiskNumber, out var history)
                 || !_diskCards.TryGetValue(sample.DiskNumber, out var card))
                 continue;
-            MetricChannel.PushHistory(history, sample.ActivePercent);
+            history.Push(sample.ActivePercent);
             card.Value = Math.Round(sample.ActivePercent).ToString(CultureInfo.InvariantCulture);
-            card.Points = SparklinePoints.Build(history, 100);
+            card.Points = history.Points(100);
         }
     }
 
