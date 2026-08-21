@@ -4,7 +4,7 @@ using System;
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// The setting descriptions that name a mechanism, or a platform that cannot honour one, so cannot be
+/// The setting descriptions that name a mechanism, or a platform that cannot honor one, so cannot be
 /// shared. "Start with Windows" is both the line the toggle shows and the line universal search
 /// matches, so leaving it elsewhere would make the setting wrong and hard to find at once. Only the
 /// varying strings live here; the platform arrives as a parameter so both arms are testable from

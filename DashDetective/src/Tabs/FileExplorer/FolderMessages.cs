@@ -10,7 +10,7 @@ internal readonly record struct FolderMessage(string Title, string Hint);
 /// from an empty one, or a filter that hid everything from a folder with nothing in it.
 ///
 /// Pure and render-free on purpose: <see cref="FileExplorerViewModel"/> cannot be tested at all — it
-/// reaches <see cref="FileTypeCatalog"/>, whose initialiser needs a render backend — so the decision
+/// reaches <see cref="FileTypeCatalog"/>, whose initializer needs a render backend — so the decision
 /// lives here instead, the way <see cref="FileExplorerPanes"/> and <see cref="FileExplorerTableLayout"/>
 /// hold their rules.
 /// </summary>
