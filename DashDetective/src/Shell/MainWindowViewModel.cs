@@ -127,7 +127,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _store = store;
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
-        _performance = new PerformanceViewModel(metrics);
+        _performance = new PerformanceViewModel(metrics, _theme);
         _storage = new StorageViewModel(metrics);
 
         // Apply the persisted appearance + layout through the seams that own them, before wiring the

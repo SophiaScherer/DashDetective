@@ -3,13 +3,35 @@ using System;
 
 namespace DashDetective.Services.Theming;
 
+/// <summary>Which graph a colour belongs to. What a view holding brushes in code names instead of a
+/// resource key — the Performance tab's rows, which cannot reach {DynamicResource}.</summary>
+public enum ChartSeries {
+    Cpu,
+    Memory,
+    Gpu,
+    Storage,
+    NetDown,
+    NetUp,
+}
+
 /// <summary>
 /// The six per-graph series colours, in the order <c>ThemeService</c> writes them to the
 /// <c>ChartCpu</c> / <c>ChartMemory</c> / <c>ChartGpu</c> / <c>ChartStorage</c> / <c>ChartNetDown</c> /
 /// <c>ChartNetUp</c> resource keys.
 /// </summary>
 public sealed record ChartSeriesColors(
-    Color Cpu, Color Memory, Color Gpu, Color Storage, Color NetDown, Color NetUp);
+    Color Cpu, Color Memory, Color Gpu, Color Storage, Color NetDown, Color NetUp) {
+
+    /// <summary>This palette's colour for one series.</summary>
+    public Color For(ChartSeries series) => series switch {
+        ChartSeries.Memory => Memory,
+        ChartSeries.Gpu => Gpu,
+        ChartSeries.Storage => Storage,
+        ChartSeries.NetDown => NetDown,
+        ChartSeries.NetUp => NetUp,
+        _ => Cpu,
+    };
+}
 
 /// <summary>
 /// The one source of truth for chart series colours, for both the default look and every accent.

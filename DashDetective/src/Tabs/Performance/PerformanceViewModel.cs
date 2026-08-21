@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.Dashboard;
@@ -44,10 +45,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
     /// Dashboard's network scale floor.</summary>
     private const double MinNetworkScaleMbps = 1.0;
-
-    // Fixed semantic per-metric legend colours (theme/accent-independent by design), matching the design
-    // comp's palette — parsed like MainWindowViewModel's live dots.
-    private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
 
     /// <summary>The resource rows shown in the left rail, in display order (filtered by <see cref="ShowAllDevices"/>).</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
@@ -160,13 +157,17 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly double[] _downHistory = new double[WindowSeconds];
     private readonly double[] _upHistory = new double[WindowSeconds];
     private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
+
+    /// <summary>Where the rows' colours come from. This page assigns brushes in code rather than binding
+    /// {DynamicResource}, so it has to be told when the accent moves the palette.</summary>
+    private readonly ThemeService _theme;
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel(SystemMetricsService service)
-        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+    public PerformanceViewModel(SystemMetricsService service, ThemeService theme)
+        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
     /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
@@ -176,7 +177,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and the inventory load disposes one of its own.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
-        Func<IGpuUsageSampler>? gpuSamplerFactory = null) {
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null) {
+        // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
+        // unshared instance simply never hears an accent change.
+        _theme = theme ?? new ThemeService();
+        _theme.SeriesChanged += OnSeriesChanged;
         _providers = providers;
         _gpuSamplerFactory = gpuSamplerFactory ?? IGpuUsageSampler.ForCurrentPlatform;
         _gpuSampler = _gpuSamplerFactory();
@@ -209,14 +214,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         _netSendTile = new StatTile("Send", "0 Mbps");
         _netErrorsTile = new StatTile("Errors", "0");
 
-        _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
+        _cpuRow = new ResourceRow("CPU", "", "", "0", "%", ChartSeries.Cpu,
                                   SparklinePoints.Build(_cpuHistory, 100),
                                   new[] {
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select);
 
-        _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
+        _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
                                      SparklinePoints.Build(_memoryHistory, 100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
@@ -228,13 +233,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
         // Receive takes the download tint and send the upload tint, matching the Dashboard's throughput chart.
-        _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
+        _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", ChartSeries.NetDown,
                                       SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
-            ValueBrush2 = Brush("#ff8a5c"),
+            Series2 = ChartSeries.NetUp,
             Points2 = SparklinePoints.Build(_upHistory, MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
         };
@@ -298,8 +303,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             Resources.Add(_gpus[0].Row);
         Resources.Add(_networkRow);
 
-        // Rows built after construction (disks, GPUs) inherit the current window here.
+        // Rows built after construction (disks, GPUs) inherit the current window and palette here.
         ApplyChartWindow();
+        ApplyPalette();
 
         Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
     }
@@ -544,7 +550,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var readTile = new StatTile("Read", "0 MB/s");
             var writeTile = new StatTile("Write", "0 MB/s");
             var responseTile = new StatTile("Response", "0 ms");
-            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", Brush("#ffcf4d"),
+            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       SparklinePoints.Build(history, 100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select);
             var resource = new DiskResource {
@@ -579,7 +585,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
             var tempTile = new StatTile("Temp", NoReading);
             var powerTile = new StatTile("Power", NoReading);
-            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", Brush("#6ccb5f"),
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", ChartSeries.Gpu,
                                       SparklinePoints.Build(history, 100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
@@ -618,6 +624,34 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var row in Resources)
             row.ChartCaption = $"{row.ChartSubject} over {window}";
     }
+
+    /// <summary>Re-resolves every row's and sub-chart's tint from the current palette. Called wherever the
+    /// rail's row set changes and whenever the accent moves the palette, so CPU reads the same hue here as
+    /// on the Dashboard's card for it.</summary>
+    private void ApplyPalette() {
+        ApplyPalette(_cpuRow);
+        ApplyPalette(_memoryRow);
+        ApplyPalette(_networkRow);
+
+        foreach (var core in _cpuCores)
+            core.Chart.Stroke = _cpuRow.ValueBrush;
+        foreach (var disk in _disks)
+            ApplyPalette(disk.Row);
+        foreach (var gpu in _gpus) {
+            ApplyPalette(gpu.Row);
+            foreach (var engine in gpu.Engines)
+                engine.Chart.Stroke = gpu.Row.ValueBrush;
+        }
+    }
+
+    /// <summary>One row's tints, from its fixed series identity. The brushes are cached per series by
+    /// <see cref="ThemeService"/>, so re-applying an unchanged palette raises nothing.</summary>
+    private void ApplyPalette(ResourceRow row) {
+        row.ValueBrush = _theme.BrushFor(row.Series);
+        row.ValueBrush2 = row.Series2 is { } second ? _theme.BrushFor(second) : null;
+    }
+
+    private void OnSeriesChanged(ChartSeriesColors series) => ApplyPalette();
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
@@ -953,6 +987,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _gpuSensors.Dispose();
         _cpuSampler.Dispose();
         _speedSampler.Dispose();
+        _theme.SeriesChanged -= OnSeriesChanged;
     }
 
     /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four

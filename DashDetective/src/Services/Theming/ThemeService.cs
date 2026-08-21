@@ -36,6 +36,13 @@ public sealed class ThemeService {
     /// holds brushes rather than resource references re-resolves them here.</summary>
     public event Action<ChartSeriesColors>? SeriesChanged;
 
+    /// <summary>One series' current colour as a brush. The seam for a page that assigns brushes in code
+    /// rather than through {DynamicResource}, so it still reads from the one palette. Cached per palette,
+    /// so re-applying an unchanged one hands back the same instance and changes nothing downstream.</summary>
+    public IBrush BrushFor(ChartSeries series) => _seriesBrushes[(int)series];
+
+    private IBrush[] _seriesBrushes = BuildSeriesBrushes(ChartPalette.Default);
+
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
@@ -103,6 +110,7 @@ public sealed class ThemeService {
     /// announces them for the pages that hold brushes instead of resource references.</summary>
     private void SetChartSeries(ChartSeriesColors series) {
         CurrentSeries = series;
+        _seriesBrushes = BuildSeriesBrushes(series);
 
         if (Application.Current is { } app) {
             var res = app.Resources;
@@ -116,5 +124,15 @@ public sealed class ThemeService {
 
         // Raised even with no Application (headless tests): the palette itself has still changed.
         SeriesChanged?.Invoke(series);
+    }
+
+    /// <summary>One brush per series, indexed by the enum so a reordered <see cref="ChartSeries"/> cannot
+    /// silently mis-map.</summary>
+    private static IBrush[] BuildSeriesBrushes(ChartSeriesColors series) {
+        var values = Enum.GetValues<ChartSeries>();
+        var brushes = new IBrush[values.Length];
+        foreach (var value in values)
+            brushes[(int)value] = new SolidColorBrush(series.For(value));
+        return brushes;
     }
 }
