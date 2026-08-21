@@ -211,6 +211,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // disposed, so the watcher simply lives for the app's lifetime — no teardown plumbing needed.
     private readonly DirectoryWatcher _watcher = new();
 
+    // Why the current folder listed as it did, so an empty list can say which reason it is. Only
+    // meaningful once a load has completed.
+    private FolderReadStatus _readStatus = FolderReadStatus.Ok;
+
     // When set, the next folder load re-selects this path if it still exists (auto-refresh preserves
     // the user's selection; navigation leaves it null so selection clears as before).
     private string? _reselectPath;
@@ -469,6 +473,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _reselectPath = null;
 
         if (clearFirst) {
+            _readStatus = FolderReadStatus.Ok;
             SelectedEntry = null;
             _allEntries.Clear();
             RebuildVisibleEntries();
@@ -477,10 +482,11 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         if (showBusy)
             _ = ShowBusyAfterGraceAsync(id);
 
-        IReadOnlyList<FileItem> items;
+        FolderRead read;
         try {
-            items = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
+            read = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
         } catch {
+            _readStatus = FolderReadStatus.Unreadable;
             EndLoad(id);
             return;
         }
@@ -491,9 +497,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
         }
 
+        _readStatus = read.Status;
         SelectedEntry = null;
         _allEntries.Clear();
-        foreach (var item in items)
+        foreach (var item in read.Items)
             _allEntries.Add(new FileEntry(item, OnEntrySelected));
         RebuildVisibleEntries();
 

@@ -26,6 +26,21 @@ public readonly record struct FileItem(
     string CreatedText, string AttributesText,
     long Size, DateTime Modified);
 
+/// <summary>Why a folder listing came back the way it did, so an empty pane can say which of these
+/// it is. Only ever anything but <see cref="FolderReadStatus.Ok"/> when the listing was empty.</summary>
+internal enum FolderReadStatus {
+    Ok,
+    AccessDenied,
+    NotFound,
+    Unreadable,
+
+    /// <summary>The folder has entries, but every one of them was filtered out as hidden/system.</summary>
+    HiddenOnly,
+}
+
+/// <summary>A folder listing plus why it is as short as it is.</summary>
+internal readonly record struct FolderRead(IReadOnlyList<FileItem> Items, FolderReadStatus Status);
+
 /// <summary>
 /// Async, soft-failing filesystem enumeration for the File Explorer. Mirrors the Dashboard
 /// <c>*InfoProvider</c> pattern: work runs off the UI thread via <see cref="Task.Run"/>, and every
@@ -59,7 +74,7 @@ public static class DirectoryService {
 
     /// <summary>Lists a folder's entries. Takes the shell seam because each row carries the shell's
     /// friendly type name; this class stays static and holds no state of its own.</summary>
-    internal static Task<IReadOnlyList<FileItem>> GetEntriesAsync(
+    internal static Task<FolderRead> GetEntriesAsync(
         string path, bool includeHidden, IShellInterop shell) =>
         Task.Run(() => ReadEntries(path, includeHidden, shell));
 
@@ -102,7 +117,7 @@ public static class DirectoryService {
 
     // Folders first (both alphabetical), matching Explorer's default ordering. Each entry's
     // type name, date and size are computed here, off the UI thread.
-    private static IReadOnlyList<FileItem> ReadEntries(string path, bool includeHidden, IShellInterop shell) {
+    private static FolderRead ReadEntries(string path, bool includeHidden, IShellInterop shell) {
         var dirs = new List<FileItem>();
         var files = new List<FileItem>();
         var opts = Options(includeHidden);
@@ -141,7 +156,28 @@ public static class DirectoryService {
         var all = new List<FileItem>(dirs.Count + files.Count);
         all.AddRange(dirs);
         all.AddRange(files);
-        return all;
+        return new FolderRead(all, all.Count > 0 ? FolderReadStatus.Ok : Diagnose(path, includeHidden));
+    }
+
+    // Why an empty listing was empty. IgnoreInaccessible hides the failure to open the folder itself,
+    // so a denied folder is otherwise indistinguishable from an empty one; this asks again without the
+    // suppression. Only reached when the listing produced nothing, so an ordinary folder never pays it.
+    private static FolderReadStatus Diagnose(string path, bool includeHidden) {
+        var probe = new EnumerationOptions { IgnoreInaccessible = false, AttributesToSkip = 0 };
+        try {
+            foreach (var _ in Directory.EnumerateFileSystemEntries(path, "*", probe))
+                // Entries exist but none reached the list: with hidden ones skipped that is what hid
+                // them, otherwise they appeared between the two passes and the watcher will catch up.
+                return includeHidden ? FolderReadStatus.Ok : FolderReadStatus.HiddenOnly;
+        } catch (UnauthorizedAccessException) {
+            return FolderReadStatus.AccessDenied;
+        } catch (DirectoryNotFoundException) {
+            return FolderReadStatus.NotFound;
+        } catch {
+            return FolderReadStatus.Unreadable;
+        }
+
+        return FolderReadStatus.Ok;
     }
 
     private static int NameCompare(FileItem a, FileItem b) =>
