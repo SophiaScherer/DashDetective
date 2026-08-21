@@ -476,9 +476,20 @@
 
                     <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoading}" Text="Loading…"/>
-                    <!-- An empty folder and one still being read would otherwise look identical. -->
-                    <TextBlock Classes="cardSub" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               IsVisible="{Binding IsEmpty}" Text="This folder is empty"/>
+                    <!-- Why the list is blank. A protected folder, one that has vanished, a filter that
+                         hid everything and a genuinely empty folder all used to read the same; the
+                         wording comes from FolderMessages so the pane can tell them apart. -->
+                    <StackPanel Spacing="6" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding FolderMessageTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding FolderMessageTitle}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding FolderMessageHint}" FontSize="11.5"
+                                   Foreground="{DynamicResource TextSubtle}"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
                     <ProgressBar Classes="loadStrip" IsIndeterminate="True" VerticalAlignment="Top"
                                  IsVisible="{Binding IsLoading}"/>
                 </Panel>

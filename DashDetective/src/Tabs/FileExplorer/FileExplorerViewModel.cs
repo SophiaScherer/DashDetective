@@ -49,19 +49,31 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     /// <summary>Full path of the currently selected folder (drives the list + breadcrumb).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanGoUp))]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
     private string _currentPath = "";
 
     // ----- Load state -----
 
     /// <summary>Whether a folder read is in flight and has outlasted the grace period below.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty))]
-    private bool _isLoading;
+    [ObservableProperty] private bool _isLoading;
 
-    /// <summary>Whether the open folder has nothing to show — distinguishing a genuinely empty folder
-    /// from one still being read, which would otherwise look identical.</summary>
-    public bool IsEmpty => !IsLoading && CurrentPath.Length > 0 && VisibleEntries.Count == 0;
+    /// <summary>Why the list is blank, or "" when it has rows. Six situations used to look identical —
+    /// see <see cref="FolderMessages"/>, which decides between them.</summary>
+    [ObservableProperty] private string _folderMessageTitle = "";
+    [ObservableProperty] private string _folderMessageHint = "";
+
+    partial void OnCurrentPathChanged(string value) => UpdateFolderMessage();
+    partial void OnIsLoadingChanged(bool value) => UpdateFolderMessage();
+
+    // Pushed rather than computed: it also depends on the read status and the unfiltered count,
+    // neither of which raises a change notification of its own.
+    private void UpdateFolderMessage() {
+        var message = FolderMessages.Resolve(
+            IsLoading || _activeLoadId != 0, CurrentPath.Length > 0, _readStatus,
+            _allEntries.Count, VisibleEntries.Count, _selectedFilter.Label);
+
+        FolderMessageTitle = message?.Title ?? "";
+        FolderMessageHint = message?.Hint ?? "";
+    }
 
     // ----- Responsive table columns -----
 
@@ -243,6 +255,9 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         SizeSort = new SortColumn(FileSortKey.Size, OnSort);
         _sortColumns = new[] { NameSort, TypeSort, ModifiedSort, SizeSort };
         UpdateSortIndicators();
+
+        // Nothing is open yet, so say so rather than showing a blank pane.
+        UpdateFolderMessage();
 
         // Fires on a timer thread — hop to the UI thread before touching bound collections.
         _watcher.Changed += () => Dispatcher.UIThread.Post(ReloadCurrentFolderPreservingState);
@@ -529,6 +544,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         _activeLoadId = 0;
         IsLoading = false;
+
+        // Explicit: a read fast enough to never raise IsLoading leaves that setter silent, so the
+        // message would stay suppressed for a folder that has finished answering.
+        UpdateFolderMessage();
     }
 
     private void OnEntrySelected(FileEntry entry) {
@@ -591,7 +610,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         // One Reset rather than a Clear plus an Add per row: a 5,000-entry folder is otherwise
         // ~5,000 layout invalidations on the UI thread.
         VisibleEntries.Reset(filtered);
-        OnPropertyChanged(nameof(IsEmpty));
+        UpdateFolderMessage();
 
         // Drop a selection that the filter just hid.
         if (SelectedEntry is { } sel && !filtered.Contains(sel)) {
