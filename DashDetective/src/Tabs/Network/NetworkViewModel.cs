@@ -30,6 +30,11 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
+    /// <summary>This page's own throughput cadence. Fixed rather than following the Settings refresh
+    /// interval, which is why its charts' window never moves — named so the caption and the channel cannot
+    /// disagree about it.</summary>
+    private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(1);
+
     /// <summary>Floor for a series' vertical scale so idle traffic isn't drawn as a huge spike.</summary>
     private const double MinScaleMbps = 1.0;
 
@@ -58,7 +63,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly NetworkProviders _providers;
     private readonly NetworkUsageSampler _networkSampler = new();
     // The channel owns the download history; upload is a second rolling buffer pushed alongside it.
-    private readonly double[] _upHistory = new double[WindowSeconds];
+    private readonly MetricHistory _upHistory = new MetricHistory(WindowSeconds);
     private readonly MetricChannel<NetworkSample> _networkChannel;
     private readonly DispatcherTimer _adapterTimer;
     private readonly DispatcherTimer _connectionsTimer;
@@ -87,6 +92,23 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Shared upper bound for BOTH charts, so equal pixel height means equal Mbps.</summary>
     [ObservableProperty] private double _throughputYMax = MinScaleMbps;
+
+    /// <summary>What the throughput charts plot and over how long. This page samples at its own fixed
+    /// cadence, so unlike the pages on the shared feeds its window never moves — but it is stated through
+    /// <c>ChartWindow</c> all the same, so the app has one wording for it.</summary>
+    public string ThroughputChartCaption { get; } =
+        $"Receive and send over {ChartWindow.Describe(WindowSeconds, SampleInterval)}";
+
+    /// <summary>The oldest end of the charts' time axis, e.g. "−60s".</summary>
+    public string ChartRangeStart { get; } = ChartWindow.StartLabel(WindowSeconds, SampleInterval);
+
+    /// <summary>The charts' shared value labels, live because the ceiling follows the traffic.</summary>
+    [ObservableProperty] private string _throughputAxisMax = "";
+    [ObservableProperty] private string _throughputAxisMid = "";
+
+    /// <summary>The cold-start line, cleared as soon as there is a trace to show. Both series are sampled
+    /// together, so one answer covers the pair.</summary>
+    [ObservableProperty] private string _throughputChartStatus = ChartStatus.Collecting;
 
     /// <summary>The shared scale as a caption (e.g. "peak 12 Mbps"), so the ceiling is visible.</summary>
     [ObservableProperty] private string _throughputScaleText = "";
@@ -154,9 +176,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     internal NetworkViewModel(NetworkProviders providers) {
         _providers = providers;
 
-        // Zero-filled buffers mean both charts are full-width (flat at 0) from the first frame; real
-        // samples then shift in from the right, one per second.
-        _networkChannel = new MetricChannel<NetworkSample>(TimeSpan.FromSeconds(1), WindowSeconds,
+        // The buffers know how much of themselves is real, so both charts start empty behind a
+        // "collecting" line and grow in from the right, one sample per second.
+        _networkChannel = new MetricChannel<NetworkSample>(SampleInterval, WindowSeconds,
             () => _networkSampler.Sample(), static s => s.DownMbps, OnNetworkSample, OnNetworkFailed);
         UpdateThroughput(new NetworkSample(0, 0));
 
@@ -207,7 +229,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Throughput channel callback: the channel already pushed the download rate into its
     /// history, so append the upload rate to the second buffer, then refresh the readouts.</summary>
     private void OnNetworkSample(NetworkSample sample) {
-        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
+        _upHistory.Push(sample.UpMbps);
         UpdateThroughput(sample);
     }
 
@@ -222,12 +244,16 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         DownUnit = unit;
         UpUnit = unit;
 
-        var peak = ChartScale.Peak(_networkChannel.History, _upHistory);
+        var peak = ChartScale.Peak(_networkChannel.History.Values, _upHistory.Values);
         ThroughputYMax = ChartScale.FitPeak(peak, MinScaleMbps);
         ThroughputScaleText = $"peak {DataRateFormatter.Format(peak)}";
 
-        DownPoints = SparklinePoints.Build(_networkChannel.History, ThroughputYMax);
-        UpPoints = SparklinePoints.Build(_upHistory, ThroughputYMax);
+        DownPoints = _networkChannel.History.Points(ThroughputYMax);
+        UpPoints = _upHistory.Points(ThroughputYMax);
+        ThroughputChartStatus = ChartStatus.For(_networkChannel.History);
+
+        // Both charts share one ceiling, so one set of value labels describes the pair.
+        (ThroughputAxisMax, ThroughputAxisMid, _) = ChartAxis.RateLabels(ThroughputYMax);
     }
 
     private void OnAdapterTick(object? sender, EventArgs e) => _ = LoadAdaptersAsync();

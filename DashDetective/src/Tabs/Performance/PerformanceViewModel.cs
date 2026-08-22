@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.Dashboard;
@@ -24,8 +25,8 @@ namespace DashDetective.Tabs.Performance;
 /// swaps a right detail pane (one large utilization chart + a stat-tile strip).
 ///
 /// Live sampling subscribes to the shared <see cref="SystemMetricsService"/>; each metric keeps its own
-/// <c>double[60]</c> rolling history, rebuilds the shared <c>Sparkline</c> via <see cref="SparklinePoints"/>,
-/// and pushes results into the selected resource's <see cref="ResourceRow"/>.
+/// 60-slot <see cref="MetricHistory"/>, rebuilds the shared <c>Sparkline</c> from it, and pushes results
+/// into the selected resource's <see cref="ResourceRow"/>.
 ///
 /// All five resources are wired live: <b>CPU</b>, <b>Memory</b>, <b>Disk</b>, <b>GPU</b>, <b>Ethernet</b>.
 /// Implements <see cref="IRefreshablePage"/> (toolbar Refresh), <see cref="ILiveSamplingPage"/>
@@ -44,10 +45,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
     /// Dashboard's network scale floor.</summary>
     private const double MinNetworkScaleMbps = 1.0;
-
-    // Fixed semantic per-metric legend colours (theme/accent-independent by design), matching the design
-    // comp's palette — parsed like MainWindowViewModel's live dots.
-    private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
 
     /// <summary>The resource rows shown in the left rail, in display order (filtered by <see cref="ShowAllDevices"/>).</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
@@ -92,7 +89,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly SamplingGate _gate;
 
     // ---- CPU (live) ----
-    private readonly double[] _cpuHistory = new double[WindowSeconds];
+    private readonly MetricHistory _cpuHistory = new MetricHistory(WindowSeconds);
     private readonly ResourceRow _cpuRow;
     private readonly StatTile _cpuUtilTile;
     private readonly StatTile _cpuSpeedTile;
@@ -119,7 +116,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private readonly Dictionary<string, CoreChart> _cpuCoresByInstance = new();
 
     // ---- Memory (live) ----
-    private readonly double[] _memoryHistory = new double[WindowSeconds];
+    private readonly MetricHistory _memoryHistory = new MetricHistory(WindowSeconds);
     private readonly ResourceRow _memoryRow;
     private readonly StatTile _memInUseTile;
     private readonly StatTile _memAvailableTile;
@@ -157,16 +154,20 @@ public partial class PerformanceViewModel : ViewModelBase,
     // ---- Ethernet / network (live) ----
     // Both directions are kept: they share one auto-fitted axis and are drawn as two series on the row's
     // chart, so the adapter's headline surface shows its whole throughput rather than receive alone.
-    private readonly double[] _downHistory = new double[WindowSeconds];
-    private readonly double[] _upHistory = new double[WindowSeconds];
+    private readonly MetricHistory _downHistory = new MetricHistory(WindowSeconds);
+    private readonly MetricHistory _upHistory = new MetricHistory(WindowSeconds);
     private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
+
+    /// <summary>Where the rows' colours come from. This page assigns brushes in code rather than binding
+    /// {DynamicResource}, so it has to be told when the accent moves the palette.</summary>
+    private readonly ThemeService _theme;
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel(SystemMetricsService service)
-        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+    public PerformanceViewModel(SystemMetricsService service, ThemeService theme)
+        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
     /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
@@ -176,7 +177,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and the inventory load disposes one of its own.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
-        Func<IGpuUsageSampler>? gpuSamplerFactory = null) {
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null) {
+        // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
+        // unshared instance simply never hears an accent change.
+        _theme = theme ?? new ThemeService();
+        _theme.SeriesChanged += OnSeriesChanged;
         _providers = providers;
         _gpuSamplerFactory = gpuSamplerFactory ?? IGpuUsageSampler.ForCurrentPlatform;
         _gpuSampler = _gpuSamplerFactory();
@@ -209,15 +214,15 @@ public partial class PerformanceViewModel : ViewModelBase,
         _netSendTile = new StatTile("Send", "0 Mbps");
         _netErrorsTile = new StatTile("Errors", "0");
 
-        _cpuRow = new ResourceRow("CPU", "", "", "0", "%", Brush("#4cc2ff"),
-                                  SparklinePoints.Build(_cpuHistory, 100),
+        _cpuRow = new ResourceRow("CPU", "", "", "0", "%", ChartSeries.Cpu,
+                                  _cpuHistory.Points(100),
                                   new[] {
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select);
 
-        _memoryRow = new ResourceRow("Memory", "", "", "0", "%", Brush("#c58fff"),
-                                     SparklinePoints.Build(_memoryHistory, 100),
+        _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
+                                     _memoryHistory.Points(100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
                                          _memCachedTile, _memCommittedTile,
@@ -228,14 +233,16 @@ public partial class PerformanceViewModel : ViewModelBase,
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
         // Receive takes the download tint and send the upload tint, matching the Dashboard's throughput chart.
-        _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", Brush("#4cc2ff"),
-                                      SparklinePoints.Build(_downHistory, MinNetworkScaleMbps),
+        _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", ChartSeries.NetDown,
+                                      _downHistory.Points(MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
-            ValueBrush2 = Brush("#ff8a5c"),
-            Points2 = SparklinePoints.Build(_upHistory, MinNetworkScaleMbps),
+            Series2 = ChartSeries.NetUp,
+            LegendLabel1 = "Receive",
+            LegendLabel2 = "Send",
+            Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
         };
 
@@ -298,8 +305,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             Resources.Add(_gpus[0].Row);
         Resources.Add(_networkRow);
 
-        // Rows built after construction (disks, GPUs) inherit the current window here.
+        // Rows built after construction (disks, GPUs) inherit the current window and palette here.
         ApplyChartWindow();
+        ApplyPalette();
 
         Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
     }
@@ -387,7 +395,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>CPU subscription callback: append to the history, then refresh the utilization surfaces
     /// plus the live process/thread/handle counts and uptime tiles (all keyed off the CPU tick).</summary>
     private void OnCpu(double value) {
-        MetricChannel.PushHistory(_cpuHistory, value);
+        _cpuHistory.Push(value);
         UpdateCpu(value);
         UpdateCpuCounts();
         UpdateCpuUptime();
@@ -403,7 +411,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         var rounded = Math.Round(value);
         _cpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
         _cpuUtilTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-        _cpuRow.Points = SparklinePoints.Build(_cpuHistory, 100);
+        _cpuRow.Points = _cpuHistory.Points(100);
+        _cpuRow.ChartStatus = ChartStatus.For(_cpuHistory);
     }
 
     /// <summary>Refreshes the live process / thread / handle counts — Task Manager's CPU-pane figures — from
@@ -458,7 +467,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
     private void OnMemory(MemorySample sample) {
-        MetricChannel.PushHistory(_memoryHistory, sample.LoadPercent);
+        _memoryHistory.Push(sample.LoadPercent);
         UpdateMemory(sample);
     }
 
@@ -484,7 +493,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         _memoryRow.Sub = totalGb > 0
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
-        _memoryRow.Points = SparklinePoints.Build(_memoryHistory, 100);
+        _memoryRow.Points = _memoryHistory.Points(100);
+        _memoryRow.ChartStatus = ChartStatus.For(_memoryHistory);
 
         _memInUseTile.Value = $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} GB";
         _memAvailableTile.Value = $"{Math.Max(0, totalGb - usedGb).ToString("F1", CultureInfo.InvariantCulture)} GB";
@@ -539,13 +549,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         _disksByNumber.Clear();
 
         foreach (var disk in disks) {
-            var history = new double[WindowSeconds];
+            var history = new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
             var readTile = new StatTile("Read", "0 MB/s");
             var writeTile = new StatTile("Write", "0 MB/s");
             var responseTile = new StatTile("Response", "0 ms");
-            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", Brush("#ffcf4d"),
-                                      SparklinePoints.Build(history, 100),
+            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
+                                      history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select);
             var resource = new DiskResource {
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
@@ -569,7 +579,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _gpusByLuid.Clear();
 
         foreach (var gpu in gpus) {
-            var history = new double[WindowSeconds];
+            var history = new MetricHistory(WindowSeconds);
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
@@ -579,8 +589,8 @@ public partial class PerformanceViewModel : ViewModelBase,
             // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
             var tempTile = new StatTile("Temp", NoReading);
             var powerTile = new StatTile("Power", NoReading);
-            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", Brush("#6ccb5f"),
-                                      SparklinePoints.Build(history, 100),
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", ChartSeries.Gpu,
+                                      history.Points(100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
                                           tempTile, powerTile,
@@ -611,13 +621,47 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyChartWindow();
     }
 
-    /// <summary>Rewrites every row's caption for the current window. Called at construction, whenever the
-    /// interval changes, and after new rows are built (they inherit the current window).</summary>
+    /// <summary>The oldest end of the chart's time axis, e.g. "−60s". One answer for the page: every
+    /// row's buffer is the same slot count on the same cadence.</summary>
+    [ObservableProperty] private string _chartRangeStart = "";
+
+    /// <summary>Rewrites every row's caption, and the shared time axis, for the current window. Called at
+    /// construction, whenever the interval changes, and after new rows are built (they inherit the current
+    /// window).</summary>
     private void ApplyChartWindow() {
         var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
         foreach (var row in Resources)
             row.ChartCaption = $"{row.ChartSubject} over {window}";
+        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
     }
+
+    /// <summary>Re-resolves every row's and sub-chart's tint from the current palette. Called wherever the
+    /// rail's row set changes and whenever the accent moves the palette, so CPU reads the same hue here as
+    /// on the Dashboard's card for it.</summary>
+    private void ApplyPalette() {
+        ApplyPalette(_cpuRow);
+        ApplyPalette(_memoryRow);
+        ApplyPalette(_networkRow);
+
+        foreach (var core in _cpuCores)
+            core.Chart.Stroke = _cpuRow.ValueBrush;
+        foreach (var disk in _disks)
+            ApplyPalette(disk.Row);
+        foreach (var gpu in _gpus) {
+            ApplyPalette(gpu.Row);
+            foreach (var engine in gpu.Engines)
+                engine.Chart.Stroke = gpu.Row.ValueBrush;
+        }
+    }
+
+    /// <summary>One row's tints, from its fixed series identity. The brushes are cached per series by
+    /// <see cref="ThemeService"/>, so re-applying an unchanged palette raises nothing.</summary>
+    private void ApplyPalette(ResourceRow row) {
+        row.ValueBrush = _theme.BrushFor(row.Series);
+        row.ValueBrush2 = row.Series2 is { } second ? _theme.BrushFor(second) : null;
+    }
+
+    private void OnSeriesChanged(ChartSeriesColors series) => ApplyPalette();
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDisks();
@@ -655,8 +699,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var sample in samples) {
             if (!_cpuCoresByInstance.TryGetValue(sample.Instance, out var core))
                 continue;
-            MetricChannel.PushHistory(core.History, Math.Clamp(sample.Percent, 0, 100));
-            core.Chart.Points = SparklinePoints.Build(core.History, 100);
+            core.History.Push(Math.Clamp(sample.Percent, 0, 100));
+            core.Chart.Points = core.History.Points(100);
         }
     }
 
@@ -667,7 +711,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         for (var i = 0; i < count; i++) {
             var core = new CoreChart {
                 Instance = samples[i].Instance, Chart = new SubChart($"CPU {i}", _cpuRow.ValueBrush),
-                History = new double[WindowSeconds],
+                History = new MetricHistory(WindowSeconds),
             };
             _cpuCores.Add(core);
             _cpuCoresByInstance[core.Instance] = core;
@@ -702,13 +746,14 @@ public partial class PerformanceViewModel : ViewModelBase,
 
             gpu.Row.Note = "";
             var overall = Math.Clamp(reading, 0, 100);
-            MetricChannel.PushHistory(gpu.History, overall);
+            gpu.History.Push(overall);
             var rounded = Math.Round(overall);
             gpu.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
             // Restores the unit the row was seeded without, so a reporting adapter reads "37 %" while one
             // that cannot stays a bare "—".
             gpu.Row.Unit = "%";
-            gpu.Row.Points = SparklinePoints.Build(gpu.History, 100);
+            gpu.Row.Points = gpu.History.Points(100);
+            gpu.Row.ChartStatus = ChartStatus.For(gpu.History);
             gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
             UpdateGpuEngines(gpu, sample.Engines);
         }
@@ -736,8 +781,8 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         foreach (var engine in gpu.Engines) {
             byEngine.TryGetValue(engine.Key, out var value);
-            MetricChannel.PushHistory(engine.History, Math.Clamp(value, 0, 100));
-            engine.Chart.Points = SparklinePoints.Build(engine.History, 100);
+            engine.History.Push(Math.Clamp(value, 0, 100));
+            engine.Chart.Points = engine.History.Points(100);
         }
     }
 
@@ -750,7 +795,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                 continue;
             var chart = new EngineChart {
                 Key = key, Chart = new SubChart(FormatEngineLabel(key), gpu.Row.ValueBrush),
-                History = new double[WindowSeconds],
+                History = new MetricHistory(WindowSeconds),
             };
             gpu.Engines.Add(chart);
             gpu.EnginesByBase[key] = chart;
@@ -825,10 +870,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_disksByNumber.TryGetValue(sample.DiskNumber, out var disk))
                 continue;
-            MetricChannel.PushHistory(disk.History, sample.ActivePercent);
+            disk.History.Push(sample.ActivePercent);
             var rounded = Math.Round(sample.ActivePercent);
             disk.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
-            disk.Row.Points = SparklinePoints.Build(disk.History, 100);
+            disk.Row.Points = disk.History.Points(100);
+            disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
             disk.ReadTile.Value = FormatRate(sample.ReadBytesPerSec);
             disk.WriteTile.Value = FormatRate(sample.WriteBytesPerSec);
@@ -849,8 +895,8 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
     private void OnNetwork(NetworkSample sample) {
-        MetricChannel.PushHistory(_downHistory, sample.DownMbps);
-        MetricChannel.PushHistory(_upHistory, sample.UpMbps);
+        _downHistory.Push(sample.DownMbps);
+        _upHistory.Push(sample.UpMbps);
         UpdateNetwork(sample);
     }
 
@@ -874,9 +920,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         // (with headroom and a floor, like the Dashboard) and draw them on that one axis — Task Manager's
         // adapter pane shows send and receive together, and a receive-only chart under the adapter's name
         // reads as its whole throughput.
-        var axis = ChartScale.FitAxis(_downHistory, _upHistory, MinNetworkScaleMbps);
-        _networkRow.Points = SparklinePoints.Build(_downHistory, axis);
-        _networkRow.Points2 = SparklinePoints.Build(_upHistory, axis);
+        var axis = ChartScale.FitAxis(_downHistory.Values, _upHistory.Values, MinNetworkScaleMbps);
+        _networkRow.Points = _downHistory.Points(axis);
+        _networkRow.Points2 = _upHistory.Points(axis);
+        _networkRow.ChartStatus = ChartStatus.For(_downHistory);
+
+        // The only row whose value labels move: both series share this ceiling, so one set describes them.
+        (_networkRow.AxisMaxLabel, _networkRow.AxisMidLabel, _networkRow.AxisMinLabel) =
+            ChartAxis.RateLabels(axis);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }
@@ -953,6 +1004,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _gpuSensors.Dispose();
         _cpuSampler.Dispose();
         _speedSampler.Dispose();
+        _theme.SeriesChanged -= OnSeriesChanged;
     }
 
     /// <summary>A live per-disk rail row and its backing state: the rolling active-time history and the four
@@ -960,7 +1012,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private sealed class DiskResource {
         public required int DiskNumber { get; init; }
         public required ResourceRow Row { get; init; }
-        public required double[] History { get; init; }
+        public required MetricHistory History { get; init; }
         public required StatTile ActiveTile { get; init; }
         public required StatTile ReadTile { get; init; }
         public required StatTile WriteTile { get; init; }
@@ -974,7 +1026,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private sealed class GpuResource {
         public required string Luid { get; init; }
         public required ResourceRow Row { get; init; }
-        public required double[] History { get; init; }
+        public required MetricHistory History { get; init; }
         public required StatTile ThreeDTile { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }
@@ -988,7 +1040,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private sealed class EngineChart {
         public required string Key { get; init; }
         public required SubChart Chart { get; init; }
-        public required double[] History { get; init; }
+        public required MetricHistory History { get; init; }
     }
 
     /// <summary>One logical processor's mini chart and its backing state: the PDH instance name the sampler
@@ -996,6 +1048,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     private sealed class CoreChart {
         public required string Instance { get; init; }
         public required SubChart Chart { get; init; }
-        public required double[] History { get; init; }
+        public required MetricHistory History { get; init; }
     }
 }

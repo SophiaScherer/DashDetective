@@ -174,6 +174,15 @@
                                IsVisible="{Binding SelectedResource.HasNote}"
                                Text="{Binding SelectedResource.Note}"/>
 
+                    <!-- The key for the one row that draws two series; a single line needs none, since the
+                         header above already names it. -->
+                    <controls:ChartLegend HorizontalAlignment="Right"
+                                          IsVisible="{Binding SelectedResource.HasSecondSeries}"
+                                          Label1="{Binding SelectedResource.LegendLabel1}"
+                                          Brush1="{Binding SelectedResource.ValueBrush}"
+                                          Label2="{Binding SelectedResource.LegendLabel2}"
+                                          Brush2="{Binding SelectedResource.ValueBrush2}"/>
+
                     <!-- Overall: one fixed-axis area chart tinted in the resource's colour, plus an optional
                          second series on the same axis (the adapter row's upload beside its download). -->
                     <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
@@ -182,7 +191,12 @@
                                         Stroke="{Binding SelectedResource.ValueBrush}"
                                         Points="{Binding SelectedResource.Points}"
                                         Stroke2="{Binding SelectedResource.ValueBrush2}"
-                                        Points2="{Binding SelectedResource.Points2}"/>
+                                        Points2="{Binding SelectedResource.Points2}"
+                                        AxisMaxLabel="{Binding SelectedResource.AxisMaxLabel}"
+                                        AxisMidLabel="{Binding SelectedResource.AxisMidLabel}"
+                                        AxisMinLabel="{Binding SelectedResource.AxisMinLabel}"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding SelectedResource.ChartStatus}"/>
 
                     <!-- Detailed: one mini chart per logical processor / engine in a compact square grid.
                          DetailColumns is the ceiling rather than a fixed count,

@@ -17,9 +17,19 @@
                            VerticalAlignment="Bottom" Margin="0,0,0,4"/>
             </StackPanel>
             <TextBlock Classes="cardSub" Text="{Binding #Root.Sub}"/>
-            <controls:Sparkline Classes="chartMini" StrokeThickness="1.4"
+            <!-- Gradient fill and lattice on the same scale as the larger charts. The grid is a scale,
+                 not decoration — its bands are quarters of the axis — so a card that ruled itself into
+                 halves would be marking different values than the panel chart beside it.
+
+                 The axis is labelled at its ends only, and carries no time range: a card chart is about a
+                 third the height of a panel one, so a third label would crowd the two that matter and a
+                 footer would take most of what is left to draw in. Every card covers the same window as the
+                 panel charts below them, which state it. -->
+            <controls:Sparkline Classes="chartMini" StrokeThickness="1.4" Fill="True" ShowGrid="True"
                                 Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"
-                                YMin="{Binding #Root.YMin}" YMax="{Binding #Root.YMax}"/>
+                                YMin="{Binding #Root.YMin}" YMax="{Binding #Root.YMax}"
+                                AxisMaxLabel="{Binding #Root.AxisMaxLabel}"
+                                AxisMinLabel="{Binding #Root.AxisMinLabel}"/>
         </StackPanel>
     </Border>
 </UserControl>

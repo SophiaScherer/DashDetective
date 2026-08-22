@@ -12,20 +12,35 @@ namespace DashDetective.Shared.Charts;
 /// Percentage metrics (CPU, Memory, GPU, Disk) pass <c>valueMax = 100</c> (giving the classic
 /// <c>100 − value</c>); unbounded metrics (network throughput) pass a rolling peak so the series still
 /// fills the same 0–100 axis without a XAML change.
+///
+/// Callers normally reach this through <see cref="MetricHistory.Points"/>, which supplies the fill count.
 /// </summary>
 public static class SparklinePoints {
     /// <summary>
-    /// Builds the points string for <paramref name="history"/> scaled against <paramref name="valueMax"/>.
-    /// Each sample is normalised to 0–1 (clamped) then mapped to <c>y = 100 · (1 − ratio)</c>. A
-    /// non-positive <paramref name="valueMax"/> pins every point flat at the bottom.
+    /// Builds the points string for the whole of <paramref name="history"/>, treating every slot as a real
+    /// sample.
     /// </summary>
-    public static string Build(ReadOnlySpan<double> history, double valueMax) {
-        var sb = new StringBuilder(history.Length * 8);
-        for (var i = 0; i < history.Length; i++) {
+    public static string Build(ReadOnlySpan<double> history, double valueMax) =>
+        Build(history, valueMax, history.Length);
+
+    /// <summary>
+    /// Builds the points string for the newest <paramref name="filled"/> slots of <paramref name="history"/>,
+    /// scaled against <paramref name="valueMax"/>. Each sample is normalised to 0–1 (clamped) then mapped to
+    /// <c>y = 100 · (1 − ratio)</c>. A non-positive <paramref name="valueMax"/> pins every point flat at the
+    /// bottom.
+    ///
+    /// The emitted x values are the samples' <b>real</b> slot indices, so a partly-filled buffer draws a
+    /// short trace against the right edge rather than a stretched one spanning the chart: <c>Sparkline</c>
+    /// takes its x scale from the data's own maximum, and the newest sample always sits at the last slot.
+    /// </summary>
+    public static string Build(ReadOnlySpan<double> history, double valueMax, int filled) {
+        var first = history.Length - Math.Clamp(filled, 0, history.Length);
+        var sb = new StringBuilder((history.Length - first) * 8);
+        for (var i = first; i < history.Length; i++) {
             var ratio = valueMax > 0 ? Math.Clamp(history[i] / valueMax, 0, 1) : 0;
             var y = 100 * (1 - ratio);
 
-            if (i > 0)
+            if (i > first)
                 sb.Append(' ');
             sb.Append(i.ToString(CultureInfo.InvariantCulture));
             sb.Append(',');

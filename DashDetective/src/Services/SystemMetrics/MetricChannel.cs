@@ -1,16 +1,18 @@
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Threading;
+using DashDetective.Shared.Charts;
 using System;
 
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// Reusable "sampler + <c>DispatcherTimer</c> + rolling <c>double[window]</c> history" unit,
+/// Reusable "sampler + <c>DispatcherTimer</c> + rolling <see cref="MetricHistory"/>" unit,
 /// replacing the per-metric timer/buffer pattern once copy-pasted across the view models. Each tick
 /// samples once, appends a scalar projection to the window, and hands the full sample to <c>onSample</c>.
 /// A sampler exception calls <c>onFailed</c> and permanently stops the timer (per-channel fault
 /// isolation); <see cref="SampleNow"/> samples once regardless of timer state (for paused Refresh). The
-/// two-history network case pushes its second buffer via <see cref="PushHistory"/>.
+/// window is a <see cref="MetricHistory"/>, so a consumer can tell a real zero from a slot no sample has
+/// reached yet.
 /// </summary>
 /// <typeparam name="TSample">One sampler call's result — a <c>double</c> or a snapshot record.</typeparam>
 public class MetricChannel<TSample> : IDisposable {
@@ -19,7 +21,7 @@ public class MetricChannel<TSample> : IDisposable {
     private readonly Func<TSample, double> _historyValue;
     private readonly Action<TSample> _onSample;
     private readonly Action _onFailed;
-    private readonly double[] _history;
+    private readonly MetricHistory _history;
 
     /// <param name="historyValue">Projects the scalar pushed into the window (identity for a plain
     /// <c>double</c>; e.g. <c>s =&gt; s.LoadPercent</c> for a snapshot).</param>
@@ -32,7 +34,7 @@ public class MetricChannel<TSample> : IDisposable {
     /// drive ticks by hand; production uses the default <see cref="DispatcherTimerAdapter"/> above.</summary>
     internal MetricChannel(TimeSpan interval, int windowSize, Func<TSample> sample,
                            Func<TSample, double> historyValue, Action<TSample> onSample, Action onFailed, IUiTimer timer) {
-        _history = new double[windowSize];
+        _history = new MetricHistory(windowSize);
         _sample = sample;
         _historyValue = historyValue;
         _onSample = onSample;
@@ -52,9 +54,9 @@ public class MetricChannel<TSample> : IDisposable {
     internal MetricChannel(TimeSpan interval, Func<TSample> sample, Action<TSample> onSample, Action onFailed, IUiTimer timer)
         : this(interval, 0, sample, static _ => 0.0, onSample, onFailed, timer) { }
 
-    /// <summary>The rolling history, oldest-first. A read-only view over the live buffer; valid only for
-    /// synchronous reads on the UI thread (the next tick mutates it in place).</summary>
-    public ReadOnlySpan<double> History => _history;
+    /// <summary>The rolling history, oldest-first, carrying how much of itself is real. Live state; valid
+    /// only for synchronous reads on the UI thread (the next tick mutates it in place).</summary>
+    public MetricHistory History => _history;
 
     /// <summary>Starts (or resumes) periodic sampling. Drives the shell's Live pill.</summary>
     public void Start() => _timer.Start();
@@ -84,19 +86,8 @@ public class MetricChannel<TSample> : IDisposable {
             return;
         }
 
-        if (_history.Length > 0)
-            PushHistory(_history, _historyValue(value));
+        _history.Push(_historyValue(value));
         _onSample(value);
-    }
-
-    /// <summary>The single canonical rolling-window update: shift <paramref name="buffer"/> left by one
-    /// and append <paramref name="value"/> at the end. Public so the two-history network case reuses the
-    /// exact same shift for its second buffer instead of re-inlining <c>Array.Copy</c>.</summary>
-    public static void PushHistory(double[] buffer, double value) {
-        if (buffer.Length == 0)
-            return;
-        Array.Copy(buffer, 1, buffer, 0, buffer.Length - 1);
-        buffer[^1] = value;
     }
 
     /// <summary>Stops the timer and unsubscribes the tick handler. Safe to call more than once.</summary>

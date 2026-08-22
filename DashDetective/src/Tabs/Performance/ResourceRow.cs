@@ -1,6 +1,8 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Theming;
+using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
 using System.Windows.Input;
@@ -14,23 +16,23 @@ namespace DashDetective.Tabs.Performance;
 /// back to the owning view model for single-selection.
 ///
 /// Carries the resource's display identity (<see cref="Name"/> / <see cref="Sub"/> / <see cref="Spec"/>),
-/// its headline value (<see cref="ValueText"/> + <see cref="Unit"/>), and the semantic per-metric
-/// <see cref="ValueBrush"/> (a fixed legend colour, like <c>MainWindowViewModel</c>'s live dots).
+/// its headline value (<see cref="ValueText"/> + <see cref="Unit"/>), and which graph it is
+/// (<see cref="Series"/>), from which the owning view model resolves <see cref="ValueBrush"/>.
 ///
 /// The owning <see cref="PerformanceViewModel"/> updates the live members (<see cref="ValueText"/>,
 /// <see cref="Sub"/>, <see cref="Spec"/>, <see cref="Points"/>, and each tile's value) in place each
-/// sampling tick; <see cref="Name"/> / <see cref="Unit"/> / <see cref="ValueBrush"/> are fixed identity.
+/// sampling tick; <see cref="Name"/> / <see cref="Unit"/> / <see cref="Series"/> are fixed identity.
 /// </summary>
 public partial class ResourceRow : ObservableObject {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
-                       IBrush valueBrush, string points, IReadOnlyList<StatTile> stats,
+                       ChartSeries series, string points, IReadOnlyList<StatTile> stats,
                        Action<ResourceRow> onSelected) {
         Name = name;
         Sub = sub;
         Spec = spec;
         ValueText = valueText;
         Unit = unit;
-        ValueBrush = valueBrush;
+        Series = series;
         Points = points;
         Stats = stats;
         SelectCommand = new RelayCommand(() => onSelected(this));
@@ -55,9 +57,14 @@ public partial class ResourceRow : ObservableObject {
     /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate.</summary>
     [ObservableProperty] private string _unit;
 
-    /// <summary>Semantic per-metric tint for the value and the detail utilization chart. A fixed
-    /// legend colour, so it is theme/accent-independent by design.</summary>
-    public IBrush ValueBrush { get; }
+    /// <summary>Which graph this row is, as fixed identity. The colour itself is not stored here: the
+    /// view model resolves it from the current <see cref="ChartPalette"/> and re-applies it when the
+    /// accent changes, so the Performance tab and the Dashboard cannot disagree about CPU's hue.</summary>
+    public ChartSeries Series { get; }
+
+    /// <summary>Tint for the value and the detail utilization chart. Observable because the palette moves
+    /// with the accent; the view model owns every assignment.</summary>
+    [ObservableProperty] private IBrush _valueBrush = Brushes.Transparent;
 
     /// <summary>The 60-point utilization history for the detail chart, as a Sparkline "x,y x,y …" string
     /// (y already flipped to axis-max − value so higher utilization sits at the top). Live-updated each
@@ -69,9 +76,22 @@ public partial class ResourceRow : ObservableObject {
     /// nothing for it.</summary>
     [ObservableProperty] private string _points2 = "";
 
-    /// <summary>Tint for <see cref="Points2"/>. Null for single-series resources. A fixed legend colour,
-    /// like <see cref="ValueBrush"/>.</summary>
-    public IBrush? ValueBrush2 { get; init; }
+    /// <summary>Which graph <see cref="Points2"/> is, or null for a single-series resource.</summary>
+    public ChartSeries? Series2 { get; init; }
+
+    /// <summary>Whether this row draws two series, and so needs a key to tell them apart. One line needs
+    /// no legend — the panel header already names it.</summary>
+    public bool HasSecondSeries => Series2 is not null;
+
+    /// <summary>The legend entries for a two-series row, e.g. "Receive" / "Send". Ignored when
+    /// <see cref="HasSecondSeries"/> is false.</summary>
+    public string LegendLabel1 { get; init; } = "";
+
+    public string LegendLabel2 { get; init; } = "";
+
+    /// <summary>Tint for <see cref="Points2"/>. Null for single-series resources, which draw nothing for
+    /// it. Set from <see cref="Series2"/> alongside <see cref="ValueBrush"/>.</summary>
+    [ObservableProperty] private IBrush? _valueBrush2;
 
     /// <summary>What the chart plots, e.g. "% Utilization" or "Receive and send" — the caption's fixed half,
     /// so it never claims a scale the chart isn't drawn on.</summary>
@@ -80,6 +100,18 @@ public partial class ResourceRow : ObservableObject {
     /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
     /// Observable because the window changes with the Settings refresh interval.</summary>
     [ObservableProperty] private string _chartCaption = "";
+
+    /// <summary>The chart's value labels. A percentage resource states a fixed 100 / 50 / 0; the network
+    /// row rewrites them each tick, since its ceiling follows the traffic — which is why these are
+    /// observable rather than fixed identity.</summary>
+    [ObservableProperty] private string _axisMaxLabel = "100%";
+    [ObservableProperty] private string _axisMidLabel = "50%";
+    [ObservableProperty] private string _axisMinLabel = "0";
+
+    /// <summary>The cold-start line, cleared as soon as this row has a trace to show. Starts set: no row
+    /// has a sample before its first tick. The initializer is qualified because this property's own name
+    /// shadows the class it comes from.</summary>
+    [ObservableProperty] private string _chartStatus = Shared.Charts.ChartStatus.Collecting;
 
     /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
     /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>

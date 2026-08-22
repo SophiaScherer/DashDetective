@@ -57,6 +57,13 @@
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
+    <!-- Chart key entry (used by the ChartLegend widget). Matches cardSub, so a legend reads as part of
+         the chart's caption line rather than as another readout. -->
+    <Style Selector="TextBlock.legendLabel">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+    </Style>
+
     <!-- ===== Key/value rows (used by the InfoRow widget) ===== -->
     <Style Selector="Border.infoRow">
         <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
