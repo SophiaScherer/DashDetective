@@ -78,4 +78,36 @@ public class ChartAxisTests {
         Assert.Equal(middle, actualMiddle);
         Assert.Equal("0", bottom);
     }
+
+    /// <summary>Grid lines land on the half-pixel centre of a device pixel, so a 1px line draws crisp
+    /// rather than smeared across two.</summary>
+    [Theory]
+    [InlineData(0, 0.5)]
+    [InlineData(20, 20.5)]
+    [InlineData(20.4, 20.5)]
+    [InlineData(20.6, 21.5)]
+    public void GridLine_SnapsToTheHalfPixel(double value, double expected) {
+        Assert.Equal(expected, ChartAxis.GridLine(value, 0, 80));
+    }
+
+    /// <summary>The regression: the last line of each run sat at the plot's exact edge, which draws half
+    /// outside a chart that does not clip — the grid bled into the padding of the card hosting it.</summary>
+    [Fact]
+    public void GridLine_HoldsTheOutermostLinesInsideThePlot() {
+        Assert.Equal(0.5, ChartAxis.GridLine(0, 0, 80));
+        Assert.Equal(79.5, ChartAxis.GridLine(80, 0, 80));
+    }
+
+    [Fact]
+    public void GridLine_RespectsAnOffsetPlot() {
+        Assert.Equal(30.5, ChartAxis.GridLine(30, 30, 200));
+        Assert.Equal(199.5, ChartAxis.GridLine(200, 30, 200));
+    }
+
+    /// <summary>A plot too thin to hold both edges keeps the near one rather than inverting, which would
+    /// throw out of Math.Clamp and take the whole page's render with it.</summary>
+    [Fact]
+    public void GridLine_PlotThinnerThanOnePixel_StaysPositive() {
+        Assert.Equal(0.5, ChartAxis.GridLine(0.4, 0, 0.8));
+    }
 }

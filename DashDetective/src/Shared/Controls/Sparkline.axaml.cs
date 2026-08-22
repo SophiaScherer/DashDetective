@@ -367,8 +367,8 @@ public partial class Sparkline : UserControl {
 
     private static double TextHeight(FormattedText? text) => text?.Height ?? 0;
 
-    /// <summary>Draws a faint lattice (<see cref="GridRows"/>+1 horizontal, <see cref="GridColumns"/>+1 vertical
-    /// lines) behind the data. Coordinates are snapped to +0.5 device pixels for crisp 1px lines.</summary>
+    /// <summary>Draws a faint lattice (<see cref="GridRows"/>+1 horizontal, <see cref="GridColumns"/>+1
+    /// vertical lines) behind the data, snapped and edge-clamped by <see cref="ChartAxis.GridLine"/>.</summary>
     private void DrawGrid(DrawingContext context, Rect plot) {
         var brush = GridBrush ?? ResolveResource("ChartGrid");
         if (brush is null)
@@ -378,13 +378,13 @@ public partial class Sparkline : UserControl {
 
         var rows = Math.Max(1, GridRows);
         for (var i = 0; i <= rows; i++) {
-            var y = Math.Round(plot.Top + plot.Height / rows * i) + 0.5;
+            var y = ChartAxis.GridLine(plot.Top + plot.Height / rows * i, plot.Top, plot.Bottom);
             context.DrawLine(pen, new Point(plot.Left, y), new Point(plot.Right, y));
         }
 
         var cols = Math.Max(1, GridColumns);
         for (var i = 0; i <= cols; i++) {
-            var x = Math.Round(plot.Left + plot.Width / cols * i) + 0.5;
+            var x = ChartAxis.GridLine(plot.Left + plot.Width / cols * i, plot.Left, plot.Right);
             context.DrawLine(pen, new Point(x, plot.Top), new Point(x, plot.Bottom));
         }
     }

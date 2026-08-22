@@ -58,7 +58,7 @@
                         </Grid>
                         <TextBlock Classes="cardSub" Text="{Binding CpuChartCaption}"/>
                     </StackPanel>
-                    <controls:Sparkline Classes="chartPanel" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
@@ -74,7 +74,7 @@
                         </Grid>
                         <TextBlock Classes="cardSub" Text="{Binding MemoryChartCaption}"/>
                     </StackPanel>
-                    <controls:Sparkline Classes="chartPanel" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
                                         YMin="0" YMax="100" Points="{Binding MemoryPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
@@ -141,7 +141,7 @@
                                               Label1="Download" Brush1="{DynamicResource ChartNetDown}"
                                               Label2="Upload" Brush2="{DynamicResource ChartNetUp}"/>
                     </Grid>
-                    <controls:Sparkline Classes="chartPanel" Fill="True"
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                         Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
                                         YMin="0" YMax="100"

@@ -17,7 +17,10 @@
                            VerticalAlignment="Bottom" Margin="0,0,0,4"/>
             </StackPanel>
             <TextBlock Classes="cardSub" Text="{Binding #Root.Sub}"/>
-            <controls:Sparkline Classes="chartMini" StrokeThickness="1.4"
+            <!-- Gradient fill and lattice on the same scale as the larger charts. The grid is a scale,
+                 not decoration — its bands are quarters of the axis — so a card that ruled itself into
+                 halves would be marking different values than the panel chart beside it. -->
+            <controls:Sparkline Classes="chartMini" StrokeThickness="1.4" Fill="True" ShowGrid="True"
                                 Stroke="{Binding #Root.Accent}" Points="{Binding #Root.Points}"
                                 YMin="{Binding #Root.YMin}" YMax="{Binding #Root.YMax}"/>
         </StackPanel>

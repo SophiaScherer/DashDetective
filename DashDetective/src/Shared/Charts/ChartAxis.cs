@@ -46,6 +46,19 @@ public static class ChartAxis {
         return new Rect(left, 0, plotWidth, plotHeight);
     }
 
+    /// <summary>Places a 1px grid line: snapped to the half-pixel centre of a device pixel so it draws
+    /// crisp, and held inside [<paramref name="lower"/>, <paramref name="upper"/>].
+    ///
+    /// The clamp is what stops the last line of each run drawing half outside the control — with no
+    /// clipping on the chart, a bottom line at the exact edge bleeds into the padding of whatever hosts it,
+    /// which reads as an unfinished grid on the small charts where the lattice is proportionally largest.
+    /// A plot too thin to hold both edges keeps the near one rather than inverting.</summary>
+    public static double GridLine(double value, double lower, double upper) {
+        var first = Math.Round(lower) + 0.5;
+        var last = Math.Round(upper) - 0.5;
+        return last <= first ? first : Math.Clamp(Math.Round(value) + 0.5, first, last);
+    }
+
     /// <summary>The three value labels for a throughput chart, whose ceiling moves with the traffic. The
     /// unit rides on the top label only — repeating it on the middle one would widen the gutter for
     /// nothing. Mirrors <see cref="DataRateFormatter"/>'s shared-unit rule, so the axis reads in the same
