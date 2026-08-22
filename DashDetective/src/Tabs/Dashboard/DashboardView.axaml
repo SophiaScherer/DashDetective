@@ -40,6 +40,7 @@
                                        Classes.net="{Binding IsNetwork}"
                                        Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
                                        Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"
+                                       AxisMaxLabel="{Binding AxisMaxLabel}" AxisMinLabel="0"
                                        ToolTip.Tip="{Binding Note}"/>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

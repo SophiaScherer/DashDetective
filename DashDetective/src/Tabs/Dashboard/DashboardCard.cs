@@ -30,6 +30,11 @@ public partial class DashboardCard : ObservableObject {
     [ObservableProperty] private string _sub = "";
     [ObservableProperty] private string _points = "";
 
+    /// <summary>Top of this card's chart axis. Most cards plot a percentage and keep the default; a card
+    /// whose series is auto-scaled (throughput) rewrites it each tick from its own live ceiling, so the
+    /// label cannot claim a percentage the chart isn't drawn on.</summary>
+    [ObservableProperty] private string _axisMaxLabel = "100%";
+
     /// <summary>Why this card shows "—" rather than a value, or "" when it has one. The card has no room for
     /// a line of its own, so the template hangs it off the tooltip.</summary>
     [ObservableProperty] private string _note = "";

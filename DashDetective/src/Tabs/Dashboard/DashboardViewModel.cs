@@ -635,6 +635,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // Both series share one ceiling, so one set of value labels describes the pair.
         (NetworkAxisMax, NetworkAxisMid, _) = ChartAxis.RateLabels(NetworkYMax);
 
+        // The one card not drawn on a percentage axis: its chart fills to the live peak, so it takes the
+        // same ceiling label as the panel chart rather than the default "100%".
+        _networkCard.AxisMaxLabel = NetworkAxisMax;
         _networkCard.Value = NetworkDownText;
         _networkCard.Unit = NetworkDownUnit;
         _networkCard.Sub = NetworkSubText;

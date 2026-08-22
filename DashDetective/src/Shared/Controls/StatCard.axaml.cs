@@ -33,6 +33,12 @@ public partial class StatCard : UserControl {
     public static readonly StyledProperty<double?> YMaxProperty =
         AvaloniaProperty.Register<StatCard, double?>(nameof(YMax));
 
+    public static readonly StyledProperty<string?> AxisMaxLabelProperty =
+        AvaloniaProperty.Register<StatCard, string?>(nameof(AxisMaxLabel));
+
+    public static readonly StyledProperty<string?> AxisMinLabelProperty =
+        AvaloniaProperty.Register<StatCard, string?>(nameof(AxisMinLabel));
+
     public StatCard() {
         InitializeComponent();
     }
@@ -83,5 +89,18 @@ public partial class StatCard : UserControl {
     public double? YMax {
         get => GetValue(YMaxProperty);
         set => SetValue(YMaxProperty, value);
+    }
+
+    /// <summary>Top of the card chart's axis, e.g. "100%". Not always a percentage: a card whose series is
+    /// auto-scaled (throughput) tops out at its own live ceiling.</summary>
+    public string? AxisMaxLabel {
+        get => GetValue(AxisMaxLabelProperty);
+        set => SetValue(AxisMaxLabelProperty, value);
+    }
+
+    /// <summary>Foot of the card chart's axis.</summary>
+    public string? AxisMinLabel {
+        get => GetValue(AxisMinLabelProperty);
+        set => SetValue(AxisMinLabelProperty, value);
     }
 }
