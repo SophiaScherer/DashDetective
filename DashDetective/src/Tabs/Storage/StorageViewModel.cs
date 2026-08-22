@@ -79,12 +79,25 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _throughputTimer.Tick += OnThroughputTick;
         service.IntervalChanged += OnIntervalChanged;
 
+        ApplyChartWindow();
+
         // The timer is not started here: the gate runs it only while the page is on screen and the Live
         // pill is on.
         _gate = new SamplingGate(ApplySampling);
     }
 
-    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
+    private void OnIntervalChanged(TimeSpan interval) {
+        _throughputTimer.Interval = interval;
+        ApplyChartWindow();
+    }
+
+    /// <summary>Rewrites the chart caption and time axis for the current window. The buffer is a fixed slot
+    /// count, so the span it covers is the refresh interval times that count — a caption that hardcoded
+    /// "60 seconds" would be wrong at every cadence but the default.</summary>
+    private void ApplyChartWindow() {
+        DiskChartCaption = $"% Active time over {ChartWindow.Describe(WindowSeconds, _service.Interval)}";
+        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
+    }
     // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
     // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
     // soft (~0.16 alpha) tint of the same hue for the pill fill.
@@ -116,6 +129,17 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Whether the machine has more than one drive to switch between. On a single-drive machine the
     /// panel just names the drive — a picker offering one choice is a dead end.</summary>
     [ObservableProperty] private bool _hasMultipleDrives;
+
+    /// <summary>What the Disk Activity chart plots and over how long, restated whenever the Settings
+    /// refresh interval moves the window.</summary>
+    [ObservableProperty] private string _diskChartCaption = "";
+
+    /// <summary>The oldest end of the chart's time axis, e.g. "−60s".</summary>
+    [ObservableProperty] private string _chartRangeStart = "";
+
+    /// <summary>The chart's cold-start line, cleared as soon as this disk has a trace to show. Starts set:
+    /// no disk has a sample before the first tick.</summary>
+    [ObservableProperty] private string _diskChartStatus = ChartStatus.Collecting;
 
     /// <summary>The Disk Activity chart's points ("x,y …") on the shared Sparkline's 0–100 axis.</summary>
     [ObservableProperty] private string _diskPoints = "";
@@ -155,6 +179,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private void UpdateActivity() {
         if (!_historiesByDisk.TryGetValue(_selectedDisk, out var history)) {
             DiskPoints = "";
+            DiskChartStatus = ChartStatus.Collecting;
             DiskActive = "—";
             DiskResponse = "—";
             DiskQueue = "—";
@@ -162,6 +187,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
 
         DiskPoints = history.Points(100);
+        DiskChartStatus = ChartStatus.For(history);
         if (!_latestByDisk.TryGetValue(_selectedDisk, out var sample)) {
             DiskActive = "—";
             DiskResponse = "—";

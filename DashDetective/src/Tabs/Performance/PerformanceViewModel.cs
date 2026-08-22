@@ -240,6 +240,8 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
             Series2 = ChartSeries.NetUp,
+            LegendLabel1 = "Receive",
+            LegendLabel2 = "Send",
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
         };
@@ -410,6 +412,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _cpuRow.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
         _cpuUtilTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
         _cpuRow.Points = _cpuHistory.Points(100);
+        _cpuRow.ChartStatus = ChartStatus.For(_cpuHistory);
     }
 
     /// <summary>Refreshes the live process / thread / handle counts — Task Manager's CPU-pane figures — from
@@ -491,6 +494,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
         _memoryRow.Points = _memoryHistory.Points(100);
+        _memoryRow.ChartStatus = ChartStatus.For(_memoryHistory);
 
         _memInUseTile.Value = $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} GB";
         _memAvailableTile.Value = $"{Math.Max(0, totalGb - usedGb).ToString("F1", CultureInfo.InvariantCulture)} GB";
@@ -617,12 +621,18 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyChartWindow();
     }
 
-    /// <summary>Rewrites every row's caption for the current window. Called at construction, whenever the
-    /// interval changes, and after new rows are built (they inherit the current window).</summary>
+    /// <summary>The oldest end of the chart's time axis, e.g. "−60s". One answer for the page: every
+    /// row's buffer is the same slot count on the same cadence.</summary>
+    [ObservableProperty] private string _chartRangeStart = "";
+
+    /// <summary>Rewrites every row's caption, and the shared time axis, for the current window. Called at
+    /// construction, whenever the interval changes, and after new rows are built (they inherit the current
+    /// window).</summary>
     private void ApplyChartWindow() {
         var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
         foreach (var row in Resources)
             row.ChartCaption = $"{row.ChartSubject} over {window}";
+        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
     }
 
     /// <summary>Re-resolves every row's and sub-chart's tint from the current palette. Called wherever the
@@ -743,6 +753,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             // that cannot stays a bare "—".
             gpu.Row.Unit = "%";
             gpu.Row.Points = gpu.History.Points(100);
+            gpu.Row.ChartStatus = ChartStatus.For(gpu.History);
             gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
             UpdateGpuEngines(gpu, sample.Engines);
         }
@@ -863,6 +874,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var rounded = Math.Round(sample.ActivePercent);
             disk.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
             disk.Row.Points = disk.History.Points(100);
+            disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
             disk.ReadTile.Value = FormatRate(sample.ReadBytesPerSec);
             disk.WriteTile.Value = FormatRate(sample.WriteBytesPerSec);
@@ -911,6 +923,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         var axis = ChartScale.FitAxis(_downHistory.Values, _upHistory.Values, MinNetworkScaleMbps);
         _networkRow.Points = _downHistory.Points(axis);
         _networkRow.Points2 = _upHistory.Points(axis);
+        _networkRow.ChartStatus = ChartStatus.For(_downHistory);
+
+        // The only row whose value labels move: both series share this ceiling, so one set describes them.
+        (_networkRow.AxisMaxLabel, _networkRow.AxisMidLabel, _networkRow.AxisMinLabel) =
+            ChartAxis.RateLabels(axis);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }

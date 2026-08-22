@@ -2,6 +2,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Theming;
+using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
 using System.Windows.Input;
@@ -78,6 +79,16 @@ public partial class ResourceRow : ObservableObject {
     /// <summary>Which graph <see cref="Points2"/> is, or null for a single-series resource.</summary>
     public ChartSeries? Series2 { get; init; }
 
+    /// <summary>Whether this row draws two series, and so needs a key to tell them apart. One line needs
+    /// no legend — the panel header already names it.</summary>
+    public bool HasSecondSeries => Series2 is not null;
+
+    /// <summary>The legend entries for a two-series row, e.g. "Receive" / "Send". Ignored when
+    /// <see cref="HasSecondSeries"/> is false.</summary>
+    public string LegendLabel1 { get; init; } = "";
+
+    public string LegendLabel2 { get; init; } = "";
+
     /// <summary>Tint for <see cref="Points2"/>. Null for single-series resources, which draw nothing for
     /// it. Set from <see cref="Series2"/> alongside <see cref="ValueBrush"/>.</summary>
     [ObservableProperty] private IBrush? _valueBrush2;
@@ -89,6 +100,18 @@ public partial class ResourceRow : ObservableObject {
     /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
     /// Observable because the window changes with the Settings refresh interval.</summary>
     [ObservableProperty] private string _chartCaption = "";
+
+    /// <summary>The chart's value labels. A percentage resource states a fixed 100 / 50 / 0; the network
+    /// row rewrites them each tick, since its ceiling follows the traffic — which is why these are
+    /// observable rather than fixed identity.</summary>
+    [ObservableProperty] private string _axisMaxLabel = "100%";
+    [ObservableProperty] private string _axisMidLabel = "50%";
+    [ObservableProperty] private string _axisMinLabel = "0";
+
+    /// <summary>The cold-start line, cleared as soon as this row has a trace to show. Starts set: no row
+    /// has a sample before its first tick. The initializer is qualified because this property's own name
+    /// shadows the class it comes from.</summary>
+    [ObservableProperty] private string _chartStatus = Shared.Charts.ChartStatus.Collecting;
 
     /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
     /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>

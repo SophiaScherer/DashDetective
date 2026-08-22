@@ -51,22 +51,34 @@
         <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
             <Border Classes="panel" MinWidth="340">
                 <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
-                        <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
-                    </Grid>
+                    <StackPanel Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
+                            <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
+                        </Grid>
+                        <TextBlock Classes="cardSub" Text="{Binding CpuChartCaption}"/>
+                    </StackPanel>
                     <controls:Sparkline Classes="chartPanel" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
-                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"/>
+                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"
+                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding CpuChartStatus}"/>
                 </StackPanel>
             </Border>
             <Border Classes="panel" MinWidth="340">
                 <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
-                        <TextBlock Grid.Column="1" Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
-                    </Grid>
+                    <StackPanel Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
+                            <TextBlock Grid.Column="1" Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
+                        </Grid>
+                        <TextBlock Classes="cardSub" Text="{Binding MemoryChartCaption}"/>
+                    </StackPanel>
                     <controls:Sparkline Classes="chartPanel" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
-                                        YMin="0" YMax="100" Points="{Binding MemoryPoints}"/>
+                                        YMin="0" YMax="100" Points="{Binding MemoryPoints}"
+                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding MemoryChartStatus}"/>
                 </StackPanel>
             </Border>
         </layout:WeightedRowPanel>
@@ -119,10 +131,24 @@
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
+                    <!-- Two series on one axis, so the key is not optional: without it the orange and blue
+                         lines are unexplained. The value labels are live because the ceiling follows the
+                         traffic; the percentage charts above can state theirs as literals. -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                   Text="{Binding NetworkChartCaption}"/>
+                        <controls:ChartLegend Grid.Column="1"
+                                              Label1="Download" Brush1="{DynamicResource ChartNetDown}"
+                                              Label2="Upload" Brush2="{DynamicResource ChartNetUp}"/>
+                    </Grid>
                     <controls:Sparkline Classes="chartPanel" Fill="True"
                                         Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                         Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
-                                        YMin="0" YMax="100"/>
+                                        YMin="0" YMax="100"
+                                        AxisMaxLabel="{Binding NetworkAxisMax}" AxisMidLabel="{Binding NetworkAxisMid}"
+                                        AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding NetworkChartStatus}"/>
                 </StackPanel>
             </Border>
         </layout:WeightedRowPanel>

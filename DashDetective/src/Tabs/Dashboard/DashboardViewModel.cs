@@ -136,6 +136,30 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private double _networkYMax = MinNetworkScaleMbps;
     [ObservableProperty] private string _networkAdapterName = "Network";
 
+    // ---- Chart captions, axes and cold-start state ----
+
+    /// <summary>What each chart plots and over how long, restated whenever the Settings refresh interval
+    /// moves the window. The Dashboard's charts used to carry no caption at all, so the same graph was
+    /// explained on the Performance tab and bare here.</summary>
+    [ObservableProperty] private string _cpuChartCaption = "";
+    [ObservableProperty] private string _memoryChartCaption = "";
+    [ObservableProperty] private string _networkChartCaption = "";
+
+    /// <summary>The oldest end of every chart's time axis, e.g. "−60s". Shared: all three cover the
+    /// same span.</summary>
+    [ObservableProperty] private string _chartRangeStart = "";
+
+    /// <summary>Each chart's cold-start line, cleared as soon as it has a trace to show. Starts set,
+    /// since no chart has a sample before the first tick.</summary>
+    [ObservableProperty] private string _cpuChartStatus = ChartStatus.Collecting;
+    [ObservableProperty] private string _memoryChartStatus = ChartStatus.Collecting;
+    [ObservableProperty] private string _networkChartStatus = ChartStatus.Collecting;
+
+    /// <summary>The throughput chart's value labels. Live, unlike the percentage charts' fixed 100/50/0,
+    /// because its ceiling follows the traffic.</summary>
+    [ObservableProperty] private string _networkAxisMax = "";
+    [ObservableProperty] private string _networkAxisMid = "";
+
     [ObservableProperty] private string _osText = "";
     [ObservableProperty] private string _deviceText = "";
     [ObservableProperty] private string _biosText = "";
@@ -181,6 +205,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
         // Uptime has no sampler/history, so it stays a plain 30 s timer. Seed once for the first frame.
         UpdateUptime();
+        ApplyChartWindow();
 
         _uptimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _uptimeTimer.Tick += OnUptimeTick;
@@ -452,6 +477,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuValueText = rounded.ToString(CultureInfo.InvariantCulture);
         CpuPercentText = $"{rounded}%";
         CpuPoints = _cpuHistory.Points(100);
+        CpuChartStatus = ChartStatus.For(_cpuHistory);
         _cpuCard.Value = CpuValueText;
         _cpuCard.Points = CpuPoints;
     }
@@ -568,6 +594,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             ? $"{usedGb.ToString("F1", CultureInfo.InvariantCulture)} / {totalGb.ToString("F0", CultureInfo.InvariantCulture)} GB"
             : "";
         MemoryPoints = _memoryHistory.Points(100);
+        MemoryChartStatus = ChartStatus.For(_memoryHistory);
         _memoryCard.Value = MemoryValueText;
         _memoryCard.Sub = MemorySubText;
         _memoryCard.Points = MemoryPoints;
@@ -603,6 +630,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         NetworkYMax = ChartScale.FitAxis(_downHistory.Values, _upHistory.Values, MinNetworkScaleMbps);
         NetworkDownPoints = _downHistory.Points(NetworkYMax);
         NetworkUpPoints = _upHistory.Points(NetworkYMax);
+        NetworkChartStatus = ChartStatus.For(_downHistory);
+
+        // Both series share one ceiling, so one set of value labels describes the pair.
+        (NetworkAxisMax, NetworkAxisMid, _) = ChartAxis.RateLabels(NetworkYMax);
 
         _networkCard.Value = NetworkDownText;
         _networkCard.Unit = NetworkDownUnit;
@@ -651,8 +682,22 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>Follows the Settings refresh interval so the page-local sparklines keep pace with the shared
-    /// feeds' and cover the same span of time.</summary>
-    private void OnIntervalChanged(TimeSpan interval) => _throughputTimer.Interval = interval;
+    /// feeds' and cover the same span of time, and restates the window every caption claims.</summary>
+    private void OnIntervalChanged(TimeSpan interval) {
+        _throughputTimer.Interval = interval;
+        ApplyChartWindow();
+    }
+
+    /// <summary>Rewrites the chart captions and the time axis for the current window. The buffers are a
+    /// fixed slot count, so the span they cover is the refresh interval times that count — a caption that
+    /// hardcoded "60 seconds" would be wrong at every cadence but the default.</summary>
+    private void ApplyChartWindow() {
+        var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
+        CpuChartCaption = $"% Utilization over {window}";
+        MemoryChartCaption = $"% Utilization over {window}";
+        NetworkChartCaption = $"Receive and send over {window}";
+        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
+    }
 
     private void OnThroughputTick(object? sender, EventArgs e) {
         UpdateDiskThroughput();

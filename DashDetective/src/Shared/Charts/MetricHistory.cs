@@ -8,8 +8,8 @@ namespace DashDetective.Shared.Charts;
 /// The buffers are allocated full of zeros and every chart drew all of them from the first tick, so a
 /// freshly launched app showed a flat line pinned at zero for a whole minute — absent data rendered as
 /// measured idle. Tracking the fill lets <see cref="Points"/> plot only the samples actually taken, so the
-/// trace enters at the right edge and grows leftward as Task Manager's does, and lets a page say it is
-/// still collecting rather than leaving the reader to guess.
+/// trace enters at the right edge and grows leftward as Task Manager's does, and lets a page tell an empty
+/// chart from an idle one (see <see cref="ChartStatus"/>).
 ///
 /// Owns the canonical rolling-window update: shift left by one, append at the end.
 /// </summary>
@@ -27,9 +27,6 @@ public sealed class MetricHistory {
 
     /// <summary>The number of slots — not the number of samples taken.</summary>
     public int Window => _values.Length;
-
-    /// <summary>Whether the window has yet to fill, which is what a page's "collecting" caption shows on.</summary>
-    public bool IsWarmingUp => Filled < _values.Length;
 
     /// <summary>Appends one sample: shift left by one, write at the end.</summary>
     public void Push(double value) {

@@ -273,9 +273,13 @@
                             </Popup>
                         </Panel>
                     </StackPanel>
+                    <TextBlock Classes="cardSub" Text="{Binding DiskChartCaption}"/>
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
-                                        Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"/>
+                                        Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"
+                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding DiskChartStatus}"/>
                     <Grid ColumnDefinitions="*,*,*">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Classes="diskStatLabel" Text="Active time"/>

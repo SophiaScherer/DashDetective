@@ -24,7 +24,7 @@ namespace DashDetective.Shared.Controls;
 /// Fixed-range mode also carries optional axis furniture: three value labels down the left
 /// (<see cref="AxisMaxLabel"/> / <see cref="AxisMidLabel"/> / <see cref="AxisMinLabel"/>), the ends of the
 /// time range along the bottom (<see cref="AxisStartLabel"/> / <see cref="AxisEndLabel"/>) and a
-/// <see cref="StatusText"/> line over the plot for a chart whose window is still filling. Each reserves
+/// <see cref="StatusText"/> line over the plot for a chart with nothing to draw yet. Each reserves
 /// room only when it is set, so an unlabelled chart — every stat-card mini, every per-core cell — measures
 /// and draws exactly as it did before.
 ///
@@ -217,8 +217,8 @@ public partial class Sparkline : UserControl {
         set => SetValue(AxisEndLabelProperty, value);
     }
 
-    /// <summary>A line drawn over the plot instead of leaving it to explain itself — a window still filling
-    /// says so here. Empty draws nothing.</summary>
+    /// <summary>A line drawn over the plot instead of leaving it to explain itself — a chart with nothing
+    /// to show yet says so here. Empty draws nothing.</summary>
     public string? StatusText {
         get => GetValue(StatusTextProperty);
         set => SetValue(StatusTextProperty, value);

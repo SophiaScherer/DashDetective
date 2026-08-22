@@ -41,4 +41,22 @@ public class ChartWindowTests {
     public void Describe_SwitchesToMinutesAboveNinetySeconds(int samples, string expected) {
         Assert.Equal(expected, ChartWindow.Describe(samples, TimeSpan.FromSeconds(1)));
     }
+
+    /// <summary>The axis end is compact because it sits under the plot's left corner, but it must switch to
+    /// minutes at the same point the caption does, or the two would describe one window differently.</summary>
+    [Theory]
+    [InlineData(60, 0.5, "−30s")]
+    [InlineData(60, 1, "−60s")]
+    [InlineData(60, 2, "−2m")]
+    [InlineData(60, 5, "−5m")]
+    [InlineData(89, 1, "−89s")]
+    [InlineData(90, 1, "−1.5m")]
+    public void StartLabel_IsCompactAndTurnsOverWhereDescribeDoes(int samples, double intervalSeconds, string expected) {
+        Assert.Equal(expected, ChartWindow.StartLabel(samples, TimeSpan.FromSeconds(intervalSeconds)));
+    }
+
+    [Fact]
+    public void EndLabel_IsTheNewestEnd() {
+        Assert.Equal("now", ChartWindow.EndLabel);
+    }
 }

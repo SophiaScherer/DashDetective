@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.ChartLegend"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- The key for a chart drawing more than one series. Each entry is the series' own colour beside its
+         name, so a two-line chart stops asking the reader to guess which line is which. The second entry
+         takes no room when it has no label, so the same control serves a single-series chart. -->
+    <StackPanel Orientation="Horizontal" Spacing="14">
+        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                    IsVisible="{Binding #Root.Label1, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                       Fill="{Binding #Root.Brush1}"/>
+            <TextBlock Classes="legendLabel" Text="{Binding #Root.Label1}"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                    IsVisible="{Binding #Root.Label2, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
+                       Fill="{Binding #Root.Brush2}"/>
+            <TextBlock Classes="legendLabel" Text="{Binding #Root.Label2}"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

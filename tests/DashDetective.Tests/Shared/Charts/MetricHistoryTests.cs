@@ -44,29 +44,16 @@ public class MetricHistoryTests {
         Assert.Equal(3, history.Filled);
     }
 
-    [Fact]
-    public void IsWarmingUp_ClearsOnceTheWindowFills() {
-        var history = new MetricHistory(2);
-        Assert.True(history.IsWarmingUp);
-
-        history.Push(1);
-        Assert.True(history.IsWarmingUp);
-
-        history.Push(2);
-        Assert.False(history.IsWarmingUp);
-    }
-
     /// <summary>A zero-width window is the no-history channel (the shared feeds, whose subscribers keep
-    /// their own buffers). It must swallow pushes rather than throw, and never claim to be warming up.</summary>
+    /// their own buffers). It must swallow pushes rather than throw.</summary>
     [Fact]
-    public void ZeroWindow_SwallowsPushesAndIsNeverWarmingUp() {
+    public void ZeroWindow_SwallowsPushes() {
         var history = new MetricHistory(0);
 
         history.Push(5);
 
         Assert.True(history.Values.IsEmpty);
         Assert.Equal(0, history.Filled);
-        Assert.False(history.IsWarmingUp);
     }
 
     /// <summary>The newest sample keeps the last slot's index whatever the fill, so a partly-filled chart
