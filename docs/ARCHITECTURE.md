@@ -44,7 +44,7 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`ChartScale`, `SparklinePoints`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
 | `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
@@ -180,8 +180,10 @@ stop `Tab` moving focus everywhere else.
 Live and static machine data follow two complementary patterns, both of which **soft-fail**.
 
 **Samplers** produce a fresh value on a timer. The reference example is the Dashboard's metric set: each
-metric has its own 1 Hz `DispatcherTimer` and a 60-sample rolling buffer in the view-model, fed by a
-feature-local sampler (typically Win32 P/Invoke or a managed counter). Samplers that more than one tab
+metric has its own 1 Hz `DispatcherTimer` and a 60-sample `MetricHistory` in the view-model, fed by a
+feature-local sampler (typically Win32 P/Invoke or a managed counter). A `MetricHistory` is the buffer
+*plus how much of it holds a real sample*, which is what lets a chart draw only the samples taken rather
+than rendering a zero-filled buffer as measured idle. Samplers that more than one tab
 needs live under `src/Services` — e.g. the CPU and Memory samplers (`src/Services/SystemMetrics`) and
 the network throughput sampler (`src/Services/Network`), each promoted there when a second tab needed
 the same reading.
@@ -224,9 +226,19 @@ Colours live in `src/Shared/Styles/Palette.axaml` in three groups:
    swapped at runtime.
 
 **`ThemeService`** (`src/Services/Theming`) is the **single seam** — the only code that writes to
-`Application.Current`. It applies the theme variant, swaps the accent (and recolours every chart key to
-match), or restores the default multi-colour look (each graph its own colour, highlight blue). It is
-constructed once in `MainWindowViewModel`, applied at startup, and handed to `SettingsViewModel`.
+`Application.Current`. It applies the theme variant, installs a chart palette, and restores the authored
+look. It is constructed once in `MainWindowViewModel`, applied at startup, and handed to
+`SettingsViewModel` and `PerformanceViewModel`.
+
+**An accent re-hues the graphs rather than flattening them.** Setting all six series keys to the one
+accent colour erased the per-metric coding the charts depend on — most visibly on the two-series
+throughput chart, where download and upload became one indistinguishable line. `ChartPalette.Derive`
+rotates the authored palette instead: the accent becomes the CPU (and net-down) series, and every other
+series keeps its own saturation and lightness while its hue turns by the accent's offset from the default
+blue, so the spacing between hues survives any accent. `ChartPalette` is the **single source** of these
+colours; a view that holds brushes in code rather than binding the keys (only the Performance tab) reads
+them through `ThemeService.BrushFor` and re-resolves on `SeriesChanged`. Status colours are a separate
+concern and stay fixed — a "Healthy" pill is green whatever accent is chosen.
 
 **The one rule:** any resource key that can change at runtime must be referenced with
 `{DynamicResource …}`, never `{StaticResource}`. Only the fixed legend colours
@@ -461,19 +473,26 @@ than guessing.
 Reusable widgets live in `src/Shared/Controls`:
 
 - **`Sparkline`** — a compact line chart. Auto-fits to its data by default, or takes a fixed `YMin`/`YMax`
-  axis (used for the 0–100 utilization charts). Fixed-axis mode also supports an optional second series
-  plus gradient area fill, which the Network throughput panel uses to plot download and upload on one
-  scale.
-- **`StatCard`** — a headline metric card wrapping a `Sparkline` (it forwards `YMin`/`YMax` through).
+  axis (used for the 0–100 utilization charts). Fixed-axis mode also supports an optional second series,
+  a gradient area fill and a background lattice, plus opt-in axis furniture: value labels down the left,
+  the time range along the bottom, and a status line over the plot. Each reserves room **only when set**,
+  so labelling one chart cannot resize another — which is what lets the small charts stay bare.
+- **`StatCard`** — a headline metric card wrapping a `Sparkline` (it forwards `YMin`/`YMax` and the axis
+  end labels through).
+- **`ChartLegend`** — a chart's key: up to two series, each a swatch in its own colour beside its name.
+  An entry with no label takes no room, so the same control serves a single-series chart.
 - **`InfoRow`** — a key/value row; long values wrap flush-right onto multiple lines instead of clipping,
   so verbose vendor strings (e.g. a full BIOS manufacturer name) are shown in full.
 - **`ExpandablePathRow`** — an `InfoRow` variant for long filesystem paths, which expands to show the
   full value rather than truncating it.
 
-The geometry behind the charts is kept out of the controls in `src/Shared/Charts`, as pure static
-helpers: **`ChartScale`** resolves the Y axis (auto-fit or fixed `YMin`/`YMax`) and **`SparklinePoints`**
-projects samples to points. Keeping them free of Avalonia types is what lets them be unit-tested
-directly, without a headless render pass.
+The geometry and wording behind the charts are kept out of the controls in `src/Shared/Charts`:
+**`MetricHistory`** is the rolling buffer and its fill count, **`ChartScale`** resolves the Y axis,
+**`SparklinePoints`** projects samples to points, **`ChartAxis`** decides where axis text sits (and keeps
+grid lines snapped and inside the plot), **`ChartWindow`** words the span a buffer covers, and
+**`ChartStatus`** words the cold start. Text is *measured* by the control, which alone has the typeface,
+and *composed* by these helpers — keeping them free of render-backend types is what lets them be
+unit-tested directly, without a headless render pass.
 
 Shared styles (card, panel, segmented control, toggle, buttons, the draggable `paneSplitter`, …) live
 in `src/Shared/Styles/SharedStyles.axaml`. Controls or styles used by only one tab stay tab-local until

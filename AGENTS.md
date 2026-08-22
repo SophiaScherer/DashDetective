@@ -245,7 +245,7 @@ de-duplication / composition refactor) — write-ups in the Appendix.
   · Capacity · Free) and a **Disk Activity (C:)** card (amber area chart + Active time / Avg response /
   Queue). Self-contained tab under `src/Tabs/Storage/` (`StorageView` + `StorageViewModel`), **page-
   scrolling like Network** (not `ISelfScrollingPage`), reusing `Border Classes="panel"`, the shared
-  `Sparkline` (with the `ChartStorage` amber key), and the built-in `ProgressBar` for the usage bars.
+  `Sparkline` (on the `ChartStorage` series key), and the built-in `ProgressBar` for the usage bars.
   Live sources: the drive cards from `PhysicalDiskProvider` + `StorageComposer` + `VolumeProvider`; the
   Disk Activity chart + Active time / Avg response / **Queue** readouts from the shared `StorageUsageSampler`
   feed (via `SystemMetricsService`); per-disk **Read/Write** from the page-local
@@ -410,11 +410,35 @@ currently exist.
                                 read by SettingDescriptions.NvidiaGpuMetricsFor and by
                                 SettingsViewModel.CanUseNvidiaMetrics)
       /Charts
+        MetricHistory.cs        (THE rolling buffer type: a double[window] plus HOW MUCH OF IT IS REAL, and
+                                 the canonical shift (left by one, append at the end) that MetricChannel
+                                 used to hold. Every page's histories and MetricChannel's own are these —
+                                 do not declare a bare double[]. The fill count is what lets Points() plot
+                                 only the samples taken, so a trace enters at the right edge and grows
+                                 leftward instead of drawing a zero-filled buffer as measured idle)
         SparklinePoints.cs      (renders a rolling metric history to a Sparkline "x,y" points string on a
                                  fixed 0–100 axis; percentage metrics pass valueMax 100, unbounded ones a
-                                 rolling peak. Used by every live chart)
+                                 rolling peak. The `filled` overload emits only the newest slots AT THEIR
+                                 REAL INDICES — Sparkline takes its x scale from the data's own maximum, so
+                                 that alone right-anchors a partial trace. Reached through
+                                 MetricHistory.Points, which supplies the count)
         ChartScale.cs           (peak/headroom/floor auto-scaling for the network throughput axis —
-                                 Peak / FitPeak / FitAxis; shared by Dashboard + Performance + Network)
+                                 Peak / FitPeak / FitAxis; shared by Dashboard + Performance + Network.
+                                 Takes ReadOnlySpan<double>, so callers pass MetricHistory.Values)
+        ChartAxis.cs            (where a chart's axis text sits + what an auto-scaled axis says. Gutter /
+                                 Footer RESERVE NOTHING when there are no labels, which is what keeps every
+                                 unlabelled chart measuring as it did before axis text existed; PlotRect
+                                 gives a reservation up rather than inverting on a control too small for it;
+                                 GridLine snaps a grid line to the half-pixel AND clamps it inside the plot
+                                 — an edge line drew half outside a chart that does not clip, bleeding into
+                                 the padding of whatever hosted it; RateLabels builds the three value labels
+                                 for a throughput axis. Pure geometry: text is MEASURED by the control,
+                                 which alone has the typeface, and COMPOSED here, which is what keeps the
+                                 layout rules testable with no render backend)
+        ChartStatus.cs          (the cold-start wording, one place for the four pages that show it. Clears
+                                 as soon as a chart has TWO samples — enough to draw a line — not when the
+                                 window finally fills: a trace growing in from the right already says data
+                                 is arriving, and the label sits on the plot it would be describing)
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
@@ -422,12 +446,24 @@ currently exist.
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter (draggable divider between resizable panes)…)
       /Controls
-        Sparkline, StatCard, InfoRow   (reusable widgets; Sparkline auto-fits to its data
+        Sparkline, StatCard, ChartLegend, InfoRow
+                                       (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
                                         StatCard forwards YMin/YMax to its inner sparkline.
                                         Fixed-axis mode also supports an optional second series
                                         (Points2/Stroke2) + gradient area fill (Fill), used by the
-                                        Network throughput panel for download+upload on one scale.
+                                        Network throughput panel for download+upload on one scale,
+                                        a background lattice (ShowGrid), and OPT-IN AXIS FURNITURE:
+                                        AxisMaxLabel/AxisMidLabel/AxisMinLabel down the left,
+                                        AxisStartLabel/AxisEndLabel along the bottom, and StatusText
+                                        over the plot. Each reserves room ONLY when set, so adding
+                                        them to one chart cannot resize another. Render works against
+                                        a plot Rect from ChartAxis and draws the grid + labels BEFORE
+                                        the has-enough-points bail-out, so an empty chart still states
+                                        its scale. All of this is fixed-range mode only.
+                                        ChartLegend is a chart's key: up to two series, each a swatch
+                                        in its own colour beside its name; an entry with no label takes
+                                        no room, so the same control serves a single-series chart.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal)
     /Services                   (cross-cutting app services)
@@ -458,9 +494,22 @@ currently exist.
                                  AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException →
                                  Log.Error. No logging packages)
       /Theming
-        ThemeService.cs         (single seam that applies theme + accent to Application at runtime)
+        ThemeService.cs         (single seam that applies theme + accent to Application at runtime. Also
+                                 the brush seam for a page that assigns colours in code rather than through
+                                 {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
+                                 SeriesChanged event so that page can re-resolve. Only the Performance tab
+                                 needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+        ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
+                                 accent, plus the ChartSeries enum and the ChartSeriesColors record.
+                                 An accent ROTATES the palette rather than flattening it: the accent is the
+                                 CPU (and net-down) series, and every other series keeps its own saturation
+                                 and lightness while its hue turns by the accent's offset from the default
+                                 blue. Derive(AccentPreset.Default.Color) reproduces Default exactly, which
+                                 is what makes the blue swatch and the "Default" swatch agree. Pure HSL
+                                 maths over Avalonia.Media value types — no render backend, so it is
+                                 unit-testable)
       /Platform
         /Linux
           IProcFileSystem.cs    (the /proc + /sys read seam — Exists/ReadAllText/ReadAllLines/
@@ -796,7 +845,7 @@ currently exist.
                                  ONLY — /proc/diskstats lists sda and sda1 alike and their I/O overlaps, so
                                  counting both roughly doubles every figure. A counter that goes backwards
                                  (device re-plugged) reads as no activity)
-        MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling double[window] history"
+        MetricChannel.cs        (reusable "sampler + DispatcherTimer + rolling MetricHistory"
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
                                  generic MetricChannel<TSample> for snapshot samples + a no-history variant)
@@ -1270,7 +1319,7 @@ currently exist.
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
                                 (LIVE — read-only drives/health view: a top row of DriveCard summary
                                  cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
-                                 card (shared Sparkline, ChartStorage amber). Page-scrolls like Network
+                                 card (shared Sparkline, ChartStorage key). Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
                                  VolumeProvider; Disk Activity + Queue from the shared StorageUsageSampler
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
@@ -1296,10 +1345,10 @@ Feature-specific *providers* (static WMI/registry reads) live in the tab folder,
 until a second feature needs them (per the "keep each tab self-contained" rule). Live **sampling**,
 however, is now shared: `SystemMetricsService` owns one sampler per metric and drives it through a
 `MetricChannel` at 1 Hz, fanning each sample out to the pages that subscribe (Dashboard, Performance,
-Processes). A subscriber keeps its own 60-sample rolling buffer (two for network — download + upload)
-and rebuilds its `Sparkline` via `SparklinePoints.Build`, using `ChartScale.FitAxis` for the unbounded
-network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer` + `Array.Copy`
-buffer or a bespoke points/peak helper.
+Processes). A subscriber keeps its own 60-sample `MetricHistory` (two for network — download + upload)
+and rebuilds its `Sparkline` via `history.Points(max)`, using `ChartScale.FitAxis` for the unbounded
+network axis. Reuse these seams — do **not** re-inline a per-metric `DispatcherTimer`, declare a bare
+`double[]` buffer, or write a bespoke points/peak helper.
 
 **Provider seams.** The OS-touching providers follow the `IGpuSensorReader` shape so they can be faked in
 tests and given a second platform later. Most already do; the stragglers are listed under *What CA1416
@@ -1548,11 +1597,45 @@ per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStor
 must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours
 `Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeService` (`src/Services/Theming`) is the
 **only** code that writes to `Application.Current` — `ApplyTheme` sets the variant; `ApplyAccent` swaps
-the accent + sets every chart key to that colour; `ApplyDefaultAppearance` restores the multi-colour look
-(highlight blue, distinct graphs). It's constructed once in `MainWindowViewModel`, applied at startup, and
-handed to `SettingsViewModel`. Theming is **session-only** (no persistence, by choice). Note this feature
-deliberately touched shared styles + the shell (Palette/SharedStyles, MainWindow, NavItem) — theming is
-cross-cutting, so it lives in `src/Services`, not a tab.
+the accent and installs the palette derived from it; `ApplyDefaultAppearance` restores the authored one.
+It's constructed once in `MainWindowViewModel`, applied at startup, and handed to `SettingsViewModel` and
+`PerformanceViewModel`. Note this feature deliberately touched shared styles + the shell
+(Palette/SharedStyles, MainWindow, NavItem) — theming is cross-cutting, so it lives in `src/Services`,
+not a tab.
+
+**An accent re-hues the graphs; it must never flatten them.** Selecting an accent used to set all six
+chart-series keys to that one colour, which erased the per-metric coding the charts depend on — worst on
+the Dashboard's Network Throughput chart, where download and upload share an axis and became one
+indistinguishable line. `ChartPalette.Derive` now rotates the whole authored palette instead: the accent
+becomes the CPU (and net-down) series, and every other series keeps its own saturation and lightness while
+its hue turns by the accent's offset from the default blue. The authored spacing between hues therefore
+survives whatever accent is chosen, and `Derive(AccentPreset.Default.Color)` reproduces `ChartPalette
+.Default` exactly, so the blue swatch and the "Default" swatch agree. **`ChartPalette` is the single
+source of these colours** — do not parse a series hex anywhere else. The Performance tab used to, giving
+the app two contradictory answers to "what colour is CPU"; its `ResourceRow`s now carry a `ChartSeries`
+identity and resolve the brush through `ThemeService.BrushFor`, re-applying on `SeriesChanged`. Status
+colours are a different thing and stay fixed: Storage's health pills, its usage bars and File Explorer's
+type glyphs must not follow an accent — "Healthy" is green whatever the user picked.
+
+**Charting conventions.** Every live chart is the shared `Sparkline` on a fixed 0–100 axis, drawn from a
+`MetricHistory` via `history.Points(max)`, with a gradient `Fill` and a `ShowGrid` lattice. The grid is a
+**scale, not decoration** — its four bands are quarters of the axis, and the middle line is the value the
+panel charts label "50%" — so do not give one chart its own row count; a card ruled into halves marks
+different values than the chart beside it. Axis furniture is graded by how much room a chart has:
+
+- **A chart in a panel of its own** — `chartPanel`, `chartHero`, and the Network tab's `chartMini`
+  throughput traces — carries the lot: a caption of what it plots and over how long, three value labels,
+  the time range, and a `StatusText`. It is the enclosing panel that decides this, not the size class.
+- **Stat cards** (`chartMini` inside `StatCard`) carry the axis **ends only** and no time range — three
+  labels would touch at a card's height and a footer would take most of the plot, and the cards share the
+  window the panel charts below them state. Their ceiling is per-card (`DashboardCard.AxisMaxLabel`): most
+  plot a percentage, but the network card fills to its own live peak, so a blanket "100%" lies on it.
+- **Per-core / per-engine cells** (`chartCell`) stay bare. They tile many-to-a-pane, and a gutter on each
+  would cost more than the labels are worth at that size.
+
+Never hardcode a window in a caption: it is the refresh interval times the slot count, so say it through
+`ChartWindow.Describe` / `StartLabel`. The oldest end reads as elapsed time ("60s ago"), never as a
+negative offset — a leading minus suggests a value below zero on a chart whose y axis starts there.
 
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
 `DashDetective.Services.Theming`, `DashDetective.Shell`, `DashDetective.Shell.Navigation`,
@@ -1566,7 +1649,8 @@ Rules of thumb:
   its own folder under `src/Tabs`, not scattered project-wide.
 - The shell (sidebar/toolbar/navigation) is shared — edit carefully.
 - **Reuse the shared abstractions instead of re-inlining the old patterns:** `MetricChannel` +
-  `SystemMetricsService` (live sampling), `SparklinePoints` + `ChartScale` (charts),
+  `SystemMetricsService` (live sampling), `MetricHistory` + `ChartScale` + `ChartAxis` +
+  `ChartWindow` + `ChartStatus` (charts), `ChartPalette` (series colours),
   `CollectionReconciler` (keyed-diff live lists), `HardwareNameFormatter` (CPU/GPU name trim),
   `UptimeFormatter` / `DataRateFormatter` (formatting), and `Log` (diagnostics behind soft-fail catches).
 
@@ -1712,9 +1796,11 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
   as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
   no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
-  in **Mbps** (dual series on one shared scale + gradient fill) with a live adapter-name caption, via
-  `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke — see the sampler note in
-  *Folder Structure*). System Information: the whole panel now reads the real machine — **OS** edition +
+  in **Mbps** (dual series on one shared scale + gradient fill, keyed by a `ChartLegend`) with a live
+  adapter-name caption, via `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke —
+  see the sampler note in *Folder Structure*). Every chart on the page states its own scale: the three
+  panels carry a caption, value labels, the time range and a cold-start line, and each card carries its
+  axis ends — see *Charting conventions* under *Theming* for which chart gets what, and why. System Information: the whole panel now reads the real machine — **OS** edition +
   feature update (WMI `Win32_OperatingSystem.Caption` + registry `DisplayVersion`), **Device**
   (`Environment.MachineName`), **BIOS** (`Win32_BIOS`), **Motherboard** (`Win32_BaseBoard`), **Build**
   (registry `CurrentBuild` + `UBR`), and a live-updating **Uptime** (`Environment.TickCount64` on a 30 s
@@ -1776,9 +1862,9 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   - **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Accent color**
     swatches are data-bound to `SettingsViewModel` and applied at runtime through a single
     `ThemeService` (see *Theming* below). The accent row's **first** swatch is a "Default"
-    (multi-colour) option — a 2×2 four-colour square that restores the default look (each dashboard
-    graph its own colour, highlight blue); the four single-colour swatches recolour **every** dashboard
-    graph to that one accent.
+    (multi-colour) option — a 2×2 four-colour square that restores the authored look (each dashboard
+    graph its own colour, highlight blue); the four single-colour swatches recolour the highlight and
+    hand the graphs a palette **derived** from that accent, each metric keeping a hue of its own.
   - **Monitoring.** The **Refresh interval** segments (0.5 / 1 / 2 / 5 s) are real `IntervalOption`
     selectable-item VMs (the `ThemeOption` pattern); selecting one calls
     `SystemMetricsService.SetInterval`, which retimes **only** the five 1 Hz metric channels — the
@@ -1807,7 +1893,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     observes them to save; `ThemeService` stays the single theming applier — the store only observes.
     `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
     that the app has disclosed, once, that closing the window does not stop it.
-    This **supersedes the "session-only" note** for Theming and Navigation (their choices now persist).
+    Theme, accent and the navigation choices **persist** through this rather than lasting a session.
 
 - **File Explorer** — **live and functional** (built in phases; plan:
   `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
@@ -2070,10 +2156,12 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
   strip (`StatTile` item VMs). Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
   `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
-  selectable-item pattern (`NavItem` / `FilterOption`), shared styles, and fixed per-metric legend
-  brushes. **All five resources are wired live**: each subscribes to the shared `SystemMetricsService`
-  (CPU / Memory / Storage / GPU / Network), keeps its own 60-sample rolling history rebuilt via
-  `SparklinePoints`, and pushes into the selected row; static hardware labels load once via the
+  selectable-item pattern (`NavItem` / `FilterOption`) and shared styles. Series colours come from
+  `ChartPalette` through `ThemeService.BrushFor`, keyed by each row's `ChartSeries` identity — this tab
+  parsed its own hex literals until that changed, so CPU read one colour here and another on the
+  Dashboard. **All five resources are wired live**: each subscribes to the shared `SystemMetricsService`
+  (CPU / Memory / Storage / GPU / Network), keeps its own 60-sample `MetricHistory`, and pushes into the
+  selected row; static hardware labels load once via the
   `*InfoProvider` async-WMI providers. Implements `IRefreshablePage` (toolbar Refresh re-samples every
   metric), `ILiveSamplingPage` (Live/Pause is the shared service's), `IActivatablePage` (it samples only
   while it is the visible tab) and `IDisposable`. No new packages,
@@ -2164,7 +2252,8 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   with **zero user-visible behaviour change**. It replaced the ~10× copy-pasted per-metric
   `DispatcherTimer` + rolling-buffer pattern with `MetricChannel` + a shared `SystemMetricsService` (one
   sampler set, ref-counted subscriptions, removing the duplicate PDH GPU/disk queries); consolidated the
-  chart/format/diff duplication into `SparklinePoints`, `ChartScale`, `HardwareNameFormatter` and
+  chart/format/diff duplication into `MetricHistory`, `SparklinePoints`, `ChartScale`,
+  `HardwareNameFormatter` and
   `CollectionReconciler`; added real shutdown disposal via a manual composition root in `App`; switched
   `NavigationView`/`MainWindow` fan-out to `[NotifyPropertyChangedFor]`; replaced the reflection
   `ViewLocator` with a compile-time switch; and added the soft-failing `Log` seam.
