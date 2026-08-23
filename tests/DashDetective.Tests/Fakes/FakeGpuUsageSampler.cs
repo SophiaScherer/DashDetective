@@ -1,4 +1,5 @@
 using DashDetective.Services.SystemMetrics;
+using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Tests.Fakes;
@@ -32,11 +33,23 @@ internal sealed class FakeGpuUsageSampler : IGpuUsageSampler {
         return this;
     }
 
+    /// <summary>Makes sampling throw, the way a shut PDH query or an absent driver does. Distinct from
+    /// <see cref="Silent"/>, which is an adapter that answers "no reading": this one does not answer at
+    /// all, which is what reaches the callers' own catch blocks.</summary>
+    public FakeGpuUsageSampler Throwing(string why = "the query handle is closed") {
+        _failure = new InvalidOperationException(why);
+        return this;
+    }
+
+    private Exception? _failure;
+
     /// <summary>Reports nothing once disposed, matching the real samplers. A fake that kept answering after
     /// its close is what hid the bug where the inventory load disposed a live page's sampler: the PDH query
     /// was shut and every GPU readout went dead, and no test could see it.</summary>
     public IReadOnlyDictionary<string, GpuAdapterSample> SampleAdapters() {
         SampleCount++;
+        if (_failure is { } failure)
+            throw failure;
         return Disposed ? new Dictionary<string, GpuAdapterSample>() : _samples;
     }
 

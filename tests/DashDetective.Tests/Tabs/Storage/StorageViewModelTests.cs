@@ -32,14 +32,60 @@ public class StorageViewModelTests {
 
     private static async Task<StorageViewModel> LoadedAsync(
         IReadOnlyList<PhysicalDiskInfo>? disks = null, IReadOnlyList<VolumeInfo>? volumes = null) {
-        var samplers = new MetricSamplers(
-            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
-        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         var providers = StubHardwareProviders.With(disks: disks ?? TwoDisks, volumes: volumes ?? Volumes());
 
-        var viewModel = new StorageViewModel(metrics, providers);
+        var viewModel = new StorageViewModel(TestMetrics.Idle(), providers);
         await viewModel.LoadStorageAsync();
         return viewModel;
+    }
+
+    /// <summary>
+    /// The page's soft-fail is the largest single fallback block in the app — it clears four collections
+    /// and drops the selection. This pins that it runs, and that it leaves a coherent empty page rather
+    /// than a half-cleared one.
+    /// </summary>
+    [Fact]
+    public async Task LoadStorageAsync_WhenADiskReadFails_ClearsThePageRatherThanShowingHalfOfIt() {
+        var providers = StubHardwareProviders.Compose(
+            disks: StubHardwareProviders.Fails<IReadOnlyList<PhysicalDiskInfo>>("the storage namespace is gone"),
+            volumes: () => Task.FromResult(Volumes()));
+        var viewModel = new StorageViewModel(TestMetrics.Idle(), providers);
+
+        await viewModel.LoadStorageAsync();
+
+        Assert.Empty(viewModel.Drives);
+        Assert.Empty(viewModel.Partitions);
+        Assert.Null(viewModel.SelectedDrive);
+        Assert.False(viewModel.HasMultipleDrives);
+    }
+
+    /// <summary>A volume read can fail on its own, and takes the page down the same path — the two reads
+    /// are awaited together, so either one faulting is one failure.</summary>
+    [Fact]
+    public async Task LoadStorageAsync_WhenAVolumeReadFails_ClearsThePageToo() {
+        var providers = StubHardwareProviders.Compose(
+            disks: () => Task.FromResult(TwoDisks),
+            volumes: StubHardwareProviders.Fails<IReadOnlyList<VolumeInfo>>());
+        var viewModel = new StorageViewModel(TestMetrics.Idle(), providers);
+
+        await viewModel.LoadStorageAsync();
+
+        Assert.Empty(viewModel.Drives);
+        Assert.Empty(viewModel.Partitions);
+    }
+
+    /// <summary>A reader that throws before returning a task at all — the other shape a broken provider
+    /// takes, and the one an <c>await</c>-only guard would miss.</summary>
+    [Fact]
+    public async Task LoadStorageAsync_WhenAReaderThrowsBeforeReturningATask_StillSoftFails() {
+        var providers = StubHardwareProviders.Compose(
+            disks: () => throw new System.InvalidOperationException("WMI is having a day"),
+            volumes: () => Task.FromResult(Volumes()));
+        var viewModel = new StorageViewModel(TestMetrics.Idle(), providers);
+
+        await viewModel.LoadStorageAsync();
+
+        Assert.Empty(viewModel.Drives);
     }
 
     [Fact]

@@ -665,6 +665,25 @@ is no mocking framework, matching the codebase's zero-dependency ethos. The test
 so a test file sits at the same relative path as its subject
 (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`).
 
+**A fake must be able to break its contract on demand.** A fake that only ever succeeds makes its
+subject's `catch` blocks unreachable, so the soft-fail rule above goes unverified — which is what had
+happened across the Linux providers and the Dashboard/Storage view models. Every shared fake therefore
+has an opt-in failure mode: `FakeProcFileSystem.ThrowOn`, `FakeGpuUsageSampler.Throwing`,
+`FakeProcessLauncher.ThrowOnCall`, and `StubHardwareProviders.Compose` (which takes a factory per
+section, so it can return a value, return a faulted task, or throw before returning one — the three
+shapes a real reader fails in).
+
+**Test the denial against a fixture that would otherwise succeed.** This is the trap worth naming: a
+provider handed an *empty* fake returns the same `Unknown`/empty value it returns when a read is denied,
+through a completely different path. A soft-fail test built that way passes whether or not the `catch`
+exists. `LinuxProviderSoftFailTests` stages a working fixture first and only then denies it, and carries
+a readable positive control beside each denial for exactly this reason.
+
+**Pure logic belongs outside a platform-gated class.** `GpuEngineInstanceName` parses a Windows counter
+name but is not itself Windows-annotated, because a method on the `[SupportedOSPlatform("windows")]`
+sampler could only be called from behind a platform guard — and would therefore never run on the Linux
+CI leg. Same reasoning as `GpuAdapter.FormatLuidToken`.
+
 The architecture is shaped to make this possible headlessly, without an Avalonia dispatcher or real
 hardware. Two seams do most of that work:
 

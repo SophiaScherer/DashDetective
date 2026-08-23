@@ -86,4 +86,19 @@ public class SearchScopesTests {
     public void For_ReturnsNothingToSearchWhenThereIsNowhereToLook() {
         Assert.Empty(SearchScopes.For(null, ""));
     }
+
+    /// <summary>
+    /// A path the OS cannot even parse must not take the search down. The containment check normalises
+    /// both sides through <c>Path.GetFullPath</c>, which throws on these; the soft-fail treats an
+    /// unparseable path as "outside the root", so it gets searched rather than silently dropped.
+    /// </summary>
+    [Theory]
+    [InlineData("\0")]
+    [InlineData("a\0b")]
+    public void For_MalformedPath_IsTreatedAsOutsideRatherThanThrowing(string malformed) {
+        var scopes = SearchScopes.For(malformed, "");
+
+        // The contract is only that it answered at all — the point is the absence of a throw.
+        Assert.NotNull(scopes);
+    }
 }

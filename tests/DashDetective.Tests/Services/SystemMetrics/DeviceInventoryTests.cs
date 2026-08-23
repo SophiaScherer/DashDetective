@@ -1,7 +1,9 @@
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Dashboard;
+using DashDetective.Tests.Fakes;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace DashDetective.Tests.Services.SystemMetrics;
@@ -169,5 +171,38 @@ public class DeviceInventoryTests {
 
         Assert.Empty(inv.All(DeviceCategory.Gpu));
         Assert.Null(inv.Primary(DeviceCategory.Gpu));
+    }
+
+    /// <summary>
+    /// The sampler that decides which adapters are "active" can fail outright — a closed PDH query, an
+    /// absent driver. <see cref="DeviceInventory.LoadAsync"/> soft-fails it to an empty set, which is the
+    /// harshest fallback in the app: because the inventory keeps only adapters that BOTH the enumeration
+    /// and the sampler report, an empty set intersects to nothing and every GPU card disappears, while
+    /// each reader's own output still looks perfectly correct. The load must survive it, and it must be
+    /// this path rather than a throw escaping into a fire-and-forget page load.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_WhenTheGpuSamplerThrows_StillComposesAnInventoryWithoutGpus() {
+        var providers = StubHardwareProviders.With(
+            gpuAdapters: [new GpuAdapter("luid-1", "GeForce RTX 4080", false, 0)]);
+
+        var inv = await DeviceInventory.LoadAsync(
+            providers, () => new FakeGpuUsageSampler().Throwing());
+
+        Assert.Empty(inv.All(DeviceCategory.Gpu));
+        Assert.NotNull(inv.Primary(DeviceCategory.Cpu));
+    }
+
+    /// <summary>The positive control: the same enumeration with a sampler that answers does build the
+    /// card, so the emptiness above is the failure being absorbed, not the fixture being wrong.</summary>
+    [Fact]
+    public async Task LoadAsync_WhenTheGpuSamplerAnswers_BuildsTheCard() {
+        var providers = StubHardwareProviders.With(
+            gpuAdapters: [new GpuAdapter("luid-1", "GeForce RTX 4080", false, 0)]);
+
+        var inv = await DeviceInventory.LoadAsync(
+            providers, () => new FakeGpuUsageSampler().Reporting("luid-1", 42));
+
+        Assert.Single(inv.All(DeviceCategory.Gpu));
     }
 }

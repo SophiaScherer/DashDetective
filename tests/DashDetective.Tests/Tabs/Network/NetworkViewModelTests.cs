@@ -22,13 +22,23 @@ public class NetworkViewModelTests {
     }
 
     private sealed class EmptyAdapters : IAdapterInfoProvider {
+        /// <summary>Set to make the read fail, so the page's own soft-fail is reachable.</summary>
+        public System.Exception? Fail { get; set; }
+
         public Task<AdapterSnapshot> GetAsync(CancellationToken token = default) =>
-            Task.FromResult(new AdapterSnapshot([], IpConfigInfo.Unknown));
+            Fail is { } failure
+                ? Task.FromException<AdapterSnapshot>(failure)
+                : Task.FromResult(new AdapterSnapshot([], IpConfigInfo.Unknown));
     }
 
     private sealed class EmptyConnections : IConnectionsProvider {
+        /// <summary>Set to make the read fail, so the page's own soft-fail is reachable.</summary>
+        public System.Exception? Fail { get; set; }
+
         public Task<ConnectionsSnapshot> GetAsync(CancellationToken token = default) =>
-            Task.FromResult(new ConnectionsSnapshot([], 0));
+            Fail is { } failure
+                ? Task.FromException<ConnectionsSnapshot>(failure)
+                : Task.FromResult(new ConnectionsSnapshot([], 0));
     }
 
     private static (NetworkViewModel Vm, RecordingDns Dns) Create() {
@@ -105,5 +115,42 @@ public class NetworkViewModelTests {
         vm.TogglePingCommand.Execute(null);
         Assert.False(vm.PingEnabled);
         Assert.Equal("Start", vm.PingButtonText);
+    }
+
+    // ---- Soft-fail ----
+
+    /// <summary>A failed connections read empties the table and says so, rather than leaving the last
+    /// snapshot on screen looking current.</summary>
+    [Fact]
+    public async Task Refresh_WhenTheConnectionsReadFails_SaysSoRatherThanShowingStaleRows() {
+        var connections = new EmptyConnections {
+            Fail = new System.InvalidOperationException("the TCP table is gone"),
+        };
+        var vm = new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), connections, new RecordingDns()));
+
+        vm.Refresh();
+        await Task.Yield();
+
+        Assert.Empty(vm.Connections);
+        Assert.False(vm.PagerVisible);
+        Assert.Equal("Connections unavailable", vm.ConnectionsSummary);
+    }
+
+    /// <summary>A failed adapter read clears the list and drops the IP panel back to Unknown — the panel
+    /// must not keep showing an address the machine may no longer hold.</summary>
+    [Fact]
+    public async Task Refresh_WhenTheAdapterReadFails_ClearsTheAdaptersAndTheIpConfig() {
+        var adapters = new EmptyAdapters {
+            Fail = new System.InvalidOperationException("the adapter enumeration is gone"),
+        };
+        var vm = new NetworkViewModel(
+            new NetworkProviders(adapters, new EmptyConnections(), new RecordingDns()));
+
+        vm.Refresh();
+        await Task.Yield();
+
+        Assert.Empty(vm.Adapters);
+        Assert.Same(IpConfigInfo.Unknown, vm.IpConfig);
     }
 }
