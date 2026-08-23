@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -11,5 +12,5 @@ public sealed record AdapterSnapshot(IReadOnlyList<AdapterInfo> Adapters, IpConf
 /// Implementations must never throw: each adapter and each field falls back independently, so one
 /// dead source can't blank the panel.</summary>
 internal interface IAdapterInfoProvider {
-    Task<AdapterSnapshot> GetAsync();
+    Task<AdapterSnapshot> GetAsync(CancellationToken token = default);
 }

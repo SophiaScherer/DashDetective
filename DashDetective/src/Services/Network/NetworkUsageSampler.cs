@@ -126,8 +126,13 @@ public sealed class NetworkUsageSampler {
 
             return new NetworkSample(down, up);
         } catch (System.Exception e) {
+            // Logged here for the adapter context, then rethrown — deliberately NOT turned into a zero
+            // sample. MetricChannel converts a throw into _onFailed(), which renders "—"; swallowing it
+            // into new NetworkSample(0, 0) made that callback unreachable through this path and drew a
+            // confident, live-looking flat line for a counter that was not being read at all. The zero
+            // returns above are different: each is a real measurement of nothing, not a failed read.
             Log.Warn("NetworkUsageSampler sample failed", e);
-            return new NetworkSample(0, 0);
+            throw;
         }
     }
 
@@ -216,6 +221,8 @@ public sealed class NetworkUsageSampler {
             return NetworkInterface.GetAllNetworkInterfaces()
                 .FirstOrDefault(a => a.Id == id && a.OperationalStatus == OperationalStatus.Up);
         } catch {
+            // Enumeration can fail while adapters are being reconfigured. Null means "not found", which
+            // the caller already handles by re-picking the primary.
             return null;
         }
     }
@@ -240,6 +247,8 @@ public sealed class NetworkUsageSampler {
             var s = a.GetIPStatistics();
             return s.BytesReceived + s.BytesSent;
         } catch {
+            // Only ever used to rank adapters by traffic, so an unreadable one simply sorts last. Zero
+            // is safe here precisely because nothing renders this number.
             return 0;
         }
     }

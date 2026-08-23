@@ -93,7 +93,7 @@ public partial class UniversalSearchView : UserControl {
         // A press on the field itself is the user returning to the box, and a press inside the popup is
         // about to pick a result — neither should cancel anything. The press stays unhandled either way,
         // so it still acts on whatever it landed on.
-        if (FieldBorder.IsVisualAncestorOf(source))
+        if (SearchBox == source || SearchBox.IsVisualAncestorOf(source))
             return;
         if (ResultsPopup.Child is Visual child && child.IsVisualAncestorOf(source))
             return;

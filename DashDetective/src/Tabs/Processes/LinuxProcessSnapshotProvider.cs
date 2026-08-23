@@ -1,8 +1,10 @@
 using DashDetective.Services.Platform.Linux;
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -71,7 +73,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
         return () => clock.Elapsed.TotalSeconds;
     }
 
-    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.Run(Snapshot, token);
 
     private IReadOnlyList<ProcessInfo> Snapshot() {
         var now = _elapsedSeconds();
@@ -157,7 +159,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
     /// <summary>This tab's placeholder for a process that names itself nowhere. <see cref="ProcPidName"/>
     /// reports "" rather than substituting, because the Network tab's placeholder differs.</summary>
     internal static string NameFrom(string? cmdline, string comm) =>
-        ProcPidName.From(cmdline, comm) is { Length: > 0 } name ? name : "Unknown";
+        ProcPidName.From(cmdline, comm) is { Length: > 0 } name ? name : Placeholders.Unknown;
 
     /// <summary>The run state as the column's text. Windows reports only "Running" or "Not responding", so
     /// the states that mean the same thing there collapse to "Running" — that string is also what tints the

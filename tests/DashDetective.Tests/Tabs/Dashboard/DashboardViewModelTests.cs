@@ -11,10 +11,69 @@ namespace DashDetective.Tests.Tabs.Dashboard;
 /// CPU / memory / system captions are formatted from a known snapshot, and an unreadable machine degrades
 /// to the "Unknown …" wording rather than blanking.</summary>
 public class DashboardViewModelTests {
-    private static DashboardViewModel Create(HardwareProviders providers) {
-        var samplers = new MetricSamplers(
-            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
-        return new DashboardViewModel(new SystemMetricsService(samplers, () => new FakeUiTimer()), providers);
+    private static DashboardViewModel Create(HardwareProviders providers) =>
+        new(TestMetrics.Idle(), providers);
+
+    // ---- Soft-fail: a failed READ, as distinct from a successful read of an unknown machine ----
+    //
+    // The two land on the same visible strings, which is exactly why they need separate tests: the
+    // existing "Unknown …" cases below drive a provider that succeeds and returns an .Unknown record,
+    // and never touch the catch blocks at all.
+
+    [Fact]
+    public async Task LoadCpuInfoAsync_WhenTheReadFails_ReportsTheUnknownWording() {
+        var viewModel = Create(StubHardwareProviders.Compose(
+            cpu: StubHardwareProviders.Fails<CpuStaticInfo>("the CPU namespace is gone")));
+
+        await viewModel.LoadCpuInfoAsync();
+
+        Assert.Equal("Unknown CPU", viewModel.CpuModelText);
+        Assert.Equal("Unknown CPU", viewModel.CpuModelShort);
+    }
+
+    [Fact]
+    public async Task LoadMemoryInfoAsync_WhenTheReadFails_ReportsTheUnknownWording() {
+        var viewModel = Create(StubHardwareProviders.Compose(
+            memory: StubHardwareProviders.Fails<MemoryStaticInfo>()));
+
+        await viewModel.LoadMemoryInfoAsync();
+
+        Assert.Equal("Unknown RAM", viewModel.MemoryModelText);
+    }
+
+    [Fact]
+    public async Task LoadSystemInfoAsync_WhenTheReadFails_FallsBackFieldByField() {
+        var viewModel = Create(StubHardwareProviders.Compose(
+            system: StubHardwareProviders.Fails<SystemStaticInfo>()));
+
+        await viewModel.LoadSystemInfoAsync();
+
+        Assert.Equal("Unknown OS", viewModel.OsText);
+        Assert.Equal("Unknown BIOS", viewModel.BiosText);
+        Assert.Equal("Unknown motherboard", viewModel.MotherboardText);
+        // The machine name comes from the runtime, not the failed read, so it survives.
+        Assert.Equal(System.Environment.MachineName, viewModel.DeviceText);
+    }
+
+    /// <summary>
+    /// The GPU load promises to leave the cards on screen alone when it fails. It could not keep that
+    /// promise while the rebuild cleared first: a throw partway left the old cards gone and the maps out
+    /// of step with Cards. Seed a good set, then fail a reload, and the first set must still be there.
+    /// </summary>
+    [Fact]
+    public async Task LoadGpusAsync_WhenAReloadFails_LeavesTheCardsAlreadyOnScreen() {
+        var viewModel = Create(StubHardwareProviders.With(
+            gpuAdapters: [new GpuAdapter("luid-1", "GeForce RTX 4080", false, 0)]));
+        await viewModel.LoadGpusAsync();
+        var seeded = viewModel.Cards.Count;
+
+        // A second page over a failing enumeration, to prove the catch writes nothing at all.
+        var failing = Create(StubHardwareProviders.Compose(
+            gpuAdapters: StubHardwareProviders.Fails<System.Collections.Generic.IReadOnlyList<GpuAdapter>>()));
+        await failing.LoadGpusAsync();
+
+        Assert.True(seeded > 0);
+        Assert.DoesNotContain(failing.Cards, c => c.Category == DeviceCategory.Gpu);
     }
 
     [Fact]

@@ -25,9 +25,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
-    /// <summary>The app-wide "no value" placeholder, for the one metric that can genuinely lack one.</summary>
-    private const string NoReading = "—";
-
     /// <summary>
     /// Floor for the network throughput chart's shared vertical scale, in Mbps. Keeps an idle graph
     /// pinned flat near the bottom (rather than amplifying counter noise) and avoids a zero span.
@@ -114,7 +111,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>The busiest adapter's utilisation, for the text report and the CSV export. Starts at the
     /// neutral placeholder and stays there on a machine where no adapter can report one — a Linux box whose
     /// only GPU is an NVIDIA or Intel part, say — rather than reading a confident 0%.</summary>
-    [ObservableProperty] private string _gpuValueText = "—";
+    [ObservableProperty] private string _gpuValueText = Placeholders.NoReading;
     [ObservableProperty] private string _gpuModelText = "";
 
     // The system drive's activity + capacity. Not shown on a card of its own (the per-disk cards cover the
@@ -298,8 +295,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
         // The only live metric that can have no reading at all, so the "%" has to be conditional — "—%"
         // would read as a measured zero.
-        AppendReportRow(sb, "GPU", GpuValueText == NoReading
-            ? $"{NoReading}  ({GpuModelText})"
+        AppendReportRow(sb, "GPU", GpuValueText == Placeholders.NoReading
+            ? $"{Placeholders.NoReading}  ({GpuModelText})"
             : $"{GpuValueText}%  ({GpuModelText})");
         AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
         AppendReportRow(sb, "Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})");
@@ -341,15 +338,21 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        // The token is read BEFORE the await, not after: once sampling stops the gate hands out
+        // CancellationToken.None, so a lazy read would never observe the cancellation it is checking for.
+        var token = _gate.Token;
         try {
             var info = await _providers.Cpu.GetAsync();
+            token.ThrowIfCancellationRequested();
             CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
             _cpuCard.Sub = CpuModelShort;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
-            CpuModelShort = "Unknown CPU";
-            CpuModelText = "Unknown CPU";
+            CpuModelShort = Placeholders.UnknownCpu;
+            CpuModelText = Placeholders.UnknownCpu;
             _cpuCard.Sub = CpuModelShort;
         }
     }
@@ -358,11 +361,15 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadMemoryInfoAsync() {
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.Memory.GetAsync();
+            token.ThrowIfCancellationRequested();
             MemoryModelText = FormatMemoryModel(info);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good value for its return.
         } catch {
-            MemoryModelText = "Unknown RAM";
+            MemoryModelText = Placeholders.UnknownRam;
         }
     }
 
@@ -370,9 +377,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// and rebuilds the per-GPU cards + the System-Information "GPU" row. Soft-fails to no GPU cards on any
     /// error. Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
     internal async Task LoadGpusAsync() {
+        var token = _gate.Token;
         try {
             var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
+            token.ThrowIfCancellationRequested();
             RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the cards on screen are still the last good ones.
         } catch {
             // Leave the existing GPU cards in place on a transient failure.
         }
@@ -383,6 +394,22 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// card's caption is its short model; its value + sparkline (busiest-engine %) are seeded here and then
     /// driven by the throughput timer. The System-Information "GPU" row lists every adapter's full name.</summary>
     private void RebuildGpuCards(IReadOnlyList<DeviceInstance> gpus) {
+        // Build the replacements BEFORE touching anything on screen. The caller's soft-fail promises to
+        // "leave the existing GPU cards in place" on a failure, and it could not keep that promise while
+        // the clear came first: a throw partway through the loop left the old cards gone, the new ones
+        // half-inserted, and _gpuCards/_gpuHistories/_gpuVendors out of step with Cards.
+        var rebuilt = new List<(string Key, DashboardCard Card, uint? Vendor)>(gpus.Count);
+        foreach (var gpu in gpus)
+            rebuilt.Add((
+                gpu.GpuLuid ?? gpu.Id,
+                new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub },
+                gpu.GpuPci?.VendorId));
+
+        var modelText = gpus.Count > 0
+            ? string.Join(" / ", gpus.Select(g => g.Spec))
+            : Placeholders.UnknownGpu;
+
+        // Everything below is collection writes over values already in hand, so the swap completes.
         foreach (var card in _gpuCards.Values)
             Cards.Remove(card);
         _gpuCards.Clear();
@@ -390,15 +417,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _gpuVendors.Clear();
 
         var insertAt = Cards.IndexOf(_memoryCard) + 1;
-        foreach (var gpu in gpus) {
-            var card = new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub };
+        foreach (var (key, card, vendor) in rebuilt) {
             Cards.Insert(insertAt++, card);
-            _gpuCards[gpu.GpuLuid ?? gpu.Id] = card;
-            _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new MetricHistory(WindowSeconds);
-            _gpuVendors[gpu.GpuLuid ?? gpu.Id] = gpu.GpuPci?.VendorId;
+            _gpuCards[key] = card;
+            _gpuHistories[key] = new MetricHistory(WindowSeconds);
+            _gpuVendors[key] = vendor;
         }
 
-        GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : "Unknown GPU";
+        GpuModelText = modelText;
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
         UpdateGpuAdapters();
@@ -408,19 +434,23 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadSystemInfoAsync() {
         // GetAsync never throws (it falls back to SystemStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.System.GetAsync();
+            token.ThrowIfCancellationRequested();
             OsText = info.Os;
             DeviceText = info.Device;
             BiosText = info.Bios;
             BuildText = info.Build;
             MotherboardText = info.Motherboard;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
-            OsText = "Unknown OS";
+            OsText = Placeholders.UnknownOs;
             DeviceText = Environment.MachineName;
-            BiosText = "Unknown BIOS";
-            BuildText = "Unknown";
-            MotherboardText = "Unknown motherboard";
+            BiosText = Placeholders.UnknownBios;
+            BuildText = Placeholders.Unknown;
+            MotherboardText = Placeholders.UnknownMotherboard;
         }
     }
 
@@ -436,7 +466,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>
     private static string FormatMemoryModel(MemoryStaticInfo info) {
         if (info.TotalGb <= 0)
-            return "Unknown RAM";
+            return Placeholders.UnknownRam;
 
         var text = $"{info.TotalGb.ToString("F0", CultureInfo.InvariantCulture)} GB {info.TypeLabel}";
         return info.SpeedMhz > 0
@@ -499,7 +529,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // An adapter with no readable utilisation still has a card — it shows "—" rather than a 0 that
             // would read as idle. The unit goes with it, so the card says "—" and not "— %".
             if (sample.Overall is not { } reading) {
-                card.Value = NoReading;
+                card.Value = Placeholders.NoReading;
                 card.Unit = "";
                 // Says why the dash is there, so a detected-but-silent adapter doesn't read as a broken card.
                 card.Note = GpuNoReadingNote.For(
@@ -649,12 +679,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// Both providers soft-fail to empty lists, so any failure just leaves the existing cards in place.
     /// </summary>
     private async Task LoadDisksAsync() {
+        var token = _gate.Token;
         try {
             var disksTask = _providers.Disks.GetAsync();
             var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
+            token.ThrowIfCancellationRequested();
             _systemDiskNumber = SystemVolume.FindDiskNumber(volumesTask.Result) ?? -1;
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the cards on screen are still the last good ones.
         } catch {
             // Leave the existing disk cards in place on a transient failure.
         }
@@ -665,19 +699,27 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// card's caption is its capacity used; its value + sparkline (Active time) are seeded here and then driven
     /// by the throughput timer.</summary>
     private void RebuildDiskCards(IReadOnlyList<DriveCardData> drives) {
+        // Built before anything on screen is touched, for the same reason as RebuildGpuCards: the
+        // caller's soft-fail promises to leave the existing cards in place, which it cannot do if the
+        // clear has already run.
+        var rebuilt = new List<(int DiskNumber, DashboardCard Card)>(drives.Count);
+        foreach (var drive in drives)
+            rebuilt.Add((
+                drive.DiskNumber,
+                new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
+                    Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
+                }));
+
         foreach (var card in _diskCards.Values)
             Cards.Remove(card);
         _diskCards.Clear();
         _diskHistories.Clear();
 
         var insertAt = Cards.IndexOf(_networkCard);
-        foreach (var drive in drives) {
-            var card = new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
-                Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
-            };
+        foreach (var (diskNumber, card) in rebuilt) {
             Cards.Insert(insertAt++, card);
-            _diskCards[drive.DiskNumber] = card;
-            _diskHistories[drive.DiskNumber] = new MetricHistory(WindowSeconds);
+            _diskCards[diskNumber] = card;
+            _diskHistories[diskNumber] = new MetricHistory(WindowSeconds);
         }
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
@@ -728,6 +770,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// per-disk sampler. The shared feed's samplers are owned (and disposed) by the service. Safe to call more
     /// than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _uptimeTimer.Stop();

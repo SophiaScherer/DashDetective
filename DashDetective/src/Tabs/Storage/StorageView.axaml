@@ -5,6 +5,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Storage"
+             xmlns:sys="using:System"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:StorageViewModel"
              x:Class="DashDetective.Tabs.Storage.StorageView">
@@ -13,13 +14,14 @@
          Disk Activity card (bottom row). Surfaces/typography come from src/Shared/Styles; the Disk Activity
          chart reuses the shared Sparkline. The page scrolls as a whole like the Dashboard/Network (not
          self-scrolling). Panels are added per phase. -->
-    <!-- Read/Write/Temp value tints are fixed semantic colours (blue/orange/green) shared by every card, so
-         they live here as tab-local resources rather than on each DriveCard. Promote to SharedStyles if a
-         second feature needs them. -->
+    <!-- The Read/Write/Temp value tints are the palette's fixed Blue/Orange/Green, referenced directly
+         rather than re-declared here under local names. They must be the FIXED keys, not ChartCpu /
+         ChartNetUp / ChartGpu — those hold the same hex today but ThemeService overwrites them when the
+         user picks a single accent, which would collapse the three tints into one. -->
     <UserControl.Resources>
-        <SolidColorBrush x:Key="MetricRead" Color="#4cc2ff"/>
-        <SolidColorBrush x:Key="MetricWrite" Color="#ff8a5c"/>
-        <SolidColorBrush x:Key="MetricTemp" Color="#6ccb5f"/>
+        <!-- The Partitions table's columns, declared once and applied to both the header row and the
+             row template through GridColumns.Definitions, so the two cannot drift apart. -->
+        <sys:String x:Key="PartitionColumns">0.6*,1.3*,0.9*,0.9*,0.9*,0.9*</sys:String>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -47,12 +49,6 @@
         </Style>
         <Style Selector="TextBlock.metricValue">
             <Setter Property="FontSize" Value="11.5"/>
-        </Style>
-        <!-- Uppercase muted column header for the Partitions table (same idiom as the Network table). -->
-        <Style Selector="TextBlock.colHead">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
         <!-- ===== Drive picker (Disk Activity header) ===== -->
         <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
@@ -153,17 +149,17 @@
                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
                                     <TextBlock Classes="metricLabel" Text="Read "/>
                                     <TextBlock Classes="metricValue" Text="{Binding Read}"
-                                               Foreground="{StaticResource MetricRead}"/>
+                                               Foreground="{StaticResource Blue}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Classes="metricLabel" Text="Write "/>
                                     <TextBlock Classes="metricValue" Text="{Binding Write}"
-                                               Foreground="{StaticResource MetricWrite}"/>
+                                               Foreground="{StaticResource Orange}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                                     <TextBlock Classes="metricLabel" Text="Temp "/>
                                     <TextBlock Classes="metricValue" Text="{Binding Temp}"
-                                               Foreground="{StaticResource MetricTemp}"/>
+                                               Foreground="{StaticResource Green}"/>
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -180,7 +176,7 @@
                     <TextBlock Classes="panelTitle" Text="Partitions" Margin="0,0,0,10"/>
                     <!-- Column header: Vol · Label · File System · Type · Capacity · Free (Free right-aligned).
                          The data rows below share this exact column template so the columns stay aligned. -->
-                    <Grid ColumnDefinitions="0.6*,1.3*,0.9*,0.9*,0.9*,0.9*" Margin="0,0,0,6">
+                    <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}" Margin="0,0,0,6">
                         <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
                         <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
                         <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
@@ -193,7 +189,7 @@
                             <DataTemplate x:DataType="vm:PartitionRow">
                                 <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
                                         Padding="0,9">
-                                    <Grid ColumnDefinitions="0.6*,1.3*,0.9*,0.9*,0.9*,0.9*">
+                                    <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}">
                                         <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
                                                    FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
                                         <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"

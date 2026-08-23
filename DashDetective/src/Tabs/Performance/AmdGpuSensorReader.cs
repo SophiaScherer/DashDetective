@@ -55,10 +55,6 @@ internal sealed class AmdGpuSensorReader : IGpuSensorReader {
     private const int AsicFusion = 1 << 5;
 
     // Plausible windows; anything outside means "not really reported".
-    private const int MinCelsius = 1;
-    private const int MaxCelsius = 150;
-    private const int MinWatts = 1;
-    private const int MaxWatts = 2000;
 
     private readonly List<int> _adapterIndices = [];
     private readonly List<VendorPciId> _adapterPci = [];
@@ -148,8 +144,8 @@ internal sealed class AmdGpuSensorReader : IGpuSensorReader {
         foreach (var sensor in (int[])[SensorTemperatureEdge, SensorTemperatureGfx, SensorTemperatureHotspot]) {
             if (sensor >= supported.Count || sensor >= values.Count || supported[sensor] == 0)
                 continue;
-            if (values[sensor] is >= MinCelsius and <= MaxCelsius)
-                return values[sensor];
+            if (GpuSensorRange.Celsius(values[sensor]) is { } celsius)
+                return celsius;
         }
         return null;
     }
@@ -169,7 +165,7 @@ internal sealed class AmdGpuSensorReader : IGpuSensorReader {
         if (supported[SensorBoardPower] == 0)
             return null;
 
-        return values[SensorBoardPower] is >= MinWatts and <= MaxWatts ? values[SensorBoardPower] : null;
+        return GpuSensorRange.Watts(values[SensorBoardPower]);
     }
 
     public void Dispose() {

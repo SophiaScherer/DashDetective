@@ -38,9 +38,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
-    /// <summary>The app-wide "no value" placeholder, for the tiles that can genuinely lack one.</summary>
-    private const string NoReading = "—";
-
     /// <summary>Floor for the network chart's auto-scaled axis, in Mbps: keeps an idle graph pinned flat
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
     /// Dashboard's network scale floor.</summary>
@@ -445,25 +442,25 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole path so a
         // surprise can't take down the app via an unobserved task exception.
+        // The token is read BEFORE the await, not after: once sampling stops the gate hands out
+        // CancellationToken.None, so a lazy read would never observe the cancellation it checks for.
+        var token = _gate.Token;
         try {
             var info = await _providers.Cpu.GetAsync();
+            token.ThrowIfCancellationRequested();
             _cpuMaxClockMhz = info.MaxClockMhz;
-            _cpuRow.Sub = FormatCpuSub(info);
+            _cpuRow.Sub = HardwareNameFormatter.CoreSummary(info.PhysicalCores, info.LogicalCores, info.MaxClockMhz);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             _cpuMaxClockMhz = 0;
             _cpuRow.Sub = "";
-            _cpuRow.Spec = "Unknown CPU";
+            _cpuRow.Spec = Placeholders.UnknownCpu;
         }
     }
 
     /// <summary>Cores plus base clock for the rail sub-label, e.g. "24 cores · 3.2 GHz".</summary>
-    private static string FormatCpuSub(CpuStaticInfo info) {
-        var cores = info.PhysicalCores > 0 ? info.PhysicalCores : info.LogicalCores;
-        if (cores > 0 && info.MaxClockMhz > 0)
-            return $"{cores} cores · {(info.MaxClockMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} GHz";
-        return cores > 0 ? $"{cores} cores" : "";
-    }
 
     /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
     private void OnMemory(MemorySample sample) {
@@ -511,31 +508,31 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadMemoryInfoAsync() {
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole path
         // so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.Memory.GetAsync();
-            _memoryRow.Spec = FormatMemorySpec(info);
+            token.ThrowIfCancellationRequested();
+            _memoryRow.Spec = HardwareNameFormatter.MemorySummary(info.TypeLabel, info.SpeedMhz, info.ModuleCount);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good value for its return.
         } catch {
-            _memoryRow.Spec = "Unknown RAM";
+            _memoryRow.Spec = Placeholders.UnknownRam;
         }
     }
 
     /// <summary>Type, speed and slot count for the detail spec header, e.g. "DDR5-6000 · 2 slots".</summary>
-    private static string FormatMemorySpec(MemoryStaticInfo info) {
-        var label = info.SpeedMhz > 0
-            ? $"{info.TypeLabel}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
-            : info.TypeLabel;
-        return info.ModuleCount > 0
-            ? $"{label} · {info.ModuleCount.ToString(CultureInfo.InvariantCulture)} slots"
-            : label;
-    }
 
     /// <summary>Enumerates the physical disks (off the UI thread) via the shared <see cref="DeviceInventory"/>
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
     internal async Task LoadInventoryAsync() {
+        var token = _gate.Token;
         try {
             var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
+            token.ThrowIfCancellationRequested();
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the rail on screen is still the last good one.
         } catch {
             // Leave the rail without the enumerated disk/GPU rows on a transient failure.
         }
@@ -545,9 +542,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// read / write / response from the page-local sampler), then re-filters the rail and seeds the readouts
     /// once so the new rows aren't blank until the next tick.</summary>
     private void BuildDiskRows(IReadOnlyList<DeviceInstance> disks) {
-        _disks.Clear();
-        _disksByNumber.Clear();
-
+        // Built into a local before the rail is touched. The caller builds disks and then GPUs, so a
+        // clear-first builder that threw partway left the rail genuinely half-rebuilt — disks replaced,
+        // GPUs missing — which is neither the old state nor the new one.
+        var rebuilt = new List<DiskResource>(disks.Count);
         foreach (var disk in disks) {
             var history = new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
@@ -561,6 +559,12 @@ public partial class PerformanceViewModel : ViewModelBase,
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
                 ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
             };
+            rebuilt.Add(resource);
+        }
+
+        _disks.Clear();
+        _disksByNumber.Clear();
+        foreach (var resource in rebuilt) {
             _disks.Add(resource);
             if (resource.DiskNumber >= 0)
                 _disksByNumber[resource.DiskNumber] = resource;
@@ -575,21 +579,20 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and seeds the readouts once. Each new row inherits the shared Detailed flag before it participates, so
     /// seeding doesn't count as a user flip.</summary>
     private void BuildGpuRows(IReadOnlyList<DeviceInstance> gpus) {
-        _gpus.Clear();
-        _gpusByLuid.Clear();
-
+        // Built into a local before the rail is touched — see BuildDiskRows.
+        var rebuilt = new List<GpuResource>(gpus.Count);
         foreach (var gpu in gpus) {
             var history = new MetricHistory(WindowSeconds);
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
-            var threeDTile = new StatTile("3D", NoReading);
+            var threeDTile = new StatTile("3D", Placeholders.NoReading);
             // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
             // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
             // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
-            var tempTile = new StatTile("Temp", NoReading);
-            var powerTile = new StatTile("Power", NoReading);
-            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", ChartSeries.Gpu,
+            var tempTile = new StatTile("Temp", Placeholders.NoReading);
+            var powerTile = new StatTile("Power", Placeholders.NoReading);
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
                                       history.Points(100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
@@ -599,6 +602,12 @@ public partial class PerformanceViewModel : ViewModelBase,
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
+            rebuilt.Add(resource);
+        }
+
+        _gpus.Clear();
+        _gpusByLuid.Clear();
+        foreach (var resource in rebuilt) {
             _gpus.Add(resource);
             _gpusByLuid[resource.Luid] = resource;
         }
@@ -949,10 +958,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadNetworkInfoAsync() {
         // Resolve the adapter's link speed + description off the UI thread (enumeration can be slow),
         // then bind on the UI thread. SelectPrimary never throws in practice, but guard defensively.
+        var token = _gate.Token;
         try {
-            var (sub, spec) = await Task.Run(ReadNetworkInfo);
+            var (sub, spec) = await Task.Run(ReadNetworkInfo, token);
+            token.ThrowIfCancellationRequested();
             _networkRow.Sub = sub;
             _networkRow.Spec = spec;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             _networkRow.Sub = "";
             _networkRow.Spec = "";
@@ -994,6 +1007,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// samplers and the timer. The shared feed's samplers are owned (and disposed) by the service. Safe to
     /// call more than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();

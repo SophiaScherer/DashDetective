@@ -48,43 +48,29 @@
     </UserControl.Styles>
 
     <Panel>
-        <!-- PointerPressed as well as the box's GotFocus: after picking a result the caret stays in the
-             box, so clicking it again raises no focus event and the dropdown would never come back. -->
-        <Border x:Name="FieldBorder" Height="34" PointerPressed="OnFieldPressed"
-                Background="{DynamicResource FieldBackground}"
-                BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
-            <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
-                <Path Grid.Column="0" Width="14" Height="14" Stretch="Uniform"
-                      Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
-                      StrokeLineCap="Round" VerticalAlignment="Center"
-                      Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-
-                <!-- Tab fills in the best result's name; Enter is bound on the box itself because the
-                     shortcut layer deliberately leaves Enter to whatever text box has focus. -->
-                <controls:GhostCompletionBox Grid.Column="1" x:Name="SearchBox" Margin="9,0,0,0"
-                                             FontSize="13" ToolTip.Tip="Search (Ctrl+F)"
-                                             GotFocus="OnSearchBoxGotFocus"
-                                             LostFocus="OnSearchBoxLostFocus"
-                                             PlaceholderText="Search pages, settings, processes, files…"
-                                             Text="{Binding Text, Mode=TwoWay}"
-                                             Completion="{Binding Completion}"
-                                             EnterCommand="{Binding ActivateSelectedCommand}"/>
-
-                <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
-                        Command="{Binding ClearCommand}" IsVisible="{Binding HasText}">
-                    <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
-                          StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
-                </Button>
-            </Grid>
-        </Border>
+        <!-- PointerPressed as well as GotFocus: after picking a result the caret stays in the box, so
+             clicking it again raises no focus event and the dropdown would never come back. Both events
+             bubble out of the field's inner box, so they still reach these handlers.
+             Tab fills in the best result's name; Enter is bound inside the field because the shortcut
+             layer deliberately leaves Enter to whatever text box has focus. -->
+        <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
+                              PointerPressed="OnFieldPressed"
+                              GotFocus="OnSearchBoxGotFocus"
+                              LostFocus="OnSearchBoxLostFocus"
+                              PlaceholderText="Search pages, settings, processes, files…"
+                              ClearToolTip="Clear search"
+                              Text="{Binding Text, Mode=TwoWay}"
+                              Completion="{Binding Completion}"
+                              EnterCommand="{Binding ActivateSelectedCommand}"
+                              ClearCommand="{Binding ClearCommand}"/>
 
         <!-- Overlay-free so the caret stays in the box while results are showing — a light-dismiss popup
              takes focus, which would stop the user typing. Close-on-outside-click is emulated in the
              code-behind, the same trade the File Explorer's Options menu makes. -->
-        <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #FieldBorder}"
+        <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #SearchBox}"
                Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
                IsLightDismissEnabled="False" Focusable="False"
-               Width="{Binding #FieldBorder.Bounds.Width}"
+               Width="{Binding #SearchBox.Bounds.Width}"
                IsOpen="{Binding IsOpen}">
             <Border Background="{DynamicResource CardBackground}"
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1"

@@ -24,6 +24,8 @@ public static class CurrentUserProvider {
             var name = Environment.UserName;
             return string.IsNullOrWhiteSpace(name) ? "User" : name.Trim();
         } catch {
+            // Environment.UserName reads the process token; a denied or broken read is not worth
+            // surfacing, and the surface it feeds is a greeting, not a fact about the machine.
             return "User";
         }
     }
@@ -37,6 +39,9 @@ public static class CurrentUserProvider {
         try {
             return IsAdministrator() ? "Administrator" : "Standard User";
         } catch {
+            // The token check needs a handle the process may not be allowed to open. Unknown elevation
+            // reports the neutral "User" rather than guessing either way — claiming "Standard User"
+            // when the check simply failed would be a near-miss.
             return "User";
         }
     }

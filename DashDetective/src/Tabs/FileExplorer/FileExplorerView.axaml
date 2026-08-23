@@ -48,20 +48,7 @@
         </Style>
 
         <!-- ===== File list ===== -->
-        <Style Selector="TextBlock.colHead">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        </Style>
-        <!-- Active sort column: accent label + arrow. -->
-        <Style Selector="TextBlock.colHead.active">
-            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="TextBlock.sortArrow">
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-        </Style>
+        <!-- colHead / colHead.active / sortArrow are shared (src/Shared/Styles/SharedStyles.axaml). -->
         <Style Selector="Border.fileRow">
             <Setter Property="Padding" Value="14,8"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
@@ -104,18 +91,8 @@
         </Style>
 
         <!-- ===== Breadcrumb + filter chips ===== -->
-        <!-- Chrome-less button wrapper so a whole crumb / chip is clickable (as in Settings). -->
-        <Style Selector="Button.pick">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
+        <!-- The chrome-less button wrapper that makes a whole crumb / chip clickable is the shared
+             Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
         <Style Selector="Button.crumb">
             <Setter Property="Padding" Value="2,0"/>
         </Style>
@@ -275,7 +252,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="fe:Crumb">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Classes="pick crumb" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare crumb" Command="{Binding SelectCommand}">
                                         <TextBlock Classes="crumbText" Classes.current="{Binding IsCurrent}"
                                                    Text="{Binding Label}"/>
                                     </Button>
@@ -340,7 +317,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="fe:FilterOption">
-                                <Button Classes="pick" Command="{Binding SelectCommand}">
+                                <Button Classes="bare" Command="{Binding SelectCommand}">
                                     <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                         <TextBlock Text="{Binding Label}"/>
                                     </Border>
@@ -407,40 +384,16 @@
                          is what the view model measures against when deciding how many still fit. -->
                     <Grid ColumnSpacing="8" SizeChanged="OnTableSizeChanged"
                           layout:GridColumns.Definitions="{Binding ColumnLayout}">
-                        <Button Grid.Column="0" Classes="pick" HorizontalAlignment="Left"
-                                Command="{Binding NameSort.SortCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Classes="colHead" Classes.active="{Binding NameSort.IsActive}"
-                                           Text="NAME"/>
-                                <TextBlock Classes="sortArrow" Text="{Binding NameSort.Arrow}"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Grid.Column="1" Classes="pick" HorizontalAlignment="Left"
-                                IsVisible="{Binding ShowTypeColumn}"
-                                Command="{Binding TypeSort.SortCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Classes="colHead" Classes.active="{Binding TypeSort.IsActive}"
-                                           Text="TYPE"/>
-                                <TextBlock Classes="sortArrow" Text="{Binding TypeSort.Arrow}"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Grid.Column="2" Classes="pick" HorizontalAlignment="Left"
-                                IsVisible="{Binding ShowModifiedColumn}"
-                                Command="{Binding ModifiedSort.SortCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Classes="colHead" Classes.active="{Binding ModifiedSort.IsActive}"
-                                           Text="MODIFIED"/>
-                                <TextBlock Classes="sortArrow" Text="{Binding ModifiedSort.Arrow}"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Grid.Column="3" Classes="pick" HorizontalAlignment="Right"
-                                Command="{Binding SizeSort.SortCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Classes="sortArrow" Text="{Binding SizeSort.Arrow}"/>
-                                <TextBlock Classes="colHead" Classes.active="{Binding SizeSort.IsActive}"
-                                           Text="SIZE"/>
-                            </StackPanel>
-                        </Button>
+                        <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"
+                                                       HorizontalAlignment="Left"/>
+                        <controls:SortableColumnHeader Grid.Column="1" Text="TYPE" Column="{Binding TypeSort}"
+                                                       HorizontalAlignment="Left"
+                                                       IsVisible="{Binding ShowTypeColumn}"/>
+                        <controls:SortableColumnHeader Grid.Column="2" Text="MODIFIED" Column="{Binding ModifiedSort}"
+                                                       HorizontalAlignment="Left"
+                                                       IsVisible="{Binding ShowModifiedColumn}"/>
+                        <controls:SortableColumnHeader Grid.Column="3" Text="SIZE" Column="{Binding SizeSort}"
+                                                       HorizontalAlignment="Right" ArrowFirst="True"/>
                     </Grid>
                 </Border>
 

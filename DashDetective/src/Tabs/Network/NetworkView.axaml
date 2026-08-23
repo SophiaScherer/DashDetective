@@ -5,6 +5,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Network"
+             xmlns:sys="using:System"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:NetworkViewModel"
              x:Class="DashDetective.Tabs.Network.NetworkView">
@@ -12,20 +13,14 @@
     <!-- The design comp's Network page: six panels in two rows (Adapters · IP Configuration ·
          Throughput / Active Connections · Ping · DNS Lookup). Surfaces/typography come from
          src/Shared/Styles; the throughput charts reuse the shared Sparkline. -->
-    <!-- Monospace token is tab-local: no mono font is used elsewhere in the app yet. Promote to
-         SharedStyles if a second feature needs it. Used for IP/address values that read better
-         column-aligned (IP config, connection endpoints, ping/DNS console output). ConsoleBg is a
-         fixed dark terminal surface (kept dark in BOTH themes) so the fixed green/blue console text
-         stays readable — a light inset would wash it out. -->
+    <!-- MonoFont and the Console* tokens come from src/Shared/Styles/Palette.axaml: the Toolkit tab
+         draws the same terminal surface, so they are app-level rather than declared here. Mono is used
+         for IP/address values that read better column-aligned (IP config, connection endpoints, and
+         the ping/DNS console output). -->
     <UserControl.Resources>
-        <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
-        <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
-        <!-- Fixed console text colours (the surface is fixed-dark in both themes, so these can't
-             follow the theme ramp or they'd vanish on the dark inset). -->
-        <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
-        <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
-        <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
-        <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
+        <!-- The connections table's columns, declared once and applied to both the header row and the
+             row template through GridColumns.Definitions, so the two cannot drift apart. -->
+        <sys:String x:Key="ConnectionColumns">1.2*,1.4*,*,Auto</sys:String>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -42,32 +37,13 @@
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <!-- Uppercase muted column header for the connections table. -->
-        <Style Selector="TextBlock.colHead">
-            <Setter Property="FontSize" Value="10.5"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
-        </Style>
-        <!-- Compact editable field (Ping/DNS targets) + its submit button. This is the app's first
-             bound text input; it mirrors the toolbar search field's surface tokens. -->
-        <Style Selector="Border.field">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Height" Value="30"/>
-        </Style>
-        <Style Selector="Border.field TextBox">
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="9,0"/>
-        </Style>
+        <!-- TextBlock.colHead and Border.field are shared (src/Shared/Styles/SharedStyles.axaml); the
+             connections table and the Ping/DNS targets use them as-is. Button.go stays here: it is the
+             field's submit partner and no other tab has one. Its height tracks Border.field. -->
         <Style Selector="Button.go">
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
@@ -227,7 +203,7 @@
                     </Grid>
                     <!-- Column header. The 14px right margin matches the rows' gutter below so the columns
                          stay aligned and the scrollbar sits in the shared gutter, not over the text. -->
-                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Margin="0,0,14,2">
+                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Margin="0,0,14,2">
                         <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
                         <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
                         <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
@@ -242,7 +218,7 @@
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid ColumnDefinitions="1.2*,1.4*,*,Auto" Height="30" Margin="0,0,14,0">
+                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="30" Margin="0,0,14,0">
                                         <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -277,60 +253,31 @@
                 </StackPanel>
             </Border>
             <StackPanel Spacing="12" MinWidth="260">
-                <Border Classes="panel">
-                    <StackPanel Spacing="10">
-                        <TextBlock Classes="panelTitle" Text="Ping"/>
-                        <!-- Editable target, seeded with this machine's own gateway. The monitor is
-                             opt-in: the button starts and stops it, and Enter applies the target and
-                             starts. Nothing here sends a packet until it is pressed. -->
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                            <Border Grid.Column="0" Classes="field">
-                                <TextBox Text="{Binding PingTarget, Mode=TwoWay}"
-                                         PlaceholderText="Host or IP to ping">
-                                    <TextBox.KeyBindings>
-                                        <KeyBinding Gesture="Enter" Command="{Binding ApplyPingTargetCommand}"/>
-                                    </TextBox.KeyBindings>
-                                </TextBox>
-                            </Border>
-                            <Button Grid.Column="1" Classes="go" Content="{Binding PingButtonText}"
-                                    Command="{Binding TogglePingCommand}"/>
-                        </Grid>
-                        <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
-                            <StackPanel Spacing="3">
-                                <TextBlock Text="{Binding PingConsole}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{StaticResource ConsoleGreen}" TextWrapping="NoWrap"/>
-                                <TextBlock Text="{Binding PingSummary}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{StaticResource ConsoleMuted}"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Border>
-                <Border Classes="panel">
-                    <StackPanel Spacing="10">
-                        <TextBlock Classes="panelTitle" Text="DNS Lookup"/>
-                        <!-- Editable host: Enter or the button re-resolves it. -->
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                            <Border Grid.Column="0" Classes="field">
-                                <TextBox Text="{Binding DnsHost, Mode=TwoWay}"
-                                         PlaceholderText="Host name to resolve">
-                                    <TextBox.KeyBindings>
-                                        <KeyBinding Gesture="Enter" Command="{Binding LookupDnsCommand}"/>
-                                    </TextBox.KeyBindings>
-                                </TextBox>
-                            </Border>
-                            <Button Grid.Column="1" Classes="go" Content="Look up"
-                                    Command="{Binding LookupDnsCommand}"/>
-                        </Grid>
-                        <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
-                            <StackPanel Spacing="3">
-                                <TextBlock Text="{Binding DnsConsole}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{StaticResource ConsoleFg}" TextWrapping="NoWrap"/>
-                                <TextBlock Text="{Binding DnsFooter}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{StaticResource ConsoleBlue}"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Border>
+                <!-- Editable target, seeded with this machine's own gateway. The monitor is opt-in: the
+                     button starts and stops it, and Enter applies the target and starts. Nothing here
+                     sends a packet until it is pressed — which is why Enter and the button differ. -->
+                <vm:ConsolePanel Title="Ping"
+                                  Target="{Binding PingTarget, Mode=TwoWay}"
+                                  Placeholder="Host or IP to ping"
+                                  ButtonText="{Binding PingButtonText}"
+                                  SubmitCommand="{Binding TogglePingCommand}"
+                                  EnterCommand="{Binding ApplyPingTargetCommand}"
+                                  ConsoleText="{Binding PingConsole}"
+                                  ConsoleBrush="{StaticResource ConsoleGreen}"
+                                  FooterText="{Binding PingSummary}"
+                                  FooterBrush="{StaticResource ConsoleMuted}"/>
+
+                <!-- Editable host: Enter or the button re-resolves it, so both run the same command. -->
+                <vm:ConsolePanel Title="DNS Lookup"
+                                  Target="{Binding DnsHost, Mode=TwoWay}"
+                                  Placeholder="Host name to resolve"
+                                  ButtonText="Look up"
+                                  SubmitCommand="{Binding LookupDnsCommand}"
+                                  EnterCommand="{Binding LookupDnsCommand}"
+                                  ConsoleText="{Binding DnsConsole}"
+                                  ConsoleBrush="{StaticResource ConsoleFg}"
+                                  FooterText="{Binding DnsFooter}"
+                                  FooterBrush="{StaticResource ConsoleBlue}"/>
             </StackPanel>
         </layout:WeightedRowPanel>
     </StackPanel>

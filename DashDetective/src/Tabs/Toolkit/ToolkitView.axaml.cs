@@ -47,10 +47,7 @@ public partial class ToolkitView : UserControl {
 
     // Focusing selects what's already typed, so a second "/" replaces the term rather than appending
     // to it — as the Processes filter does.
-    private void FocusSearch() {
-        SearchBox.Focus();
-        SearchBox.SelectAll();
-    }
+    private void FocusSearch() => SearchBox.FocusAndSelectAll();
 
     /// <summary>
     /// Scrolls the command waiting to be revealed into view and flashes it, if there is one. Rows are

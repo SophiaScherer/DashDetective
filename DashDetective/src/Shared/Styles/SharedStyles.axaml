@@ -64,6 +64,25 @@
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
+    <!-- Uppercase muted column header for a table (File Explorer, Network, Processes, Storage). Where
+         the column sorts, .active tints the label and its ↑/↓ arrow to the accent; a non-sorting table
+         simply never sets the class. The four tabs had drifted to three variants (10.5pt vs 11pt,
+         TextSubtle vs TextMuted) while rendering the same thing, so the header row now reads the same
+         on every tab. -->
+    <Style Selector="TextBlock.colHead">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+    </Style>
+    <Style Selector="TextBlock.colHead.active">
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="TextBlock.sortArrow">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+
     <!-- ===== Key/value rows (used by the InfoRow widget) ===== -->
     <Style Selector="Border.infoRow">
         <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
@@ -193,6 +212,27 @@
     </Style>
 
     <!-- ===== Search / path fields ===== -->
+    <!-- The bordered surface a bound text input sits in (the Ping/DNS targets, the Toolkit "Add
+         command" form). The same four chrome setters were also written by hand at seven more call
+         sites; those keep their local geometry but should draw this surface. Height is 32 — Network
+         drew 30 and Toolkit 32 for the same control. -->
+    <Style Selector="Border.field">
+        <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Height" Value="32"/>
+    </Style>
+    <!-- Padding rather than Margin for the 9px inset, so the whole field width is a click target
+         instead of leaving a dead zone down each side. -->
+    <Style Selector="Border.field TextBox">
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="9,0"/>
+    </Style>
+
     <!-- A TextBox that draws no chrome of its own, for boxes sitting inside a styled field Border
          (the toolbar search, the process filter, the File Explorer path bar). Fluent otherwise paints
          a solid background and an accent underline on focus, which fills the rounded field with a

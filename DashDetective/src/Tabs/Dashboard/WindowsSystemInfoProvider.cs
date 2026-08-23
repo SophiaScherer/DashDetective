@@ -1,4 +1,6 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
+using DashDetective.Shared;
 using Microsoft.Win32;
 using System;
 using System.Management;
@@ -38,7 +40,7 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
         try {
             var caption = QueryString("SELECT Caption FROM Win32_OperatingSystem", "Caption");
             if (string.IsNullOrWhiteSpace(caption))
-                caption = "Unknown OS";
+                caption = Placeholders.UnknownOs;
             // Win32_OperatingSystem reports "Microsoft Windows 11 Pro"; drop the prefix to match
             // the panel's compact style.
             else if (caption.StartsWith("Microsoft ", StringComparison.OrdinalIgnoreCase))
@@ -47,7 +49,7 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
             var display = ReadRegistryString("DisplayVersion");
             return string.IsNullOrWhiteSpace(display) ? caption : $"{caption} {display}";
         } catch {
-            return "Unknown OS";
+            return Placeholders.UnknownOs;
         }
     }
 
@@ -56,10 +58,10 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
         try {
             var manufacturer = QueryString("SELECT Manufacturer, SMBIOSBIOSVersion FROM Win32_BIOS", "Manufacturer");
             var version = QueryString("SELECT Manufacturer, SMBIOSBIOSVersion FROM Win32_BIOS", "SMBIOSBIOSVersion");
-            var text = Join(manufacturer, version);
-            return string.IsNullOrWhiteSpace(text) ? "Unknown BIOS" : text;
+            var text = WmiRead.Join(manufacturer, version);
+            return string.IsNullOrWhiteSpace(text) ? Placeholders.UnknownBios : text;
         } catch {
-            return "Unknown BIOS";
+            return Placeholders.UnknownBios;
         }
     }
 
@@ -68,10 +70,10 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
         try {
             var manufacturer = QueryString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
             var product = QueryString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
-            var text = Join(manufacturer, product);
-            return string.IsNullOrWhiteSpace(text) ? "Unknown motherboard" : text;
+            var text = WmiRead.Join(manufacturer, product);
+            return string.IsNullOrWhiteSpace(text) ? Placeholders.UnknownMotherboard : text;
         } catch {
-            return "Unknown motherboard";
+            return Placeholders.UnknownMotherboard;
         }
     }
 
@@ -82,12 +84,12 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
             if (string.IsNullOrWhiteSpace(build))
                 build = ReadRegistryString("CurrentBuildNumber");
             if (string.IsNullOrWhiteSpace(build))
-                return "Unknown";
+                return Placeholders.Unknown;
 
             var ubr = ReadRegistryInt("UBR");
             return ubr > 0 ? $"{build}.{ubr}" : build;
         } catch {
-            return "Unknown";
+            return Placeholders.Unknown;
         }
     }
 
@@ -116,13 +118,6 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
     }
 
     /// <summary>Joins two parts with a space, skipping blanks (e.g. vendor + version).</summary>
-    private static string Join(string first, string second) {
-        if (string.IsNullOrWhiteSpace(first))
-            return second.Trim();
-        if (string.IsNullOrWhiteSpace(second))
-            return first.Trim();
-        return $"{first.Trim()} {second.Trim()}";
-    }
 }
 
 /// <summary>The no-identity set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>

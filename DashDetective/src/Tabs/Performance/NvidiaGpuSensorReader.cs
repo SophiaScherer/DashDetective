@@ -28,10 +28,6 @@ internal sealed class NvidiaGpuSensorReader : IGpuSensorReader {
     private const int ThermalTargetGpu = 1;
 
     // Plausible windows; anything outside means "not really reported" (the DiskTemperatureProvider idiom).
-    private const int MinCelsius = 1;
-    private const int MaxCelsius = 150;
-    private const double MinWatts = 0.1;
-    private const double MaxWatts = 2000;
 
     private readonly List<IntPtr> _nvapiGpus = [];
     private readonly List<VendorPciId> _nvapiPci = [];
@@ -157,14 +153,12 @@ internal sealed class NvidiaGpuSensorReader : IGpuSensorReader {
 
     /// <summary>Accepts a sensor reading only inside a plausible GPU range, so a zero ("not reported") or a
     /// garbage value blanks the tile instead of being displayed. Pure; unit-tested.</summary>
-    internal static double? PlausibleCelsius(int celsius) =>
-        celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
+    internal static double? PlausibleCelsius(int celsius) => GpuSensorRange.Celsius(celsius);
 
     /// <summary>Converts NVML's milliwatts to watts, rejecting readings outside a plausible board range.
     /// Pure; unit-tested.</summary>
     internal static double? PlausibleWatts(uint milliwatts) {
-        var watts = milliwatts / 1000.0;
-        return watts is >= MinWatts and <= MaxWatts ? watts : null;
+        return GpuSensorRange.Watts(milliwatts / 1000.0);
     }
 
     public void Dispose() {

@@ -8,6 +8,7 @@ using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -34,7 +35,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(2);
 
     private readonly DispatcherTimer _timer;
-    private bool _inFlight;
+    private readonly OverlapGuard _loadGuard = new();
 
     // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from the
     // shared SystemMetricsService (so there's one sampler across all tabs).
@@ -48,7 +49,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     // Background. Defaults to Name ascending (matching the initial list order).
     private ProcessSortKey _sortKey = ProcessSortKey.Name;
     private bool _ascending = true;
-    private readonly ProcessSortColumn[] _sortColumns;
+    private readonly SortColumn<ProcessSortKey>[] _sortColumns;
 
     /// <summary>The last snapshot, kept so a header click can re-sort immediately without waiting for
     /// the next poll.</summary>
@@ -81,13 +82,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
     // Clickable column headers.
-    public ProcessSortColumn NameSort { get; }
-    public ProcessSortColumn PidSort { get; }
-    public ProcessSortColumn StatusSort { get; }
-    public ProcessSortColumn CpuSort { get; }
-    public ProcessSortColumn MemorySort { get; }
-    public ProcessSortColumn DiskSort { get; }
-    public ProcessSortColumn GpuSort { get; }
+    public SortColumn<ProcessSortKey> NameSort { get; }
+    public SortColumn<ProcessSortKey> PidSort { get; }
+    public SortColumn<ProcessSortKey> StatusSort { get; }
+    public SortColumn<ProcessSortKey> CpuSort { get; }
+    public SortColumn<ProcessSortKey> MemorySort { get; }
+    public SortColumn<ProcessSortKey> DiskSort { get; }
+    public SortColumn<ProcessSortKey> GpuSort { get; }
 
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
     [ObservableProperty] private string _appsHeader = "Apps";
@@ -276,13 +277,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _interop = interop;
 
         _service = service;
-        NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
-        PidSort = new ProcessSortColumn(ProcessSortKey.Pid, OnSort);
-        StatusSort = new ProcessSortColumn(ProcessSortKey.Status, OnSort);
-        CpuSort = new ProcessSortColumn(ProcessSortKey.Cpu, OnSort);
-        MemorySort = new ProcessSortColumn(ProcessSortKey.Memory, OnSort);
-        DiskSort = new ProcessSortColumn(ProcessSortKey.Disk, OnSort);
-        GpuSort = new ProcessSortColumn(ProcessSortKey.Gpu, OnSort);
+        NameSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Name, OnSort);
+        PidSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Pid, OnSort);
+        StatusSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Status, OnSort);
+        CpuSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Cpu, OnSort);
+        MemorySort = new SortColumn<ProcessSortKey>(ProcessSortKey.Memory, OnSort);
+        DiskSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Disk, OnSort);
+        GpuSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Gpu, OnSort);
         _sortColumns = new[] {
             NameSort, PidSort, StatusSort, CpuSort, MemorySort, DiskSort, GpuSort,
         };
@@ -295,16 +296,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             () => _service.SubscribeCpu(OnCpuTotal, OnCpuTotalFailed),
             () => _service.SubscribeMemory(OnMemoryTotal, OnMemoryTotalFailed));
 
+        // Built FIRST, before anything that reads it: every load captures _gate.Token, so a load started
+        // above this line would dereference a null field and its soft-fail would empty the page. The gate
+        // starts idle and fires no callback until a transition, so building it early costs nothing.
+        _gate = new SamplingGate(ApplySampling);
+
         // One list load here even though the page is not on screen yet: universal search reads Snapshot,
         // and a tab the user has not opened would otherwise offer no processes at all.
         _ = LoadAsync();
 
-        _timer = new DispatcherTimer { Interval = SampleInterval };
-        _timer.Tick += OnTick;
-
         // The timer is not started here: the gate runs it only while the page is on screen and the Live
         // pill is on.
-        _gate = new SamplingGate(ApplySampling);
+        _timer = new DispatcherTimer { Interval = SampleInterval };
+        _timer.Tick += OnTick;
     }
 
     private void OnTick(object? sender, EventArgs e) => _ = LoadAsync();
@@ -315,11 +319,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Summary Memory% callback.</summary>
     private void OnMemoryTotal(MemorySample memory) => MemoryUsageText = FormatPercent(memory.LoadPercent);
 
-    /// <summary>On a CPU sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
-    private void OnCpuTotalFailed() => CpuUsageText = FormatPercent(0);
+    /// <summary>On a CPU sampler failure, report no reading. NOT 0%: the channel stops polling after a
+    /// failure, so a confident "0%" would sit there for the rest of the session claiming an idle CPU.
+    /// This is the same feed the Dashboard, Performance and Network tabs render as "—".</summary>
+    private void OnCpuTotalFailed() => CpuUsageText = Placeholders.NoReading;
 
-    /// <summary>On a memory sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
-    private void OnMemoryTotalFailed() => MemoryUsageText = FormatPercent(0);
+    /// <summary>On a memory sampler failure, report no reading — see <see cref="OnCpuTotalFailed"/>.</summary>
+    private void OnMemoryTotalFailed() => MemoryUsageText = Placeholders.NoReading;
 
     private static string FormatPercent(double percent) {
         if (percent < 0)
@@ -331,14 +337,20 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// enumeration must not pile up ticks) and never throws.</summary>
     /// <summary>Internal rather than private so a test can await the poll the ctor fires and forgets.</summary>
     internal async Task LoadAsync() {
-        if (_inFlight)
+        using var run = _loadGuard.TryEnter();
+        if (run is null)
             return;
-        _inFlight = true;
+
+        var token = _gate.Token;
         try {
-            var processes = await _snapshots.GetAsync();
+            var processes = await _snapshots.GetAsync(token);
             // Awaited on the UI thread, so the continuation resumes there — safe to touch collections.
+            token.ThrowIfCancellationRequested();
             _lastSnapshot = processes;
             ApplySnapshot(processes);
+        } catch when (token.IsCancellationRequested) {
+            // Left mid-read: cancelled, or failed once the user had already gone. Either way the
+            // emptying fallback below must NOT run — it would blank the list they come back to.
         } catch {
             _lastSnapshot = Array.Empty<ProcessInfo>();
             _lastRoots = Array.Empty<ProcessNode>();
@@ -351,8 +363,6 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             TotalProcessesText = "0";
             ProcessBreakdownText = "";
             ThreadsText = "0";
-        } finally {
-            _inFlight = false;
         }
     }
 
@@ -645,17 +655,23 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (row is null)
             return;
 
+        // Only the kill is guarded. The row removals used to sit inside this try as well, which meant a
+        // bug in the removal logic reported itself as "Couldn't end <process>" — a message blaming the
+        // machine for a fault in this file, after the process had in fact been killed.
         try {
             using var process = Process.GetProcessById(row.Pid);
             process.Kill();
-            if (!Apps.Remove(row) && !Background.Remove(row))
-                WindowsProcesses.Remove(row);
-            SelectedRow = null;
-            ActionMessage = "";
-        } catch {
-            // ArgumentException (already exited) or Win32Exception (access denied without elevation).
+        } catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+            // Already exited (ArgumentException / InvalidOperationException) or access denied without
+            // elevation (Win32Exception).
             ActionMessage = $"Couldn't end {row.Name}";
+            return;
         }
+
+        if (!Apps.Remove(row) && !Background.Remove(row))
+            WindowsProcesses.Remove(row);
+        SelectedRow = null;
+        ActionMessage = "";
     }
 
     /// <summary>
@@ -731,6 +747,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Stops the timer and unsubscribes from the shared metrics. Safe to call more than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _timer.Stop();
         _timer.Tick -= OnTick;
         _subscriptions.Dispose();

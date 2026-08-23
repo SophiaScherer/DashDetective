@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace DashDetective.Shared;
@@ -18,7 +19,7 @@ public static partial class HardwareNameFormatter {
     /// name, e.g. "AMD Ryzen 5 7600X 6-Core Processor" → "AMD Ryzen 5 7600X".</summary>
     public static string ShortenCpu(string raw) {
         if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown CPU";
+            return Placeholders.UnknownCpu;
 
         var name = raw.Replace("(R)", "").Replace("(r)", "")
                       .Replace("(TM)", "").Replace("(tm)", "");
@@ -36,7 +37,7 @@ public static partial class HardwareNameFormatter {
     /// e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060".</summary>
     public static string ShortenGpu(string raw) {
         if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown GPU";
+            return Placeholders.UnknownGpu;
 
         var name = raw.Replace("(R)", "").Replace("(r)", "")
                       .Replace("(TM)", "").Replace("(tm)", "");
@@ -46,6 +47,33 @@ public static partial class HardwareNameFormatter {
                 name = name[vendor.Length..];
 
         return WhitespaceRegex().Replace(name, " ").Trim();
+    }
+
+    /// <summary>
+    /// The processor's caption line, e.g. "6 cores · 4.7 GHz" — physical cores where known, falling back
+    /// to logical, and the clock only when there is one. Empty when neither is known, so the caller can
+    /// choose its own placeholder.
+    /// </summary>
+    /// <remarks>
+    /// Takes primitives rather than <c>CpuStaticInfo</c> so <c>src/Shared</c> keeps its independence
+    /// from any tab's model. The Performance rail and <c>DeviceInventory</c> had byte-identical copies.
+    /// </remarks>
+    public static string CoreSummary(int physicalCores, int logicalCores, double maxClockMhz) {
+        var cores = physicalCores > 0 ? physicalCores : logicalCores;
+        if (cores > 0 && maxClockMhz > 0)
+            return $"{cores} cores · {(maxClockMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} GHz";
+        return cores > 0 ? $"{cores} cores" : "";
+    }
+
+    /// <summary>The memory caption, e.g. "DDR5-4800 · 2 slots" — the speed and slot count each appear
+    /// only when known. See <see cref="CoreSummary"/> on why this takes primitives.</summary>
+    public static string MemorySummary(string typeLabel, int speedMhz, int moduleCount) {
+        var label = speedMhz > 0
+            ? $"{typeLabel}-{speedMhz.ToString(CultureInfo.InvariantCulture)}"
+            : typeLabel;
+        return moduleCount > 0
+            ? $"{label} · {moduleCount.ToString(CultureInfo.InvariantCulture)} slots"
+            : label;
     }
 
     [GeneratedRegex(@"\s+\d+-Core Processor")]

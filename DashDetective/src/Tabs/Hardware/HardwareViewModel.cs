@@ -1,4 +1,5 @@
 using DashDetective.Shared;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
@@ -125,17 +126,32 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     private async Task LoadAsync() {
         // GetAsync never throws (each section falls back to its .Unknown record), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        HardwareInfo info;
         try {
-            var info = await _provider.GetAsync();
-            // Constructed on the UI thread, so the continuation resumes there — safe to bind.
-            ApplyProcessor(info.Processor);
-            ApplyMemory(info.Memory);
-            ApplyStorage(info.Storage);
-            ApplyMotherboard(info.Motherboard);
-            ApplyGraphics(info.Graphics);
-            // Sensors card intentionally untouched — deferred, stays "—".
+            info = await _provider.GetAsync();
         } catch {
             // Leave whatever values are already shown (placeholders on first load).
+            return;
+        }
+
+        // Constructed on the UI thread, so the continuation resumes there — safe to bind.
+        // Each card is applied under its own guard, mirroring HardwareInfoProvider.Section, which
+        // already isolates a failing *reader* per card. Applying all five in one try undid that at the
+        // last step: a throw in the fifth left four cards updated and one stale, which is neither the
+        // old card set nor the new one.
+        Apply(() => ApplyProcessor(info.Processor));
+        Apply(() => ApplyMemory(info.Memory));
+        Apply(() => ApplyStorage(info.Storage));
+        Apply(() => ApplyMotherboard(info.Motherboard));
+        Apply(() => ApplyGraphics(info.Graphics));
+        // Sensors card intentionally untouched — deferred, stays "—".
+
+        static void Apply(Action apply) {
+            try {
+                apply();
+            } catch {
+                // That one card keeps the values it already shows; the rest still update.
+            }
         }
     }
 

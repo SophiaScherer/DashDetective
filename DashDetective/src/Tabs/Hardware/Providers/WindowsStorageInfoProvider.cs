@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Versioning;

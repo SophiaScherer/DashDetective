@@ -215,11 +215,16 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // up — the machine has moved on and the list should too.
     private async Task ReopenAsync(RecentSearch entry) {
         IReadOnlyList<SearchResult> results;
+        var token = StartRun();
         try {
-            results = await _aggregator.QueryAsync(new SearchQuery(entry.Title), CancellationToken.None);
+            results = await _aggregator.QueryAsync(new SearchQuery(entry.Title), token);
         } catch {
             return;
         }
+
+        // A newer query started while this one was resolving; it owns the field now.
+        if (token.IsCancellationRequested)
+            return;
 
         foreach (var result in results)
             if (result.Category == entry.Category &&

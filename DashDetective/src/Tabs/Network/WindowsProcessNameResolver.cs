@@ -1,3 +1,5 @@
+using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 
@@ -26,8 +28,10 @@ internal sealed class WindowsProcessNameResolver : IProcessNameResolver {
         try {
             using var process = Process.GetProcessById(pid);
             return process.ProcessName + ".exe";
-        } catch {
-            // ArgumentException (exited) or Win32Exception (access denied on a protected process).
+        } catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+            // The process exited (ArgumentException, or InvalidOperationException once the handle is
+            // stale) or is protected and denies the read (Win32Exception). Narrow on purpose: a bare
+            // catch here would report a genuine bug as an unnamed process on every row.
             return IProcessNameResolver.Unnamed(pid);
         }
     }

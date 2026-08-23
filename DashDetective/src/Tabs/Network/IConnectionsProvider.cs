@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -10,5 +11,5 @@ public sealed record ConnectionsSnapshot(IReadOnlyList<ConnectionInfo> Rows, int
 /// <summary>Snapshots the machine's active TCP/UDP connections for the Active Connections panel.
 /// Implementations must never throw: any failure soft-fails to an empty snapshot.</summary>
 internal interface IConnectionsProvider {
-    Task<ConnectionsSnapshot> GetAsync();
+    Task<ConnectionsSnapshot> GetAsync(CancellationToken token = default);
 }

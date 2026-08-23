@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using System;
 using System.Collections.Generic;
 using System.Management;
@@ -37,16 +38,16 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
                 var disks = new List<PhysicalDiskInfo>();
                 foreach (var obj in results) {
                     using (obj) {
-                        int deviceId = ToInt(obj["DeviceId"]);
-                        var kind = DriveKinds.FromStorageCodes(ToInt(obj["MediaType"]), ToInt(obj["BusType"]));
+                        int deviceId = WmiRead.ToInt(obj["DeviceId"]);
+                        var kind = DriveKinds.FromStorageCodes(WmiRead.ToInt(obj["MediaType"]), WmiRead.ToInt(obj["BusType"]));
                         // Only NVMe drives expose a readable composite temperature; leave others at null.
                         double? temperature = kind == DriveKind.Nvme ? readTemperatureCelsius(deviceId) : null;
                         disks.Add(new PhysicalDiskInfo(
                             deviceId,
                             ModelOrDefault(obj["FriendlyName"] as string),
                             DriveKinds.CardLabel(kind),
-                            ToUInt64(obj["Size"]),
-                            ToInt(obj["HealthStatus"]) == HealthStatusHealthy,
+                            WmiRead.ToUInt64(obj["Size"]),
+                            WmiRead.ToInt(obj["HealthStatus"]) == HealthStatusHealthy,
                             temperature));
                     }
                 }
@@ -65,8 +66,8 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
                 foreach (var obj in results) {
                     using (obj) {
                         disks.Add(new PhysicalDiskInfo(
-                            ToInt(obj["Index"]), ModelOrDefault(obj["Model"] as string), "",
-                            ToUInt64(obj["Size"]), true));
+                            WmiRead.ToInt(obj["Index"]), ModelOrDefault(obj["Model"] as string), "",
+                            WmiRead.ToUInt64(obj["Size"]), true));
                     }
                 }
 
@@ -81,21 +82,6 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
     private static string ModelOrDefault(string? model) =>
         string.IsNullOrWhiteSpace(model) ? "Drive" : model.Trim();
 
-    private static int ToInt(object? value) {
-        try {
-            return value is null ? 0 : Convert.ToInt32(value);
-        } catch {
-            return 0;
-        }
-    }
-
-    private static ulong ToUInt64(object? value) {
-        try {
-            return value is null ? 0 : Convert.ToUInt64(value);
-        } catch {
-            return 0;
-        }
-    }
 }
 
 /// <summary>The no-disks set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>

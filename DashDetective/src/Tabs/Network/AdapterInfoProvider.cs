@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -31,7 +32,7 @@ internal sealed class AdapterInfoProvider : IAdapterInfoProvider {
         "pseudo", "wan miniport", "bluetooth", "wintun", "wireguard", "npcap", "docker",
     };
 
-    public Task<AdapterSnapshot> GetAsync() => Task.Run(Read);
+    public Task<AdapterSnapshot> GetAsync(CancellationToken token = default) => Task.Run(Read, token);
 
     private static AdapterSnapshot Read() {
         try {

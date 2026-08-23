@@ -34,7 +34,8 @@ crash on someone else's machine. Windows-only NuGet assets still load correctly 
 - **Small seams over big base classes.** Shell behaviours are opt-in via marker interfaces, not a
   heavyweight page base class.
 - **Soft-fail everywhere.** Reading the machine can fail (denied access, a non-Windows host, a
-  vanishing process). Every reader degrades to a neutral fallback instead of throwing.
+  vanishing process). Every reader degrades to a neutral fallback instead of throwing. *Neutral* is the
+  load-bearing word — see *Soft-fail: what a fallback owes you* below.
 
 ## Source layout
 
@@ -44,8 +45,8 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
-| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`), the table `SortColumn` model, `Placeholders`, the `OverlapGuard`, and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity`, `Diagnostics`, and `Platform/Linux` + `Platform/Windows` — the per-OS reading primitives (`ProcFileSystem` and the `/proc` parsers; `WmiRead`) that providers on both sides build on. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
 
@@ -116,6 +117,41 @@ by the same rule, behind `AlertsEnabled`, which follows the user's setting.
 
 One-shot constructor loads stay in the constructor: the exported report and universal search read values
 from pages the user may never open.
+
+**The gate also owns the lifetime of the work it starts.** Stopping a timer says nothing about the read
+already in the air. Left alone, that read lands on a page nobody is looking at — and if it *failed*, its
+soft-fail writes "Connections unavailable" or empties the list, which is what the user then meets the
+next time they open the tab. So `SamplingGate` mints a `CancellationTokenSource` when sampling starts and
+cancels it when sampling stops, and every timer-driven read captures `_gate.Token` and passes it down.
+
+Three details make it work, and all three are easy to get wrong:
+
+- **Capture the token *before* the `await`, never after.** While sampling is stopped the gate hands out
+  `CancellationToken.None` — deliberately, so a page's one-shot constructor load still runs to completion
+  (the exported report and universal search read from tabs the user may never open). A token read *after*
+  the await would therefore be `None` and would never report the cancellation it is checking for.
+- **Filter the catch, don't add a `catch (OperationCanceledException)`.** The read can also *fail* after
+  the user has gone, and that exception short-circuits any token check placed after the await. Every
+  such site is `catch when (token.IsCancellationRequested)`, which covers cancelled and failed-while-gone
+  with one clause. A genuine timeout (a provider's own internal CTS) still falls through to the real
+  soft-fail, which is right — a timeout *is* a failure.
+- **Cancellation is not failure.** The filtered clause writes nothing at all: no placeholder, no cleared
+  collection. The values already on screen are the last good ones.
+
+**Overlapping polls are refused, not queued.** A page's timer can tick again while the previous read is
+still in flight, so each poll claims an **`OverlapGuard`** (`src/Shared`) and returns if a run already
+holds it. The scope is `IDisposable` rather than a flag the caller lowers, because a run that *throws*
+must still free the guard or the poll is dead for the rest of the session. The guard is deliberately
+**not** thread-safe: every caller is UI-thread-affine, so the test-and-set cannot interleave.
+
+That is one answer to overlap, and the codebase has three more on purpose — do not merge them:
+
+| Where | Idiom | Why not the guard |
+| --- | --- | --- |
+| Timer polls (Network ×3, Processes) | `OverlapGuard` | last-write-**loses**: the run under way will report the same thing a moment later |
+| File Explorer's folder load | generation counter | user-driven, so the **newest** request must win and the older result be discarded |
+| Toolkit's run command | `[RelayCommand(AllowConcurrentExecutions = false)]` | the framework already does it, and its busy state reaches the UI |
+| `NvidiaSmiReader` | `lock` + retire latch | called off the UI thread, so it really can interleave; also latches off permanently after a failure |
 - **`IShortcutTarget`** — the page handles keyboard shortcuts of its own, and names the
   `ShortcutScope` its bindings belong to. Processes, File Explorer and Network implement it; see
   *Keyboard shortcuts* below.
@@ -392,6 +428,12 @@ each consumer apply its own placeholder**, because the placeholders genuinely di
 wants "Unknown" where the Network tab wants "PID 1234", and a derivation that substituted early would have
 destroyed the information needed to tell them apart.
 
+The placeholder *strings* themselves live in **`Placeholders`** (`src/Shared`) — `NoReading` (the `—`
+every surface renders for "no reading") and the `Unknown*` set. Choosing which one to apply stays with
+the consumer; only the wording is shared. Note `UnknownCpu` ("Unknown CPU") and `UnknownProcessor`
+("Unknown processor") are the same concept in two spellings: that predates the class and is kept because
+reconciling it changes text the user sees, but both are named there so the divergence sits in one place.
+
 **Reporting "not known" as `0` is only safe when `0` is impossible as a real reading.** That is the usual
 case, and `CpuFacts` leans on it. It fails for the owner of a process: `/proc/[pid]/status`'s `Uid` is `0`
 for root, so a denied read reported as `0` would move someone's own process into the System group. That
@@ -494,10 +536,86 @@ grid lines snapped and inside the plot), **`ChartWindow`** words the span a buff
 and *composed* by these helpers — keeping them free of render-backend types is what lets them be
 unit-tested directly, without a headless render pass.
 
-Shared styles (card, panel, segmented control, toggle, buttons, the draggable `paneSplitter`, …) live
-in `src/Shared/Styles/SharedStyles.axaml`. Controls or styles used by only one tab stay tab-local until
-a second tab needs them (the Network tab's console colours and File Explorer's checkbox style are
-current examples).
+Shared styles (card, panel, segmented control, toggle, buttons, the table column header `colHead` and
+its `sortArrow`, the bordered input surface `field`, the draggable `paneSplitter`, …) live in
+`src/Shared/Styles/SharedStyles.axaml`; shared *resources* (the colour ramp, plus the `MonoFont` and
+`Console*` terminal tokens that the Network and Toolkit tabs both draw) live in `Palette.axaml`. Both
+are merged app-wide from `App.axaml`, so a view consumes them without an include of its own.
+
+Controls or styles used by only one tab stay tab-local until a second tab needs them — File Explorer's
+checkbox style and the Toolkit tab's `ShieldAmber` are current examples. **The promotion is not
+optional once the second user arrives:** four tabs had independently defined `colHead` and had drifted
+to three variants of it, which is what the rule exists to prevent.
+
+**The chrome-less click wrapper is `Button.bare`,** and a style that needs it plus extras layers on top
+(`Classes="bare rowRun"`) rather than restating the six setters. Three tabs had copied it as
+`Button.pick` and a fourth as `Button.chip`.
+
+Two shared controls exist specifically to stop a repeated *assembly* of elements from drifting:
+**`SortableColumnHeader`** (the sorting button + label + arrow, eleven copies across File Explorer and
+Processes) and **`SearchField`** (the magnifier + input + clear ×, three copies with identical path
+geometry). `SearchField`'s dimensions are properties because the three differ by role — a toolbar field
+is deliberately larger than an inline list filter — not by accident. Both bind a **key-agnostic
+`SortColumn`** (`src/Shared`); the generic `SortColumn<TKey>` carries each table's own sort-key enum.
+
+A panel repeated within a *single* feature stays in that feature: the Network tab's `ConsolePanel`
+backs both Ping and DNS Lookup and lives in `src/Tabs/Network`, even though the console *tokens* it
+draws with are app-level.
+
+## Soft-fail: what a fallback owes you
+
+"Degrades to a neutral fallback" is the rule; these are the four ways it gets broken.
+
+**A fallback must not be a confident wrong answer.** `0` is only neutral where `0` is impossible as a
+real reading. It is not neutral for a utilisation percentage: `MetricChannel` *stops polling* after a
+failure, so a `0%` written there sits on screen claiming an idle machine for the rest of the session.
+Anything a surface renders and a user could read as a measurement uses `Placeholders.NoReading`.
+
+**A fallback must not be unreachable.** A sampler that catches its own failure and returns a
+zero-valued reading never lets `MetricChannel` call `_onFailed`, so the placeholder the pages are wired
+to show can never appear — a vanished NIC draws a flat, live-looking line instead. Samplers therefore
+**throw**, and the channel turns that into the placeholder. Returning a zero *measurement* is different
+and fine: `NetworkUsageSampler` legitimately reports `0` when it has just rebaselined or when too little
+time has passed, because those are real measurements of nothing.
+
+**A fallback must leave the surface in one piece.** A rebuild that clears its collections and then
+throws partway leaves the page neither in its old state nor its new one — and the catch above it,
+promising to "leave the existing cards in place", cannot keep that promise. Every rebuild therefore
+**builds into a local first and swaps at the end**, so everything that can throw happens before
+anything on screen is touched (`RebuildGpuCards`, `RebuildDiskCards`, `BuildDiskRows`, `BuildGpuRows`).
+Where a surface is a set of independent cards, each one is applied under its own guard, mirroring
+`HardwareInfoProvider.Section`, which already isolates a failing *reader* per card.
+
+**A `catch` must not be wider than its comment.** Several catches named the exact exceptions they meant
+— and then caught everything, so a genuine bug in the same block was reported to the user as "couldn't
+end that process" or an unnamed row. The idiom is a filter, as `NativeLoadFailure.Matches` and
+`ProcFileSystem.IsIoFailure` already use:
+
+```csharp
+} catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+```
+
+Keep the `try` no wider than the failable call, too: the Processes tab's end-task once wrapped its three
+collection removals in the same `try` as `Process.Kill()`, so a bug in the removal logic surfaced as a
+message blaming the machine — after the process had in fact been killed.
+
+**Who logs.** Providers, samplers and services log through `Services/Diagnostics/Log`; view models and
+code-behind do not, because the provider that failed has already logged it with more context than the
+view model has. Consistent across all 40 files that log today. The exception worth knowing is
+`DeviceInventory.SampleActiveGpuLuids`: it is a view-model-facing helper whose empty result is
+indistinguishable from "nothing is busy", and because the inventory *intersects* enumeration with
+sampling, that empty set makes every GPU card disappear while each reader's own output still looks
+correct. It logs.
+
+**Every bare `catch { }` carries a comment saying why nothing is done.** A silent catch and a forgotten
+one look identical six months later.
+
+**A sanity window is a shared constant, not a per-reader one.** Sensor readings are filtered through
+`GpuSensorRange` (`Tabs/Performance`, shared by the NVIDIA, AMD and Linux readers) and
+`DiskTemperatureRange` (`Services/SystemMetrics`, shared by both platform arms). Each had been written
+out per reader, and had drifted — one GPU reader floored power at 1 W where the others used 0.1 W. The
+two windows stay *separate from each other* on purpose: a drive at 130 °C is a bad reading, a GPU at
+130 °C is a hot one.
 
 ## Dependencies
 
@@ -553,6 +671,25 @@ Fakes are small hand-written classes under `Fakes/` — there
 is no mocking framework, matching the codebase's zero-dependency ethos. The test layout mirrors the app,
 so a test file sits at the same relative path as its subject
 (`src/Shared/Charts/SparklinePoints.cs` → `tests/DashDetective.Tests/Shared/Charts/SparklinePointsTests.cs`).
+
+**A fake must be able to break its contract on demand.** A fake that only ever succeeds makes its
+subject's `catch` blocks unreachable, so the soft-fail rule above goes unverified — which is what had
+happened across the Linux providers and the Dashboard/Storage view models. Every shared fake therefore
+has an opt-in failure mode: `FakeProcFileSystem.ThrowOn`, `FakeGpuUsageSampler.Throwing`,
+`FakeProcessLauncher.ThrowOnCall`, and `StubHardwareProviders.Compose` (which takes a factory per
+section, so it can return a value, return a faulted task, or throw before returning one — the three
+shapes a real reader fails in).
+
+**Test the denial against a fixture that would otherwise succeed.** This is the trap worth naming: a
+provider handed an *empty* fake returns the same `Unknown`/empty value it returns when a read is denied,
+through a completely different path. A soft-fail test built that way passes whether or not the `catch`
+exists. `LinuxProviderSoftFailTests` stages a working fixture first and only then denies it, and carries
+a readable positive control beside each denial for exactly this reason.
+
+**Pure logic belongs outside a platform-gated class.** `GpuEngineInstanceName` parses a Windows counter
+name but is not itself Windows-annotated, because a method on the `[SupportedOSPlatform("windows")]`
+sampler could only be called from behind a platform guard — and would therefore never run on the Linux
+CI leg. Same reasoning as `GpuAdapter.FormatLuidToken`.
 
 The architecture is shaped to make this possible headlessly, without an Avalonia dispatcher or real
 hardware. Two seams do most of that work:

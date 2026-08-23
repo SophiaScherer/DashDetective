@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using System;
 using System.Collections.Generic;
 using System.Management;
@@ -38,7 +39,7 @@ internal sealed class WindowsVolumeProvider : IVolumeProvider {
             foreach (var obj in results) {
                 using (obj) {
                     // Skip volumes with no media/capacity (e.g. an empty optical drive).
-                    var size = ToUInt64(obj["Size"]);
+                    var size = WmiRead.ToUInt64(obj["Size"]);
                     if (size == 0)
                         continue;
 
@@ -54,7 +55,7 @@ internal sealed class WindowsVolumeProvider : IVolumeProvider {
                         (obj["FileSystemLabel"] as string ?? "").Trim(),
                         (obj["FileSystem"] as string ?? "").Trim(),
                         size,
-                        ToUInt64(obj["SizeRemaining"]),
+                        WmiRead.ToUInt64(obj["SizeRemaining"]),
                         partition?.GptType ?? ""));
                 }
             }
@@ -120,17 +121,11 @@ internal sealed class WindowsVolumeProvider : IVolumeProvider {
         try {
             return Convert.ToInt32(value);
         } catch {
+            // A malformed WMI value is "unknown partition", not partition 0 — see the note above.
             return null;
         }
     }
 
-    private static ulong ToUInt64(object? value) {
-        try {
-            return value is null ? 0 : Convert.ToUInt64(value);
-        } catch {
-            return 0;
-        }
-    }
 }
 
 /// <summary>The no-volumes set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>

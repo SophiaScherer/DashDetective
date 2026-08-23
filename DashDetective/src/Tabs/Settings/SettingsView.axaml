@@ -43,18 +43,8 @@
             <Setter Property="Opacity" Value="0.5"/>
         </Style>
 
-        <!-- Chrome-less button wrapper so a whole segment / swatch is clickable. -->
-        <Style Selector="Button.pick">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.pick /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
+        <!-- The chrome-less button wrapper that makes a whole segment / swatch clickable is the shared
+             Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
 
         <!-- Accent swatch + its selection ring. ClipToBounds so the four-colour legend of the
              default option is clipped to the rounded corners. -->
@@ -93,7 +83,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:ThemeOption">
-                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -119,7 +109,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="settings:AccentOption">
-                                <Button Classes="pick" Command="{Binding SelectCommand}"
+                                <Button Classes="bare" Command="{Binding SelectCommand}"
                                         ToolTip.Tip="{Binding Preset.Name, FallbackValue='Default'}">
                                     <Border Classes="swatch" Classes.selected="{Binding IsSelected}"
                                             Background="{Binding Swatch}">
@@ -163,7 +153,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="nav:NavPositionOption">
-                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -184,12 +174,12 @@
                         </StackPanel>
                         <Border Grid.Column="1" Classes="segments">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Classes="pick" Command="{Binding Nav.ExpandCommand}">
+                                <Button Classes="bare" Command="{Binding Nav.ExpandCommand}">
                                     <Border Classes="seg" Classes.selected="{Binding !Nav.IsCollapsed}">
                                         <TextBlock Text="Expanded"/>
                                     </Border>
                                 </Button>
-                                <Button Classes="pick" Command="{Binding Nav.CollapseCommand}">
+                                <Button Classes="bare" Command="{Binding Nav.CollapseCommand}">
                                     <Border Classes="seg" Classes.selected="{Binding Nav.IsCollapsed}">
                                         <TextBlock Text="Icons only"/>
                                     </Border>
@@ -221,7 +211,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:IntervalOption">
-                                    <Button Classes="pick" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>

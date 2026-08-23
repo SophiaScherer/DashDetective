@@ -105,7 +105,7 @@ public static class ProcessGpuSampler {
                 continue;
 
             var name = Marshal.PtrToStringUni(item.Name);
-            if (!TryParse(name, out var pid, out var engine))
+            if (!GpuEngineInstanceName.TryParse(name, out var pid, out var engine))
                 continue;
 
             var key = (pid, engine);
@@ -122,30 +122,4 @@ public static class ProcessGpuSampler {
         return result;
     }
 
-    /// <summary>Pulls the PID (digits after <c>pid_</c>) and engine type (after the trailing
-    /// <c>engtype_</c>) from a GPU-engine instance name.</summary>
-    private static bool TryParse(string? instanceName, out int pid, out string engine) {
-        pid = 0;
-        engine = "";
-        if (string.IsNullOrEmpty(instanceName))
-            return false;
-
-        const string pidToken = "pid_";
-        var pidIdx = instanceName.IndexOf(pidToken, StringComparison.Ordinal);
-        if (pidIdx < 0)
-            return false;
-
-        var start = pidIdx + pidToken.Length;
-        var end = start;
-        while (end < instanceName.Length && char.IsDigit(instanceName[end]))
-            end++;
-        if (end == start ||
-            !int.TryParse(instanceName.AsSpan(start, end - start), NumberStyles.Integer, CultureInfo.InvariantCulture, out pid))
-            return false;
-
-        const string engToken = "engtype_";
-        var engIdx = instanceName.LastIndexOf(engToken, StringComparison.Ordinal);
-        engine = engIdx < 0 ? "" : instanceName[(engIdx + engToken.Length)..];
-        return true;
-    }
 }
