@@ -48,7 +48,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     // Background. Defaults to Name ascending (matching the initial list order).
     private ProcessSortKey _sortKey = ProcessSortKey.Name;
     private bool _ascending = true;
-    private readonly ProcessSortColumn[] _sortColumns;
+    private readonly SortColumn<ProcessSortKey>[] _sortColumns;
 
     /// <summary>The last snapshot, kept so a header click can re-sort immediately without waiting for
     /// the next poll.</summary>
@@ -81,13 +81,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     public ObservableCollection<ProcessRow> WindowsProcesses { get; } = new();
 
     // Clickable column headers.
-    public ProcessSortColumn NameSort { get; }
-    public ProcessSortColumn PidSort { get; }
-    public ProcessSortColumn StatusSort { get; }
-    public ProcessSortColumn CpuSort { get; }
-    public ProcessSortColumn MemorySort { get; }
-    public ProcessSortColumn DiskSort { get; }
-    public ProcessSortColumn GpuSort { get; }
+    public SortColumn<ProcessSortKey> NameSort { get; }
+    public SortColumn<ProcessSortKey> PidSort { get; }
+    public SortColumn<ProcessSortKey> StatusSort { get; }
+    public SortColumn<ProcessSortKey> CpuSort { get; }
+    public SortColumn<ProcessSortKey> MemorySort { get; }
+    public SortColumn<ProcessSortKey> DiskSort { get; }
+    public SortColumn<ProcessSortKey> GpuSort { get; }
 
     /// <summary>Group header caption for the Apps section (e.g. "Apps · 6").</summary>
     [ObservableProperty] private string _appsHeader = "Apps";
@@ -276,13 +276,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _interop = interop;
 
         _service = service;
-        NameSort = new ProcessSortColumn(ProcessSortKey.Name, OnSort);
-        PidSort = new ProcessSortColumn(ProcessSortKey.Pid, OnSort);
-        StatusSort = new ProcessSortColumn(ProcessSortKey.Status, OnSort);
-        CpuSort = new ProcessSortColumn(ProcessSortKey.Cpu, OnSort);
-        MemorySort = new ProcessSortColumn(ProcessSortKey.Memory, OnSort);
-        DiskSort = new ProcessSortColumn(ProcessSortKey.Disk, OnSort);
-        GpuSort = new ProcessSortColumn(ProcessSortKey.Gpu, OnSort);
+        NameSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Name, OnSort);
+        PidSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Pid, OnSort);
+        StatusSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Status, OnSort);
+        CpuSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Cpu, OnSort);
+        MemorySort = new SortColumn<ProcessSortKey>(ProcessSortKey.Memory, OnSort);
+        DiskSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Disk, OnSort);
+        GpuSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Gpu, OnSort);
         _sortColumns = new[] {
             NameSort, PidSort, StatusSort, CpuSort, MemorySort, DiskSort, GpuSort,
         };

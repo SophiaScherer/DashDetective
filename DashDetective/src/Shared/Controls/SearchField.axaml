@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
+             x:Class="DashDetective.Shared.Controls.SearchField"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- The app's search / filter field: magnifier, input, and a × that appears once something is typed.
+         The toolbar search, the process filter and the Toolkit command filter all draw this. The sizes
+         differ by role (a toolbar field is larger than an inline list filter), so the dimensions are
+         properties rather than baked in — but the geometry, the layout and the clear affordance are
+         defined once here.
+
+         The input is always a GhostCompletionBox. A caller with no suggestions to offer simply leaves
+         Completion null: the ghost draws nothing, and Tab is only ever consumed when a suggestion was
+         actually accepted, so Tab still moves focus in a field that has none. -->
+    <Border Background="{DynamicResource FieldBackground}"
+            BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="{Binding #Root.ContentPadding}">
+            <Path Grid.Column="0" Stretch="Uniform" VerticalAlignment="Center"
+                  Width="{Binding #Root.IconSize}" Height="{Binding #Root.IconSize}"
+                  Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4" StrokeLineCap="Round"
+                  Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+
+            <controls:GhostCompletionBox Grid.Column="1" x:Name="Box"
+                                         Margin="{Binding #Root.IconGap}"
+                                         FontSize="{Binding #Root.TextSize}"
+                                         PlaceholderText="{Binding #Root.PlaceholderText}"
+                                         Text="{Binding #Root.Text, Mode=TwoWay}"
+                                         Completion="{Binding #Root.Completion}"
+                                         EnterCommand="{Binding #Root.EnterCommand}"/>
+
+            <Button Grid.Column="2" Classes="clearField"
+                    ToolTip.Tip="{Binding #Root.ClearToolTip}"
+                    Command="{Binding #Root.ClearCommand}"
+                    IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                      StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

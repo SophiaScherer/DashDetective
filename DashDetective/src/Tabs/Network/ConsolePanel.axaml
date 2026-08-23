@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Tabs.Network.ConsolePanel"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- A target field, its submit button, and two lines of terminal output. The Ping and DNS Lookup
+         panels are the same shape down to the node, differing only in their labels, bindings and the two
+         console colours, so the shape lives here once.
+
+         Tab-local by the repo's promotion rule: both users are the Network tab. The console TOKENS are
+         app-level (Palette.axaml) because the Toolkit tab draws them too — this panel is not. -->
+    <Border Classes="panel">
+        <StackPanel Spacing="10">
+            <TextBlock Classes="panelTitle" Text="{Binding #Root.Title}"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <Border Grid.Column="0" Classes="field">
+                    <TextBox Text="{Binding #Root.Target, Mode=TwoWay}"
+                             PlaceholderText="{Binding #Root.Placeholder}">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding #Root.EnterCommand}"/>
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                </Border>
+                <Button Grid.Column="1" Classes="go" Content="{Binding #Root.ButtonText}"
+                        Command="{Binding #Root.SubmitCommand}"/>
+            </Grid>
+            <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding #Root.ConsoleText}" FontFamily="{StaticResource MonoFont}"
+                               FontSize="11" Foreground="{Binding #Root.ConsoleBrush}"
+                               TextWrapping="NoWrap"/>
+                    <TextBlock Text="{Binding #Root.FooterText}" FontFamily="{StaticResource MonoFont}"
+                               FontSize="11" Foreground="{Binding #Root.FooterBrush}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

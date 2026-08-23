@@ -40,6 +40,19 @@
     <SolidColorBrush x:Key="ChartNetDown" Color="#4cc2ff"/>
     <SolidColorBrush x:Key="ChartNetUp" Color="#ff8a5c"/>
 
+    <!-- ===== Theme-invariant: console surface =====
+         The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
+         output and execution log. Two features draw it, so it lives here rather than being declared
+         twice. ConsoleBg stays dark in BOTH themes: the text colours below are fixed, and a light
+         inset would wash them out. That is also why these do not follow the theme ramp or the accent.
+         Fixed, so {StaticResource} is the correct binding for them. -->
+    <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
+    <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
+    <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
+    <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
+    <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
+    <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
+
     <ResourceDictionary.ThemeDictionaries>
 
         <!-- ===================== DARK ===================== -->

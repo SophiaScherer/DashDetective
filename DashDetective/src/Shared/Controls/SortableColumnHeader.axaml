@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.SortableColumnHeader"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- One sortable column header: a chrome-less button wrapping the label and its ↑/↓ arrow, so the
+         whole cell is the click target. The active column tints both to the accent (colHead.active).
+         Numeric columns are right-aligned and lead with the arrow, so the digits below stay flush to the
+         column edge — those set HorizontalAlignment="Right" ArrowFirst="True" on this control. -->
+    <Button Classes="bare" HorizontalAlignment="Stretch"
+            Command="{Binding #Root.Column.SortCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+            <TextBlock Classes="sortArrow" Text="{Binding #Root.Column.Arrow}"
+                       IsVisible="{Binding #Root.ArrowFirst}"/>
+            <TextBlock Classes="colHead" Classes.active="{Binding #Root.Column.IsActive}"
+                       Text="{Binding #Root.Text}"/>
+            <TextBlock Classes="sortArrow" Text="{Binding #Root.Column.Arrow}"
+                       IsVisible="{Binding !#Root.ArrowFirst}"/>
+        </StackPanel>
+    </Button>
+</UserControl>

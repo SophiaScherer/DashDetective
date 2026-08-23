@@ -34,10 +34,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public event Action? ScrollToTopRequested;
 
     /// <summary>Clickable file-list column headers, bound one-to-one to the header cells.</summary>
-    public SortColumn NameSort { get; }
-    public SortColumn TypeSort { get; }
-    public SortColumn ModifiedSort { get; }
-    public SortColumn SizeSort { get; }
+    public SortColumn<FileSortKey> NameSort { get; }
+    public SortColumn<FileSortKey> TypeSort { get; }
+    public SortColumn<FileSortKey> ModifiedSort { get; }
+    public SortColumn<FileSortKey> SizeSort { get; }
 
     [ObservableProperty] private FileSystemNode? _selectedNode;
     [ObservableProperty] private FileEntry? _selectedEntry;
@@ -224,7 +224,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     private FilterOption _selectedFilter;
 
     // Active sort. Default matches the service baseline (name, ascending); the header columns drive it.
-    private readonly SortColumn[] _sortColumns;
+    private readonly SortColumn<FileSortKey>[] _sortColumns;
     private FileSortKey _sortKey = FileSortKey.Name;
     private bool _sortDescending;
 
@@ -271,10 +271,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _selectedFilter = Filters[0];
         _selectedFilter.IsSelected = true;
 
-        NameSort = new SortColumn(FileSortKey.Name, OnSort);
-        TypeSort = new SortColumn(FileSortKey.Type, OnSort);
-        ModifiedSort = new SortColumn(FileSortKey.Modified, OnSort);
-        SizeSort = new SortColumn(FileSortKey.Size, OnSort);
+        NameSort = new SortColumn<FileSortKey>(FileSortKey.Name, OnSort);
+        TypeSort = new SortColumn<FileSortKey>(FileSortKey.Type, OnSort);
+        ModifiedSort = new SortColumn<FileSortKey>(FileSortKey.Modified, OnSort);
+        SizeSort = new SortColumn<FileSortKey>(FileSortKey.Size, OnSort);
         _sortColumns = new[] { NameSort, TypeSort, ModifiedSort, SizeSort };
         UpdateSortIndicators();
 

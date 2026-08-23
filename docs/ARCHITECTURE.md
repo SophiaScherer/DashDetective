@@ -44,7 +44,7 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`) and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`), the table `SortColumn` model, and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
 | `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
@@ -494,10 +494,31 @@ grid lines snapped and inside the plot), **`ChartWindow`** words the span a buff
 and *composed* by these helpers — keeping them free of render-backend types is what lets them be
 unit-tested directly, without a headless render pass.
 
-Shared styles (card, panel, segmented control, toggle, buttons, the draggable `paneSplitter`, …) live
-in `src/Shared/Styles/SharedStyles.axaml`. Controls or styles used by only one tab stay tab-local until
-a second tab needs them (the Network tab's console colours and File Explorer's checkbox style are
-current examples).
+Shared styles (card, panel, segmented control, toggle, buttons, the table column header `colHead` and
+its `sortArrow`, the bordered input surface `field`, the draggable `paneSplitter`, …) live in
+`src/Shared/Styles/SharedStyles.axaml`; shared *resources* (the colour ramp, plus the `MonoFont` and
+`Console*` terminal tokens that the Network and Toolkit tabs both draw) live in `Palette.axaml`. Both
+are merged app-wide from `App.axaml`, so a view consumes them without an include of its own.
+
+Controls or styles used by only one tab stay tab-local until a second tab needs them — File Explorer's
+checkbox style and the Toolkit tab's `ShieldAmber` are current examples. **The promotion is not
+optional once the second user arrives:** four tabs had independently defined `colHead` and had drifted
+to three variants of it, which is what the rule exists to prevent.
+
+**The chrome-less click wrapper is `Button.bare`,** and a style that needs it plus extras layers on top
+(`Classes="bare rowRun"`) rather than restating the six setters. Three tabs had copied it as
+`Button.pick` and a fourth as `Button.chip`.
+
+Two shared controls exist specifically to stop a repeated *assembly* of elements from drifting:
+**`SortableColumnHeader`** (the sorting button + label + arrow, eleven copies across File Explorer and
+Processes) and **`SearchField`** (the magnifier + input + clear ×, three copies with identical path
+geometry). `SearchField`'s dimensions are properties because the three differ by role — a toolbar field
+is deliberately larger than an inline list filter — not by accident. Both bind a **key-agnostic
+`SortColumn`** (`src/Shared`); the generic `SortColumn<TKey>` carries each table's own sort-key enum.
+
+A panel repeated within a *single* feature stays in that feature: the Network tab's `ConsolePanel`
+backs both Ping and DNS Lookup and lives in `src/Tabs/Network`, even though the console *tokens* it
+draws with are app-level.
 
 ## Dependencies
 

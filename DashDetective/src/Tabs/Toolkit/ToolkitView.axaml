@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:DashDetective.Tabs.Toolkit"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
              x:DataType="vm:ToolkitViewModel"
              x:Class="DashDetective.Tabs.Toolkit.ToolkitView">
@@ -10,36 +11,19 @@
     <!-- The design comp's Commands page: a filter bar over a grouped command list, with the
          Execution Log panel alongside. Surfaces/typography come from src/Shared/Styles.
          Phase 3 builds the filter bar; the list (Phase 4) and the log panel (Phase 5) follow. -->
-    <!-- Monospace token is tab-local, as in NetworkView: commands read better in a fixed pitch.
-         Promote to SharedStyles only if a third feature needs it. -->
-    <!-- ConsoleBg is a fixed dark terminal surface (kept dark in BOTH themes) so the fixed blue/green
-         console text stays readable — a light inset would wash it out. Same tokens and same reasoning
-         as NetworkView's ping/DNS consoles. -->
+    <!-- MonoFont and the Console* tokens come from src/Shared/Styles/Palette.axaml: the Network tab's
+         ping/DNS consoles draw the same terminal surface, so they are app-level rather than declared
+         here. Commands read better in a fixed pitch. -->
     <UserControl.Resources>
-        <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
-        <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
-        <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
-        <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
-        <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
         <!-- The elevation shield. Fixed rather than themed, like the kind badges and the status dots:
-             "this raises a UAC prompt" must read the same under every accent. -->
+             "this raises a UAC prompt" must read the same under every accent. Tab-local: no other
+             feature raises a UAC prompt. -->
         <SolidColorBrush x:Key="ShieldAmber" Color="#ffcf4d"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- Chrome-less button wrapper so a whole chip is clickable, as File Explorer's Button.pick
-             and Performance's Button.resButton (each local to its own view). -->
-        <Style Selector="Button.chip">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.chip /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
+        <!-- The chrome-less button wrapper that makes a whole chip clickable is the shared Button.bare
+             (src/Shared/Styles/SharedStyles.axaml). -->
 
         <!-- One command row. The bottom hairline separates rows inside the grouped card.
              Hover is instant and untransitioned, matching File Explorer's fileRow and Performance's
@@ -76,19 +60,12 @@
              AND reachable by Tab. Being a real Button is what makes Enter work on a focused row — the
              shortcut layer leaves Enter unconsumed (Activate falls through MainWindowViewModel's global
              switch), so it arrives here natively and no IShortcutTarget case is needed. -->
+        <!-- Layered on the shared Button.bare, which carries the chrome-less setters; only the stretch
+             to fill the row is local. Call sites set Classes="bare rowRun". -->
         <Style Selector="Button.rowRun">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Button.rowRun /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <!-- Concurrent runs are refused, so a run in flight disables every row at once. Dimmed only
              lightly: this is a second-or-two state for most commands, and greying the whole list hard
@@ -134,38 +111,19 @@
 
         <!-- Chrome-less text button for the log panel's "Clear", so it reads as inline text rather
              than a control (as SharedStyles' pathToggle does on the path row). -->
+        <!-- Layered on the shared Button.bare; only the inline-text look is local. Call sites set
+             Classes="bare linkAction". -->
         <Style Selector="Button.linkAction">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Button.linkAction /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="Button.linkAction:pointerover">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
         <!-- ===== "+ Add command" form ===== -->
-        <!-- The same field chrome the search box and the row parameter slot draw by hand, named once
-             here because the form has five of them. -->
-        <Style Selector="Border.formField">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Height" Value="32"/>
-        </Style>
-        <Style Selector="Border.formField TextBox">
-            <Setter Property="Margin" Value="9,0"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
+        <!-- The form's five fields use the shared Border.field (src/Shared/Styles/SharedStyles.axaml),
+             which is the same chrome the Network tab's ping/DNS targets draw. -->
         <Style Selector="TextBlock.fieldLabel">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
@@ -198,26 +156,15 @@
              cannot be reached is worse than a taller bar. -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
             <WrapPanel Grid.Column="0">
-                <Border Width="300" Height="34" Margin="0,0,10,6" VerticalAlignment="Center"
-                        Background="{DynamicResource FieldBackground}"
-                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1" CornerRadius="6">
-                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0">
-                        <Path Grid.Column="0" Width="13" Height="13" Stretch="Uniform"
-                              Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4"
-                              StrokeLineCap="Round" VerticalAlignment="Center"
-                              Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
-                        <TextBox Grid.Column="1" x:Name="SearchBox" Classes="flat" Margin="8,0,0,0"
-                                 FontSize="12.5" VerticalContentAlignment="Center"
-                                 PlaceholderText="Search commands…"
-                                 Text="{Binding Search, Mode=TwoWay}"/>
-                        <Button Grid.Column="2" Classes="clearField" ToolTip.Tip="Clear search"
-                                Command="{Binding ClearSearchCommand}"
-                                IsVisible="{Binding Search, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                            <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
-                                  StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L9,9 M9,1 L1,9"/>
-                        </Button>
-                    </Grid>
-                </Border>
+                <!-- No Completion: this filter offers no suggestions, so the field draws no ghost and
+                     leaves Tab alone. -->
+                <controls:SearchField x:Name="SearchBox" Width="300" Height="34"
+                                      Margin="0,0,10,6" VerticalAlignment="Center"
+                                      IconSize="13" TextSize="12.5" IconGap="8,0,0,0"
+                                      PlaceholderText="Search commands…"
+                                      ClearToolTip="Clear search"
+                                      Text="{Binding Search, Mode=TwoWay}"
+                                      ClearCommand="{Binding ClearSearchCommand}"/>
 
                 <Border Classes="segments" Margin="0,0,0,6" VerticalAlignment="Center">
                     <ItemsControl ItemsSource="{Binding Categories}">
@@ -228,7 +175,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ToolkitCategoryOption">
-                                <Button Classes="chip" Command="{Binding SelectCommand}">
+                                <Button Classes="bare" Command="{Binding SelectCommand}">
                                     <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                         <TextBlock Text="{Binding Label}"/>
                                     </Border>
@@ -278,7 +225,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:ToolkitCommandTypeOption">
-                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                            <Button Classes="bare" Command="{Binding SelectCommand}">
                                                 <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                                     <TextBlock Text="{Binding Label}"/>
                                                 </Border>
@@ -292,7 +239,7 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <StackPanel Grid.Column="0" Spacing="6">
                                 <TextBlock Classes="fieldLabel" Text="Title"/>
-                                <Border Classes="formField">
+                                <Border Classes="field">
                                     <TextBox Classes="flat" PlaceholderText="What the row will read"
                                              Text="{Binding Title, Mode=TwoWay}">
                                         <TextBox.KeyBindings>
@@ -304,7 +251,7 @@
 
                             <StackPanel Grid.Column="1" Spacing="6">
                                 <TextBlock Classes="fieldLabel" Text="Description (optional)"/>
-                                <Border Classes="formField">
+                                <Border Classes="field">
                                     <TextBox Classes="flat" PlaceholderText="One line on what it does"
                                              Text="{Binding Description, Mode=TwoWay}"/>
                                 </Border>
@@ -315,7 +262,7 @@
                              strings, not a converter — this codebase does without them. -->
                         <StackPanel Spacing="6">
                             <TextBlock Classes="fieldLabel" Text="{Binding PayloadLabel}"/>
-                            <Border Classes="formField">
+                            <Border Classes="field">
                                 <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
                                          PlaceholderText="{Binding PayloadPrompt}"
                                          Text="{Binding Payload, Mode=TwoWay}">
@@ -330,7 +277,7 @@
                              there inert. -->
                         <StackPanel Spacing="6" IsVisible="{Binding TakesArguments}">
                             <TextBlock Classes="fieldLabel" Text="Arguments (optional)"/>
-                            <Border Classes="formField">
+                            <Border Classes="field">
                                 <TextBox Classes="flat" FontFamily="{StaticResource MonoFont}"
                                          PlaceholderText="Separated by spaces; quote anything containing one"
                                          Text="{Binding Arguments, Mode=TwoWay}">
@@ -352,7 +299,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:ToolkitCategoryOption">
-                                            <Button Classes="chip" Command="{Binding SelectCommand}">
+                                            <Button Classes="bare" Command="{Binding SelectCommand}">
                                                 <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                                     <TextBlock Text="{Binding Label}"/>
                                                 </Border>
@@ -404,7 +351,7 @@
                                                          run the command too. -->
                                                     <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                                                           ColumnSpacing="10" Margin="14,12">
-                                                        <Button Grid.Column="0" Classes="rowRun"
+                                                        <Button Grid.Column="0" Classes="bare rowRun"
                                                                 ToolTip.Tip="{Binding Description}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
                                                                 CommandParameter="{Binding}">
@@ -647,11 +594,11 @@
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                     <TextBlock Text="Execution Log" Classes="panelTitle" FontSize="13"
                                Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="linkAction" Content="Export"
+                    <Button Grid.Column="1" Classes="bare linkAction" Content="Export"
                             Click="OnExportLogClick" IsEnabled="{Binding HasLog}"
                             ToolTip.Tip="Save the log to a text file"
                             VerticalAlignment="Center"/>
-                    <Button Grid.Column="2" Classes="linkAction" Content="Clear"
+                    <Button Grid.Column="2" Classes="bare linkAction" Content="Clear"
                             Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"
                             VerticalAlignment="Center"/>
                 </Grid>
