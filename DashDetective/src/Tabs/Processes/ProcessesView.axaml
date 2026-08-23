@@ -57,7 +57,7 @@
     <UserControl.Styles>
         <!-- Column header cells. Each is a chrome-less button (the shared Button.bare) that sorts by its
              column; the active column tints to the accent and shows a ↑/↓ arrow (bound to the
-             ProcessSortColumn VMs). colHead / colHead.active / sortArrow are shared
+             SortColumn VMs). colHead / colHead.active / sortArrow are shared
              (src/Shared/Styles/SharedStyles.axaml). -->
 
         <!-- Expand/collapse chevron: a chrome-less button (the shared Button.bare) in the name cell. Its
