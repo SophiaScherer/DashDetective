@@ -36,8 +36,6 @@ internal sealed class WindowsDiskTemperatureProvider : IDiskTemperatureProvider 
     private const int BufferSize = ProtocolDataOffset + LogSize;
 
     // Plausible drive-temperature window; anything outside means "no real reading".
-    private const double MinCelsius = 1;
-    private const double MaxCelsius = 125;
     private const double KelvinOffset = 273;
 
     /// <summary>NVMe composite temperature in °C for physical drive <paramref name="deviceId"/>, or
@@ -79,7 +77,7 @@ internal sealed class WindowsDiskTemperatureProvider : IDiskTemperatureProvider 
     /// is outside a plausible drive range (e.g. 0 Kelvin = "not reported").</summary>
     internal static double? KelvinToCelsius(ushort kelvin) {
         double celsius = kelvin - KelvinOffset;
-        return celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
+        return DiskTemperatureRange.Celsius(celsius);
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

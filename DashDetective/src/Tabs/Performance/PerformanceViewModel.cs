@@ -449,7 +449,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var info = await _providers.Cpu.GetAsync();
             token.ThrowIfCancellationRequested();
             _cpuMaxClockMhz = info.MaxClockMhz;
-            _cpuRow.Sub = FormatCpuSub(info);
+            _cpuRow.Sub = HardwareNameFormatter.CoreSummary(info.PhysicalCores, info.LogicalCores, info.MaxClockMhz);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
         } catch when (token.IsCancellationRequested) {
             // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
@@ -461,12 +461,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>Cores plus base clock for the rail sub-label, e.g. "24 cores · 3.2 GHz".</summary>
-    private static string FormatCpuSub(CpuStaticInfo info) {
-        var cores = info.PhysicalCores > 0 ? info.PhysicalCores : info.LogicalCores;
-        if (cores > 0 && info.MaxClockMhz > 0)
-            return $"{cores} cores · {(info.MaxClockMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} GHz";
-        return cores > 0 ? $"{cores} cores" : "";
-    }
 
     /// <summary>Memory subscription callback: append load% to the history, then refresh the surface.</summary>
     private void OnMemory(MemorySample sample) {
@@ -518,7 +512,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         try {
             var info = await _providers.Memory.GetAsync();
             token.ThrowIfCancellationRequested();
-            _memoryRow.Spec = FormatMemorySpec(info);
+            _memoryRow.Spec = HardwareNameFormatter.MemorySummary(info.TypeLabel, info.SpeedMhz, info.ModuleCount);
         } catch when (token.IsCancellationRequested) {
             // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good value for its return.
         } catch {
@@ -527,14 +521,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>Type, speed and slot count for the detail spec header, e.g. "DDR5-6000 · 2 slots".</summary>
-    private static string FormatMemorySpec(MemoryStaticInfo info) {
-        var label = info.SpeedMhz > 0
-            ? $"{info.TypeLabel}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
-            : info.TypeLabel;
-        return info.ModuleCount > 0
-            ? $"{label} · {info.ModuleCount.ToString(CultureInfo.InvariantCulture)} slots"
-            : label;
-    }
 
     /// <summary>Enumerates the physical disks (off the UI thread) via the shared <see cref="DeviceInventory"/>
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>

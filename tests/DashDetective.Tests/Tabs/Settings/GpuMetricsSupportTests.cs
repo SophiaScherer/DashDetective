@@ -1,9 +1,8 @@
-using DashDetective.Shared;
 using DashDetective.Tabs.Settings;
 using System;
 using Xunit;
 
-namespace DashDetective.Tests.Shared;
+namespace DashDetective.Tests.Tabs.Settings;
 
 /// <summary>
 /// Covers <see cref="GpuMetricsSupport"/> and the copy that depends on it. The bug it encodes is a

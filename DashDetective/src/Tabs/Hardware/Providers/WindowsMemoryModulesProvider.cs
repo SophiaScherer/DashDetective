@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using DashDetective.Shared;
 using DashDetective.Tabs.Hardware.Catalog;
 using System;

@@ -121,10 +121,10 @@ public sealed class DeviceInventory {
         IReadOnlyList<PhysicalDiskInfo> disks, IReadOnlyList<VolumeInfo> volumes,
         string networkName, string networkSpec) {
         var instances = new List<DeviceInstance> {
-            new(DeviceCategory.Cpu, "cpu", "CPU", FormatCpuSub(cpu), HardwareNameFormatter.ShortenCpu(cpu.Name)),
+            new(DeviceCategory.Cpu, "cpu", "CPU", HardwareNameFormatter.CoreSummary(cpu.PhysicalCores, cpu.LogicalCores, cpu.MaxClockMhz), HardwareNameFormatter.ShortenCpu(cpu.Name)),
             // Memory's caption is the live used/total figure the view model fills each tick, so the static Sub
             // is blank; the Spec carries the module type/speed/slots.
-            new(DeviceCategory.Memory, "mem", "Memory", "", FormatMemorySpec(memory)),
+            new(DeviceCategory.Memory, "mem", "Memory", "", HardwareNameFormatter.MemorySummary(memory.TypeLabel, memory.SpeedMhz, memory.ModuleCount)),
         };
 
         // GPUs: one instance per real adapter — DXGI's non-software adapters intersected with the LUIDs
@@ -160,22 +160,8 @@ public sealed class DeviceInventory {
     }
 
     /// <summary>Cores plus base clock, e.g. "24 cores · 3.2 GHz" (matches the Performance rail).</summary>
-    private static string FormatCpuSub(CpuStaticInfo info) {
-        var cores = info.PhysicalCores > 0 ? info.PhysicalCores : info.LogicalCores;
-        if (cores > 0 && info.MaxClockMhz > 0)
-            return $"{cores} cores · {(info.MaxClockMhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture)} GHz";
-        return cores > 0 ? $"{cores} cores" : "";
-    }
 
     /// <summary>Type, speed and slot count, e.g. "DDR5-6000 · 2 slots".</summary>
-    private static string FormatMemorySpec(MemoryStaticInfo info) {
-        var label = info.SpeedMhz > 0
-            ? $"{info.TypeLabel}-{info.SpeedMhz.ToString(CultureInfo.InvariantCulture)}"
-            : info.TypeLabel;
-        return info.ModuleCount > 0
-            ? $"{label} · {info.ModuleCount.ToString(CultureInfo.InvariantCulture)} slots"
-            : label;
-    }
 
     /// <summary>Model plus capacity, e.g. "Samsung SSD 990 Pro 1.8 TB" (binary TB/GB, like the drive cards).</summary>
     private static string FormatDiskSpec(string model, ulong sizeBytes) {

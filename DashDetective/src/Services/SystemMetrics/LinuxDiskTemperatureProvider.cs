@@ -33,8 +33,6 @@ internal sealed class LinuxDiskTemperatureProvider : IDiskTemperatureProvider {
     private static readonly string[] DriveSensors = ["nvme", "drivetemp"];
 
     // The same plausible window the Windows arm applies: outside it, the drive is not really reporting.
-    private const double MinCelsius = 1;
-    private const double MaxCelsius = 125;
 
     private readonly IProcFileSystem _proc;
 
@@ -114,8 +112,7 @@ internal sealed class LinuxDiskTemperatureProvider : IDiskTemperatureProvider {
 
     /// <summary>Rejects a reading outside a plausible drive range, matching the Windows arm — a sensor
     /// reporting 0 means "not reported", not a drive at freezing. Pure; unit-tested.</summary>
-    internal static double? PlausibleCelsius(double? celsius) =>
-        celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
+    internal static double? PlausibleCelsius(double? celsius) => DiskTemperatureRange.Celsius(celsius);
 
     private static string LastSegment(string path) {
         var slash = path.LastIndexOf('/');

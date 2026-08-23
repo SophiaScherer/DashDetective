@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using DashDetective.Shared;
 using System;
 using System.Management;
@@ -33,11 +34,11 @@ internal sealed class WindowsMemoryInfoProvider : IMemoryInfoProvider {
                 using (obj) {
                     found = true;
                     modules++;
-                    totalBytes += ToUInt64(obj["Capacity"]);
+                    totalBytes += WmiRead.ToUInt64(obj["Capacity"]);
                     speed = Math.Max(speed,
-                        MemorySpeed.Running(ToInt(obj["ConfiguredClockSpeed"]), ToInt(obj["Speed"])));
+                        MemorySpeed.Running(WmiRead.ToInt(obj["ConfiguredClockSpeed"]), WmiRead.ToInt(obj["Speed"])));
                     if (memoryType == 0)
-                        memoryType = ToInt(obj["SMBIOSMemoryType"]);
+                        memoryType = WmiRead.ToInt(obj["SMBIOSMemoryType"]);
                 }
             }
 
@@ -67,9 +68,7 @@ internal sealed class WindowsMemoryInfoProvider : IMemoryInfoProvider {
         _ => "RAM",
     };
 
-    private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
 
-    private static ulong ToUInt64(object? value) => value is null ? 0 : Convert.ToUInt64(value);
 }
 
 /// <summary>The no-memory-facts set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>

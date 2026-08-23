@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using DashDetective.Shared;
 using System;
 using System.Management;
@@ -34,9 +35,9 @@ internal sealed class WindowsCpuInfoProvider : ICpuInfoProvider {
                     found = true;
                     if (obj["Name"] is string n && !string.IsNullOrWhiteSpace(n))
                         name = n.Trim();
-                    physical += ToInt(obj["NumberOfCores"]);
-                    logical += ToInt(obj["NumberOfLogicalProcessors"]);
-                    maxClock = Math.Max(maxClock, ToInt(obj["MaxClockSpeed"]));
+                    physical += WmiRead.ToInt(obj["NumberOfCores"]);
+                    logical += WmiRead.ToInt(obj["NumberOfLogicalProcessors"]);
+                    maxClock = Math.Max(maxClock, WmiRead.ToInt(obj["MaxClockSpeed"]));
                 }
             }
 
@@ -52,7 +53,6 @@ internal sealed class WindowsCpuInfoProvider : ICpuInfoProvider {
         }
     }
 
-    private static int ToInt(object? value) => value is null ? 0 : Convert.ToInt32(value);
 }
 
 /// <summary>The no-CPU-facts set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>

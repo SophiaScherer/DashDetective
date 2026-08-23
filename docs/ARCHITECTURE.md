@@ -46,7 +46,7 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 | Area | Holds |
 | --- | --- |
 | `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`), the table `SortColumn` model, `Placeholders`, the `OverlapGuard`, and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
-| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
+| `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity`, `Diagnostics`, and `Platform/Linux` + `Platform/Windows` — the per-OS reading primitives (`ProcFileSystem` and the `/proc` parsers; `WmiRead`) that providers on both sides build on. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
 
@@ -609,6 +609,13 @@ correct. It logs.
 
 **Every bare `catch { }` carries a comment saying why nothing is done.** A silent catch and a forgotten
 one look identical six months later.
+
+**A sanity window is a shared constant, not a per-reader one.** Sensor readings are filtered through
+`GpuSensorRange` (`Tabs/Performance`, shared by the NVIDIA, AMD and Linux readers) and
+`DiskTemperatureRange` (`Services/SystemMetrics`, shared by both platform arms). Each had been written
+out per reader, and had drifted — one GPU reader floored power at 1 W where the others used 0.1 W. The
+two windows stay *separate from each other* on purpose: a drive at 130 °C is a bad reading, a GPU at
+130 °C is a hot one.
 
 ## Dependencies
 

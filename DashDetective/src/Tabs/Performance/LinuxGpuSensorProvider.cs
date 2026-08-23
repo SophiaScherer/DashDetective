@@ -28,10 +28,6 @@ internal sealed class LinuxGpuSensorProvider : IGpuSensorProvider {
     // Plausible windows; anything outside means "not really reported", the DiskTemperatureProvider idiom.
     // The temperature window matches the vendor readers'; the power floor is deliberately theirs too —
     // an idle card genuinely reporting a fraction of a watt should still show a number.
-    private const double MinCelsius = 1;
-    private const double MaxCelsius = 150;
-    private const double MinWatts = 0.1;
-    private const double MaxWatts = 2000;
 
     private const string TemperatureFile = "/temp1_input";
 
@@ -91,14 +87,12 @@ internal sealed class LinuxGpuSensorProvider : IGpuSensorProvider {
 
     /// <summary>Rejects a temperature outside a plausible GPU range — a driver that reports 0 for a sensor
     /// it does not have would otherwise show a card sitting at absolute zero. Pure; unit-tested.</summary>
-    internal static double? PlausibleCelsius(double? celsius) =>
-        celsius is >= MinCelsius and <= MaxCelsius ? celsius : null;
+    internal static double? PlausibleCelsius(double? celsius) => GpuSensorRange.Celsius(celsius);
 
     /// <summary>Rejects a power draw outside a plausible board range, which is also what catches a wrong
     /// unit scale: a milliwatt reading read as microwatts lands far below the floor. Pure;
     /// unit-tested.</summary>
-    internal static double? PlausibleWatts(double? watts) =>
-        watts is >= MinWatts and <= MaxWatts ? watts : null;
+    internal static double? PlausibleWatts(double? watts) => GpuSensorRange.Watts(watts);
 
     /// <summary>Nothing to release: sysfs reads open and close per call, unlike a vendor SDK's init
     /// handles.</summary>

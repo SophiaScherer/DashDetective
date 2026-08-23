@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Platform.Windows;
 using DashDetective.Shared;
 using Microsoft.Win32;
 using System;
@@ -57,7 +58,7 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
         try {
             var manufacturer = QueryString("SELECT Manufacturer, SMBIOSBIOSVersion FROM Win32_BIOS", "Manufacturer");
             var version = QueryString("SELECT Manufacturer, SMBIOSBIOSVersion FROM Win32_BIOS", "SMBIOSBIOSVersion");
-            var text = Join(manufacturer, version);
+            var text = WmiRead.Join(manufacturer, version);
             return string.IsNullOrWhiteSpace(text) ? Placeholders.UnknownBios : text;
         } catch {
             return Placeholders.UnknownBios;
@@ -69,7 +70,7 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
         try {
             var manufacturer = QueryString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Manufacturer");
             var product = QueryString("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
-            var text = Join(manufacturer, product);
+            var text = WmiRead.Join(manufacturer, product);
             return string.IsNullOrWhiteSpace(text) ? Placeholders.UnknownMotherboard : text;
         } catch {
             return Placeholders.UnknownMotherboard;
@@ -117,13 +118,6 @@ internal sealed class WindowsSystemInfoProvider : ISystemInfoProvider {
     }
 
     /// <summary>Joins two parts with a space, skipping blanks (e.g. vendor + version).</summary>
-    private static string Join(string first, string second) {
-        if (string.IsNullOrWhiteSpace(first))
-            return second.Trim();
-        if (string.IsNullOrWhiteSpace(second))
-            return first.Trim();
-        return $"{first.Trim()} {second.Trim()}";
-    }
 }
 
 /// <summary>The no-identity set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
