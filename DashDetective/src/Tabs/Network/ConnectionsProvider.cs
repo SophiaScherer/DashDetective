@@ -7,6 +7,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -32,7 +33,7 @@ internal sealed class ConnectionsProvider(
 
     private readonly Dictionary<int, string> _nameCache = new();
 
-    public Task<ConnectionsSnapshot> GetAsync() => Task.Run(Snapshot);
+    public Task<ConnectionsSnapshot> GetAsync(CancellationToken token = default) => Task.Run(Snapshot, token);
 
     private ConnectionsSnapshot Snapshot() {
         try {

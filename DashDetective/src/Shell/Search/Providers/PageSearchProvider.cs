@@ -22,6 +22,9 @@ public sealed class PageSearchProvider : ISearchProvider {
 
     public SearchCategory Category => SearchCategory.Page;
 
+    // The token is accepted but not checked: this scan is a synchronous pass over an in-memory table
+    // that returns before a cancellation could arrive. The aggregator re-checks the token after the
+    // fan-out, so a superseded query still discards these results.
     public Task<IReadOnlyList<SearchResult>> QueryAsync(SearchQuery query, CancellationToken token) {
         var term = query.Term;
         var results = new List<SearchResult>();

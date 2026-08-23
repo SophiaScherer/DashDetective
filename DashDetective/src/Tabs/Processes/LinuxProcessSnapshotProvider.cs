@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -72,7 +73,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
         return () => clock.Elapsed.TotalSeconds;
     }
 
-    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.Run(Snapshot, token);
 
     private IReadOnlyList<ProcessInfo> Snapshot() {
         var now = _elapsedSeconds();

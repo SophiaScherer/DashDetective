@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -25,6 +26,57 @@ public class ProcessesViewModelTests {
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         var interop = new FakeProcessInterop();
         return (new ProcessesViewModel(metrics, new FakeSnapshotProvider(processes), interop), interop);
+    }
+
+    /// <summary>
+    /// Leaving the tab mid-read must abandon the load rather than let it land. Without this the read
+    /// completes off-screen and, on a failure, writes the emptying fallback — which the user then meets
+    /// as a blank list the next time they open the tab.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_WhenTheTabIsLeftMidRead_KeepsTheRowsAlreadyOnScreen() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([Proc(100, 0, "editor.exe", ProcessCategory.App)]);
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        // The constructor's own load seeds the list.
+        await viewModel.LoadAsync();
+        Assert.Single(viewModel.Apps);
+
+        // Now arm the provider to park, then fail — and leave the tab while it is parked.
+        provider.Gate = new TaskCompletionSource();
+        provider.Fail = new InvalidOperationException("the enumeration broke");
+        viewModel.SetActive(true);
+        var inFlight = viewModel.LoadAsync();
+
+        viewModel.SetActive(false);   // the user switches away
+        provider.Gate.SetResult();    // the read comes back badly, into a page nobody is watching
+        await inFlight;
+
+        // The soft-fail would have cleared every group. Off screen, it must not have run.
+        Assert.Single(viewModel.Apps);
+    }
+
+    /// <summary>
+    /// The constructor's own load must survive. It runs before the page is ever shown — universal search
+    /// reads the snapshot from tabs the user never opens — so it captures the gate's token while the gate
+    /// is still idle. Building the gate after that load would make the capture dereference a null field,
+    /// and the soft-fail would swallow it as an ordinary failure and empty the page: a blank tab with
+    /// nothing logged. Asserting on the constructor alone, with no explicit load, is what pins the order.
+    /// </summary>
+    [Fact]
+    public void Construction_LoadsTheSnapshotWithoutTrippingOverItsOwnGate() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([Proc(100, 0, "editor.exe", ProcessCategory.App)]);
+
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        Assert.Single(viewModel.Apps);
+        Assert.Equal("1", viewModel.TotalProcessesText);
     }
 
     /// <summary>A canned snapshot lands in the three Task-Manager-style groups by category.</summary>
@@ -92,7 +144,23 @@ public class ProcessesViewModelTests {
     }
 
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
-        public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.FromResult(processes);
+        public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
+    }
+
+    /// <summary>A provider the test can park and then fail on demand, so a load can be caught in flight
+    /// and made to come back badly after the page has gone off screen.</summary>
+    private sealed class ControllableSnapshotProvider(IReadOnlyList<ProcessInfo> processes)
+        : IProcessSnapshotProvider {
+        public TaskCompletionSource? Gate { get; set; }
+        public Exception? Fail { get; set; }
+
+        public async Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) {
+            if (Gate is { } gate)
+                await gate.Task;
+            if (Fail is { } failure)
+                throw failure;
+            return processes;
+        }
     }
 
     private sealed class FakeProcessInterop : IProcessInterop {

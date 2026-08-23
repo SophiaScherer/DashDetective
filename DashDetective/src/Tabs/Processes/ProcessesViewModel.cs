@@ -295,16 +295,19 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             () => _service.SubscribeCpu(OnCpuTotal, OnCpuTotalFailed),
             () => _service.SubscribeMemory(OnMemoryTotal, OnMemoryTotalFailed));
 
+        // Built FIRST, before anything that reads it: every load captures _gate.Token, so a load started
+        // above this line would dereference a null field and its soft-fail would empty the page. The gate
+        // starts idle and fires no callback until a transition, so building it early costs nothing.
+        _gate = new SamplingGate(ApplySampling);
+
         // One list load here even though the page is not on screen yet: universal search reads Snapshot,
         // and a tab the user has not opened would otherwise offer no processes at all.
         _ = LoadAsync();
 
-        _timer = new DispatcherTimer { Interval = SampleInterval };
-        _timer.Tick += OnTick;
-
         // The timer is not started here: the gate runs it only while the page is on screen and the Live
         // pill is on.
-        _gate = new SamplingGate(ApplySampling);
+        _timer = new DispatcherTimer { Interval = SampleInterval };
+        _timer.Tick += OnTick;
     }
 
     private void OnTick(object? sender, EventArgs e) => _ = LoadAsync();
@@ -335,11 +338,16 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (run is null)
             return;
 
+        var token = _gate.Token;
         try {
-            var processes = await _snapshots.GetAsync();
+            var processes = await _snapshots.GetAsync(token);
             // Awaited on the UI thread, so the continuation resumes there — safe to touch collections.
+            token.ThrowIfCancellationRequested();
             _lastSnapshot = processes;
             ApplySnapshot(processes);
+        } catch when (token.IsCancellationRequested) {
+            // Left mid-read: cancelled, or failed once the user had already gone. Either way the
+            // emptying fallback below must NOT run — it would blank the list they come back to.
         } catch {
             _lastSnapshot = Array.Empty<ProcessInfo>();
             _lastRoots = Array.Empty<ProcessNode>();
@@ -730,6 +738,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Stops the timer and unsubscribes from the shared metrics. Safe to call more than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _timer.Stop();
         _timer.Tick -= OnTick;
         _subscriptions.Dispose();

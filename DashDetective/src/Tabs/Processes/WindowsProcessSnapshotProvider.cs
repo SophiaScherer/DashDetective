@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -30,7 +31,7 @@ internal sealed class WindowsProcessSnapshotProvider(IProcessInterop interop) : 
     /// (a single fully-busy thread on a 12-thread box reads ~8%, not 100%).</summary>
     private static readonly int LogicalProcessors = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : 1;
 
-    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.Run(Snapshot);
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.Run(Snapshot, token);
 
     private IReadOnlyList<ProcessInfo> Snapshot() {
         var now = DateTime.UtcNow;
@@ -144,5 +145,5 @@ internal sealed class WindowsProcessSnapshotProvider(IProcessInterop interop) : 
 
 /// <summary>The no-processes set — what the old <c>OperatingSystem.IsWindows()</c> guard returned.</summary>
 internal sealed class UnsupportedProcessSnapshotProvider : IProcessSnapshotProvider {
-    public Task<IReadOnlyList<ProcessInfo>> GetAsync() => Task.FromResult<IReadOnlyList<ProcessInfo>>([]);
+    public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult<IReadOnlyList<ProcessInfo>>([]);
 }

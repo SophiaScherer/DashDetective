@@ -25,8 +25,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
-    /// <summary>The app-wide "no value" placeholder, for the one metric that can genuinely lack one.</summary>
-
     /// <summary>
     /// Floor for the network throughput chart's shared vertical scale, in Mbps. Keeps an idle graph
     /// pinned flat near the bottom (rather than amplifying counter noise) and avoids a zero span.
@@ -113,7 +111,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>The busiest adapter's utilisation, for the text report and the CSV export. Starts at the
     /// neutral placeholder and stays there on a machine where no adapter can report one — a Linux box whose
     /// only GPU is an NVIDIA or Intel part, say — rather than reading a confident 0%.</summary>
-    [ObservableProperty] private string _gpuValueText = "—";
+    [ObservableProperty] private string _gpuValueText = Placeholders.NoReading;
     [ObservableProperty] private string _gpuModelText = "";
 
     // The system drive's activity + capacity. Not shown on a card of its own (the per-disk cards cover the
@@ -340,12 +338,18 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        // The token is read BEFORE the await, not after: once sampling stops the gate hands out
+        // CancellationToken.None, so a lazy read would never observe the cancellation it is checking for.
+        var token = _gate.Token;
         try {
             var info = await _providers.Cpu.GetAsync();
+            token.ThrowIfCancellationRequested();
             CpuModelShort = HardwareNameFormatter.ShortenCpu(info.Name);
             CpuModelText = FormatCpuModel(info);
             CpuCoresText = FormatCpuCores(info);
             _cpuCard.Sub = CpuModelShort;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             CpuModelShort = Placeholders.UnknownCpu;
             CpuModelText = Placeholders.UnknownCpu;
@@ -357,9 +361,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadMemoryInfoAsync() {
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.Memory.GetAsync();
+            token.ThrowIfCancellationRequested();
             MemoryModelText = FormatMemoryModel(info);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good value for its return.
         } catch {
             MemoryModelText = Placeholders.UnknownRam;
         }
@@ -369,9 +377,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// and rebuilds the per-GPU cards + the System-Information "GPU" row. Soft-fails to no GPU cards on any
     /// error. Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
     internal async Task LoadGpusAsync() {
+        var token = _gate.Token;
         try {
             var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
+            token.ThrowIfCancellationRequested();
             RebuildGpuCards(inventory.All(DeviceCategory.Gpu));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the cards on screen are still the last good ones.
         } catch {
             // Leave the existing GPU cards in place on a transient failure.
         }
@@ -407,13 +419,17 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     internal async Task LoadSystemInfoAsync() {
         // GetAsync never throws (it falls back to SystemStaticInfo.Unknown), but guard the whole
         // path so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.System.GetAsync();
+            token.ThrowIfCancellationRequested();
             OsText = info.Os;
             DeviceText = info.Device;
             BiosText = info.Bios;
             BuildText = info.Build;
             MotherboardText = info.Motherboard;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             OsText = Placeholders.UnknownOs;
             DeviceText = Environment.MachineName;
@@ -648,12 +664,16 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// Both providers soft-fail to empty lists, so any failure just leaves the existing cards in place.
     /// </summary>
     private async Task LoadDisksAsync() {
+        var token = _gate.Token;
         try {
             var disksTask = _providers.Disks.GetAsync();
             var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
+            token.ThrowIfCancellationRequested();
             _systemDiskNumber = SystemVolume.FindDiskNumber(volumesTask.Result) ?? -1;
             RebuildDiskCards(StorageComposer.Compose(disksTask.Result, volumesTask.Result));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the cards on screen are still the last good ones.
         } catch {
             // Leave the existing disk cards in place on a transient failure.
         }
@@ -727,6 +747,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// per-disk sampler. The shared feed's samplers are owned (and disposed) by the service. Safe to call more
     /// than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _uptimeTimer.Stop();

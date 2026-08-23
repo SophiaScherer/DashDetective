@@ -70,20 +70,22 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         _service = service;
 
+        // Built FIRST, before anything that reads it: every load captures _gate.Token, so a load started
+        // above this line would dereference a null field and its soft-fail would wipe the page. The gate
+        // starts idle and fires no callback until a transition, so building it early costs nothing.
+        _gate = new SamplingGate(ApplySampling);
+
         // Load the (static structural) drive + volume info off the UI thread; the surfaces fill in when ready.
         _ = LoadStorageAsync();
 
         // Drive the per-disk readouts and the Disk Activity surface from the page-local sampler, at the
-        // Settings cadence so this chart covers the same span as the other pages'.
+        // Settings cadence so this chart covers the same span as the other pages'. The timer is not
+        // started here: the gate runs it only while the page is on screen and the Live pill is on.
         _throughputTimer = new DispatcherTimer { Interval = service.Interval };
         _throughputTimer.Tick += OnThroughputTick;
         service.IntervalChanged += OnIntervalChanged;
 
         ApplyChartWindow();
-
-        // The timer is not started here: the gate runs it only while the page is on screen and the Live
-        // pill is on.
-        _gate = new SamplingGate(ApplySampling);
     }
 
     private void OnIntervalChanged(TimeSpan interval) {
@@ -233,10 +235,14 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// </summary>
     /// <summary>Internal rather than private so a test can await the read the ctor fires and forgets.</summary>
     internal async Task LoadStorageAsync() {
+        // The token is read BEFORE the await, not after: once sampling stops the gate hands out
+        // CancellationToken.None, so a lazy read would never observe the cancellation it checks for.
+        var token = _gate.Token;
         try {
             var disksTask = _providers.Disks.GetAsync();
             var volumesTask = _providers.Volumes.GetAsync();
             await Task.WhenAll(disksTask, volumesTask);
+            token.ThrowIfCancellationRequested();
             var disks = disksTask.Result;
             var volumes = volumesTask.Result;
 
@@ -270,6 +276,10 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
             // Seed the new cards' Read/Write once so they don't sit on "—" until the next timer tick.
             UpdateThroughput();
+        } catch when (token.IsCancellationRequested) {
+            // Left mid-read: cancelled, or failed once the user had already gone. Either way the wipe
+            // below must NOT run — it would blank every drive card and the partitions table they come
+            // back to.
         } catch {
             Drives.Clear();
             _cardsByDisk.Clear();
@@ -411,6 +421,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Tears down the page-local throughput timer + sampler. Safe to call more than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();
         _throughputTimer.Tick -= OnThroughputTick;

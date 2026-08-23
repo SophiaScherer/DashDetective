@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -12,7 +13,7 @@ namespace DashDetective.Tabs.Processes;
 /// implementation is single-consumer and must not be shared between pages.
 /// </summary>
 internal interface IProcessSnapshotProvider {
-    Task<IReadOnlyList<ProcessInfo>> GetAsync();
+    Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default);
 
     /// <summary>The snapshot reader for this machine, or one that reports no processes. The Linux arm takes
     /// no <paramref name="interop"/>: that seam is Windows-shaped (its I/O counters are read from a managed

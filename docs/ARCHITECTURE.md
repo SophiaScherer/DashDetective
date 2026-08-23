@@ -117,6 +117,26 @@ by the same rule, behind `AlertsEnabled`, which follows the user's setting.
 One-shot constructor loads stay in the constructor: the exported report and universal search read values
 from pages the user may never open.
 
+**The gate also owns the lifetime of the work it starts.** Stopping a timer says nothing about the read
+already in the air. Left alone, that read lands on a page nobody is looking at — and if it *failed*, its
+soft-fail writes "Connections unavailable" or empties the list, which is what the user then meets the
+next time they open the tab. So `SamplingGate` mints a `CancellationTokenSource` when sampling starts and
+cancels it when sampling stops, and every timer-driven read captures `_gate.Token` and passes it down.
+
+Three details make it work, and all three are easy to get wrong:
+
+- **Capture the token *before* the `await`, never after.** While sampling is stopped the gate hands out
+  `CancellationToken.None` — deliberately, so a page's one-shot constructor load still runs to completion
+  (the exported report and universal search read from tabs the user may never open). A token read *after*
+  the await would therefore be `None` and would never report the cancellation it is checking for.
+- **Filter the catch, don't add a `catch (OperationCanceledException)`.** The read can also *fail* after
+  the user has gone, and that exception short-circuits any token check placed after the await. Every
+  such site is `catch when (token.IsCancellationRequested)`, which covers cancelled and failed-while-gone
+  with one clause. A genuine timeout (a provider's own internal CTS) still falls through to the real
+  soft-fail, which is right — a timeout *is* a failure.
+- **Cancellation is not failure.** The filtered clause writes nothing at all: no placeholder, no cleared
+  collection. The values already on screen are the last good ones.
+
 **Overlapping polls are refused, not queued.** A page's timer can tick again while the previous read is
 still in flight, so each poll claims an **`OverlapGuard`** (`src/Shared`) and returns if a run already
 holds it. The scope is `IDisposable` rather than a flag the caller lowers, because a run that *throws*

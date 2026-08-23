@@ -38,8 +38,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
-    /// <summary>The app-wide "no value" placeholder, for the tiles that can genuinely lack one.</summary>
-
     /// <summary>Floor for the network chart's auto-scaled axis, in Mbps: keeps an idle graph pinned flat
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
     /// Dashboard's network scale floor.</summary>
@@ -444,11 +442,17 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadCpuInfoAsync() {
         // GetAsync never throws (it falls back to CpuStaticInfo.Unknown), but guard the whole path so a
         // surprise can't take down the app via an unobserved task exception.
+        // The token is read BEFORE the await, not after: once sampling stops the gate hands out
+        // CancellationToken.None, so a lazy read would never observe the cancellation it checks for.
+        var token = _gate.Token;
         try {
             var info = await _providers.Cpu.GetAsync();
+            token.ThrowIfCancellationRequested();
             _cpuMaxClockMhz = info.MaxClockMhz;
             _cpuRow.Sub = FormatCpuSub(info);
             _cpuRow.Spec = HardwareNameFormatter.ShortenCpu(info.Name);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             _cpuMaxClockMhz = 0;
             _cpuRow.Sub = "";
@@ -510,9 +514,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadMemoryInfoAsync() {
         // GetAsync never throws (it falls back to MemoryStaticInfo.Unknown), but guard the whole path
         // so a surprise can't take down the app via an unobserved task exception.
+        var token = _gate.Token;
         try {
             var info = await _providers.Memory.GetAsync();
+            token.ThrowIfCancellationRequested();
             _memoryRow.Spec = FormatMemorySpec(info);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good value for its return.
         } catch {
             _memoryRow.Spec = Placeholders.UnknownRam;
         }
@@ -531,10 +539,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Enumerates the physical disks (off the UI thread) via the shared <see cref="DeviceInventory"/>
     /// and rebuilds the per-disk rows. Soft-fails to no disk rows on any error.</summary>
     internal async Task LoadInventoryAsync() {
+        var token = _gate.Token;
         try {
             var inventory = await DeviceInventory.LoadAsync(_providers, _gpuSamplerFactory);
+            token.ThrowIfCancellationRequested();
             BuildDiskRows(inventory.All(DeviceCategory.Disk));
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); the rail on screen is still the last good one.
         } catch {
             // Leave the rail without the enumerated disk/GPU rows on a transient failure.
         }
@@ -948,10 +960,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     private async Task LoadNetworkInfoAsync() {
         // Resolve the adapter's link speed + description off the UI thread (enumeration can be slow),
         // then bind on the UI thread. SelectPrimary never throws in practice, but guard defensively.
+        var token = _gate.Token;
         try {
-            var (sub, spec) = await Task.Run(ReadNetworkInfo);
+            var (sub, spec) = await Task.Run(ReadNetworkInfo, token);
+            token.ThrowIfCancellationRequested();
             _networkRow.Sub = sub;
             _networkRow.Spec = spec;
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read (cancelled, or failed once the user had gone); leave the last good values for its return.
         } catch {
             _networkRow.Sub = "";
             _networkRow.Spec = "";
@@ -993,6 +1009,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// samplers and the timer. The shared feed's samplers are owned (and disposed) by the service. Safe to
     /// call more than once.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _subscriptions.Dispose();
         _service.IntervalChanged -= OnIntervalChanged;
         _throughputTimer.Stop();

@@ -183,6 +183,16 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             () => _networkSampler.Sample(), static s => s.DownMbps, OnNetworkSample, OnNetworkFailed);
         UpdateThroughput(new NetworkSample(0, 0));
 
+        // Built FIRST, before anything that reads it: every load captures _gate.Token, so a load started
+        // above this line would dereference a null field and its soft-fail would blank the panels. The
+        // gate starts idle and fires no callback until a transition, so building it early costs nothing.
+        //
+        // Nothing below is started here either: the gate runs the timers only while the tab is on screen
+        // and the Live pill is on, so a tab that is never opened costs nothing. The ping timer
+        // additionally waits for the user to press Start, and the DNS panel for Look up — neither sends
+        // anything on its own.
+        _gate = new SamplingGate(ApplySampling);
+
         // Adapters + IP config load once off the UI thread, then refresh on a coarse timer. This load
         // stays in the constructor because the shell's exported report reads the IP configuration from
         // here whether or not the tab was ever opened.
@@ -196,12 +206,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         _pingTimer = new DispatcherTimer { Interval = PingInterval };
         _pingTimer.Tick += OnPingTick;
-
-        // Nothing above is started here: the gate runs the timers only while the tab is on screen and
-        // the Live pill is on, so a tab that is never opened costs nothing. The ping timer additionally
-        // waits for the user to press Start, and the DNS panel for Look up — neither sends anything on
-        // its own.
-        _gate = new SamplingGate(ApplySampling);
 
         _pingSeed = SeedPingTargetAsync();
     }
@@ -272,13 +276,18 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         if (run is null)
             return;
 
+        var token = _gate.Token;
         try {
-            var snapshot = await _providers.Adapters.GetAsync();
+            var snapshot = await _providers.Adapters.GetAsync(token);
             // GetAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
+            token.ThrowIfCancellationRequested();
             Adapters.Clear();
             foreach (var adapter in snapshot.Adapters)
                 Adapters.Add(adapter);
             IpConfig = snapshot.PrimaryConfig;
+        } catch when (token.IsCancellationRequested) {
+            // Left mid-read: cancelled, or failed once the user had already gone. Either way, keep the
+            // last good values for their return.
         } catch {
             Adapters.Clear();
             IpConfig = IpConfigInfo.Unknown;
@@ -298,13 +307,19 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         if (run is null)
             return;
 
+        var token = _gate.Token;
         try {
-            var snapshot = await _providers.Connections.GetAsync();
+            var snapshot = await _providers.Connections.GetAsync(token);
             // Awaited on the UI thread, so the continuation resumes there — safe to touch the collections.
+            token.ThrowIfCancellationRequested();
             _allConnections.Clear();
             _allConnections.AddRange(snapshot.Rows);
             _connectionsTotal = snapshot.Total;
             RebuildPage();
+        } catch when (token.IsCancellationRequested) {
+            // Left mid-read: cancelled, or failed once the user had already gone. Either way the
+            // "unavailable" fallback below must NOT run — it would be sitting there waiting the next
+            // time the tab was opened.
         } catch {
             _allConnections.Clear();
             _connectionsTotal = 0;
@@ -520,8 +535,11 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             if (PingEnabled)
                 _pingTimer.Start();
 
-            // Any time away leaves the connections snapshot stale, so re-read it now rather than showing
-            // the old page until the first tick.
+            // Any time away leaves both snapshots stale, so re-read them now rather than showing the old
+            // page until the first tick. Adapters matters more than it looks: its tick is a coarse 5 s,
+            // and leaving the tab mid-read abandons that read, so without this the panel could sit on
+            // its previous contents — or, on the first visit, blank — for the whole interval.
+            _ = LoadAdaptersAsync();
             _ = LoadConnectionsAsync();
         } else {
             _networkChannel.Stop();
@@ -534,6 +552,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Stops the timers and disposes the ping monitor. Safe to call more than once. The
     /// network sampler is fully managed, so it needs no disposal.</summary>
     public void Dispose() {
+        _gate.Dispose();
         _networkChannel.Dispose();
         _adapterTimer.Stop();
         _adapterTimer.Tick -= OnAdapterTick;

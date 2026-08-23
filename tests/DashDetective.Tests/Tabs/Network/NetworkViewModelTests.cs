@@ -1,5 +1,6 @@
 using DashDetective.Tabs.Network;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -21,12 +22,12 @@ public class NetworkViewModelTests {
     }
 
     private sealed class EmptyAdapters : IAdapterInfoProvider {
-        public Task<AdapterSnapshot> GetAsync() =>
+        public Task<AdapterSnapshot> GetAsync(CancellationToken token = default) =>
             Task.FromResult(new AdapterSnapshot([], IpConfigInfo.Unknown));
     }
 
     private sealed class EmptyConnections : IConnectionsProvider {
-        public Task<ConnectionsSnapshot> GetAsync() =>
+        public Task<ConnectionsSnapshot> GetAsync(CancellationToken token = default) =>
             Task.FromResult(new ConnectionsSnapshot([], 0));
     }
 

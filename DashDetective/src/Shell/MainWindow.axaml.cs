@@ -108,8 +108,10 @@ public partial class MainWindow : Window {
     /// <summary>The toolbar's Export button.</summary>
     private async void OnExportClick(object? sender, RoutedEventArgs e) => await ExportReportAsync();
 
-    /// <summary>The Export keyboard shortcut, routed here by the view model.</summary>
-    private async void OnExportRequested() => await ExportReportAsync();
+    /// <summary>The Export keyboard shortcut, routed here by the view model. Not <c>async void</c>: this
+    /// is a plain <c>Action</c> subscriber, not a routed event handler, so the fire-and-forget is written
+    /// out rather than hidden in the signature. <see cref="ExportReportAsync"/> never throws.</summary>
+    private void OnExportRequested() => _ = ExportReportAsync();
 
     /// <summary>
     /// Exports the current system snapshot as a plain-text report. Owns the file-save dialog here
