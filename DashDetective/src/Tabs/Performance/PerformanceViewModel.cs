@@ -39,7 +39,6 @@ public partial class PerformanceViewModel : ViewModelBase,
     private const int WindowSeconds = 60;
 
     /// <summary>The app-wide "no value" placeholder, for the tiles that can genuinely lack one.</summary>
-    private const string NoReading = "—";
 
     /// <summary>Floor for the network chart's auto-scaled axis, in Mbps: keeps an idle graph pinned flat
     /// near the bottom (rather than amplifying counter noise) and avoids a zero span. Mirrors the
@@ -453,7 +452,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         } catch {
             _cpuMaxClockMhz = 0;
             _cpuRow.Sub = "";
-            _cpuRow.Spec = "Unknown CPU";
+            _cpuRow.Spec = Placeholders.UnknownCpu;
         }
     }
 
@@ -515,7 +514,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var info = await _providers.Memory.GetAsync();
             _memoryRow.Spec = FormatMemorySpec(info);
         } catch {
-            _memoryRow.Spec = "Unknown RAM";
+            _memoryRow.Spec = Placeholders.UnknownRam;
         }
     }
 
@@ -583,13 +582,13 @@ public partial class PerformanceViewModel : ViewModelBase,
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
-            var threeDTile = new StatTile("3D", NoReading);
+            var threeDTile = new StatTile("3D", Placeholders.NoReading);
             // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
             // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
             // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
-            var tempTile = new StatTile("Temp", NoReading);
-            var powerTile = new StatTile("Power", NoReading);
-            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, NoReading, "", ChartSeries.Gpu,
+            var tempTile = new StatTile("Temp", Placeholders.NoReading);
+            var powerTile = new StatTile("Power", Placeholders.NoReading);
+            var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
                                       history.Points(100),
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),

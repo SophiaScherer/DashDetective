@@ -44,7 +44,7 @@ Source lives under `DashDetective/src/`, split into four areas. Namespaces follo
 
 | Area | Holds |
 | --- | --- |
-| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`), the table `SortColumn` model, and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
+| `src/Shared` | Cross-cutting, feature-agnostic building blocks: `ViewModelBase`, the marker interfaces, `AppInfo`, reusable controls, styles and the colour palette, the `Shortcuts` model (`ShortcutCatalog` and friends), the pure-logic `Charts` helpers (`MetricHistory`, `ChartScale`, `SparklinePoints`, `ChartAxis`, `ChartWindow`, `ChartStatus`), the table `SortColumn` model, `Placeholders`, the `OverlapGuard`, and formatters (`DataRateFormatter`, `UptimeFormatter`, `HardwareNameFormatter`, `CollectionReconciler`). |
 | `src/Services` | Cross-cutting services shared by more than one tab: `Theming` (the `ThemeService` seam), `SystemMetrics` (CPU/Memory/GPU/Storage samplers and providers), `Network` (the shared throughput sampler), `Settings` (the persistence store), `Startup` (launch-at-startup registration), `Threading` (the `IUiTimer` seam), `Identity` and `Diagnostics`. |
 | `src/Shell` | The application frame: `MainWindow`, `MainWindowViewModel`, `ViewLocator`, the dockable `Navigation` bar, the `Help` modal and the `Shortcuts` key listener. |
 | `src/Tabs/<Feature>` | One folder per tab (Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware, Settings). |
@@ -116,6 +116,21 @@ by the same rule, behind `AlertsEnabled`, which follows the user's setting.
 
 One-shot constructor loads stay in the constructor: the exported report and universal search read values
 from pages the user may never open.
+
+**Overlapping polls are refused, not queued.** A page's timer can tick again while the previous read is
+still in flight, so each poll claims an **`OverlapGuard`** (`src/Shared`) and returns if a run already
+holds it. The scope is `IDisposable` rather than a flag the caller lowers, because a run that *throws*
+must still free the guard or the poll is dead for the rest of the session. The guard is deliberately
+**not** thread-safe: every caller is UI-thread-affine, so the test-and-set cannot interleave.
+
+That is one answer to overlap, and the codebase has three more on purpose — do not merge them:
+
+| Where | Idiom | Why not the guard |
+| --- | --- | --- |
+| Timer polls (Network ×3, Processes) | `OverlapGuard` | last-write-**loses**: the run under way will report the same thing a moment later |
+| File Explorer's folder load | generation counter | user-driven, so the **newest** request must win and the older result be discarded |
+| Toolkit's run command | `[RelayCommand(AllowConcurrentExecutions = false)]` | the framework already does it, and its busy state reaches the UI |
+| `NvidiaSmiReader` | `lock` + retire latch | called off the UI thread, so it really can interleave; also latches off permanently after a failure |
 - **`IShortcutTarget`** — the page handles keyboard shortcuts of its own, and names the
   `ShortcutScope` its bindings belong to. Processes, File Explorer and Network implement it; see
   *Keyboard shortcuts* below.
@@ -391,6 +406,12 @@ truncated `systemd-resolve` on the other. **These shared derivations report `""`
 each consumer apply its own placeholder**, because the placeholders genuinely differ — the Processes tab
 wants "Unknown" where the Network tab wants "PID 1234", and a derivation that substituted early would have
 destroyed the information needed to tell them apart.
+
+The placeholder *strings* themselves live in **`Placeholders`** (`src/Shared`) — `NoReading` (the `—`
+every surface renders for "no reading") and the `Unknown*` set. Choosing which one to apply stays with
+the consumer; only the wording is shared. Note `UnknownCpu` ("Unknown CPU") and `UnknownProcessor`
+("Unknown processor") are the same concept in two spellings: that predates the class and is kept because
+reconciling it changes text the user sees, but both are named there so the divergence sits in one place.
 
 **Reporting "not known" as `0` is only safe when `0` is impossible as a real reading.** That is the usual
 case, and `CpuFacts` leans on it. It fails for the owner of a process: `/proc/[pid]/status`'s `Uid` is `0`

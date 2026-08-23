@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -119,6 +120,6 @@ internal sealed class ConnectionsProvider(
         10 => "Last-ack",
         11 => "Time-wait",
         12 => "Delete-tcb",
-        _ => "Unknown",
+        _ => Placeholders.Unknown,
     };
 }

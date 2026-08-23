@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -137,7 +138,7 @@ internal sealed class WindowsProcessSnapshotProvider(IProcessInterop interop) : 
     }
 
     private static string SafeName(Process process) {
-        try { return process.ProcessName + ".exe"; } catch { return "Unknown"; }
+        try { return process.ProcessName + ".exe"; } catch { return Placeholders.Unknown; }
     }
 }
 

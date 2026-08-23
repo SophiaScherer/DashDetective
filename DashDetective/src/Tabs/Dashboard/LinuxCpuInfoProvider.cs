@@ -1,5 +1,6 @@
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Platform.Linux;
+using DashDetective.Shared;
 using System;
 using System.Threading.Tasks;
 
@@ -33,7 +34,7 @@ internal sealed class LinuxCpuInfoProvider : ICpuInfoProvider {
             // always has at least one block, and an unreadable one already returned Unknown above — which
             // carries the runtime's processor count itself. Physical cores and clock stay 0, rendering "—".
             return new CpuStaticInfo(
-                string.IsNullOrWhiteSpace(facts.Name) ? "Unknown processor" : facts.Name,
+                string.IsNullOrWhiteSpace(facts.Name) ? Placeholders.UnknownProcessor : facts.Name,
                 facts.PhysicalCores,
                 facts.LogicalCores,
                 facts.MaxClockMhz);

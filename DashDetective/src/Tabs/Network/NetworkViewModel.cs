@@ -71,8 +71,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly PingMonitor _pingMonitor = new();
     private readonly SamplingGate _gate;
     private readonly Task _pingSeed;
-    private bool _connectionsInFlight;
-    private bool _pingInFlight;
+    private readonly OverlapGuard _adaptersGuard = new();
+    private readonly OverlapGuard _connectionsGuard = new();
+    private readonly OverlapGuard _pingGuard = new();
 
     /// <summary>The latest full (sorted) snapshot; the UI only ever binds one page-sized slice of it.</summary>
     private readonly List<ConnectionInfo> _allConnections = new();
@@ -263,8 +264,14 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// never throws (it falls back to an empty list / <see cref="IpConfigInfo.Unknown"/>), but the
     /// whole path is guarded so a surprise can't take down the app via an unobserved task exception.
     /// The small adapter list is rebuilt wholesale — cheap and flicker-free at this size/cadence.
+    /// Guarded against overlap like the connections poll below: this runs from the constructor, a
+    /// repeating timer and Refresh, so the same pile-up is possible.
     /// </summary>
     private async Task LoadAdaptersAsync() {
+        using var run = _adaptersGuard.TryEnter();
+        if (run is null)
+            return;
+
         try {
             var snapshot = await _providers.Adapters.GetAsync();
             // GetAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
@@ -287,9 +294,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// not pile up ticks) and never throws.
     /// </summary>
     private async Task LoadConnectionsAsync() {
-        if (_connectionsInFlight)
+        using var run = _connectionsGuard.TryEnter();
+        if (run is null)
             return;
-        _connectionsInFlight = true;
+
         try {
             var snapshot = await _providers.Connections.GetAsync();
             // Awaited on the UI thread, so the continuation resumes there — safe to touch the collections.
@@ -304,8 +312,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             PageLinks.Clear();
             PagerVisible = false;
             ConnectionsSummary = "Connections unavailable";
-        } finally {
-            _connectionsInFlight = false;
         }
     }
 
@@ -389,9 +395,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Sends one ping off the UI thread and publishes the console + summary text. Guarded so
     /// sends never overlap (a <see cref="PingMonitor"/> can't run two at once) and never throws.</summary>
     private async Task RunPingAsync() {
-        if (_pingInFlight)
+        using var run = _pingGuard.TryEnter();
+        if (run is null)
             return;
-        _pingInFlight = true;
+
         try {
             await _pingMonitor.SendAsync();
             // SendAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
@@ -399,8 +406,6 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             PingSummary = _pingMonitor.SummaryText;
         } catch {
             // SendAsync already soft-fails; nothing further to do.
-        } finally {
-            _pingInFlight = false;
         }
     }
 

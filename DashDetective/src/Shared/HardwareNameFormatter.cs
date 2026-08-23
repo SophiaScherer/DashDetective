@@ -18,7 +18,7 @@ public static partial class HardwareNameFormatter {
     /// name, e.g. "AMD Ryzen 5 7600X 6-Core Processor" → "AMD Ryzen 5 7600X".</summary>
     public static string ShortenCpu(string raw) {
         if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown CPU";
+            return Placeholders.UnknownCpu;
 
         var name = raw.Replace("(R)", "").Replace("(r)", "")
                       .Replace("(TM)", "").Replace("(tm)", "");
@@ -36,7 +36,7 @@ public static partial class HardwareNameFormatter {
     /// e.g. "NVIDIA GeForce RTX 3060" → "GeForce RTX 3060".</summary>
     public static string ShortenGpu(string raw) {
         if (string.IsNullOrWhiteSpace(raw))
-            return "Unknown GPU";
+            return Placeholders.UnknownGpu;
 
         var name = raw.Replace("(R)", "").Replace("(r)", "")
                       .Replace("(TM)", "").Replace("(tm)", "");

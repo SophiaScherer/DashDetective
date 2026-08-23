@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Shared;
 using System;
 using System.Management;
 using System.Runtime.Versioning;
@@ -18,7 +19,7 @@ internal sealed class WindowsCpuInfoProvider : ICpuInfoProvider {
 
     private static CpuStaticInfo Read() {
         try {
-            var name = "Unknown processor";
+            var name = Placeholders.UnknownProcessor;
             int physical = 0, logical = 0;
             double maxClock = 0;
             var found = false;

@@ -55,7 +55,11 @@ internal sealed class NvidiaSmiReader {
         _readings.TryGetValue(pciAddress, out var value) ? value : null;
 
     /// <summary>Starts a refresh if one is due and none is in flight. Returns immediately; the readings
-    /// land on a later call. Never throws.</summary>
+    /// land on a later call. Never throws.
+    /// <para>Locks rather than using the shared <c>OverlapGuard</c>, which is deliberately not
+    /// thread-safe: this is called from sampler threads, not the UI thread, so the test-and-set really
+    /// can interleave. It also latches off permanently after a failure, which the guard has no notion
+    /// of.</para></summary>
     internal void RefreshIfDue() {
         lock (_gate) {
             if (_retired || _running)

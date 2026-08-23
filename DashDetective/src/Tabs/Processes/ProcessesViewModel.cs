@@ -34,7 +34,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(2);
 
     private readonly DispatcherTimer _timer;
-    private bool _inFlight;
+    private readonly OverlapGuard _loadGuard = new();
 
     // System-wide CPU% / Memory% for the summary strip — the same readings the Dashboard shows, from the
     // shared SystemMetricsService (so there's one sampler across all tabs).
@@ -331,9 +331,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// enumeration must not pile up ticks) and never throws.</summary>
     /// <summary>Internal rather than private so a test can await the poll the ctor fires and forgets.</summary>
     internal async Task LoadAsync() {
-        if (_inFlight)
+        using var run = _loadGuard.TryEnter();
+        if (run is null)
             return;
-        _inFlight = true;
+
         try {
             var processes = await _snapshots.GetAsync();
             // Awaited on the UI thread, so the continuation resumes there — safe to touch collections.
@@ -351,8 +352,6 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             TotalProcessesText = "0";
             ProcessBreakdownText = "";
             ThreadsText = "0";
-        } finally {
-            _inFlight = false;
         }
     }
 

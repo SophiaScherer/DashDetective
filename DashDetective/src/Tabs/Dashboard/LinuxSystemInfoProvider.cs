@@ -1,5 +1,6 @@
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Platform.Linux;
+using DashDetective.Shared;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -62,20 +63,20 @@ internal sealed class LinuxSystemInfoProvider : ISystemInfoProvider {
             return composed;
 
         var description = RuntimeInformation.OSDescription;
-        return string.IsNullOrWhiteSpace(description) ? "Unknown OS" : description.Trim();
+        return string.IsNullOrWhiteSpace(description) ? Placeholders.UnknownOs : description.Trim();
     }
 
     /// <summary>Firmware vendor and version, e.g. "innotek GmbH VirtualBox".</summary>
     private static string ReadBios(DmiIdReader dmi) {
         var text = DmiIdReader.Join(dmi.BiosVendor, dmi.BiosVersion);
-        return string.IsNullOrWhiteSpace(text) ? "Unknown BIOS" : text;
+        return string.IsNullOrWhiteSpace(text) ? Placeholders.UnknownBios : text;
     }
 
     /// <summary>The running kernel release, e.g. "6.8.0-51-generic" — the closest analogue to the Windows
     /// build number this row carries, and what <c>uname -r</c> prints.</summary>
     private string ReadKernel() {
         var release = _proc.ReadAllText(KernelReleasePath)?.Trim();
-        return string.IsNullOrWhiteSpace(release) ? "Unknown" : release;
+        return string.IsNullOrWhiteSpace(release) ? Placeholders.Unknown : release;
     }
 
     /// <summary>Board vendor and product, e.g. "Oracle Corporation VirtualBox". Falls back to the system
@@ -86,6 +87,6 @@ internal sealed class LinuxSystemInfoProvider : ISystemInfoProvider {
             return board;
 
         var system = DmiIdReader.Join(dmi.SysVendor, dmi.ProductName);
-        return string.IsNullOrWhiteSpace(system) ? "Unknown motherboard" : system;
+        return string.IsNullOrWhiteSpace(system) ? Placeholders.UnknownMotherboard : system;
     }
 }

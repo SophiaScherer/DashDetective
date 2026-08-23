@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 
 namespace DashDetective.Tabs.Dashboard;
@@ -14,5 +15,5 @@ public sealed record SystemStaticInfo(
     /// runtime, which is reliable on any platform.
     /// </summary>
     public static SystemStaticInfo Unknown { get; } =
-        new("Unknown OS", Environment.MachineName, "Unknown BIOS", "Unknown", "Unknown motherboard");
+        new(Placeholders.UnknownOs, Environment.MachineName, Placeholders.UnknownBios, Placeholders.Unknown, Placeholders.UnknownMotherboard);
 }

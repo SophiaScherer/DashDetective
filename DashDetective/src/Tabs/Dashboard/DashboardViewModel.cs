@@ -26,7 +26,6 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private const int WindowSeconds = 60;
 
     /// <summary>The app-wide "no value" placeholder, for the one metric that can genuinely lack one.</summary>
-    private const string NoReading = "—";
 
     /// <summary>
     /// Floor for the network throughput chart's shared vertical scale, in Mbps. Keeps an idle graph
@@ -298,8 +297,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
         // The only live metric that can have no reading at all, so the "%" has to be conditional — "—%"
         // would read as a measured zero.
-        AppendReportRow(sb, "GPU", GpuValueText == NoReading
-            ? $"{NoReading}  ({GpuModelText})"
+        AppendReportRow(sb, "GPU", GpuValueText == Placeholders.NoReading
+            ? $"{Placeholders.NoReading}  ({GpuModelText})"
             : $"{GpuValueText}%  ({GpuModelText})");
         AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
         AppendReportRow(sb, "Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})");
@@ -348,8 +347,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             CpuCoresText = FormatCpuCores(info);
             _cpuCard.Sub = CpuModelShort;
         } catch {
-            CpuModelShort = "Unknown CPU";
-            CpuModelText = "Unknown CPU";
+            CpuModelShort = Placeholders.UnknownCpu;
+            CpuModelText = Placeholders.UnknownCpu;
             _cpuCard.Sub = CpuModelShort;
         }
     }
@@ -362,7 +361,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             var info = await _providers.Memory.GetAsync();
             MemoryModelText = FormatMemoryModel(info);
         } catch {
-            MemoryModelText = "Unknown RAM";
+            MemoryModelText = Placeholders.UnknownRam;
         }
     }
 
@@ -398,7 +397,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             _gpuVendors[gpu.GpuLuid ?? gpu.Id] = gpu.GpuPci?.VendorId;
         }
 
-        GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : "Unknown GPU";
+        GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : Placeholders.UnknownGpu;
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
         UpdateGpuAdapters();
@@ -416,11 +415,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             BuildText = info.Build;
             MotherboardText = info.Motherboard;
         } catch {
-            OsText = "Unknown OS";
+            OsText = Placeholders.UnknownOs;
             DeviceText = Environment.MachineName;
-            BiosText = "Unknown BIOS";
-            BuildText = "Unknown";
-            MotherboardText = "Unknown motherboard";
+            BiosText = Placeholders.UnknownBios;
+            BuildText = Placeholders.Unknown;
+            MotherboardText = Placeholders.UnknownMotherboard;
         }
     }
 
@@ -436,7 +435,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Capacity, type and speed for the System Information row, e.g. "32 GB DDR5-6000".</summary>
     private static string FormatMemoryModel(MemoryStaticInfo info) {
         if (info.TotalGb <= 0)
-            return "Unknown RAM";
+            return Placeholders.UnknownRam;
 
         var text = $"{info.TotalGb.ToString("F0", CultureInfo.InvariantCulture)} GB {info.TypeLabel}";
         return info.SpeedMhz > 0
@@ -499,7 +498,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // An adapter with no readable utilisation still has a card — it shows "—" rather than a 0 that
             // would read as idle. The unit goes with it, so the card says "—" and not "— %".
             if (sample.Overall is not { } reading) {
-                card.Value = NoReading;
+                card.Value = Placeholders.NoReading;
                 card.Unit = "";
                 // Says why the dash is there, so a detected-but-silent adapter doesn't read as a broken card.
                 card.Note = GpuNoReadingNote.For(

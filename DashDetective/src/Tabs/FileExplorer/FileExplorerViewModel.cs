@@ -506,6 +506,10 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         return null;
     }
 
+    /// <summary>Loads one folder. Supersession here is a generation counter, not the shared
+    /// <see cref="OverlapGuard"/>: this is user-driven, so the NEWEST request must win and the older
+    /// result be discarded. The guard drops the newer request instead, which is right for a timer poll
+    /// and wrong here — the user would be left looking at the folder they navigated away from.</summary>
     private async Task LoadEntriesAsync(string path, bool clearFirst, bool showBusy) {
         _pendingPath = path;
         var id = _activeLoadId = ++_loadSeq;

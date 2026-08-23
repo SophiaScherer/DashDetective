@@ -1,10 +1,11 @@
+using DashDetective.Shared;
 using System;
 
 namespace DashDetective.Tabs.Dashboard;
 
 /// <summary>
 /// Static CPU hardware facts, read once at startup via WMI. Fields fall back to
-/// <c>0</c> / "Unknown processor" when the information could not be retrieved.
+/// <c>0</c> / Placeholders.UnknownProcessor when the information could not be retrieved.
 /// </summary>
 public sealed record CpuStaticInfo(string Name, int PhysicalCores, int LogicalCores, double MaxClockMhz) {
     /// <summary>
@@ -12,5 +13,5 @@ public sealed record CpuStaticInfo(string Name, int PhysicalCores, int LogicalCo
     /// runtime, which is reliable on any platform.
     /// </summary>
     public static CpuStaticInfo Unknown { get; } =
-        new("Unknown processor", 0, Environment.ProcessorCount, 0);
+        new(Placeholders.UnknownProcessor, 0, Environment.ProcessorCount, 0);
 }
