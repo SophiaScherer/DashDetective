@@ -556,9 +556,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// read / write / response from the page-local sampler), then re-filters the rail and seeds the readouts
     /// once so the new rows aren't blank until the next tick.</summary>
     private void BuildDiskRows(IReadOnlyList<DeviceInstance> disks) {
-        _disks.Clear();
-        _disksByNumber.Clear();
-
+        // Built into a local before the rail is touched. The caller builds disks and then GPUs, so a
+        // clear-first builder that threw partway left the rail genuinely half-rebuilt — disks replaced,
+        // GPUs missing — which is neither the old state nor the new one.
+        var rebuilt = new List<DiskResource>(disks.Count);
         foreach (var disk in disks) {
             var history = new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
@@ -572,6 +573,12 @@ public partial class PerformanceViewModel : ViewModelBase,
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
                 ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
             };
+            rebuilt.Add(resource);
+        }
+
+        _disks.Clear();
+        _disksByNumber.Clear();
+        foreach (var resource in rebuilt) {
             _disks.Add(resource);
             if (resource.DiskNumber >= 0)
                 _disksByNumber[resource.DiskNumber] = resource;
@@ -586,9 +593,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// and seeds the readouts once. Each new row inherits the shared Detailed flag before it participates, so
     /// seeding doesn't count as a user flip.</summary>
     private void BuildGpuRows(IReadOnlyList<DeviceInstance> gpus) {
-        _gpus.Clear();
-        _gpusByLuid.Clear();
-
+        // Built into a local before the rail is touched — see BuildDiskRows.
+        var rebuilt = new List<GpuResource>(gpus.Count);
         foreach (var gpu in gpus) {
             var history = new MetricHistory(WindowSeconds);
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
@@ -610,6 +616,12 @@ public partial class PerformanceViewModel : ViewModelBase,
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
+            rebuilt.Add(resource);
+        }
+
+        _gpus.Clear();
+        _gpusByLuid.Clear();
+        foreach (var resource in rebuilt) {
             _gpus.Add(resource);
             _gpusByLuid[resource.Luid] = resource;
         }

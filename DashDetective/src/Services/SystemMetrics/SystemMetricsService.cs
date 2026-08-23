@@ -229,6 +229,9 @@ public sealed class SystemMetricsService : IDisposable {
                 _latest = sample();
                 _hasLatest = true;
             } catch {
+                // The prime read is a nicety, not a requirement: the first subscriber simply waits for
+                // the first tick instead of seeding from cache. The channel reports a persistent
+                // failure through its own _onFailed, so nothing is lost by staying quiet here.
                 _hasLatest = false;
             }
         }

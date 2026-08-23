@@ -115,6 +115,8 @@ public sealed class WindowsSearchIndex : IFileSearch {
                 string.Equals(itemType, DirectoryItemType, StringComparison.OrdinalIgnoreCase),
                 modified);
         } catch {
+            // One malformed row (a column the index filled differently, a bad timestamp) drops that
+            // hit rather than the whole result set — the rest of the reader keeps going.
             return null;
         }
     }

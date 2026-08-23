@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Network;
 using DashDetective.Shared;
 using DashDetective.Tabs.Dashboard;
@@ -98,7 +99,13 @@ public sealed class DeviceInventory {
         try {
             using var sampler = (factory ?? IGpuUsageSampler.ForCurrentPlatform)();
             return sampler.SampleAdapters().Keys.ToHashSet(StringComparer.Ordinal);
-        } catch {
+        } catch (Exception e) {
+            // Logged rather than swallowed silently, because an empty set here is indistinguishable from
+            // "no adapter is busy": the inventory keeps only adapters that BOTH the enumeration and this
+            // sampler report, so an empty set intersects to nothing and every GPU card disappears — while
+            // each reader's own output still looks perfectly correct. Without this line that happens with
+            // no trace at all.
+            Log.Warn("GPU utilisation sampling failed; no GPU cards will be built this pass", e);
             return new HashSet<string>(StringComparer.Ordinal);
         }
     }

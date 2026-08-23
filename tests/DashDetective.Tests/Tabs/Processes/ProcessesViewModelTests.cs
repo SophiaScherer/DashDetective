@@ -79,6 +79,34 @@ public class ProcessesViewModelTests {
         Assert.Equal("1", viewModel.TotalProcessesText);
     }
 
+    /// <summary>
+    /// A dead CPU counter reports no reading, not a confident 0%. This page used to render the failure as
+    /// "0%" while the Dashboard, Performance and Network tabs rendered the very same feed as "—", and
+    /// <see cref="MetricChannel{T}"/> stops polling after a failure — so that "0%" sat there claiming an
+    /// idle machine for the rest of the session.
+    /// </summary>
+    [Fact]
+    public void CpuSamplerFailure_ReportsNoReadingRatherThanAConfidentZero() {
+        var timers = new List<FakeUiTimer>();
+        var samplers = new MetricSamplers(
+            () => throw new InvalidOperationException("the counter is gone"),
+            () => new MemorySample(0, 0, 0, 0, 0),
+            () => new NetworkSample(0, 0),
+            () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => {
+            var timer = new FakeUiTimer();
+            timers.Add(timer);
+            return timer;
+        });
+        var viewModel = new ProcessesViewModel(
+            metrics, new FakeSnapshotProvider([]), new FakeProcessInterop());
+
+        viewModel.SetActive(true);   // attaches the subscriptions
+        timers[0].RaiseTick();       // the CPU feed's timer
+
+        Assert.Equal("—", viewModel.CpuUsageText);
+    }
+
     /// <summary>A canned snapshot lands in the three Task-Manager-style groups by category.</summary>
     [Fact]
     public async Task LoadAsync_GroupsProcessesByCategory() {

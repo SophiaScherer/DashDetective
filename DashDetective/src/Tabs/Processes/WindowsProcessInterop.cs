@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -62,8 +63,11 @@ internal sealed class WindowsProcessInterop : IProcessInterop {
         try {
             using var process = Process.GetProcessById(pid);
             path = process.MainModule?.FileName;
-        } catch {
-            // Exited (ArgumentException) or access denied on a protected process (Win32Exception).
+        } catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+            // The process exited between the snapshot and this call (ArgumentException, or
+            // InvalidOperationException once the handle is stale), or it is protected and denies
+            // MainModule (Win32Exception). Nothing broader is caught: the codebase's catch-filter idiom
+            // (see NativeLoadFailure.Matches) exists so a genuine bug here is not read as "no path".
         }
         if (string.IsNullOrEmpty(path))
             return;

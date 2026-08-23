@@ -8,6 +8,7 @@ using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -318,11 +319,13 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Summary Memory% callback.</summary>
     private void OnMemoryTotal(MemorySample memory) => MemoryUsageText = FormatPercent(memory.LoadPercent);
 
-    /// <summary>On a CPU sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
-    private void OnCpuTotalFailed() => CpuUsageText = FormatPercent(0);
+    /// <summary>On a CPU sampler failure, report no reading. NOT 0%: the channel stops polling after a
+    /// failure, so a confident "0%" would sit there for the rest of the session claiming an idle CPU.
+    /// This is the same feed the Dashboard, Performance and Network tabs render as "—".</summary>
+    private void OnCpuTotalFailed() => CpuUsageText = Placeholders.NoReading;
 
-    /// <summary>On a memory sampler failure, keep the current summary at 0% (matches the old soft-fail).</summary>
-    private void OnMemoryTotalFailed() => MemoryUsageText = FormatPercent(0);
+    /// <summary>On a memory sampler failure, report no reading — see <see cref="OnCpuTotalFailed"/>.</summary>
+    private void OnMemoryTotalFailed() => MemoryUsageText = Placeholders.NoReading;
 
     private static string FormatPercent(double percent) {
         if (percent < 0)
@@ -652,17 +655,23 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (row is null)
             return;
 
+        // Only the kill is guarded. The row removals used to sit inside this try as well, which meant a
+        // bug in the removal logic reported itself as "Couldn't end <process>" — a message blaming the
+        // machine for a fault in this file, after the process had in fact been killed.
         try {
             using var process = Process.GetProcessById(row.Pid);
             process.Kill();
-            if (!Apps.Remove(row) && !Background.Remove(row))
-                WindowsProcesses.Remove(row);
-            SelectedRow = null;
-            ActionMessage = "";
-        } catch {
-            // ArgumentException (already exited) or Win32Exception (access denied without elevation).
+        } catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+            // Already exited (ArgumentException / InvalidOperationException) or access denied without
+            // elevation (Win32Exception).
             ActionMessage = $"Couldn't end {row.Name}";
+            return;
         }
+
+        if (!Apps.Remove(row) && !Background.Remove(row))
+            WindowsProcesses.Remove(row);
+        SelectedRow = null;
+        ActionMessage = "";
     }
 
     /// <summary>

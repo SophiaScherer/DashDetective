@@ -394,6 +394,22 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// card's caption is its short model; its value + sparkline (busiest-engine %) are seeded here and then
     /// driven by the throughput timer. The System-Information "GPU" row lists every adapter's full name.</summary>
     private void RebuildGpuCards(IReadOnlyList<DeviceInstance> gpus) {
+        // Build the replacements BEFORE touching anything on screen. The caller's soft-fail promises to
+        // "leave the existing GPU cards in place" on a failure, and it could not keep that promise while
+        // the clear came first: a throw partway through the loop left the old cards gone, the new ones
+        // half-inserted, and _gpuCards/_gpuHistories/_gpuVendors out of step with Cards.
+        var rebuilt = new List<(string Key, DashboardCard Card, uint? Vendor)>(gpus.Count);
+        foreach (var gpu in gpus)
+            rebuilt.Add((
+                gpu.GpuLuid ?? gpu.Id,
+                new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub },
+                gpu.GpuPci?.VendorId));
+
+        var modelText = gpus.Count > 0
+            ? string.Join(" / ", gpus.Select(g => g.Spec))
+            : Placeholders.UnknownGpu;
+
+        // Everything below is collection writes over values already in hand, so the swap completes.
         foreach (var card in _gpuCards.Values)
             Cards.Remove(card);
         _gpuCards.Clear();
@@ -401,15 +417,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _gpuVendors.Clear();
 
         var insertAt = Cards.IndexOf(_memoryCard) + 1;
-        foreach (var gpu in gpus) {
-            var card = new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub };
+        foreach (var (key, card, vendor) in rebuilt) {
             Cards.Insert(insertAt++, card);
-            _gpuCards[gpu.GpuLuid ?? gpu.Id] = card;
-            _gpuHistories[gpu.GpuLuid ?? gpu.Id] = new MetricHistory(WindowSeconds);
-            _gpuVendors[gpu.GpuLuid ?? gpu.Id] = gpu.GpuPci?.VendorId;
+            _gpuCards[key] = card;
+            _gpuHistories[key] = new MetricHistory(WindowSeconds);
+            _gpuVendors[key] = vendor;
         }
 
-        GpuModelText = gpus.Count > 0 ? string.Join(" / ", gpus.Select(g => g.Spec)) : Placeholders.UnknownGpu;
+        GpuModelText = modelText;
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
         UpdateGpuAdapters();
@@ -684,19 +699,27 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// card's caption is its capacity used; its value + sparkline (Active time) are seeded here and then driven
     /// by the throughput timer.</summary>
     private void RebuildDiskCards(IReadOnlyList<DriveCardData> drives) {
+        // Built before anything on screen is touched, for the same reason as RebuildGpuCards: the
+        // caller's soft-fail promises to leave the existing cards in place, which it cannot do if the
+        // clear has already run.
+        var rebuilt = new List<(int DiskNumber, DashboardCard Card)>(drives.Count);
+        foreach (var drive in drives)
+            rebuilt.Add((
+                drive.DiskNumber,
+                new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
+                    Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
+                }));
+
         foreach (var card in _diskCards.Values)
             Cards.Remove(card);
         _diskCards.Clear();
         _diskHistories.Clear();
 
         var insertAt = Cards.IndexOf(_networkCard);
-        foreach (var drive in drives) {
-            var card = new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
-                Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
-            };
+        foreach (var (diskNumber, card) in rebuilt) {
             Cards.Insert(insertAt++, card);
-            _diskCards[drive.DiskNumber] = card;
-            _diskHistories[drive.DiskNumber] = new MetricHistory(WindowSeconds);
+            _diskCards[diskNumber] = card;
+            _diskHistories[diskNumber] = new MetricHistory(WindowSeconds);
         }
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.

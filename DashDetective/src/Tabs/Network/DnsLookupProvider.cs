@@ -51,8 +51,13 @@ internal sealed class DnsLookupProvider : IDnsLookupProvider {
             var footer = $"Resolved in {elapsedMs.ToString(CultureInfo.InvariantCulture)}ms · " +
                          $"{RecordType(addresses)} record";
             return new DnsResult(sb.ToString(), footer);
-        } catch {
-            // Timeout (cancelled), SocketException (offline / NXDOMAIN), etc.
+        } catch (Exception e) when (e is SocketException or OperationCanceledException or ArgumentException) {
+            // The three ways a lookup legitimately does not resolve: the host is unknown or the machine
+            // is offline (SocketException), the lookup outran TimeoutMs (OperationCanceledException from
+            // this method's own CTS — no caller token reaches here), or the host is not a valid name
+            // (ArgumentException). All three read the same to the user, so all three word it the same.
+            // Narrow on purpose: anything else is a bug, and reporting it as "could not resolve" would
+            // blame the network for it.
             return Failure(host);
         }
     }

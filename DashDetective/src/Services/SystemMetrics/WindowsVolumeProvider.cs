@@ -120,6 +120,7 @@ internal sealed class WindowsVolumeProvider : IVolumeProvider {
         try {
             return Convert.ToInt32(value);
         } catch {
+            // A malformed WMI value is "unknown partition", not partition 0 — see the note above.
             return null;
         }
     }
@@ -128,6 +129,8 @@ internal sealed class WindowsVolumeProvider : IVolumeProvider {
         try {
             return value is null ? 0 : Convert.ToUInt64(value);
         } catch {
+            // A byte count WMI could not express reads as 0, which is safe here only because a real
+            // volume never has a zero size — the surface reads it as "not known" either way.
             return 0;
         }
     }

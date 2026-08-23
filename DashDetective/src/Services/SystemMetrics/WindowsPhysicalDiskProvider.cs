@@ -85,6 +85,8 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
         try {
             return value is null ? 0 : Convert.ToInt32(value);
         } catch {
+            // A malformed WMI value reads as 0. Safe for the fields this parses (disk number is
+            // validated by the caller; counts are never legitimately absent), unlike a capacity.
             return 0;
         }
     }
@@ -93,6 +95,8 @@ internal sealed class WindowsPhysicalDiskProvider(IDiskTemperatureProvider tempe
         try {
             return value is null ? 0 : Convert.ToUInt64(value);
         } catch {
+            // As ToInt above: a byte count WMI could not express reads as 0, which no surface
+            // distinguishes from a genuinely empty field.
             return 0;
         }
     }

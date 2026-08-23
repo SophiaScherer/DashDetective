@@ -34,7 +34,8 @@ crash on someone else's machine. Windows-only NuGet assets still load correctly 
 - **Small seams over big base classes.** Shell behaviours are opt-in via marker interfaces, not a
   heavyweight page base class.
 - **Soft-fail everywhere.** Reading the machine can fail (denied access, a non-Windows host, a
-  vanishing process). Every reader degrades to a neutral fallback instead of throwing.
+  vanishing process). Every reader degrades to a neutral fallback instead of throwing. *Neutral* is the
+  load-bearing word — see *Soft-fail: what a fallback owes you* below.
 
 ## Source layout
 
@@ -560,6 +561,54 @@ is deliberately larger than an inline list filter — not by accident. Both bind
 A panel repeated within a *single* feature stays in that feature: the Network tab's `ConsolePanel`
 backs both Ping and DNS Lookup and lives in `src/Tabs/Network`, even though the console *tokens* it
 draws with are app-level.
+
+## Soft-fail: what a fallback owes you
+
+"Degrades to a neutral fallback" is the rule; these are the four ways it gets broken.
+
+**A fallback must not be a confident wrong answer.** `0` is only neutral where `0` is impossible as a
+real reading. It is not neutral for a utilisation percentage: `MetricChannel` *stops polling* after a
+failure, so a `0%` written there sits on screen claiming an idle machine for the rest of the session.
+Anything a surface renders and a user could read as a measurement uses `Placeholders.NoReading`.
+
+**A fallback must not be unreachable.** A sampler that catches its own failure and returns a
+zero-valued reading never lets `MetricChannel` call `_onFailed`, so the placeholder the pages are wired
+to show can never appear — a vanished NIC draws a flat, live-looking line instead. Samplers therefore
+**throw**, and the channel turns that into the placeholder. Returning a zero *measurement* is different
+and fine: `NetworkUsageSampler` legitimately reports `0` when it has just rebaselined or when too little
+time has passed, because those are real measurements of nothing.
+
+**A fallback must leave the surface in one piece.** A rebuild that clears its collections and then
+throws partway leaves the page neither in its old state nor its new one — and the catch above it,
+promising to "leave the existing cards in place", cannot keep that promise. Every rebuild therefore
+**builds into a local first and swaps at the end**, so everything that can throw happens before
+anything on screen is touched (`RebuildGpuCards`, `RebuildDiskCards`, `BuildDiskRows`, `BuildGpuRows`).
+Where a surface is a set of independent cards, each one is applied under its own guard, mirroring
+`HardwareInfoProvider.Section`, which already isolates a failing *reader* per card.
+
+**A `catch` must not be wider than its comment.** Several catches named the exact exceptions they meant
+— and then caught everything, so a genuine bug in the same block was reported to the user as "couldn't
+end that process" or an unnamed row. The idiom is a filter, as `NativeLoadFailure.Matches` and
+`ProcFileSystem.IsIoFailure` already use:
+
+```csharp
+} catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
+```
+
+Keep the `try` no wider than the failable call, too: the Processes tab's end-task once wrapped its three
+collection removals in the same `try` as `Process.Kill()`, so a bug in the removal logic surfaced as a
+message blaming the machine — after the process had in fact been killed.
+
+**Who logs.** Providers, samplers and services log through `Services/Diagnostics/Log`; view models and
+code-behind do not, because the provider that failed has already logged it with more context than the
+view model has. Consistent across all 40 files that log today. The exception worth knowing is
+`DeviceInventory.SampleActiveGpuLuids`: it is a view-model-facing helper whose empty result is
+indistinguishable from "nothing is busy", and because the inventory *intersects* enumeration with
+sampling, that empty set makes every GPU card disappear while each reader's own output still looks
+correct. It logs.
+
+**Every bare `catch { }` carries a comment saying why nothing is done.** A silent catch and a forgotten
+one look identical six months later.
 
 ## Dependencies
 
