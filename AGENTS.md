@@ -1799,6 +1799,18 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
   *Persistence* below); this is shared shell work, not a tab-local change.
 
+- **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
+  arrows** bracketing them. The arrows are **stable `[RelayCommand]`s on the view model, deliberately NOT
+  `PageLinks` entries**: that collection is cleared and rebuilt on every 2.5s connections poll, so anything
+  living in it would be torn down twenty-four times a minute. All four route through the **same
+  `TryGoToPage`** the `Ctrl+←`/`Ctrl+→` shortcuts use, so keyboard and mouse cannot disagree, and page maths
+  stays in `PagerMath`. `HasPreviousPage`/`HasNextPage` drive `CanExecute` and are refreshed in
+  `RebuildPageLinks`; **the failure path must reset them by hand** (unlike `PageLinks`, stable commands
+  survive a `Clear()`, so an unavailable list would otherwise keep a live pager over nothing). Styled
+  `Button.pageArrow`, which copies File Explorer's `navBtn` disabled treatment — dim the glyph, keep the
+  surface transparent — because Fluent's default disabled state paints a filled box. No ellipsis: the
+  provider's 1000-row cap over a page size of 100 means at most ten numbers, which fit on one row.
+
 - **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the
   tab that owns the selected device: a disk row to **Storage** (selecting that drive), the network row to
   **Network** (flashing that adapter), and CPU/Memory/GPU to **Hardware** (tab only — it is a static spec

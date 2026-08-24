@@ -5,6 +5,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:layout="using:DashDetective.Shared.Layout"
              xmlns:vm="using:DashDetective.Tabs.Network"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
              xmlns:sys="using:System"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:NetworkViewModel"
@@ -53,8 +54,8 @@
         <Style Selector="Button.go:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
-        <!-- Google-style pager: page-number / arrow buttons, with the current page accented and
-             ellipsis / end-arrows dimmed via the disabled state. -->
+        <!-- Pager buttons: the current page number accented, and the four skip/step arrows dimmed at
+             either end via the disabled state. No ellipsis — every page number fits on one row. -->
         <!-- Reveal flash for an adapter arrived at from the Performance tab. The transition sits directly
              on the row: it carries no :pointerover, so there is nothing for a hover to smear. -->
         <Style Selector="Border.adapterRow">
@@ -66,6 +67,39 @@
         </Style>
         <Style Selector="Border.adapterRow.highlighted">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
+        <!-- Skip/step arrows bracketing the page numbers. Same 30px box and hover as pageLink so the row
+             reads as one control, with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
+             surface transparent, since Fluent's default disabled state paints a filled box. -->
+        <Style Selector="Button.pageArrow">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.pageArrow Path">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <Style Selector="Button.pageArrow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+        <Style Selector="Button.pageArrow:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.pageArrow:disabled Path">
+            <Setter Property="Opacity" Value="0.35"/>
         </Style>
 
         <Style Selector="Button.pageLink">
@@ -251,21 +285,38 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
-                    <!-- Pager (Prev · 1 … 4 5 6 … 20 · Next); only visible when there's >1 page. -->
-                    <ItemsControl ItemsSource="{Binding PageLinks}" IsVisible="{Binding PagerVisible}"
-                                  HorizontalAlignment="Center" Margin="0,2,0,0">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="4"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PageLink">
-                                <Button Classes="pageLink" Classes.selected="{Binding IsCurrent}"
-                                        Content="{Binding Label}" Command="{Binding SelectCommand}"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- Pager: « ‹ 1 2 3 4 › » — the numbers with skip/step arrows bracketing them. Only
+                         visible when there is more than one page. The arrows are bound straight to the view
+                         model's commands rather than being items in PageLinks, which is cleared and rebuilt
+                         on every 2.5s poll; their CanExecute dims them at either end. -->
+                    <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding PagerVisible}"
+                                HorizontalAlignment="Center" Margin="0,2,0,0">
+                        <Button Classes="pageArrow" Command="{Binding FirstPageCommand}" ToolTip.Tip="First page">
+                            <Path Data="{x:Static nav:Icons.ChevronFirst}"/>
+                        </Button>
+                        <Button Classes="pageArrow" Command="{Binding PreviousPageCommand}" ToolTip.Tip="Previous page">
+                            <Path Data="{x:Static nav:Icons.ChevronLeft}"/>
+                        </Button>
+                        <ItemsControl ItemsSource="{Binding PageLinks}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PageLink">
+                                    <Button Classes="pageLink" Classes.selected="{Binding IsCurrent}"
+                                            Content="{Binding Label}" Command="{Binding SelectCommand}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="pageArrow" Command="{Binding NextPageCommand}" ToolTip.Tip="Next page">
+                            <Path Data="{x:Static nav:Icons.ChevronRight}"/>
+                        </Button>
+                        <Button Classes="pageArrow" Command="{Binding LastPageCommand}" ToolTip.Tip="Last page">
+                            <Path Data="{x:Static nav:Icons.ChevronLast}"/>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Border>
             <StackPanel Spacing="12" MinWidth="260">
