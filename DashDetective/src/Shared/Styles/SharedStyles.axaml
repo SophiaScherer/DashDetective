@@ -211,6 +211,34 @@
         <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
     </Style>
 
+    <!-- A cross-reference to somewhere else in the app: accent text plus a small arrow, no button chrome.
+         Used by the Performance detail header to jump to the tab that owns the selected device. Sized to
+         sit on a panelTitle line without lifting it. The arrow is drawn by the caller, as the repo's other
+         glyphs are; this styles the frame and colours both through Foreground. -->
+    <Style Selector="Button.link">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="6,2"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
+    <Style Selector="Button.link:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <!-- Strokes follow the button's Foreground, so the hover recolour reaches the arrow too. -->
+    <Style Selector="Button.link Path.linkArrow">
+        <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+    </Style>
+
     <!-- ===== Search / path fields ===== -->
     <!-- The bordered surface a bound text input sits in (the Ping/DNS targets, the Toolkit "Add
          command" form). The same four chrome setters were also written by hand at seven more call

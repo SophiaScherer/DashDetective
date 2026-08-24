@@ -140,10 +140,28 @@
                  in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
             <Border Classes="panel">
                 <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto">
+                    <!-- Name · jump link · spec. The link takes its own Auto column beside the name rather
+                         than making the title clickable: a bare title offers no resting cue that it goes
+                         anywhere. Hidden on a resource with no home tab (HasLink), the same way the
+                         Overall/Detailed toggle below is gated on SupportsDetail. -->
+                    <Grid ColumnDefinitions="Auto,Auto,*">
                         <TextBlock Grid.Column="0" Classes="panelTitle"
                                    Text="{Binding SelectedResource.Name}"/>
-                        <TextBlock Grid.Column="1" Classes="cardSub" VerticalAlignment="Center"
+                        <Button Grid.Column="1" Classes="link" Margin="10,0,0,0"
+                                IsVisible="{Binding SelectedResource.HasLink}"
+                                Command="{Binding SelectedResource.Link.Command}"
+                                ToolTip.Tip="Open this device on the tab that owns it">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{Binding SelectedResource.Link.Label}"
+                                           VerticalAlignment="Center"/>
+                                <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
+                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                      VerticalAlignment="Center"
+                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="2" Classes="cardSub" VerticalAlignment="Center"
+                                   HorizontalAlignment="Right"
                                    Text="{Binding SelectedResource.Spec}"/>
                     </Grid>
                     <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource

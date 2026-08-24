@@ -1760,29 +1760,73 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
   icons-only rail**, in any orientation. The bar carries **no permanent control chrome**; every entry
   point drives the **same shared** `NavigationViewModel`:
-  - **Collapse/expand** — a **semi-circular puck** standing **entirely outside** the bar, touching its
-    content-facing edge along the flat side only, revealed while the pointer is over the bar. It is a
-    true half-disc: one radius deep, two long, both outward corners rounded by the full radius (no
-    clamping). Its chevron points the way the bar will move (at the docked edge when expanded, away from
-    it when collapsed). It is a sibling of the rail, not a child, and standing outside needs **two**
-    things: `ClipToBounds="False"` on `NavigationView` (which otherwise clips to its docked slot and the
-    puck vanishes) and **`ZIndex="1"`** on the bar in `MainWindow.axaml` (it is the `DockPanel`'s first
-    child, so it would paint under the content area).
+  - **Collapse/expand** — a **semi-circular puck domed INTO the bar**, its flat side flush on the
+    content-facing edge, revealed while the pointer is over the bar **and for a 600 ms grace period after
+    it leaves**. It is a true half-disc: one radius deep, two long, both **inward** corners rounded by the
+    full radius (no clamping). Its chevron points the way the bar will move (at the docked edge when
+    expanded, away from it when collapsed). It is a sibling of the rail, not a child, so its rounding and
+    alignment stay its own. **It used to stand outside the bar and that was the bug**: a hidden control is
+    not hit-testable, so reaching for it left the rail, dropped `:pointerover`, and took the puck away
+    mid-reach. Inside the bounds, reaching for it never leaves the rail. Two consequences: the view needs
+    no `ClipToBounds` and the shell no `ZIndex` (both existed only to let it draw outside), and the
+    reveal is a **bound flag, not a style** — `ShowChevron` (`IsChevronVisible && !IsDragging`), because a
+    style setter cannot override a local `IsVisible` binding, so the drag rule had to move to the VM. The
+    grace period is an `IUiTimer` on the `UniversalSearchViewModel` debounce shape (internal ctor +
+    `FakeUiTimer`), which is what makes it testable headlessly.
   - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
     `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
     items, the footer and any empty space all reach it.
   - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
     in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
+  - **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
+    **collapse tweens the rail's size** (~150ms, `CubicEaseOut`); the transition is declared **per axis**
+    (`Border.rail:not(.horizontal)` → `Width`, `.horizontal` → `Height`) because `RailWidth`/`RailHeight`
+    are `NaN` on whichever axis stretches. A **re-dock fades** — out 120ms, change edge, back in — because
+    a `DockPanel` offers no path between edges to slide along. Every re-dock path (command, picker, drag)
+    funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
+    changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
+    the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
+    dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
+    otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
   - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 
   Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
   label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
-  alignment / stand-off / rounding) are **computed properties on the VM — no value converters**. The rail
+  alignment / rounding) are **computed properties on the VM — no value converters**. The rail
   thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`/`RailHeight` delegate
   to and the drop preview measures against; it takes the axis as an argument because a drag previews
   edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
   `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
   *Persistence* below); this is shared shell work, not a tab-local change.
+
+- **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
+  arrows** bracketing them. The arrows are **stable `[RelayCommand]`s on the view model, deliberately NOT
+  `PageLinks` entries**: that collection is cleared and rebuilt on every 2.5s connections poll, so anything
+  living in it would be torn down twenty-four times a minute. All four route through the **same
+  `TryGoToPage`** the `Ctrl+←`/`Ctrl+→` shortcuts use, so keyboard and mouse cannot disagree, and page maths
+  stays in `PagerMath`. `HasPreviousPage`/`HasNextPage` drive `CanExecute` and are refreshed in
+  `RebuildPageLinks`; **the failure path must reset them by hand** (unlike `PageLinks`, stable commands
+  survive a `Clear()`, so an unavailable list would otherwise keep a live pager over nothing). Styled
+  `Button.pageArrow`, which copies File Explorer's `navBtn` disabled treatment — dim the glyph, keep the
+  surface transparent — because Fluent's default disabled state paints a filled box. No ellipsis: the
+  provider's 1000-row cap over a page size of 100 means at most ten numbers, which fit on one row.
+
+- **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the
+  tab that owns the selected device: a disk row to **Storage** (selecting that drive), the network row to
+  **Network** (flashing that adapter), and CPU/Memory/GPU to **Hardware** (tab only — it is a static spec
+  sheet with nothing to select). Built on the **`ToolkitViewModel.FileExplorerRevealRequested` shape**, and
+  that is the rule: `PerformanceViewModel` raises `StorageRevealRequested(int)` /
+  `NetworkRevealRequested(string)` / `HardwareRevealRequested`, naming a device and **nothing about which
+  tab shows it** — only `MainWindowViewModel` knows the wiring. Payloads are identities the destinations
+  already key on (the physical disk number, the adapter's friendly name), and the disk number match is exact
+  by construction: `DeviceInventory` names disk rows from the same `StorageComposer.Compose` the Storage
+  cards use. `ResourceRow` stays a data model — it carries a `ResourceLink` (label + command) built by the
+  view model, never routing of its own. **Both destinations load asynchronously from their constructors**, so
+  each needs the pending-slot treatment: `StorageViewModel._pendingReveal` is drained in `SelectDefaultDrive`
+  (outranking both the previous-disk and system-disk defaults), and `NetworkViewModel` re-raises after
+  `LoadAdaptersAsync`. A name or disk that matches nothing **degrades to a plain navigate**, never a failed
+  jump. The link is a new shared **`Button.link`** style (accent text + arrow) rather than a clickable title:
+  a bare title offers no resting cue that it goes anywhere.
 
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**

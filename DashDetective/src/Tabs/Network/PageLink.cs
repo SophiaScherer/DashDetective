@@ -11,8 +11,9 @@ namespace DashDetective.Tabs.Network;
 /// selectable-item-VM shape as <c>FilterOption</c>: immutable display state plus a
 /// <see cref="SelectCommand"/> that calls back into the owning VM with the target page. The current
 /// page is highlighted (<see cref="IsCurrent"/>) and its command is a no-op, so clicking it does
-/// nothing. There is no ellipsis or Prev/Next chrome — the connections list is capped at ten pages,
-/// so every number fits on one row.
+/// nothing. There is no ellipsis — the connections list is capped at ten pages, so every number fits on
+/// one row. The first/prev/next/last arrows that bracket the numbers are NOT PageLinks: this collection is
+/// cleared and rebuilt on every 2.5s poll, so they are stable commands on the view model instead.
 /// </summary>
 public partial class PageLink : ObservableObject {
     public PageLink(int pageNumber, bool isCurrent, Action<int> onSelected) {

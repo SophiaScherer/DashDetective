@@ -54,6 +54,14 @@ public partial class NavigationView : UserControl {
 
     private void CloseDockMenu() => RailBorder.ContextFlyout?.Hide();
 
+    // ----- Collapse puck reveal -----
+    // Hover is tracked on the whole host panel, so the items, footer and empty space all count. The hide
+    // itself is the view model's (it owns the grace period); this only reports the pointer.
+
+    private void OnRailPointerEntered(object? sender, PointerEventArgs e) => _viewModel?.PointerEnteredBar();
+
+    private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
+
     // ----- Drag-to-dock -----
 
     private void OnBrandPointerPressed(object? sender, PointerPressedEventArgs e) {

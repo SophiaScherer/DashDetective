@@ -6,6 +6,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Identity;
+using DashDetective.Services.Threading;
 using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
@@ -76,7 +77,7 @@ public partial class NavigationViewModel : ViewModelBase {
         nameof(ControlsDock), nameof(FooterAvatarDock),
         nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
         nameof(ChevronHAlign), nameof(ChevronVAlign),
-        nameof(ChevronMargin), nameof(ChevronCornerRadius))]
+        nameof(ChevronCornerRadius))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -99,9 +100,16 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
     /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
-    [ObservableProperty] private bool _isDragging;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowChevron))]
+    private bool _isDragging;
 
-    public NavigationViewModel() {
+    public NavigationViewModel() : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter()) { }
+
+    /// <summary>Test seam: takes the puck's hide timer and the re-dock fade timer explicitly. A real
+    /// <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is pumping, so headless tests inject
+    /// fakes and tick them by hand.</summary>
+    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -109,6 +117,14 @@ public partial class NavigationViewModel : ViewModelBase {
             new("Bottom", NavOrientation.Bottom, SelectPosition),
         };
         SyncPositions();
+
+        _chevronHide = chevronHide;
+        _chevronHide.Interval = ChevronHideDelay;
+        _chevronHide.Tick += OnChevronHideElapsed;
+
+        _relocate = relocate;
+        _relocate.Interval = RelocateFade;
+        _relocate.Tick += OnRelocateElapsed;
 
         var user = CurrentUserProvider.Load();
         UserName = user.DisplayName;
@@ -208,15 +224,50 @@ public partial class NavigationViewModel : ViewModelBase {
     /// ends, so the two bracket the user's name when it is shown.</summary>
     public Dock FooterAvatarDock => IsRailCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
-    // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
+    // ----- Collapse/expand puck (the hover-revealed semi-circle domed into the bar's content edge) -----
 
-    /// <summary>The semi-circle's radius: how far the puck stands off the bar's edge, and half the
-    /// length of the flat side that meets it. Keeping it exactly half of <see cref="PuckLength"/> is
+    /// <summary>The semi-circle's radius: how far the puck reaches into the bar from its edge, and half
+    /// the length of the flat side lying on it. Keeping it exactly half of <see cref="PuckLength"/> is
     /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
     private const double PuckRadius = 20;
 
     /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
     private const double PuckLength = PuckRadius * 2;
+
+    /// <summary>How long the puck lingers after the pointer leaves the bar, so a moment's wobble on the
+    /// way to it does not snatch it away mid-reach.</summary>
+    private static readonly TimeSpan ChevronHideDelay = TimeSpan.FromMilliseconds(600);
+
+    private readonly IUiTimer _chevronHide;
+
+    /// <summary>Whether the pointer currently counts as over the bar. Hover sets it at once; leaving clears
+    /// it only after <see cref="ChevronHideDelay"/>. UI-only, never persisted.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowChevron))]
+    private bool _isChevronVisible;
+
+    /// <summary>Whether the puck draws. A drag masks it without disturbing the hover state, so a gesture that
+    /// ends with the pointer still on the bar brings it straight back. The view binds this, not the flag:
+    /// a style setter cannot override a local binding, so the drag rule has to live here.</summary>
+    public bool ShowChevron => IsChevronVisible && !IsDragging;
+
+    /// <summary>The pointer entered the bar: show the puck and cancel any pending hide.</summary>
+    internal void PointerEnteredBar() {
+        _chevronHide.Stop();
+        IsChevronVisible = true;
+    }
+
+    /// <summary>The pointer left the bar: hide the puck once the grace period elapses. Restarting the timer
+    /// from scratch is what lets a re-entry cancel the pending hide.</summary>
+    internal void PointerExitedBar() {
+        _chevronHide.Stop();
+        _chevronHide.Start();
+    }
+
+    private void OnChevronHideElapsed(object? sender, EventArgs e) {
+        _chevronHide.Stop();
+        IsChevronVisible = false;
+    }
 
     /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
     /// will collapse), away from it when collapsed (it will expand).</summary>
@@ -250,23 +301,13 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => VerticalAlignment.Center,
     };
 
-    /// <summary>Stands the puck fully clear of the bar, so only its flat side touches the edge and the
-    /// whole curve reads against the content area. Needs the view's ClipToBounds and the shell's ZIndex
-    /// to draw — see NavigationView.axaml.</summary>
-    public Thickness ChevronMargin => Orientation switch {
-        NavOrientation.Left => new Thickness(0, 0, -PuckRadius, 0),
-        NavOrientation.Right => new Thickness(-PuckRadius, 0, 0, 0),
-        NavOrientation.Top => new Thickness(0, 0, 0, -PuckRadius),
-        _ => new Thickness(0, -PuckRadius, 0, 0),
-    };
-
-    /// <summary>Rounds the two outward corners by the full radius. On a box that is one radius deep and
-    /// two long, that is exactly a half-disc — no clamping involved.</summary>
+    /// <summary>Rounds the two corners facing into the bar by the full radius. On a box one radius deep
+    /// and two long that is exactly a half-disc — domed inward, flat side flush on the content edge.</summary>
     public CornerRadius ChevronCornerRadius => Orientation switch {
-        NavOrientation.Left => new CornerRadius(0, PuckRadius, PuckRadius, 0),
-        NavOrientation.Right => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
-        NavOrientation.Top => new CornerRadius(0, 0, PuckRadius, PuckRadius),
-        _ => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
+        NavOrientation.Left => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
+        NavOrientation.Right => new CornerRadius(0, PuckRadius, PuckRadius, 0),
+        NavOrientation.Top => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
+        _ => new CornerRadius(0, 0, PuckRadius, PuckRadius),
     };
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
@@ -292,20 +333,72 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Docks the bar to the given window edge.</summary>
     [RelayCommand]
-    private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
+    private void SetOrientation(NavOrientation orientation) => BeginRelocate(orientation);
+
+    // ----- Re-dock fade -----
+
+    /// <summary>How long the bar fades out before it changes edge, and back in after. A DockPanel offers no
+    /// path between edges, so a move can only be tweened as a fade, not a slide.</summary>
+    private static readonly TimeSpan RelocateFade = TimeSpan.FromMilliseconds(120);
+
+    /// <summary>One beat between the edge changing and the fade back in, so the relayout lands while the
+    /// size transitions are still suspended. Without it the .relocating class would drop in the same pass
+    /// that changes the edge, and nothing orders the two — reinstate the size transition first and Width
+    /// tweens from NaN.</summary>
+    private static readonly TimeSpan RelocateSettle = TimeSpan.FromMilliseconds(30);
+
+    private readonly IUiTimer _relocate;
+    private NavOrientation _pendingEdge = NavOrientation.Left;
+    private bool _edgeApplied;
+
+    /// <summary>Whether the bar is mid-move between edges, which fades it out and suspends its size
+    /// transitions. UI-only, never persisted.</summary>
+    [ObservableProperty] private bool _isRelocating;
+
+    /// <summary>Starts a docked-edge change. The edge itself is applied when the fade-out finishes, so the
+    /// relayout happens while the bar is invisible and only its arrival is seen. Every re-dock path — the
+    /// command, the picker and the drag — goes through here, so none of them can skip the fade.</summary>
+    private void BeginRelocate(NavOrientation edge) {
+        // While a move is already in flight it is the pending target, not the current edge, that a new
+        // pick replaces — otherwise re-picking the edge being left would be read as a no-op.
+        if (edge == (IsRelocating ? _pendingEdge : Orientation))
+            return;
+
+        _pendingEdge = edge;
+        _edgeApplied = false;
+        IsRelocating = true;
+        _relocate.Stop();
+        _relocate.Interval = RelocateFade;
+        _relocate.Start();
+    }
+
+    // Two beats, not one: move while still faded out, then let the layout settle before fading back in.
+    private void OnRelocateElapsed(object? sender, EventArgs e) {
+        _relocate.Stop();
+
+        if (!_edgeApplied) {
+            Orientation = _pendingEdge;
+            _edgeApplied = true;
+            _relocate.Interval = RelocateSettle;
+            _relocate.Start();
+            return;
+        }
+
+        IsRelocating = false;
+    }
 
     /// <summary>Asks the shell to open the Help modal.</summary>
     [RelayCommand]
     private void ShowHelp() => HelpRequested?.Invoke();
 
     private void SelectPosition(NavPositionOption option) {
-        Orientation = option.Value;
+        BeginRelocate(option.Value);
         PositionPicked?.Invoke();
     }
 
     /// <summary>Docks the bar to an edge chosen by a drag gesture. Same effect as the picker, so the
     /// Settings control and on-bar flyout stay in sync via <see cref="OnOrientationChanged"/>.</summary>
-    public void DockTo(NavOrientation orientation) => Orientation = orientation;
+    public void DockTo(NavOrientation orientation) => BeginRelocate(orientation);
 
     private void SyncPositions() {
         foreach (var position in Positions)

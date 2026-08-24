@@ -175,6 +175,29 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The drive card whose disk the Disk Activity panel is showing, or null before the load.</summary>
     [ObservableProperty] private DriveCard? _selectedDrive;
 
+    // ----- Reveal (a Performance disk row jumping here) -----
+
+    /// <summary>Raised once a revealed drive has been selected, so the view can scroll its card into sight
+    /// and flash it. UI-only; the card itself is already selected by then.</summary>
+    public event Action? RevealRequested;
+
+    // A reveal that lands before the async card load finds nothing to select, so the disk number waits here
+    // and SelectDefaultDrive consumes it — the same pending-slot shape ToolkitViewModel.Reveal uses.
+    private int? _pendingReveal;
+
+    /// <summary>Points the page at a physical disk, selecting its card and asking the view to reveal it.
+    /// Held until the drives finish loading if it arrives first. An unknown disk number is ignored rather
+    /// than clearing the current selection.</summary>
+    public void Reveal(int diskNumber) {
+        if (_cardsByDisk.TryGetValue(diskNumber, out var card)) {
+            SelectDrive(card);
+            RevealRequested?.Invoke();
+            return;
+        }
+
+        _pendingReveal = diskNumber;
+    }
+
     /// <summary>Redraws the Disk Activity surface (chart, Active time, Avg response, Queue) from the selected
     /// disk's latest sample and kept history. Shows neutral placeholders when that disk has no reading —
     /// a drive the PDH counters don't report, or before the first tick.</summary>
@@ -299,6 +322,16 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private void SelectDefaultDrive(IReadOnlyList<VolumeInfo> volumes, int previousDisk) {
         if (Drives.Count == 0)
             return;
+
+        // A reveal that arrived before the cards existed outranks both: it is what the user just asked for.
+        if (_pendingReveal is { } pending) {
+            _pendingReveal = null;
+            if (_cardsByDisk.TryGetValue(pending, out var revealed)) {
+                SelectDrive(revealed);
+                RevealRequested?.Invoke();
+                return;
+            }
+        }
 
         if (_cardsByDisk.TryGetValue(previousDisk, out var previous)) {
             SelectDrive(previous);

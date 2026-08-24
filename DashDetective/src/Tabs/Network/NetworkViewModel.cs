@@ -123,6 +123,38 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The machine's network adapters (physical + virtual), for the Adapters panel.</summary>
     public ObservableCollection<AdapterInfo> Adapters { get; } = new();
 
+    // ----- Reveal (the Performance network row jumping here) -----
+
+    /// <summary>The adapter name a reveal asked for, so the view can find and flash its row. Cleared once
+    /// the view has taken it. The Adapters panel has no selection of its own — this is a highlight, not a
+    /// selection, which is why the name lives here rather than in a SelectedAdapter property.</summary>
+    private string? _revealedAdapter;
+
+    /// <summary>Raised when an adapter should be flashed in the Adapters panel. UI-only.</summary>
+    public event Action? AdapterRevealRequested;
+
+    /// <summary>Points the page at an adapter by its friendly name — the same name the Performance rail
+    /// row carries. A name matching nothing simply leaves the page as it is, so the jump degrades to a
+    /// plain navigate rather than failing.</summary>
+    public void Reveal(string adapterName) {
+        if (string.IsNullOrWhiteSpace(adapterName))
+            return;
+
+        _revealedAdapter = adapterName;
+        AdapterRevealRequested?.Invoke();
+    }
+
+    /// <summary>Test seam and view seam: takes the pending adapter name, clearing it. Returns null when the
+    /// adapters have not loaded yet, so the caller can wait and ask again.</summary>
+    internal string? TakeRevealedAdapter() {
+        if (_revealedAdapter is null || Adapters.Count == 0)
+            return null;
+
+        var name = _revealedAdapter;
+        _revealedAdapter = null;
+        return name;
+    }
+
     /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
     [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
 
@@ -132,11 +164,23 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Count caption for the connections panel header (e.g. "142 active · page 2 of 3").</summary>
     [ObservableProperty] private string _connectionsSummary = "";
 
-    /// <summary>Google-style pager items (Prev · 1 … 4 5 6 … 20 · Next). Empty when there's one page.</summary>
+    /// <summary>The numbered pager items (1, 2, 3 …). Empty when there's one page. The first/prev/next/last
+    /// arrows are NOT in here: this collection is cleared and rebuilt on every 2.5s poll, and stable commands
+    /// must not be torn down twenty-four times a minute.</summary>
     public ObservableCollection<PageLink> PageLinks { get; } = new();
 
     /// <summary>Whether to show the pager row (only when the list spans more than one page).</summary>
     [ObservableProperty] private bool _pagerVisible;
+
+    /// <summary>Whether there is a page before the current one — the first/prev arrows' enabled state.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(FirstPageCommand), nameof(PreviousPageCommand))]
+    private bool _hasPreviousPage;
+
+    /// <summary>Whether there is a page after the current one — the next/last arrows' enabled state.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextPageCommand), nameof(LastPageCommand))]
+    private bool _hasNextPage;
 
     /// <summary>The ping target, editable in the Ping panel. Seeded with the machine's own gateway.</summary>
     [ObservableProperty] private string _pingTarget = "";
@@ -285,6 +329,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             foreach (var adapter in snapshot.Adapters)
                 Adapters.Add(adapter);
             IpConfig = snapshot.PrimaryConfig;
+            // A reveal that arrived before the adapters loaded has been waiting for a row to point at.
+            if (_revealedAdapter is not null)
+                AdapterRevealRequested?.Invoke();
         } catch when (token.IsCancellationRequested) {
             // Left mid-read: cancelled, or failed once the user had already gone. Either way, keep the
             // last good values for their return.
@@ -326,6 +373,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             Connections.Clear();
             PageLinks.Clear();
             PagerVisible = false;
+            // The arrows are stable commands, so unlike PageLinks they survive a clear — they have to be
+            // disabled by hand or an unavailable list keeps a live pager over it.
+            HasPreviousPage = false;
+            HasNextPage = false;
             ConnectionsSummary = "Connections unavailable";
         }
     }
@@ -372,18 +423,41 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                $"of {totalPages.ToString(CultureInfo.InvariantCulture)}";
     }
 
-    /// <summary>Rebuilds the numbered pager (1, 2, 3, …). Every page fits on one row (the list is
-    /// capped at ten pages), so all numbers are shown with no ellipsis or arrows. Hidden entirely when
-    /// there's only one page.</summary>
+    /// <summary>Rebuilds the numbered pager (1, 2, 3, …). Every page fits on one row (the list is capped at
+    /// ten pages), so all numbers are shown with no ellipsis. The first/prev/next/last arrows bracket them
+    /// and are stable commands, so only their enabled state is refreshed here. Hidden entirely when there's
+    /// only one page.</summary>
     private void RebuildPageLinks(int totalPages) {
         PageLinks.Clear();
         PagerVisible = totalPages > 1;
+        HasPreviousPage = PagerVisible && _currentPage > 1;
+        HasNextPage = PagerVisible && _currentPage < totalPages;
         if (!PagerVisible)
             return;
 
         for (var p = 1; p <= totalPages; p++)
             PageLinks.Add(new PageLink(p, isCurrent: p == _currentPage, GoToPage));
     }
+
+    // ----- Pager arrows -----
+    // Stable commands rather than PageLinks entries, and all four route through the same TryGoToPage the
+    // Ctrl+Left/Ctrl+Right shortcuts use, so keyboard and mouse cannot end up on different pages.
+
+    /// <summary>Jumps to the first page.</summary>
+    [RelayCommand(CanExecute = nameof(HasPreviousPage))]
+    private void FirstPage() => TryGoToPage(1);
+
+    /// <summary>Steps back one page.</summary>
+    [RelayCommand(CanExecute = nameof(HasPreviousPage))]
+    private void PreviousPage() => TryGoToPage(_currentPage - 1);
+
+    /// <summary>Steps forward one page.</summary>
+    [RelayCommand(CanExecute = nameof(HasNextPage))]
+    private void NextPage() => TryGoToPage(_currentPage + 1);
+
+    /// <summary>Jumps to the last page.</summary>
+    [RelayCommand(CanExecute = nameof(HasNextPage))]
+    private void LastPage() => TryGoToPage(_pageCount);
 
     public ShortcutScope Scope => ShortcutScope.Network;
 

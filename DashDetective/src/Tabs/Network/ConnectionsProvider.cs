@@ -27,8 +27,9 @@ namespace DashDetective.Tabs.Network;
 internal sealed class ConnectionsProvider(
     IConnectionsInterop interop, IProcessNameResolver names) : IConnectionsProvider {
     /// <summary>Safety ceiling on rows returned, so a machine with a pathological number of sockets
-    /// can't bloat memory. Well above the UI's max page size (150) — the VM pages the full set
-    /// client-side, only ever binding one page at a time — so this is a backstop, not the display cap.</summary>
+    /// can't bloat memory. Ten times the UI's page size of 100 — the VM pages the full set client-side,
+    /// only ever binding one page at a time — so this is a backstop, not the display cap, and it is what
+    /// caps the pager at ten numbered pages.</summary>
     public const int MaxRows = 1000;
 
     private readonly Dictionary<int, string> _nameCache = new();

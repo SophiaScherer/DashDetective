@@ -5,8 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="236" d:DesignHeight="760"
              x:Class="DashDetective.Shell.Navigation.NavigationView"
-             x:DataType="nav:NavigationViewModel"
-             ClipToBounds="False">
+             x:DataType="nav:NavigationViewModel">
 
     <UserControl.Styles>
         <!-- Sidebar nav rows. Selection-driven visuals are all sourced from theme/accent resources
@@ -26,6 +25,30 @@
         </Style>
         <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
+        </Style>
+
+        <!-- Motion. The rail is the one place in this app that animates, and only for its own two moves:
+             a collapse that snaps 236px to 64px and a bar that teleports between window edges both read as
+             glitches rather than gestures. The size transition is declared PER AXIS because RailWidth and
+             RailHeight are NaN on whichever axis stretches, and NaN is not worth interpolating — a vertical
+             rail tweens Width only, a horizontal one Height only. A dock change cannot be tweened at all
+             (a DockPanel offers no path between edges), so it fades instead: out, relayout while
+             invisible, back in. Both live on the rail Border, which carries no :pointerover of its own. -->
+        <Style Selector="Border.rail:not(.horizontal)">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.rail.horizontal">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Height" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
         </Style>
 
         <!-- Nav row surface + selection highlight. -->
@@ -197,13 +220,12 @@
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
         </Style>
 
-        <!-- Collapse/expand puck: a semi-circle flush against the bar's content-facing edge, revealed
-             only while the pointer is over the bar. Hidden rather than faded (this app uses no
-             transitions), and shown from the host panel's :pointerover so the whole bar is the hover
-             target, not just the puck. A chrome-less button wrapping a styled Border, the same split as
-             the dock menu's `pickTile`/`posTile` pair, so the puck's rounding is its own. -->
+        <!-- Collapse/expand puck: a semi-circle domed into the bar with its flat side flush on the
+             content-facing edge, revealed while the pointer is over the bar and for a grace period after
+             it leaves (NavigationViewModel.PointerEnteredBar/PointerExitedBar) — a bare :pointerover rule
+             snatched it away the moment the pointer wobbled off the rail. A chrome-less button wrapping a
+             styled Border, the same split as the dock menu's `pickTile`/`posTile` pair. -->
         <Style Selector="Button.railChevron">
-            <Setter Property="IsVisible" Value="False"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
@@ -214,10 +236,7 @@
         <Style Selector="Button.railChevron /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
-        <Style Selector="Panel.railHost:pointerover Button.railChevron">
-            <Setter Property="IsVisible" Value="True"/>
-        </Style>
-        <!-- Raised one step off the bar so it reads as sitting on top of the edge, in both themes. -->
+        <!-- Raised one step off the rail's own surface so it reads as sitting on the edge, in both themes. -->
         <Style Selector="Border.puck">
             <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
@@ -236,32 +255,43 @@
         </Style>
 
         <!-- Drag-to-dock: dim the bar where it still sits so it reads as picked up, while the overlay's
-             drop band previews the edge it will land on. Declared after the hover rule above so it wins
-             — Avalonia takes the last matching setter, not the most specific — which keeps the puck out
-             of the way of a moving cursor. -->
+             drop band previews the edge it will land on. The puck is kept out of a moving cursor's way by
+             ShowChevron, not by a style — a setter cannot override the local IsVisible binding. -->
         <Style Selector="Panel.railHost.dragging Border.rail">
             <Setter Property="Opacity" Value="0.4"/>
         </Style>
-        <Style Selector="Panel.railHost.dragging Button.railChevron">
-            <Setter Property="IsVisible" Value="False"/>
+        <!-- Declared after the drag dim so it wins the overlap: a dropped drag re-docks before EndDrag
+             clears the dim, and the arriving bar must be fully out, not four-tenths in. Dropping the size
+             transition for the duration is the other half: a dock change flips which axis is NaN, and NaN
+             is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
+             is insurance rather than a fix for something visible. Opacity keeps its transition here, or
+             there would be no fade at all. -->
+        <Style Selector="Border.rail.relocating">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
         </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
-    <!-- The rail plus its edge puck. The puck is a sibling of the rail, not a child, because it stands
-         entirely outside it: a negative margin the depth of the half-disc's radius lifts it clear, so only
-         its flat side touches the bar's content-facing edge. Two things have to hold for it to draw —
-         `ClipToBounds="False"` on this control (it otherwise clips to its docked slot and the puck
-         vanishes) and the ZIndex the shell gives the bar (it is the DockPanel's first child, so it would
-         paint under the content area). Its negative margin keeps its desired size at zero on that axis,
-         so hosting it here does not widen the bar. -->
-    <Panel x:Name="RailHost" Classes="railHost" Classes.dragging="{Binding IsDragging}">
+    <!-- The rail plus its edge puck. The puck is a sibling of the rail, not a child, so its rounding and
+         alignment are its own, but it now sits INSIDE the bar's bounds — domed inward from the
+         content-facing edge. That is what makes it reliably clickable: reaching for it never leaves the
+         rail, so the hover that reveals it cannot lapse on the way. It also means the view needs no
+         ClipToBounds and the shell no ZIndex, both of which existed only to let it draw outside. -->
+    <Panel x:Name="RailHost" Classes="railHost"
+           Classes.dragging="{Binding IsDragging}"
+           PointerEntered="OnRailPointerEntered" PointerExited="OnRailPointerExited">
 
     <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
          inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
          the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
-            Classes="rail" Classes.collapsed="{Binding IsCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
+            Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
+            Classes.relocating="{Binding IsRelocating}"
             Width="{Binding RailWidth}" Height="{Binding RailHeight}"
             Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
@@ -328,8 +358,8 @@
                         </Viewbox>
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
-                        <TextBlock Text="System Console" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="DashDetective" FontSize="13.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="System Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
             </Panel>
@@ -414,9 +444,9 @@
              the docked edge with no converters, and it reuses the same ToggleCollapse command as the
              Settings control. -->
         <Button Classes="railChevron" Command="{Binding ToggleCollapseCommand}"
+                IsVisible="{Binding ShowChevron}"
                 Width="{Binding ChevronWidth}" Height="{Binding ChevronHeight}"
                 HorizontalAlignment="{Binding ChevronHAlign}" VerticalAlignment="{Binding ChevronVAlign}"
-                Margin="{Binding ChevronMargin}"
                 ToolTip.Tip="Collapse or expand navigation">
             <Border Classes="puck" CornerRadius="{Binding ChevronCornerRadius}">
                 <Path Classes="chevronGlyph" Width="18" Height="18" Stretch="None"
