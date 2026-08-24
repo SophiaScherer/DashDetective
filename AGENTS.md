@@ -1760,14 +1760,19 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
   icons-only rail**, in any orientation. The bar carries **no permanent control chrome**; every entry
   point drives the **same shared** `NavigationViewModel`:
-  - **Collapse/expand** — a **semi-circular puck** standing **entirely outside** the bar, touching its
-    content-facing edge along the flat side only, revealed while the pointer is over the bar. It is a
-    true half-disc: one radius deep, two long, both outward corners rounded by the full radius (no
-    clamping). Its chevron points the way the bar will move (at the docked edge when expanded, away from
-    it when collapsed). It is a sibling of the rail, not a child, and standing outside needs **two**
-    things: `ClipToBounds="False"` on `NavigationView` (which otherwise clips to its docked slot and the
-    puck vanishes) and **`ZIndex="1"`** on the bar in `MainWindow.axaml` (it is the `DockPanel`'s first
-    child, so it would paint under the content area).
+  - **Collapse/expand** — a **semi-circular puck domed INTO the bar**, its flat side flush on the
+    content-facing edge, revealed while the pointer is over the bar **and for a 600 ms grace period after
+    it leaves**. It is a true half-disc: one radius deep, two long, both **inward** corners rounded by the
+    full radius (no clamping). Its chevron points the way the bar will move (at the docked edge when
+    expanded, away from it when collapsed). It is a sibling of the rail, not a child, so its rounding and
+    alignment stay its own. **It used to stand outside the bar and that was the bug**: a hidden control is
+    not hit-testable, so reaching for it left the rail, dropped `:pointerover`, and took the puck away
+    mid-reach. Inside the bounds, reaching for it never leaves the rail. Two consequences: the view needs
+    no `ClipToBounds` and the shell no `ZIndex` (both existed only to let it draw outside), and the
+    reveal is a **bound flag, not a style** — `ShowChevron` (`IsChevronVisible && !IsDragging`), because a
+    style setter cannot override a local `IsVisible` binding, so the drag rule had to move to the VM. The
+    grace period is an `IUiTimer` on the `UniversalSearchViewModel` debounce shape (internal ctor +
+    `FakeUiTimer`), which is what makes it testable headlessly.
   - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
     `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
     items, the footer and any empty space all reach it.
@@ -1777,7 +1782,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
 
   Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
   label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
-  alignment / stand-off / rounding) are **computed properties on the VM — no value converters**. The rail
+  alignment / rounding) are **computed properties on the VM — no value converters**. The rail
   thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`/`RailHeight` delegate
   to and the drop preview measures against; it takes the axis as an argument because a drag previews
   edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to

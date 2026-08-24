@@ -6,12 +6,12 @@ using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
 
-/// <summary>Covers the collapse/expand puck — the semi-circle standing off the bar's content-facing
-/// edge, touching it along its flat side only. Its chevron must point the way the bar will move, and
-/// its size, alignment, stand-off and rounding must all follow the docked edge (all computed on the
-/// view model, no converters).</summary>
+/// <summary>Covers the collapse/expand puck — the semi-circle domed into the bar, its flat side lying on
+/// the content-facing edge. Its chevron must point the way the bar will move, and its size, alignment and
+/// rounding must all follow the docked edge (all computed on the view model, no converters). The reveal
+/// itself lives in <see cref="NavigationChevronRevealTests"/>.</summary>
 public class NavigationChevronTests {
-    // The half-disc's radius: how far it stands clear of the bar, and half its flat side.
+    // The half-disc's radius: how far it reaches into the bar, and half its flat side.
     private const double Radius = 20;
 
     private static NavigationViewModel Bar(NavOrientation orientation, bool collapsed) =>
@@ -70,26 +70,14 @@ public class NavigationChevronTests {
         Assert.Equal(vertical, bar.ChevronVAlign);
     }
 
-    // A negative margin of one radius on the content-facing side only — the other three stay zero, so
-    // the puck clears the bar entirely and touches it along its flat side alone.
+    // Both corners facing INTO the bar rounded by the full radius: on a box one radius deep and two long,
+    // that is exactly a half-disc, domed inward with its flat side on the content-facing edge.
     [Theory]
-    [InlineData(NavOrientation.Left, 0d, 0d, -Radius, 0d)]
-    [InlineData(NavOrientation.Right, -Radius, 0d, 0d, 0d)]
-    [InlineData(NavOrientation.Top, 0d, 0d, 0d, -Radius)]
-    [InlineData(NavOrientation.Bottom, 0d, -Radius, 0d, 0d)]
-    public void ChevronMargin_StandsThePuckClearOfTheBar(
-        NavOrientation orientation, double left, double top, double right, double bottom) {
-        Assert.Equal(new Thickness(left, top, right, bottom), Bar(orientation, collapsed: false).ChevronMargin);
-    }
-
-    // Both outward corners rounded by the full radius: on a box one radius deep and two long, that is
-    // exactly a half-disc.
-    [Theory]
-    [InlineData(NavOrientation.Left, 0d, Radius, Radius, 0d)]
-    [InlineData(NavOrientation.Right, Radius, 0d, 0d, Radius)]
-    [InlineData(NavOrientation.Top, 0d, 0d, Radius, Radius)]
-    [InlineData(NavOrientation.Bottom, Radius, Radius, 0d, 0d)]
-    public void ChevronCornerRadius_RoundsOnlyTheOutwardCorners(
+    [InlineData(NavOrientation.Left, Radius, 0d, 0d, Radius)]
+    [InlineData(NavOrientation.Right, 0d, Radius, Radius, 0d)]
+    [InlineData(NavOrientation.Top, Radius, Radius, 0d, 0d)]
+    [InlineData(NavOrientation.Bottom, 0d, 0d, Radius, Radius)]
+    public void ChevronCornerRadius_RoundsOnlyTheInwardCorners(
         NavOrientation orientation, double topLeft, double topRight, double bottomRight, double bottomLeft) {
         Assert.Equal(new CornerRadius(topLeft, topRight, bottomRight, bottomLeft),
             Bar(orientation, collapsed: false).ChevronCornerRadius);
@@ -131,7 +119,6 @@ public class NavigationChevronTests {
         Assert.Contains(nameof(NavigationViewModel.ChevronHeight), changed);
         Assert.Contains(nameof(NavigationViewModel.ChevronHAlign), changed);
         Assert.Contains(nameof(NavigationViewModel.ChevronVAlign), changed);
-        Assert.Contains(nameof(NavigationViewModel.ChevronMargin), changed);
         Assert.Contains(nameof(NavigationViewModel.ChevronCornerRadius), changed);
     }
 }

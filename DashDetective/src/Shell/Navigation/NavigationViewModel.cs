@@ -6,6 +6,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Identity;
+using DashDetective.Services.Threading;
 using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
@@ -76,7 +77,7 @@ public partial class NavigationViewModel : ViewModelBase {
         nameof(ControlsDock), nameof(FooterAvatarDock),
         nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
         nameof(ChevronHAlign), nameof(ChevronVAlign),
-        nameof(ChevronMargin), nameof(ChevronCornerRadius))]
+        nameof(ChevronCornerRadius))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -99,9 +100,15 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
     /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
-    [ObservableProperty] private bool _isDragging;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowChevron))]
+    private bool _isDragging;
 
-    public NavigationViewModel() {
+    public NavigationViewModel() : this(new DispatcherTimerAdapter()) { }
+
+    /// <summary>Test seam: takes the puck's hide timer explicitly. A real <c>DispatcherTimer</c> only fires
+    /// while an Avalonia dispatcher is pumping, so headless tests inject a fake and tick it by hand.</summary>
+    internal NavigationViewModel(IUiTimer chevronHide) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -109,6 +116,10 @@ public partial class NavigationViewModel : ViewModelBase {
             new("Bottom", NavOrientation.Bottom, SelectPosition),
         };
         SyncPositions();
+
+        _chevronHide = chevronHide;
+        _chevronHide.Interval = ChevronHideDelay;
+        _chevronHide.Tick += OnChevronHideElapsed;
 
         var user = CurrentUserProvider.Load();
         UserName = user.DisplayName;
@@ -208,15 +219,50 @@ public partial class NavigationViewModel : ViewModelBase {
     /// ends, so the two bracket the user's name when it is shown.</summary>
     public Dock FooterAvatarDock => IsRailCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
-    // ----- Collapse/expand puck (the hover-revealed semi-circle on the bar's outer edge) -----
+    // ----- Collapse/expand puck (the hover-revealed semi-circle domed into the bar's content edge) -----
 
-    /// <summary>The semi-circle's radius: how far the puck stands off the bar's edge, and half the
-    /// length of the flat side that meets it. Keeping it exactly half of <see cref="PuckLength"/> is
+    /// <summary>The semi-circle's radius: how far the puck reaches into the bar from its edge, and half
+    /// the length of the flat side lying on it. Keeping it exactly half of <see cref="PuckLength"/> is
     /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
     private const double PuckRadius = 20;
 
     /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
     private const double PuckLength = PuckRadius * 2;
+
+    /// <summary>How long the puck lingers after the pointer leaves the bar, so a moment's wobble on the
+    /// way to it does not snatch it away mid-reach.</summary>
+    private static readonly TimeSpan ChevronHideDelay = TimeSpan.FromMilliseconds(600);
+
+    private readonly IUiTimer _chevronHide;
+
+    /// <summary>Whether the pointer currently counts as over the bar. Hover sets it at once; leaving clears
+    /// it only after <see cref="ChevronHideDelay"/>. UI-only, never persisted.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowChevron))]
+    private bool _isChevronVisible;
+
+    /// <summary>Whether the puck draws. A drag masks it without disturbing the hover state, so a gesture that
+    /// ends with the pointer still on the bar brings it straight back. The view binds this, not the flag:
+    /// a style setter cannot override a local binding, so the drag rule has to live here.</summary>
+    public bool ShowChevron => IsChevronVisible && !IsDragging;
+
+    /// <summary>The pointer entered the bar: show the puck and cancel any pending hide.</summary>
+    internal void PointerEnteredBar() {
+        _chevronHide.Stop();
+        IsChevronVisible = true;
+    }
+
+    /// <summary>The pointer left the bar: hide the puck once the grace period elapses. Restarting the timer
+    /// from scratch is what lets a re-entry cancel the pending hide.</summary>
+    internal void PointerExitedBar() {
+        _chevronHide.Stop();
+        _chevronHide.Start();
+    }
+
+    private void OnChevronHideElapsed(object? sender, EventArgs e) {
+        _chevronHide.Stop();
+        IsChevronVisible = false;
+    }
 
     /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
     /// will collapse), away from it when collapsed (it will expand).</summary>
@@ -250,23 +296,13 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => VerticalAlignment.Center,
     };
 
-    /// <summary>Stands the puck fully clear of the bar, so only its flat side touches the edge and the
-    /// whole curve reads against the content area. Needs the view's ClipToBounds and the shell's ZIndex
-    /// to draw — see NavigationView.axaml.</summary>
-    public Thickness ChevronMargin => Orientation switch {
-        NavOrientation.Left => new Thickness(0, 0, -PuckRadius, 0),
-        NavOrientation.Right => new Thickness(-PuckRadius, 0, 0, 0),
-        NavOrientation.Top => new Thickness(0, 0, 0, -PuckRadius),
-        _ => new Thickness(0, -PuckRadius, 0, 0),
-    };
-
-    /// <summary>Rounds the two outward corners by the full radius. On a box that is one radius deep and
-    /// two long, that is exactly a half-disc — no clamping involved.</summary>
+    /// <summary>Rounds the two corners facing into the bar by the full radius. On a box one radius deep
+    /// and two long that is exactly a half-disc — domed inward, flat side flush on the content edge.</summary>
     public CornerRadius ChevronCornerRadius => Orientation switch {
-        NavOrientation.Left => new CornerRadius(0, PuckRadius, PuckRadius, 0),
-        NavOrientation.Right => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
-        NavOrientation.Top => new CornerRadius(0, 0, PuckRadius, PuckRadius),
-        _ => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
+        NavOrientation.Left => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
+        NavOrientation.Right => new CornerRadius(0, PuckRadius, PuckRadius, 0),
+        NavOrientation.Top => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
+        _ => new CornerRadius(0, 0, PuckRadius, PuckRadius),
     };
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
