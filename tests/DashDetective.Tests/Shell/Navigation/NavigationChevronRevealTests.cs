@@ -10,7 +10,7 @@ namespace DashDetective.Tests.Shell.Navigation;
 public class NavigationChevronRevealTests {
     private static (NavigationViewModel Bar, FakeUiTimer Hide) Bar() {
         var hide = new FakeUiTimer();
-        return (new NavigationViewModel(hide), hide);
+        return (new NavigationViewModel(hide, new FakeUiTimer()), hide);
     }
 
     [Fact]

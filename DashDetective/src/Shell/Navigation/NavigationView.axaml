@@ -27,6 +27,30 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
+        <!-- Motion. The rail is the one place in this app that animates, and only for its own two moves:
+             a collapse that snaps 236px to 64px and a bar that teleports between window edges both read as
+             glitches rather than gestures. The size transition is declared PER AXIS because RailWidth and
+             RailHeight are NaN on whichever axis stretches, and NaN is not worth interpolating — a vertical
+             rail tweens Width only, a horizontal one Height only. A dock change cannot be tweened at all
+             (a DockPanel offers no path between edges), so it fades instead: out, relayout while
+             invisible, back in. Both live on the rail Border, which carries no :pointerover of its own. -->
+        <Style Selector="Border.rail:not(.horizontal)">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.rail.horizontal">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Height" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
         <!-- Nav row surface + selection highlight. -->
         <Style Selector="Border.rail Border.navRow">
             <Setter Property="Background" Value="Transparent"/>
@@ -236,6 +260,20 @@
         <Style Selector="Panel.railHost.dragging Border.rail">
             <Setter Property="Opacity" Value="0.4"/>
         </Style>
+        <!-- Declared after the drag dim so it wins the overlap: a dropped drag re-docks before EndDrag
+             clears the dim, and the arriving bar must be fully out, not four-tenths in. Dropping the size
+             transition for the duration is the other half: a dock change flips which axis is NaN, and NaN
+             is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
+             is insurance rather than a fix for something visible. Opacity keeps its transition here, or
+             there would be no fade at all. -->
+        <Style Selector="Border.rail.relocating">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
@@ -253,6 +291,7 @@
          the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
             Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
+            Classes.relocating="{Binding IsRelocating}"
             Width="{Binding RailWidth}" Height="{Binding RailHeight}"
             Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">

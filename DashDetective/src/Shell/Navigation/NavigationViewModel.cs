@@ -104,11 +104,12 @@ public partial class NavigationViewModel : ViewModelBase {
     [NotifyPropertyChangedFor(nameof(ShowChevron))]
     private bool _isDragging;
 
-    public NavigationViewModel() : this(new DispatcherTimerAdapter()) { }
+    public NavigationViewModel() : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter()) { }
 
-    /// <summary>Test seam: takes the puck's hide timer explicitly. A real <c>DispatcherTimer</c> only fires
-    /// while an Avalonia dispatcher is pumping, so headless tests inject a fake and tick it by hand.</summary>
-    internal NavigationViewModel(IUiTimer chevronHide) {
+    /// <summary>Test seam: takes the puck's hide timer and the re-dock fade timer explicitly. A real
+    /// <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is pumping, so headless tests inject
+    /// fakes and tick them by hand.</summary>
+    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -120,6 +121,10 @@ public partial class NavigationViewModel : ViewModelBase {
         _chevronHide = chevronHide;
         _chevronHide.Interval = ChevronHideDelay;
         _chevronHide.Tick += OnChevronHideElapsed;
+
+        _relocate = relocate;
+        _relocate.Interval = RelocateFade;
+        _relocate.Tick += OnRelocateElapsed;
 
         var user = CurrentUserProvider.Load();
         UserName = user.DisplayName;
@@ -328,20 +333,72 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Docks the bar to the given window edge.</summary>
     [RelayCommand]
-    private void SetOrientation(NavOrientation orientation) => Orientation = orientation;
+    private void SetOrientation(NavOrientation orientation) => BeginRelocate(orientation);
+
+    // ----- Re-dock fade -----
+
+    /// <summary>How long the bar fades out before it changes edge, and back in after. A DockPanel offers no
+    /// path between edges, so a move can only be tweened as a fade, not a slide.</summary>
+    private static readonly TimeSpan RelocateFade = TimeSpan.FromMilliseconds(120);
+
+    /// <summary>One beat between the edge changing and the fade back in, so the relayout lands while the
+    /// size transitions are still suspended. Without it the .relocating class would drop in the same pass
+    /// that changes the edge, and nothing orders the two — reinstate the size transition first and Width
+    /// tweens from NaN.</summary>
+    private static readonly TimeSpan RelocateSettle = TimeSpan.FromMilliseconds(30);
+
+    private readonly IUiTimer _relocate;
+    private NavOrientation _pendingEdge = NavOrientation.Left;
+    private bool _edgeApplied;
+
+    /// <summary>Whether the bar is mid-move between edges, which fades it out and suspends its size
+    /// transitions. UI-only, never persisted.</summary>
+    [ObservableProperty] private bool _isRelocating;
+
+    /// <summary>Starts a docked-edge change. The edge itself is applied when the fade-out finishes, so the
+    /// relayout happens while the bar is invisible and only its arrival is seen. Every re-dock path — the
+    /// command, the picker and the drag — goes through here, so none of them can skip the fade.</summary>
+    private void BeginRelocate(NavOrientation edge) {
+        // While a move is already in flight it is the pending target, not the current edge, that a new
+        // pick replaces — otherwise re-picking the edge being left would be read as a no-op.
+        if (edge == (IsRelocating ? _pendingEdge : Orientation))
+            return;
+
+        _pendingEdge = edge;
+        _edgeApplied = false;
+        IsRelocating = true;
+        _relocate.Stop();
+        _relocate.Interval = RelocateFade;
+        _relocate.Start();
+    }
+
+    // Two beats, not one: move while still faded out, then let the layout settle before fading back in.
+    private void OnRelocateElapsed(object? sender, EventArgs e) {
+        _relocate.Stop();
+
+        if (!_edgeApplied) {
+            Orientation = _pendingEdge;
+            _edgeApplied = true;
+            _relocate.Interval = RelocateSettle;
+            _relocate.Start();
+            return;
+        }
+
+        IsRelocating = false;
+    }
 
     /// <summary>Asks the shell to open the Help modal.</summary>
     [RelayCommand]
     private void ShowHelp() => HelpRequested?.Invoke();
 
     private void SelectPosition(NavPositionOption option) {
-        Orientation = option.Value;
+        BeginRelocate(option.Value);
         PositionPicked?.Invoke();
     }
 
     /// <summary>Docks the bar to an edge chosen by a drag gesture. Same effect as the picker, so the
     /// Settings control and on-bar flyout stay in sync via <see cref="OnOrientationChanged"/>.</summary>
-    public void DockTo(NavOrientation orientation) => Orientation = orientation;
+    public void DockTo(NavOrientation orientation) => BeginRelocate(orientation);
 
     private void SyncPositions() {
         foreach (var position in Positions)

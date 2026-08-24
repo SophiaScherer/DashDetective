@@ -1778,6 +1778,16 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     items, the footer and any empty space all reach it.
   - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
     in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
+  - **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
+    **collapse tweens the rail's size** (~150ms, `CubicEaseOut`); the transition is declared **per axis**
+    (`Border.rail:not(.horizontal)` → `Width`, `.horizontal` → `Height`) because `RailWidth`/`RailHeight`
+    are `NaN` on whichever axis stretches. A **re-dock fades** — out 120ms, change edge, back in — because
+    a `DockPanel` offers no path between edges to slide along. Every re-dock path (command, picker, drag)
+    funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
+    changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
+    the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
+    dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
+    otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
   - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 
   Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
