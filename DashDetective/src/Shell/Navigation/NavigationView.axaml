@@ -358,8 +358,8 @@
                         </Viewbox>
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
-                        <TextBlock Text="System Console" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="DashDetective" FontSize="13.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="System Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
             </Panel>
