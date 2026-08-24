@@ -1799,6 +1799,23 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
   *Persistence* below); this is shared shell work, not a tab-local change.
 
+- **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the
+  tab that owns the selected device: a disk row to **Storage** (selecting that drive), the network row to
+  **Network** (flashing that adapter), and CPU/Memory/GPU to **Hardware** (tab only — it is a static spec
+  sheet with nothing to select). Built on the **`ToolkitViewModel.FileExplorerRevealRequested` shape**, and
+  that is the rule: `PerformanceViewModel` raises `StorageRevealRequested(int)` /
+  `NetworkRevealRequested(string)` / `HardwareRevealRequested`, naming a device and **nothing about which
+  tab shows it** — only `MainWindowViewModel` knows the wiring. Payloads are identities the destinations
+  already key on (the physical disk number, the adapter's friendly name), and the disk number match is exact
+  by construction: `DeviceInventory` names disk rows from the same `StorageComposer.Compose` the Storage
+  cards use. `ResourceRow` stays a data model — it carries a `ResourceLink` (label + command) built by the
+  view model, never routing of its own. **Both destinations load asynchronously from their constructors**, so
+  each needs the pending-slot treatment: `StorageViewModel._pendingReveal` is drained in `SelectDefaultDrive`
+  (outranking both the previous-disk and system-disk defaults), and `NetworkViewModel` re-raises after
+  `LoadAdaptersAsync`. A name or disk that matches nothing **degrades to a plain navigate**, never a failed
+  jump. The link is a new shared **`Button.link`** style (accent text + arrow) rather than a clickable title:
+  a bare title offers no resting cue that it goes anywhere.
+
 - **Dashboard** — the **CPU, Memory, GPU, Storage and Network surfaces are live and functional**. CPU:
   the CPU `StatCard`, the "CPU Utilization" panel, and the System Information **CPU** and **Cores**
   rows. Memory: the Memory `StatCard`, the "Memory Utilization" panel, and the System

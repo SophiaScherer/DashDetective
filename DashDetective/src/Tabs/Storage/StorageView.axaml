@@ -50,6 +50,20 @@
         <Style Selector="TextBlock.metricValue">
             <Setter Property="FontSize" Value="11.5"/>
         </Style>
+        <!-- Reveal flash for a drive arrived at from the Performance tab. The transition sits directly on
+             the card because it carries no :pointerover of its own — the SettingsView.settingRow case, not
+             the Toolkit one that needs a separate layer to keep hover from smearing. -->
+        <Style Selector="Border.driveCard">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.driveCard.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
         <!-- ===== Drive picker (Disk Activity header) ===== -->
         <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
              deliberately light — it sits inside a panel header, so it reads as part of the title rather
@@ -115,7 +129,9 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DriveCard">
-                    <Border Classes="panel">
+                    <!-- Tag carries the physical disk number so a reveal can find this card without the
+                         view keeping a parallel list — the SettingsView.FindRow arrangement. -->
+                    <Border Classes="panel driveCard" Tag="{Binding DiskNumber}">
                         <StackPanel Spacing="0">
                             <!-- Header: name + health pill. -->
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">

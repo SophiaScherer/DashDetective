@@ -55,6 +55,19 @@
         </Style>
         <!-- Google-style pager: page-number / arrow buttons, with the current page accented and
              ellipsis / end-arrows dimmed via the disabled state. -->
+        <!-- Reveal flash for an adapter arrived at from the Performance tab. The transition sits directly
+             on the row: it carries no :pointerover, so there is nothing for a hover to smear. -->
+        <Style Selector="Border.adapterRow">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.adapterRow.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
+
         <Style Selector="Button.pageLink">
             <Setter Property="MinWidth" Value="30"/>
             <Setter Property="Height" Value="30"/>
@@ -95,7 +108,10 @@
                                 <DataTemplate x:DataType="vm:AdapterInfo">
                                     <!-- Right padding reserves a gutter so the vertical scrollbar sits
                                          beside the row content (link speed) rather than over it. -->
-                                    <Border BorderBrush="{DynamicResource RowLine}"
+                                    <!-- Tag carries the adapter name so a reveal from the Performance tab
+                                         can find this row without a parallel list here. -->
+                                    <Border Classes="adapterRow" Tag="{Binding Name}"
+                                            BorderBrush="{DynamicResource RowLine}"
                                             BorderThickness="0,0,0,1" Padding="0,9,14,9">
                                         <Grid ColumnDefinitions="Auto,*,Auto">
                                             <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"

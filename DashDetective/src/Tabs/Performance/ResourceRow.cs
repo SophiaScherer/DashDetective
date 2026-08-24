@@ -130,6 +130,12 @@ public partial class ResourceRow : ObservableObject {
 
     public ICommand SelectCommand { get; }
 
+    /// <summary>Where this resource lives on another tab, or null for one with nowhere to go.</summary>
+    public ResourceLink? Link { get; init; }
+
+    /// <summary>Whether this resource offers a jump — the link button's visibility.</summary>
+    public bool HasLink => Link is not null;
+
     [ObservableProperty] private bool _isSelected;
 
     /// <summary>Whether this resource offers an "Overall / Detailed" chart toggle (CPU logical processors,

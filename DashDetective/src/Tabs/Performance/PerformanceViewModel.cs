@@ -57,6 +57,21 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Raised when <see cref="ShowAllDevices"/> changes, so the shell can persist the choice.</summary>
     public event Action? ScopeChanged;
 
+    // ----- Jumps to the tab that owns the selected device -----
+    // The same shape as ToolkitViewModel.FileExplorerRevealRequested: this page names a device and says
+    // nothing about which tab shows it, so the shell alone knows the wiring. Payloads are the identities
+    // the destination pages already key on — the physical disk number and the adapter's friendly name.
+
+    /// <summary>Raised with a physical disk number when a disk row asks to be opened on the Storage tab.</summary>
+    public event Action<int>? StorageRevealRequested;
+
+    /// <summary>Raised with an adapter's friendly name when the network row asks for the Network tab.</summary>
+    public event Action<string>? NetworkRevealRequested;
+
+    /// <summary>Raised when a CPU / memory / GPU row asks for the Hardware tab. Carries nothing: that page
+    /// is a static spec sheet with no per-device selection to reveal.</summary>
+    public event Action? HardwareRevealRequested;
+
     /// <summary>Raised when a resource's Overall/Detailed view changes, so the shell can persist the choice.</summary>
     public event Action? DetailChanged;
 
@@ -216,14 +231,14 @@ public partial class PerformanceViewModel : ViewModelBase,
                                   new[] {
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
-                                  }, Select);
+                                  }, Select) { Link = HardwareLink() };
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
                                      _memoryHistory.Points(100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
                                          _memCachedTile, _memCommittedTile,
-                                     }, Select);
+                                     }, Select) { Link = HardwareLink() };
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
         // read once at construction (it rarely changes).
@@ -241,6 +256,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             LegendLabel2 = "Send",
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
+            Link = NetworkLink(adapterName),
         };
 
         // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
@@ -554,7 +570,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             var responseTile = new StatTile("Response", "0 ms");
             var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       history.Points(100),
-                                      new[] { activeTile, readTile, writeTile, responseTile }, Select);
+                                      new[] { activeTile, readTile, writeTile, responseTile }, Select) {
+                Link = StorageLink(disk.DiskNumber),
+            };
             var resource = new DiskResource {
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
                 ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
@@ -597,7 +615,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
                                           tempTile, powerTile,
-                                      }, Select) { IsDetailed = _gpuDetailed };
+                                      }, Select) { IsDetailed = _gpuDetailed, Link = HardwareLink() };
             var resource = new GpuResource {
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
@@ -616,6 +634,22 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateGpuAdapters();
         UpdateGpuSensors();
     }
+
+    // ----- Link builders -----
+    // One per destination, so a row is given its jump where its identity is already in hand. Each closes
+    // over that identity and raises the matching event; nothing here knows what a Storage or Network tab is.
+
+    // A disk with no number cannot be pointed at, so it gets no link rather than a dead one.
+    private ResourceLink? StorageLink(int? diskNumber) =>
+        diskNumber is { } disk and >= 0
+            ? new ResourceLink("View in Storage", () => StorageRevealRequested?.Invoke(disk))
+            : null;
+
+    private ResourceLink NetworkLink(string adapterName) =>
+        new("View in Network", () => NetworkRevealRequested?.Invoke(adapterName));
+
+    private ResourceLink HardwareLink() =>
+        new("View in Hardware", () => HardwareRevealRequested?.Invoke());
 
     /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
     /// shared-memory adapter, or a failed read). Reuses the shared byte humanizer, so a small integrated

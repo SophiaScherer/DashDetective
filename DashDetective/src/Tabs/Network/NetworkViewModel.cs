@@ -123,6 +123,38 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The machine's network adapters (physical + virtual), for the Adapters panel.</summary>
     public ObservableCollection<AdapterInfo> Adapters { get; } = new();
 
+    // ----- Reveal (the Performance network row jumping here) -----
+
+    /// <summary>The adapter name a reveal asked for, so the view can find and flash its row. Cleared once
+    /// the view has taken it. The Adapters panel has no selection of its own — this is a highlight, not a
+    /// selection, which is why the name lives here rather than in a SelectedAdapter property.</summary>
+    private string? _revealedAdapter;
+
+    /// <summary>Raised when an adapter should be flashed in the Adapters panel. UI-only.</summary>
+    public event Action? AdapterRevealRequested;
+
+    /// <summary>Points the page at an adapter by its friendly name — the same name the Performance rail
+    /// row carries. A name matching nothing simply leaves the page as it is, so the jump degrades to a
+    /// plain navigate rather than failing.</summary>
+    public void Reveal(string adapterName) {
+        if (string.IsNullOrWhiteSpace(adapterName))
+            return;
+
+        _revealedAdapter = adapterName;
+        AdapterRevealRequested?.Invoke();
+    }
+
+    /// <summary>Test seam and view seam: takes the pending adapter name, clearing it. Returns null when the
+    /// adapters have not loaded yet, so the caller can wait and ask again.</summary>
+    internal string? TakeRevealedAdapter() {
+        if (_revealedAdapter is null || Adapters.Count == 0)
+            return null;
+
+        var name = _revealedAdapter;
+        _revealedAdapter = null;
+        return name;
+    }
+
     /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
     [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
 
@@ -285,6 +317,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             foreach (var adapter in snapshot.Adapters)
                 Adapters.Add(adapter);
             IpConfig = snapshot.PrimaryConfig;
+            // A reveal that arrived before the adapters loaded has been waiting for a row to point at.
+            if (_revealedAdapter is not null)
+                AdapterRevealRequested?.Invoke();
         } catch when (token.IsCancellationRequested) {
             // Left mid-read: cancelled, or failed once the user had already gone. Either way, keep the
             // last good values for their return.

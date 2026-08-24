@@ -198,6 +198,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // makes, so it reuses it rather than teaching the page about another tab.
         _toolkit.FileExplorerRevealRequested += RevealFile;
 
+        // The Performance rail names real devices, so its detail header offers a jump to the tab that owns
+        // the selected one. Same arrangement as the Toolkit row above: the page raises what it is looking
+        // at, and only the shell knows which tab that means.
+        _performance.StorageRevealRequested += RevealDrive;
+        _performance.NetworkRevealRequested += RevealAdapter;
+        _performance.HardwareRevealRequested += ShowHardware;
+
         // Seed once so the clock is correct on the first frame, then tick every second.
         UpdateClock();
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -570,6 +577,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavigateToPage(_fileExplorer);
         _fileExplorer.Reveal(path);
     }
+
+    /// <summary>Opens Storage with the given physical disk's card selected.</summary>
+    private void RevealDrive(int diskNumber) {
+        NavigateToPage(_storage);
+        _storage.Reveal(diskNumber);
+    }
+
+    /// <summary>Opens Network with the named adapter's row flashed in the Adapters panel.</summary>
+    private void RevealAdapter(string adapterName) {
+        NavigateToPage(_network);
+        _network.Reveal(adapterName);
+    }
+
+    /// <summary>Opens Hardware. No reveal: it is a static spec sheet with nothing to select.</summary>
+    private void ShowHardware() => NavigateToPage(_hardware);
 
     /// <summary>Disposes the page view models, the shared metrics service and the settings store on
     /// shutdown, flushing any pending save. Driven by the composition root.</summary>
