@@ -136,7 +136,10 @@
                          lines are unexplained. The value labels are live because the ceiling follows the
                          traffic; the percentage charts above can state theirs as literals. -->
                     <Grid ColumnDefinitions="*,Auto">
+                        <!-- Trims: the caption carries the adapter NAME, which runs long on a virtual or
+                             filter adapter, and an untrimmed TextBlock overflows its column into the key. -->
                         <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
                                    Text="{Binding NetworkChartCaption}"/>
                         <controls:ChartLegend Grid.Column="1"
                                               Label1="Download" Brush1="{DynamicResource ChartNetDown}"

@@ -167,7 +167,10 @@
                     <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
                          supports it: CPU logical processors / GPU engines). -->
                     <Grid ColumnDefinitions="*,Auto">
+                        <!-- Trims: the star column shrinks under the toggle beside it, and an untrimmed
+                             TextBlock overflows its column rather than clipping to it. -->
                         <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
                                    Text="{Binding SelectedResource.ChartCaption}"/>
                         <Border Grid.Column="1" Classes="segments"
                                 IsVisible="{Binding SelectedResource.SupportsDetail}">
