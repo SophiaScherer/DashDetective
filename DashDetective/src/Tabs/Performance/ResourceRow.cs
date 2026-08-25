@@ -126,7 +126,14 @@ public partial class ResourceRow : ObservableObject {
     /// caption line takes no space on a resource that is reporting normally.</summary>
     public bool HasNote => Note.Length > 0;
 
-    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
+    /// <summary><see cref="Note"/> as a tooltip, or null when there is nothing to say. Avalonia only skips
+    /// a tooltip on null, so binding the bare string pops an empty one on every healthy resource.</summary>
+    public string? NoteTip => HasNote ? Note : null;
+
+    partial void OnNoteChanged(string value) {
+        OnPropertyChanged(nameof(HasNote));
+        OnPropertyChanged(nameof(NoteTip));
+    }
 
     public ICommand SelectCommand { get; }
 

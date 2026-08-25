@@ -100,9 +100,11 @@ public class PerformanceGpuRowTests {
         var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
         Assert.True(row.HasNote);
         Assert.Equal("This GPU's driver publishes no utilization figure.", row.Note);
+        Assert.Equal(row.Note, row.NoteTip);
     }
 
-    /// <summary>An adapter that reports carries no note, so the caption line stays out of the way.</summary>
+    /// <summary>An adapter that reports carries no note, so the caption line stays out of the way — and the
+    /// tooltip is null rather than empty, or hovering the card would pop an empty box.</summary>
     [Fact]
     public async Task LoadInventoryAsync_AdapterThatReports_CarriesNoNote() {
         var (viewModel, _) = await LoadedAsync(
@@ -113,5 +115,6 @@ public class PerformanceGpuRowTests {
         var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
         Assert.False(row.HasNote);
         Assert.Equal("", row.Note);
+        Assert.Null(row.NoteTip);
     }
 }
