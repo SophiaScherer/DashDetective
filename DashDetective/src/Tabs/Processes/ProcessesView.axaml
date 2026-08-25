@@ -102,16 +102,14 @@
         <Style Selector="Border.procRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <!-- Selection wins over hover (defined after :pointerover). A solid accent bar down the left
-             edge makes the selected row unmistakable in both themes; the soft accent fill tints the
-             rest. The 3px left border is offset by trimming the left padding 16→13 so the row content
-             doesn't shift when selected. Accent brushes are DynamicResource so they track the runtime
-             accent (ThemeService.SetAccent). -->
+        <!-- Selection wins over hover (defined after :pointerover) and is fill-only, like File Explorer's
+             fileRow. A Border has ONE BorderBrush for every edge, so an accent bar down the left also
+             repaints the bottom row rule in the accent — a 3px left and 1px bottom reading as one lopsided
+             border, shaved on the first and last rows by the panel's rounded clip. Leaving the base
+             BorderThickness alone keeps that rule neutral, and the fill carries the selection on its own.
+             AccentSoft is DynamicResource so it tracks the runtime accent (ThemeService.SetAccent). -->
         <Style Selector="Border.procRow.selected">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-            <Setter Property="BorderThickness" Value="3,0,0,1"/>
-            <Setter Property="Padding" Value="13,8"/>
         </Style>
         <Style Selector="Border.procRow.selected:pointerover">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
