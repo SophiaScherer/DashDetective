@@ -62,18 +62,21 @@
 
         <!-- Expand/collapse chevron: a chrome-less button (the shared Button.bare) in the name cell. Its
              16px slot is reserved on every row (empty when the entry has no children) so names stay
-             aligned parent-to-child; only that slot is local here. -->
+             aligned parent-to-child; only that slot is local here.
+
+             The hit target is that whole column, top of the row to bottom. Button.bare zeroes Padding and
+             MinHeight, so left alone the button measures to the glyph and leaves a dead band above and below
+             it INSIDE the slot: a click there missed the button, fell through to the row's Tapped, and
+             selected instead of expanding. Stretch fills the cell; the negative margin then bleeds over the
+             row's own 8px vertical padding, which the cell does not cover. The margin is negative so it does
+             NOT feed back into measure — a MinHeight would make every row taller instead. KEEP THE -8 IN STEP
+             WITH Border.procRow's Padding below. -->
         <Style Selector="Button.chev">
             <Setter Property="Width" Value="16"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="Button.chev TextBlock">
-            <Setter Property="FontSize" Value="9"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        </Style>
-        <Style Selector="Button.chev:pointerover TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,-8"/>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
@@ -102,16 +105,14 @@
         <Style Selector="Border.procRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
-        <!-- Selection wins over hover (defined after :pointerover). A solid accent bar down the left
-             edge makes the selected row unmistakable in both themes; the soft accent fill tints the
-             rest. The 3px left border is offset by trimming the left padding 16→13 so the row content
-             doesn't shift when selected. Accent brushes are DynamicResource so they track the runtime
-             accent (ThemeService.SetAccent). -->
+        <!-- Selection wins over hover (defined after :pointerover) and is fill-only, like File Explorer's
+             fileRow. A Border has ONE BorderBrush for every edge, so an accent bar down the left also
+             repaints the bottom row rule in the accent — a 3px left and 1px bottom reading as one lopsided
+             border, shaved on the first and last rows by the panel's rounded clip. Leaving the base
+             BorderThickness alone keeps that rule neutral, and the fill carries the selection on its own.
+             AccentSoft is DynamicResource so it tracks the runtime accent (ThemeService.SetAccent). -->
         <Style Selector="Border.procRow.selected">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-            <Setter Property="BorderThickness" Value="3,0,0,1"/>
-            <Setter Property="Padding" Value="13,8"/>
         </Style>
         <Style Selector="Border.procRow.selected:pointerover">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
@@ -119,6 +120,16 @@
         <Style Selector="Border.procRow TextBlock">
             <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- The chevron glyph, sized DELIBERATELY BELOW the cell text. These must stay BELOW the rule above:
+             the glyph matches both selectors, and Avalonia settles that by declaration order rather than
+             specificity, so declared alongside Button.chev the 9 lost to the row's 12.5. -->
+        <Style Selector="Button.chev TextBlock">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        </Style>
+        <Style Selector="Button.chev:pointerover TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style Selector="TextBlock.cellName">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>

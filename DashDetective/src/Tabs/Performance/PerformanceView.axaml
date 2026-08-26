@@ -109,7 +109,7 @@
                         <Button Classes="bare" Command="{Binding SelectCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                             <Border Classes="resCard" Classes.selected="{Binding IsSelected}"
-                                    ToolTip.Tip="{Binding Note}">
+                                    ToolTip.Tip="{Binding NoteTip}">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Classes="resName" Text="{Binding Name}"/>
@@ -167,7 +167,10 @@
                     <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
                          supports it: CPU logical processors / GPU engines). -->
                     <Grid ColumnDefinitions="*,Auto">
+                        <!-- Trims: the star column shrinks under the toggle beside it, and an untrimmed
+                             TextBlock overflows its column rather than clipping to it. -->
                         <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
                                    Text="{Binding SelectedResource.ChartCaption}"/>
                         <Border Grid.Column="1" Classes="segments"
                                 IsVisible="{Binding SelectedResource.SupportsDetail}">
@@ -216,19 +219,16 @@
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                         StatusText="{Binding SelectedResource.ChartStatus}"/>
 
-                    <!-- Detailed: one mini chart per logical processor / engine in a compact square grid.
-                         DetailColumns is the ceiling rather than a fixed count,
-                         so the square-ish shape holds on a wide pane but wraps below it when a cell
-                         would drop under 110px. The panel sizes to its content up to MaxHeight, so a
-                         small grid shows flush while many cores scroll. -->
+                    <!-- Detailed: one mini chart per logical processor / engine. Uncapped like the
+                         Dashboard card strip, so the cells reflow to fill the pane instead of stretching;
+                         110px is the width below which one wraps. The panel sizes to its content up to
+                         MaxHeight, so a small grid shows flush while many cores scroll. -->
                     <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding SelectedResource.IsDetailed}">
                         <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <layout:UniformFlowPanel x:DataType="vm:PerformanceViewModel"
-                                                             MinItemWidth="110" ColumnSpacing="8" RowSpacing="8"
-                                                             MaxColumns="{Binding SelectedResource.DetailColumns}"/>
+                                    <layout:UniformFlowPanel MinItemWidth="110" ColumnSpacing="8" RowSpacing="8"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -251,13 +251,13 @@
                 </StackPanel>
             </Border>
 
-            <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most,
-                 six for CPU wrapping to further rows once a tile would fall under 150px. -->
+            <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most, six
+                 for CPU. Uncapped like the Dashboard card strip, so a wide pane gains columns rather than
+                 widening the tiles; 150px is the width below which one wraps. -->
             <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <layout:UniformFlowPanel MinItemWidth="150" MaxColumns="4"
-                                                 ColumnSpacing="12" RowSpacing="12"/>
+                        <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>

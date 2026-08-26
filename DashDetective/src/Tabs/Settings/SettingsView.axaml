@@ -14,12 +14,17 @@
          in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
          store. Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
     <UserControl.Styles>
+        <!-- Both trim. Each row is a star column beside an Auto control, so the text column shrinks as the
+             window narrows, and an untrimmed TextBlock overflows its column instead of clipping to it —
+             the description drew straight under the segmented control at the window's minimum. -->
         <Style Selector="TextBlock.settingName">
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style Selector="TextBlock.settingDesc">
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <!-- One row per setting. Each carries its SettingId as its Tag, which is how a jump from

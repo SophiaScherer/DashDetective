@@ -39,6 +39,12 @@ public partial class DashboardCard : ObservableObject {
     /// a line of its own, so the template hangs it off the tooltip.</summary>
     [ObservableProperty] private string _note = "";
 
+    /// <summary><see cref="Note"/> as a tooltip, or null when there is nothing to say. Avalonia only skips
+    /// a tooltip on null, so binding the bare string pops an empty one on every healthy card.</summary>
+    public string? NoteTip => Note.Length > 0 ? Note : null;
+
+    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(NoteTip));
+
     // Category flags the StatCard template binds to Classes.* so each card picks up its semantic accent brush
     // (ChartCpu / ChartMemory / …) via style setters, keeping the accents theme/accent-aware.
     public bool IsCpu => Category == DeviceCategory.Cpu;
