@@ -30,6 +30,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Palette.axaml"/>
+                <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Dimensions.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

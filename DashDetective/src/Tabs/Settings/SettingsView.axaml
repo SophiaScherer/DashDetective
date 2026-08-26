@@ -29,18 +29,12 @@
 
         <!-- One row per setting. Each carries its SettingId as its Tag, which is how a jump from
              universal search finds the row to scroll to (see the code-behind) without the page needing
-             a name for every control. The transition makes the flash fade out rather than blink off. -->
+             a name for every control. The reveal tint and its fade come from the shared
+             Border.revealFlash, which every row also carries. This style must NOT set Background:
+             Avalonia ranks styles by how close their host is to the control, so a Background here — even
+             Transparent — outranks the app-level .highlighted rule and the flash never shows. -->
         <Style Selector="Border.settingRow">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.settingRow.highlighted">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         </Style>
         <!-- A setting this platform cannot honour. The whole row dims, not just its control: a disabled
              toggle alone is indistinguishable from one that is merely off. -->
@@ -73,7 +67,7 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Appearance"/>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.Theme}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Theme}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Classes="settingName" Text="{Binding Catalog.Theme.Name}"/>
@@ -100,7 +94,7 @@
                 </Grid>
                 </Border>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.Accent}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Accent}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Classes="settingName" Text="{Binding Catalog.Accent.Name}"/>
@@ -143,7 +137,7 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Navigation"/>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NavPosition}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.NavPosition}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Classes="settingName" Text="{Binding Catalog.NavPosition.Name}"/>
@@ -170,7 +164,7 @@
                 </Grid>
                 </Border>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NavCollapse}"
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.NavCollapse}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
@@ -201,7 +195,7 @@
             <StackPanel Spacing="16">
                 <TextBlock Classes="panelTitle" Text="Monitoring"/>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.RefreshInterval}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.RefreshInterval}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Classes="settingName" Text="{Binding Catalog.RefreshInterval.Name}"/>
@@ -230,7 +224,7 @@
 
                 <!-- Toggle rows. "Resource alerts" merges the comp's two notification toggles (there is
                      no OS toast in scope, so both described the same in-app threshold banner). -->
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ResourceAlerts}"
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
@@ -243,7 +237,7 @@
 
                 <!-- Disabled rather than hidden where nothing has to be launched: the row stays in the
                      search index, and a preference carried between machines survives. -->
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.NvidiaGpuMetrics}"
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.NvidiaGpuMetrics}"
                         IsEnabled="{Binding CanUseNvidiaMetrics}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
@@ -255,7 +249,7 @@
                     </Grid>
                 </Border>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ShowInTray}"
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ShowInTray}"
                         IsEnabled="{Binding CanUseTray}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
@@ -267,7 +261,7 @@
                     </Grid>
                 </Border>
 
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.LaunchAtStartup}"
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.LaunchAtStartup}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
@@ -286,7 +280,7 @@
                 <TextBlock Classes="panelTitle" Text="{Binding Catalog.ExportData.Section}"/>
                 <!-- The three actions share one search entry, so the row tag sits on the group rather
                      than on any one button. -->
-                <Border Classes="settingRow" Tag="{x:Static settings:SettingId.ExportData}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ExportData}">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Classes="action primary" Content="Export report (.txt)" Click="OnExportReportClick"/>
                         <Button Classes="action" Content="Export CSV" Click="OnExportCsvClick"/>

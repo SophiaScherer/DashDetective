@@ -40,17 +40,13 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
 
-        <!-- The search-reveal tint, on its own layer behind the row's content. It carries the
-             transition — and has no hover rule of its own — so the flash still fades out rather than
-             blinking off, exactly as SettingsView's settingRow does. -->
+        <!-- The search-reveal tint, on its own layer behind the row's content, because cmdRow carries a
+             hover rule that a transition would smear. The transition and tint colour are the shared
+             Border.revealFlash; only this layer's own chrome is local. The tint is driven by the PARENT
+             row's .highlighted, so the shared .highlighted rule stays inert here. -->
         <Style Selector="Border.revealFlash">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="IsHitTestVisible" Value="False"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Border.cmdRow.highlighted Border.revealFlash">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>

@@ -50,20 +50,6 @@
         <Style Selector="TextBlock.metricValue">
             <Setter Property="FontSize" Value="11.5"/>
         </Style>
-        <!-- Reveal flash for a drive arrived at from the Performance tab. The transition sits directly on
-             the card because it carries no :pointerover of its own — the SettingsView.settingRow case, not
-             the Toolkit one that needs a separate layer to keep hover from smearing. -->
-        <Style Selector="Border.driveCard">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.driveCard.highlighted">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-        </Style>
-
         <!-- ===== Drive picker (Disk Activity header) ===== -->
         <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
              deliberately light — it sits inside a panel header, so it reads as part of the title rather
@@ -104,16 +90,6 @@
         <Style Selector="Border.driveOption.selected TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
         </Style>
-        <!-- Disk Activity stat blocks: a muted label over a larger value. -->
-        <Style Selector="TextBlock.diskStatLabel">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        </Style>
-        <Style Selector="TextBlock.diskStatValue">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
-        </Style>
     </UserControl.Styles>
 
     <StackPanel Spacing="16">
@@ -131,7 +107,7 @@
                 <DataTemplate x:DataType="vm:DriveCard">
                     <!-- Tag carries the physical disk number so a reveal can find this card without the
                          view keeping a parallel list — the SettingsView.FindRow arrangement. -->
-                    <Border Classes="panel driveCard" Tag="{Binding DiskNumber}">
+                    <Border Classes="panel revealFlash" Tag="{Binding DiskNumber}">
                         <StackPanel Spacing="0">
                             <!-- Header: name + health pill. -->
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
@@ -294,17 +270,17 @@
                                         StatusText="{Binding DiskChartStatus}"/>
                     <Grid ColumnDefinitions="*,*,*">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="diskStatLabel" Text="Active time"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskActive}"
+                            <TextBlock Classes="tileLabel" Text="Active time"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskActive}"
                                        Foreground="{DynamicResource ChartStorage}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
-                            <TextBlock Classes="diskStatLabel" Text="Avg response"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskResponse}"/>
+                            <TextBlock Classes="tileLabel" Text="Avg response"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskResponse}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
-                            <TextBlock Classes="diskStatLabel" Text="Queue"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskQueue}"/>
+                            <TextBlock Classes="tileLabel" Text="Queue"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskQueue}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

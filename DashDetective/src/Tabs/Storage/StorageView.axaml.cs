@@ -1,16 +1,13 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DashDetective.Shared;
 using System;
 using System.Linq;
 
 namespace DashDetective.Tabs.Storage;
 
 public partial class StorageView : UserControl {
-    /// <summary>How long a revealed card stays tinted before fading back (the fade itself is the
-    /// <c>driveCard</c> style's brush transition).</summary>
-    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(1.6);
-
     private StorageViewModel? _boundViewModel;
 
     public StorageView() {
@@ -46,18 +43,11 @@ public partial class StorageView : UserControl {
                 return;
 
             card.BringIntoView();
-            Flash(card);
+            RevealFlash.Flash(card);
         }, DispatcherPriority.Loaded);
 
     private Border? FindCard(int diskNumber) =>
         this.GetVisualDescendants()
             .OfType<Border>()
             .FirstOrDefault(border => border.Tag is int tag && tag == diskNumber);
-
-    // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
-    private static void Flash(Border card) {
-        card.Classes.Remove("highlighted");
-        card.Classes.Add("highlighted");
-        DispatcherTimer.RunOnce(() => card.Classes.Remove("highlighted"), HighlightDuration);
-    }
 }

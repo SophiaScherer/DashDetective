@@ -11,8 +11,8 @@
         <Setter Property="Background" Value="{DynamicResource PanelBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="9"/>
-        <Setter Property="Padding" Value="16"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusPanel}"/>
+        <Setter Property="Padding" Value="{StaticResource PanelPadding}"/>
     </Style>
     <!-- Draggable divider between resizable panes. Transparent grip that doubles as the
          inter-panel gap; subtle highlight on hover. -->
@@ -29,8 +29,42 @@
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="9"/>
-        <Setter Property="Padding" Value="13,12"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusPanel}"/>
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
+    </Style>
+    <!-- A card that is also a choice (the Performance resource list). Layered onto .card rather than
+         restated as its own style: Performance's resCard was the same four surface setters at radius 8
+         and padding 12,10, which is drift, not a different thing. Call sites write Classes="card
+         selectable". No transition — a brush transition here animates the hover itself, so scrolling a
+         list under a stationary pointer smears the highlight across every row it passes. -->
+    <Style Selector="Border.card.selectable">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.card.selectable:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
+    <Style Selector="Border.card.selectable.selected">
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
+    <!-- ===== Reveal flash ===== -->
+    <!-- The tint a row/card wears for a moment when something else in the app jumps to it (universal
+         search, or the Performance tab naming a device). The transition lives here so the untint fades
+         instead of blinking off; code-behind only adds and removes .highlighted, via RevealFlash.Flash.
+         Four tabs had written this same pair by hand under four names (settingRow, adapterRow,
+         driveCard, cmdRow's overlay). Where the flashed element also has a hover rule, the class goes on
+         a separate non-hit-testable layer behind the content and the parent carries .highlighted — see
+         the Toolkit tab; the shared .highlighted rule below is simply inert for that case. -->
+    <Style Selector="Border.revealFlash">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.4"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.revealFlash.highlighted">
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
     </Style>
 
     <!-- ===== Typography ===== -->
@@ -55,6 +89,20 @@
     <Style Selector="TextBlock.cardSub">
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+    </Style>
+
+    <!-- A small readout inside a card: muted label over a larger value. Sits below cardValue (26), which
+         is a headline figure. Performance drew 11/17 and Storage 12/16 for the same tile, so both now
+         read at one size; Processes' 22pt summary figure is a genuinely different scale and stays local
+         to that tab until a second one wants it. -->
+    <Style Selector="TextBlock.tileLabel">
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+    </Style>
+    <Style Selector="TextBlock.tileValue">
+        <Setter Property="FontSize" Value="16.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
     </Style>
 
     <!-- Chart key entry (used by the ChartLegend widget). Matches cardSub, so a legend reads as part of
@@ -107,6 +155,17 @@
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="TextAlignment" Value="Left"/>
     </Style>
+    <!-- InfoRow variants, set as classes on the control itself (Classes="mono flush"). Declared after
+         the rules above so they win the tie. mono: addresses and IDs read better column-aligned, which
+         is what the Network tab's IP Configuration wanted. flush: drops the divider, for a list that
+         reads as one block rather than a table of rows. -->
+    <Style Selector="Border.infoRow.mono TextBlock.infoVal">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="Border.infoRow.flush">
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
     <!-- Chrome-less toggle for the path row: the "…" affordance and the expanded click target.
          Accent-tinted, no button box, so it reads as inline text rather than a control. -->
     <Style Selector="Border.infoRow Button.pathToggle">
@@ -147,11 +206,11 @@
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSegment}"/>
         <Setter Property="Padding" Value="3"/>
     </Style>
     <Style Selector="Border.seg">
-        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}"/>
         <Setter Property="Padding" Value="14,6"/>
     </Style>
     <Style Selector="Border.seg.selected">
@@ -192,7 +251,7 @@
 
     <!-- ===== Action buttons ===== -->
     <Style Selector="Button.action">
-        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="16,9"/>
         <Setter Property="FontSize" Value="12.5"/>
         <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
@@ -219,7 +278,7 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="6,2"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
         <Setter Property="FontSize" Value="11.5"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -248,8 +307,8 @@
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="Height" Value="32"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Height" Value="{StaticResource FieldHeight}"/>
     </Style>
     <!-- Padding rather than Margin for the 9px inset, so the whole field width is a click target
          instead of leaving a dead zone down each side. -->
@@ -287,7 +346,7 @@
         <Setter Property="Width" Value="20"/>
         <Setter Property="Height" Value="20"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>

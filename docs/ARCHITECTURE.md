@@ -538,14 +538,41 @@ unit-tested directly, without a headless render pass.
 
 Shared styles (card, panel, segmented control, toggle, buttons, the table column header `colHead` and
 its `sortArrow`, the bordered input surface `field`, the draggable `paneSplitter`, …) live in
-`src/Shared/Styles/SharedStyles.axaml`; shared *resources* (the colour ramp, plus the `MonoFont` and
-`Console*` terminal tokens that the Network and Toolkit tabs both draw) live in `Palette.axaml`. Both
-are merged app-wide from `App.axaml`, so a view consumes them without an include of its own.
+`src/Shared/Styles/SharedStyles.axaml`; shared *resources* live in two files — `Palette.axaml` for
+colour (the ramp, plus the `MonoFont` and `Console*` terminal tokens the Network and Toolkit tabs both
+draw) and `Dimensions.axaml` for layout (spacing, insets, corner radii, control heights). All three are
+merged app-wide from `App.axaml`, so a view consumes them without an include of its own.
+
+**Colour is bound with `{DynamicResource}` and dimension with `{StaticResource}`,** and the split is
+not stylistic: `ThemeService` rewrites the accent and theme brushes at runtime, while nothing ever
+rewrites a dimension. Keeping them in separate files is what lets each state one rule.
+
+**Dimensions are adopted by contact, not by sweep.** `SharedStyles.axaml` draws from the tokens, new
+code uses them from the start, and a view converts only the lines it was already editing — a literal
+that already has a token is a defect; one that doesn't is fine until a second site needs it. A single
+mechanical pass over every view would be a large diff that proves nothing and reviews as noise.
+
+**A shared style can only be overridden by a local one, never the reverse.** Avalonia ranks styles by
+how close their host is to the control, so a `<UserControl.Styles>` rule beats an app-level rule
+regardless of selector specificity. `Border.settingRow` is the cautionary case: it set
+`Background="Transparent"` locally, which silently outranked the app-level `Border.revealFlash.highlighted`
+and left the Settings tab with no reveal flash at all — a build-clean, test-clean regression visible
+only by running the app. A local style must therefore not set a property the shared style needs to win.
 
 Controls or styles used by only one tab stay tab-local until a second tab needs them — File Explorer's
 checkbox style and the Toolkit tab's `ShieldAmber` are current examples. **The promotion is not
 optional once the second user arrives:** four tabs had independently defined `colHead` and had drifted
 to three variants of it, which is what the rule exists to prevent.
+
+Promotions made under that rule so far, beyond `colHead`: **`Border.revealFlash`** (the cross-tab
+reveal tint and its fade, written by hand in four tabs as `settingRow`, `adapterRow`, `driveCard` and
+the Toolkit row's overlay layer, each with its own copy of the 1.6s hold — now `RevealFlash.Flash` in
+`src/Shared`), and **`TextBlock.tileLabel` / `tileValue`** (the label-over-value readout inside a card,
+which Performance drew at 11/17 and Storage at 12/16). Processes' 22pt summary figure was deliberately
+*not* folded in: it is a genuinely different scale with one user, so it stays local until a second tab
+wants it. `Border.card.selectable` is the layering case rather than a promotion — Performance's
+`resCard` turned out to be `Border.card`'s own setters at a different radius and padding, so it became
+`Classes="card selectable"` in the `Button.bare` + `Classes="bare rowRun"` idiom.
 
 **The chrome-less click wrapper is `Button.bare`,** and a style that needs it plus extras layers on top
 (`Classes="bare rowRun"`) rather than restating the six setters. Three tabs had copied it as

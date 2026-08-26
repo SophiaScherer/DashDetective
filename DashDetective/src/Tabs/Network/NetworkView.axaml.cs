@@ -2,16 +2,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DashDetective.Shared;
 using System;
 using System.Linq;
 
 namespace DashDetective.Tabs.Network;
 
 public partial class NetworkView : UserControl {
-    /// <summary>How long a revealed adapter row stays tinted before fading back (the fade itself is the
-    /// <c>adapterRow</c> style's brush transition).</summary>
-    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(1.6);
-
     private NetworkViewModel? _subscribed;
 
     public NetworkView() {
@@ -55,7 +52,7 @@ public partial class NetworkView : UserControl {
                 return;
 
             row.BringIntoView();
-            Flash(row);
+            RevealFlash.Flash(row);
         }, DispatcherPriority.Loaded);
 
     private Border? FindAdapterRow(string name) =>
@@ -63,11 +60,4 @@ public partial class NetworkView : UserControl {
             .OfType<Border>()
             .FirstOrDefault(border => border.Tag is string tag &&
                                       string.Equals(tag, name, StringComparison.OrdinalIgnoreCase));
-
-    // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
-    private static void Flash(Border row) {
-        row.Classes.Remove("highlighted");
-        row.Classes.Add("highlighted");
-        DispatcherTimer.RunOnce(() => row.Classes.Remove("highlighted"), HighlightDuration);
-    }
 }

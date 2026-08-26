@@ -25,19 +25,6 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- One IP Configuration key/value row: muted key on the left, monospace value on the right. -->
-        <Style Selector="TextBlock.ipKey">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="TextBlock.ipVal">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
         <!-- TextBlock.colHead and Border.field are shared (src/Shared/Styles/SharedStyles.axaml); the
              connections table and the Ping/DNS targets use them as-is. Button.go stays here: it is the
              field's submit partner and no other tab has one. Its height tracks Border.field. -->
@@ -56,19 +43,6 @@
         </Style>
         <!-- Pager buttons: the current page number accented, and the four skip/step arrows dimmed at
              either end via the disabled state. No ellipsis — every page number fits on one row. -->
-        <!-- Reveal flash for an adapter arrived at from the Performance tab. The transition sits directly
-             on the row: it carries no :pointerover, so there is nothing for a hover to smear. -->
-        <Style Selector="Border.adapterRow">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.adapterRow.highlighted">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-        </Style>
-
         <!-- Skip/step arrows bracketing the page numbers. Same 30px box and hover as pageLink so the row
              reads as one control, with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
              surface transparent, since Fluent's default disabled state paints a filled box. -->
@@ -144,7 +118,7 @@
                                          beside the row content (link speed) rather than over it. -->
                                     <!-- Tag carries the adapter name so a reveal from the Performance tab
                                          can find this row without a parallel list here. -->
-                                    <Border Classes="adapterRow" Tag="{Binding Name}"
+                                    <Border Classes="revealFlash" Tag="{Binding Name}"
                                             BorderBrush="{DynamicResource RowLine}"
                                             BorderThickness="0,0,0,1" Padding="0,9,14,9">
                                         <Grid ColumnDefinitions="Auto,*,Auto">
@@ -173,20 +147,16 @@
             <Border Classes="panel" MinWidth="260">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="panelTitle" Text="IP Configuration"/>
-                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="ipKey" Text="IPv4 Address"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Ipv4}"/>
-                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="ipKey" Text="Subnet Mask"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.SubnetMask}"/>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="ipKey" Text="Gateway"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Gateway}"/>
-                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="ipKey" Text="DNS"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dns}"/>
-                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="ipKey" Text="MAC"/>
-                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Mac}"/>
-                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="ipKey" Text="DHCP"/>
-                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dhcp}"/>
-                    </Grid>
+                    <!-- The shared InfoRow, in its mono variant so addresses stay column-aligned, and
+                         flush because this panel reads as one block rather than a table of rows. -->
+                    <StackPanel>
+                        <controls:InfoRow Mono="True" Flush="True" Key="IPv4 Address" Value="{Binding IpConfig.Ipv4}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="Subnet Mask" Value="{Binding IpConfig.SubnetMask}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="Gateway" Value="{Binding IpConfig.Gateway}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="DNS" Value="{Binding IpConfig.Dns}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="MAC" Value="{Binding IpConfig.Mac}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="DHCP" Value="{Binding IpConfig.Dhcp}"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
             <Border layout:WeightedRowPanel.Weight="1.1" Classes="panel" MinWidth="280">

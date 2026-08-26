@@ -1,0 +1,48 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="using:System">
+    <!--
+      Layout dimensions for DashDetective: the spacings, insets, radii and control heights the app
+      had been restating as literals at every call site. Colour lives in Palette.axaml; this file is
+      theme-invariant, so unlike the accent brushes these are never swapped at runtime and are always
+      consumed with {StaticResource}.
+
+      Adoption is by contact, not by sweep: SharedStyles.axaml draws from these, new code uses them
+      from the start, and a view converts only the lines it was already editing. A literal that
+      already has a token here is a defect; one that doesn't is fine until a second site needs it.
+    -->
+
+    <!-- ===== Spacing ===== -->
+    <!-- SpacePage is the gap between a page's sections and between widgets; the rest are the rhythms
+         inside one widget, from a label/value pair (Hair) out to a chart and its caption (Panel). -->
+    <sys:Double x:Key="SpaceHair">4</sys:Double>
+    <sys:Double x:Key="SpaceTight">8</sys:Double>
+    <sys:Double x:Key="SpaceSnug">10</sys:Double>
+    <sys:Double x:Key="SpacePanel">12</sys:Double>
+    <sys:Double x:Key="SpacePage">16</sys:Double>
+
+    <!-- ===== Insets ===== -->
+    <!-- PageInset is the shell's content margin (deeper at the bottom so a scrolled page ends on a
+         gap rather than flush against the window edge). -->
+    <Thickness x:Key="PageInset">22,20,22,30</Thickness>
+    <Thickness x:Key="PanelPadding">16</Thickness>
+    <Thickness x:Key="CardPadding">13,12</Thickness>
+
+    <!-- ===== Corner radii ===== -->
+    <!-- Four steps, largest surface to smallest affordance: panel/card, segmented track, field and
+         action button, segment, inline link. -->
+    <CornerRadius x:Key="RadiusPanel">9</CornerRadius>
+    <CornerRadius x:Key="RadiusSegment">7</CornerRadius>
+    <CornerRadius x:Key="RadiusField">6</CornerRadius>
+    <CornerRadius x:Key="RadiusSmall">5</CornerRadius>
+    <CornerRadius x:Key="RadiusHair">4</CornerRadius>
+
+    <!-- ===== Widget and table metrics ===== -->
+    <!-- TableGutter is the right inset a table's header and rows share so the vertical scrollbar sits
+         beside the content instead of over it; both must use the one value or the columns misalign. -->
+    <sys:Double x:Key="WidgetHeaderGap">10</sys:Double>
+    <sys:Double x:Key="WidgetGutter">16</sys:Double>
+    <sys:Double x:Key="TableGutter">14</sys:Double>
+    <sys:Double x:Key="FieldHeight">32</sys:Double>
+    <sys:Double x:Key="TableRowHeight">30</sys:Double>
+</ResourceDictionary>
