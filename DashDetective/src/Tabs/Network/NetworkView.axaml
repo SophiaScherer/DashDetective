@@ -98,12 +98,12 @@
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="16">
-
-        <!-- ===== Row 1: Adapters · IP Configuration · Throughput. Three across while each clears
-             its minimum, then stacked full width. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260" Title="Adapters">
+    <!-- One board for the whole page. The caps are what stop this tab, the widest in the app, from
+         simply stretching on an ultrawide: the connections table past ~900 leaves its four columns
+         metres apart, so the surplus buys another column instead. -->
+    <layout:WidgetBoard ColumnSpacing="16" RowSpacing="16">
+            <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260"
+                                  layout:WidgetBoard.MaxSlotWidth="520" Title="Adapters">
                     <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
                          a machine with many adapters doesn't push the rest of the page off-screen. -->
                     <ScrollViewer MaxHeight="188"
@@ -141,7 +141,8 @@
                         </ItemsControl>
                     </ScrollViewer>
             </controls:WidgetPanel>
-            <controls:WidgetPanel WidgetId="network.ipconfig" MinWidth="260" Title="IP Configuration">
+            <controls:WidgetPanel WidgetId="network.ipconfig" MinWidth="260"
+                                  layout:WidgetBoard.MaxSlotWidth="520" Title="IP Configuration">
                     <!-- The shared InfoRow, in its mono variant so addresses stay column-aligned, and
                          flush because this panel reads as one block rather than a table of rows. -->
                     <StackPanel>
@@ -153,7 +154,8 @@
                         <controls:InfoRow Mono="True" Flush="True" Key="DHCP" Value="{Binding IpConfig.Dhcp}"/>
                     </StackPanel>
             </controls:WidgetPanel>
-            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.1" MinWidth="280"
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.1" MinWidth="280"
+                                  layout:WidgetBoard.MaxSlotWidth="620"
                                   WidgetId="network.throughput" Title="Throughput">
                 <StackPanel Spacing="10">
                     <!-- Both charts share one Y axis (ThroughputYMax), so their heights must match too:
@@ -202,12 +204,9 @@
                     </StackPanel>
                 </StackPanel>
             </controls:WidgetPanel>
-        </layout:WeightedRowPanel>
 
-        <!-- ===== Row 2: Active Connections · (Ping + DNS). The connections table keeps the wider
-             share; below their minimums the two stack. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.6" MinWidth="420"
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="420"
+                                  layout:WidgetBoard.MaxSlotWidth="900"
                                   WidgetId="network.connections" Title="Active Connections">
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding ConnectionsSummary}" FontSize="11"
@@ -282,11 +281,12 @@
                     </StackPanel>
                 </StackPanel>
             </controls:WidgetPanel>
-            <StackPanel Spacing="12" MinWidth="260">
+
                 <!-- Editable target, seeded with this machine's own gateway. The monitor is opt-in: the
                      button starts and stops it, and Enter applies the target and starts. Nothing here
                      sends a packet until it is pressed — which is why Enter and the button differ. -->
                 <vm:ConsolePanel WidgetId="network.ping" Title="Ping"
+                                  MinWidth="260" layout:WidgetBoard.MaxSlotWidth="480"
                                   Target="{Binding PingTarget, Mode=TwoWay}"
                                   Placeholder="Host or IP to ping"
                                   ButtonText="{Binding PingButtonText}"
@@ -299,6 +299,7 @@
 
                 <!-- Editable host: Enter or the button re-resolves it, so both run the same command. -->
                 <vm:ConsolePanel WidgetId="network.dns" Title="DNS Lookup"
+                                  MinWidth="260" layout:WidgetBoard.MaxSlotWidth="480"
                                   Target="{Binding DnsHost, Mode=TwoWay}"
                                   Placeholder="Host name to resolve"
                                   ButtonText="Look up"
@@ -308,7 +309,5 @@
                                   ConsoleBrush="{StaticResource ConsoleFg}"
                                   FooterText="{Binding DnsFooter}"
                                   FooterBrush="{StaticResource ConsoleBlue}"/>
-            </StackPanel>
-        </layout:WeightedRowPanel>
-    </StackPanel>
+    </layout:WidgetBoard>
 </UserControl>

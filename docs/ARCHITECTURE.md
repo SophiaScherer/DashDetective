@@ -556,6 +556,43 @@ A `Border Classes="panel"` that survives is a **surface, not a widget** — the 
 Processes table, a Storage drive card, the Help modal. The distinction is the header: a panel with a
 title is a `WidgetPanel`.
 
+### The board: how a page decides its columns
+
+A page's widgets are children of one **`WidgetBoard`** (`src/Shared/Layout`), not of a `StackPanel`
+holding two or three `WeightedRowPanel`s as they were before. Row membership used to be frozen in that
+markup, which is what made a wide window simply stretch every panel, and what would have made dragging
+a widget from one row to another impossible. One board over the whole page settles both from one
+arithmetic (`WidgetBoardLayout`, kept free of Avalonia types and unit-tested without a layout pass).
+
+Each widget declares what it can readably use: its own `MinWidth`, and an attached
+`WidgetBoard.MaxSlotWidth`. **A row then keeps pulling the next widget in for as long as it is still
+too roomy** — while the width it has exceeds what its members can use — and stops as soon as they can.
+That is the whole mechanism: surplus width becomes another column rather than a wider widget. At 1120
+of content the Network tab packs 3 + 3, the layout it used to author by hand; at 3400 it packs all six
+onto one row instead of stretching the connections table past 2000px with its four columns metres
+apart.
+
+Three rules keep it honest, and each exists because the obvious alternative looked broken:
+
+- **A cap is what a widget can readably use, not a hard ceiling.** Once every slot in a row is capped
+  and width still remains, the caps give way and the row is just the weighted split. Banking that
+  leftover as a wider gutter instead put most of a 3400px Storage page into a single gap — the unused
+  whitespace the caps exist to remove.
+- **A lone trailing widget is pulled back up into the row above** when it still clears every minimum
+  there. Otherwise a page whose widget count does not divide evenly ends on one widget spanning the
+  full width beside a capped neighbour, which reads as a mistake. Only where the whole merged row is
+  capped: a widget that declares no ceiling was left to own its row deliberately.
+- **Order is never rearranged to pack better.** The user drags widgets into an order and has to be
+  able to predict where one lands.
+
+`MaxSlotWidth` is **attached to the board rather than being the child's own `MaxWidth`** on purpose:
+Avalonia's arrange clamps a stretched child to its `MaxWidth` and then *centres* it in the slot, which
+would leave a dead margin down each side. Making the board the only clamper keeps alignment out of it.
+`MinWidth` stays the child's own, for the reason `WeightedRowPanel` already gave — one source of truth,
+and Avalonia keeps honouring it inside the child's own measure. A child with no `WidgetId` (the
+Dashboard's stat-card strip, the Storage drive cards) sets `WidgetBoard.Stretch` and owns its row,
+which is also what pins it in place.
+
 The geometry and wording behind the charts are kept out of the controls in `src/Shared/Charts`:
 **`MetricHistory`** is the rolling buffer and its fill count, **`ChartScale`** resolves the Y axis,
 **`SparklinePoints`** projects samples to points, **`ChartAxis`** decides where axis text sits (and keeps

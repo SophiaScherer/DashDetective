@@ -92,10 +92,12 @@
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="16">
+    <!-- One board for the whole page rather than a stack of fixed rows: a wide window buys another
+         column instead of stretching every panel. -->
+    <layout:WidgetBoard ColumnSpacing="16" RowSpacing="16">
 
         <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
-        <ItemsControl ItemsSource="{Binding Drives}">
+        <ItemsControl ItemsSource="{Binding Drives}" layout:WidgetBoard.Stretch="True">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <!-- Wraps below 280px per card, where the used/free split and the
@@ -162,8 +164,8 @@
 
         <!-- ===== Row 2: Partitions table (left) · Disk Activity (right). The table keeps the wider
              share while both clear their minimums; below that they stack. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.6" MinWidth="440"
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="440"
+                                  layout:WidgetBoard.MaxSlotWidth="900"
                                   WidgetId="storage.partitions" Title="Partitions">
                 <StackPanel Spacing="0">
                     <!-- Column header: Vol · Label · File System · Type · Capacity · Free (Free right-aligned).
@@ -208,7 +210,8 @@
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
                  area fill, like the Dashboard), over three readouts. Chart, title and readouts all describe
                  the drive card selected above — one real physical disk, not the _Total average. -->
-            <controls:WidgetPanel WidgetId="storage.activity" MinWidth="280" Title="Disk Activity"
+            <controls:WidgetPanel WidgetId="storage.activity" MinWidth="280"
+                                  layout:WidgetBoard.MaxSlotWidth="620" Title="Disk Activity"
                                   Subtitle="{Binding DiskChartCaption}">
                 <!-- The drive on show belongs to the title, so it sits in HeaderLead rather than at the
                      far end of the row. With several drives the name becomes a chevron toggle that lists
@@ -287,6 +290,5 @@
                     </Grid>
                 </StackPanel>
             </controls:WidgetPanel>
-        </layout:WeightedRowPanel>
-    </StackPanel>
+    </layout:WidgetBoard>
 </UserControl>
