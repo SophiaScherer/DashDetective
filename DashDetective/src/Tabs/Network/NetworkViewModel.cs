@@ -26,7 +26,27 @@ namespace DashDetective.Tabs.Network;
 /// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
-public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable {
+public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable, IReorderablePage {
+    /// <summary>Key this page's widget order is persisted under.</summary>
+    public string PageKey => "network";
+
+    private IReadOnlyList<string> _widgetOrder = [];
+
+    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
+    public IReadOnlyList<string> WidgetOrder {
+        get => _widgetOrder;
+        set {
+            if (ReferenceEquals(_widgetOrder, value))
+                return;
+            _widgetOrder = value ?? [];
+            OnPropertyChanged();
+            WidgetOrderChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
+    public event Action? WidgetOrderChanged;
+
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -99,6 +119,19 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <c>ChartWindow</c> all the same, so the app has one wording for it.</summary>
     public string ThroughputChartCaption { get; } =
         $"Receive and send over {ChartWindow.Describe(WindowSeconds, SampleInterval)}";
+
+    /// <summary>Output lines the Ping console has room for, reported by the panel from the height the
+    /// board gave it. Pushed into the monitor so a taller widget shows more history, not empty space.</summary>
+    public int PingConsoleLines {
+        get => _pingMonitor.LineCount;
+        set {
+            if (_pingMonitor.LineCount == value)
+                return;
+            _pingMonitor.LineCount = value;
+            OnPropertyChanged();
+            PingConsole = _pingMonitor.ConsoleText;
+        }
+    }
 
     /// <summary>The oldest end of the charts' time axis, e.g. "−60s".</summary>
     public string ChartRangeStart { get; } = ChartWindow.StartLabel(WindowSeconds, SampleInterval);

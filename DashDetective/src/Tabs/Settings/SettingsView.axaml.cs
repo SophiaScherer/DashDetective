@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DashDetective.Shared;
 using System;
 using System.IO;
 using System.Linq;
@@ -11,10 +12,6 @@ using System.Linq;
 namespace DashDetective.Tabs.Settings;
 
 public partial class SettingsView : UserControl {
-    /// <summary>How long a revealed row stays tinted before fading back (the fade itself is the
-    /// <c>settingRow</c> style's brush transition).</summary>
-    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(1.6);
-
     private SettingsViewModel? _boundViewModel;
 
     public SettingsView() {
@@ -47,20 +44,13 @@ public partial class SettingsView : UserControl {
                 return;
 
             row.BringIntoView();
-            Flash(row);
+            RevealFlash.Flash(row);
         }, DispatcherPriority.Loaded);
 
     private Border? FindRow(SettingId id) =>
         this.GetVisualDescendants()
             .OfType<Border>()
             .FirstOrDefault(border => border.Tag is SettingId tag && tag == id);
-
-    // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
-    private static void Flash(Border row) {
-        row.Classes.Remove("highlighted");
-        row.Classes.Add("highlighted");
-        DispatcherTimer.RunOnce(() => row.Classes.Remove("highlighted"), HighlightDuration);
-    }
 
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>
     private async void OnCopyDiagnosticsClick(object? sender, RoutedEventArgs e) {

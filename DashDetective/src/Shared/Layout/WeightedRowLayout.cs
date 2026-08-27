@@ -3,8 +3,8 @@ using System;
 namespace DashDetective.Shared.Layout;
 
 /// <summary>
-/// Split arithmetic for <see cref="WeightedRowPanel"/>: whether a weighted row still clears every
-/// child's minimum width, and how the row divides when it does. Kept separate from the panel so it
+/// Split arithmetic for a weighted row: whether it still clears every child's minimum width, and how
+/// it divides when it does. Used by <see cref="WidgetBoardLayout"/>, and kept separate from it so it
 /// is testable without a layout pass.
 /// </summary>
 public static class WeightedRowLayout {

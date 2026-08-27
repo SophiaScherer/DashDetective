@@ -8,6 +8,7 @@ using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Layout;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Help;
 using DashDetective.Shell.Navigation;
@@ -23,6 +24,7 @@ using DashDetective.Tabs.Settings;
 using DashDetective.Tabs.Storage;
 using DashDetective.Tabs.Toolkit;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
@@ -147,6 +149,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
         _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
+        foreach (var page in ReorderablePages)
+            page.WidgetOrderChanged += Persist;
         _metrics.AlertActiveChanged += OnAlertActiveChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
@@ -238,6 +242,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
         _metrics.AlertsEnabled = settings.ResourceAlerts;
         _recents.Load(settings.RecentSearches);
+
+        var orders = WidgetOrders.Decode(settings.WidgetOrders);
+        foreach (var page in ReorderablePages)
+            if (orders.TryGetValue(page.PageKey, out var order))
+                page.WidgetOrder = order;
+    }
+
+    /// <summary>The pages whose widget order is persisted.</summary>
+    private IEnumerable<IReorderablePage> ReorderablePages {
+        get {
+            yield return _dashboard;
+            yield return _network;
+            yield return _storage;
+        }
+    }
+
+    /// <summary>Every page's widget order, keyed by page, for the settings snapshot.</summary>
+    private string EncodeWidgetOrders() {
+        var orders = new Dictionary<string, IReadOnlyList<string>>();
+        foreach (var page in ReorderablePages)
+            if (page.WidgetOrder.Count > 0)
+                orders[page.PageKey] = page.WidgetOrder;
+
+        return WidgetOrders.Encode(orders);
     }
 
     /// <summary>Resolves a persisted accent name to its preset, or <c>null</c> for the default look
@@ -270,6 +298,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
+        WidgetOrders = EncodeWidgetOrders(),
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>

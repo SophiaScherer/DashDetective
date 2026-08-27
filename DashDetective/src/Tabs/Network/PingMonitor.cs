@@ -26,12 +26,28 @@ public sealed class PingMonitor : IDisposable {
 
     private const int TimeoutMs = 1500;
     private const int WindowSize = 20; // rolling window for avg RTT + loss %
-    private const int LineCount = 3;   // console shows the last N replies
+
+    /// <summary>Console scrollback, in lines. The floor is what the panel showed before it could
+    /// measure itself; the ceiling is where more history stops being worth the memory.</summary>
+    public const int MinLines = 3;
+    public const int MaxLines = 24;
 
     private readonly Ping _ping = new();
     private readonly Queue<bool> _results = new();
     private readonly Queue<long> _rtts = new();
     private readonly Queue<string> _lines = new();
+    private int _lineCount = MinLines;
+
+    /// <summary>How many reply lines the console keeps. Set by the panel from the height it was given,
+    /// so a taller widget shows more history rather than empty space.</summary>
+    public int LineCount {
+        get => _lineCount;
+        set {
+            _lineCount = Math.Clamp(value, MinLines, MaxLines);
+            while (_lines.Count > _lineCount)
+                _lines.Dequeue();
+        }
+    }
 
     /// <summary>Last few reply lines joined for the console readout (newest at the bottom).</summary>
     public string ConsoleText => string.Join("\n", _lines);
@@ -84,7 +100,7 @@ public sealed class PingMonitor : IDisposable {
         if (target != Target)
             return;
 
-        Push(_lines, line, LineCount);
+        Push(_lines, line, _lineCount);
         Push(_results, ok, WindowSize);
         if (ok)
             Push(_rtts, rtt, WindowSize);

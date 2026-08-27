@@ -50,20 +50,6 @@
         <Style Selector="TextBlock.metricValue">
             <Setter Property="FontSize" Value="11.5"/>
         </Style>
-        <!-- Reveal flash for a drive arrived at from the Performance tab. The transition sits directly on
-             the card because it carries no :pointerover of its own — the SettingsView.settingRow case, not
-             the Toolkit one that needs a separate layer to keep hover from smearing. -->
-        <Style Selector="Border.driveCard">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.driveCard.highlighted">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-        </Style>
-
         <!-- ===== Drive picker (Disk Activity header) ===== -->
         <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
              deliberately light — it sits inside a panel header, so it reads as part of the title rather
@@ -104,22 +90,14 @@
         <Style Selector="Border.driveOption.selected TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
         </Style>
-        <!-- Disk Activity stat blocks: a muted label over a larger value. -->
-        <Style Selector="TextBlock.diskStatLabel">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        </Style>
-        <Style Selector="TextBlock.diskStatValue">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
-        </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="16">
+    <!-- One board for the whole page rather than a stack of fixed rows: a wide window buys another
+         column instead of stretching every panel. -->
+    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding WidgetOrder, Mode=TwoWay}">
 
         <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
-        <ItemsControl ItemsSource="{Binding Drives}">
+        <ItemsControl ItemsSource="{Binding Drives}" layout:WidgetBoard.Stretch="True">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <!-- Wraps below 280px per card, where the used/free split and the
@@ -131,7 +109,7 @@
                 <DataTemplate x:DataType="vm:DriveCard">
                     <!-- Tag carries the physical disk number so a reveal can find this card without the
                          view keeping a parallel list — the SettingsView.FindRow arrangement. -->
-                    <Border Classes="panel driveCard" Tag="{Binding DiskNumber}">
+                    <Border Classes="panel revealFlash" Tag="{Binding DiskNumber}">
                         <StackPanel Spacing="0">
                             <!-- Header: name + health pill. -->
                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
@@ -186,20 +164,25 @@
 
         <!-- ===== Row 2: Partitions table (left) · Disk Activity (right). The table keeps the wider
              share while both clear their minimums; below that they stack. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border layout:WeightedRowPanel.Weight="1.6" Classes="panel" MinWidth="440">
-                <StackPanel Spacing="0">
-                    <TextBlock Classes="panelTitle" Text="Partitions" Margin="0,0,0,10"/>
-                    <!-- Column header: Vol · Label · File System · Type · Capacity · Free (Free right-aligned).
-                         The data rows below share this exact column template so the columns stay aligned. -->
-                    <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}" Margin="0,0,0,6">
-                        <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
-                        <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
-                        <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
-                        <TextBlock Grid.Column="3" Classes="colHead" Text="TYPE"/>
-                        <TextBlock Grid.Column="4" Classes="colHead" Text="CAPACITY"/>
-                        <TextBlock Grid.Column="5" Classes="colHead" Text="FREE" TextAlignment="Right"/>
-                    </Grid>
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="440"
+                                  layout:WidgetBoard.MaxSlotWidth="900"
+                                  WidgetId="storage.partitions" Title="Partitions">
+                <!-- Gutter 0: this table grows with the page rather than scrolling, so there is no
+                     scrollbar to inset for. -->
+                <controls:WidgetTable Gutter="0">
+                    <controls:WidgetTable.Header>
+                        <!-- Vol · Label · File System · Type · Capacity · Free. The rows below share this
+                             exact column template so the columns stay aligned. -->
+                        <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}"
+                              Margin="0,0,0,6">
+                            <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
+                            <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
+                            <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
+                            <TextBlock Grid.Column="3" Classes="colHead" Text="TYPE"/>
+                            <TextBlock Grid.Column="4" Classes="colHead" Text="CAPACITY"/>
+                            <TextBlock Grid.Column="5" Classes="colHead" Text="FREE" TextAlignment="Right"/>
+                        </Grid>
+                    </controls:WidgetTable.Header>
                     <ItemsControl ItemsSource="{Binding Partitions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PartitionRow">
@@ -226,18 +209,20 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </StackPanel>
-            </Border>
+                </controls:WidgetTable>
+            </controls:WidgetPanel>
 
             <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
                  area fill, like the Dashboard), over three readouts. Chart, title and readouts all describe
                  the drive card selected above — one real physical disk, not the _Total average. -->
-            <Border Classes="panel" MinWidth="280">
-                <StackPanel Spacing="12">
-                    <!-- Title + the drive on show. With several drives the name becomes a chevron toggle
-                         that lists the others; with one there is nothing to switch to, so it stays text. -->
+            <controls:WidgetPanel WidgetId="storage.activity" MinWidth="280"
+                                  layout:WidgetBoard.MaxSlotWidth="620" Title="Disk Activity"
+                                  Subtitle="{Binding DiskChartCaption}">
+                <!-- The drive on show belongs to the title, so it sits in HeaderLead rather than at the
+                     far end of the row. With several drives the name becomes a chevron toggle that lists
+                     the others; with one there is nothing to switch to, so it stays text. -->
+                <controls:WidgetPanel.HeaderLead>
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                        <TextBlock Classes="panelTitle" Text="Disk Activity" VerticalAlignment="Center"/>
                         <TextBlock Classes="panelTitle" Text="—" Margin="6,0" VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextMuted}"/>
                         <TextBlock Classes="panelTitle" VerticalAlignment="Center"
@@ -285,7 +270,8 @@
                             </Popup>
                         </Panel>
                     </StackPanel>
-                    <TextBlock Classes="cardSub" Text="{Binding DiskChartCaption}"/>
+                </controls:WidgetPanel.HeaderLead>
+                <StackPanel Spacing="12">
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"
@@ -294,21 +280,20 @@
                                         StatusText="{Binding DiskChartStatus}"/>
                     <Grid ColumnDefinitions="*,*,*">
                         <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="diskStatLabel" Text="Active time"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskActive}"
+                            <TextBlock Classes="tileLabel" Text="Active time"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskActive}"
                                        Foreground="{DynamicResource ChartStorage}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
-                            <TextBlock Classes="diskStatLabel" Text="Avg response"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskResponse}"/>
+                            <TextBlock Classes="tileLabel" Text="Avg response"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskResponse}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
-                            <TextBlock Classes="diskStatLabel" Text="Queue"/>
-                            <TextBlock Classes="diskStatValue" Text="{Binding DiskQueue}"/>
+                            <TextBlock Classes="tileLabel" Text="Queue"/>
+                            <TextBlock Classes="tileValue" Text="{Binding DiskQueue}"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
-            </Border>
-        </layout:WeightedRowPanel>
-    </StackPanel>
+            </controls:WidgetPanel>
+    </layout:WidgetBoard>
 </UserControl>

@@ -35,7 +35,8 @@ self-scrolling patterns)** (full write-ups in *Appendix — Completed Feature De
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
 drives/health view; status below), **Toolkit** (live; status below) and **Keyboard shortcuts**
 (status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
-de-duplication / composition refactor) — write-ups in the Appendix.
+de-duplication / composition refactor) — write-ups in the Appendix. A third, the **widget system**, is
+below: it changes how every page is laid out, so read it before touching a view.
 
 **Toolkit — implementation status** (LIVE):
 
@@ -278,6 +279,36 @@ own 1 Hz clock timer, which is not gated.
 
 Closing the window also **says so once** — see `/Shell/TrayNotice` in *Folder Structure*.
 
+### Widget system — SHIPPED (branch `widgitUpdates`, 2026-08)
+
+**A widget is a `WidgetPanel`, and a page's widgets are children of one `WidgetBoard`.** Nineteen
+widgets across seven tabs were hand-rolled `Border Classes="panel"` + `StackPanel` + `panelTitle`; that
+shape now exists once. Five rules, all load-bearing:
+
+1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
+   `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
+   `Border Classes="panel"` is a *surface* — a pane, the Help modal, a drive card — not a widget.
+2. **A page's widgets go in one `WidgetBoard`, never fixed rows.** The board packs rows to fit and caps
+   each widget with `WidgetBoard.MaxSlotWidth`, so a wide window buys another column rather than a wider
+   widget. `MaxSlotWidth` is attached to the board, not the child's own `MaxWidth`, because Avalonia
+   clamps a stretched child and then *centres* it.
+3. **Order is dragged by the header and persisted by widget id**, never by index. `WidgetOrders.Resolve`
+   drops ids a page no longer has and keeps a newly added widget at its declared position.
+4. **The board must never touch `Panel.Children`.** Reorder is an arrange-time permutation over its own
+   index list; mutating `Children` mid-layout is re-entrant and detaches a live `Sparkline` from its feed.
+5. **A tunneling input handler must only undo what it started.** `WidgetBoard.OnPointerUp` once released
+   the pointer capture on *any* release, which stripped the capture a button took on its own press —
+   every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
+   screenshots all clean. Guard on the press you actually claimed.
+
+Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
+connections and Storage partitions only; Processes and File Explorer measure column drops off their own
+header width and were deliberately left alone), the collapsing toolbar search, the Ping console filling
+its widget and keeping as much scrollback as fits, and `Dimensions.axaml`.
+
+**Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
+is doing design work first — do not start it without a task.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.
@@ -444,8 +475,26 @@ currently exist.
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
                                  sit top-level and are swapped at runtime — see Theming below)
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
-                                 paneSplitter (draggable divider between resizable panes)…)
+                                 paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
+                                 tileLabel/tileValue, card.selectable…)
+        Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
+                                 so always {StaticResource}. A token with no call site should not exist)
+        Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
+                                 which is what satisfies compiled bindings without an x:DataType)
+      /Layout
+        WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
+                                 so surplus buys a column, and drags by the header to reorder)
+        WidgetBoardLayout.cs    (its arithmetic + DropIndex — no Avalonia types, so it tests without layout)
+        WidgetOrders.cs         (per-page order codec + the resolver that survives a widget being added,
+                                 removed or renamed)
+        UniformFlowPanel, FlowLayout, GridColumns, TableColumns, WeightedRowLayout
       /Controls
+        WidgetPanel, WidgetTable
+                                       (WidgetPanel is one widget: surface, header row, body. Title /
+                                        Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
+                                        Border Classes="panel" is a SURFACE, not a widget.
+                                        WidgetTable is a table's chrome: header above a scrolling body,
+                                        one gutter for both. Columns and sorting stay at the call site)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
@@ -465,7 +514,8 @@ currently exist.
                                         in its own colour beside its name; an entry with no label takes
                                         no room, so the same control serves a single-series chart.
                                         InfoRow is a key/value row; long values wrap to multiple
-                                        lines (flush-right) instead of clipping — see SharedStyles infoVal)
+                                        lines (flush-right) instead of clipping — see SharedStyles infoVal.
+                                        Its Mono and Flush variants back the Network tab's IP config)
     /Services                   (cross-cutting app services)
       /Settings
         AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
@@ -1733,6 +1783,105 @@ types on Windows, then delete it.
   static initialiser, touching **any** `Icons` member — even a pure static method — fails. Keep glyph
   *selection* rules out of `Icons` (as `NavigationViewModel.ChevronPointing` → `ChevronDirection` does)
   and leave `Icons` a plain geometry lookup, so the rule stays testable and the geometry never loads.
+
+## Code conventions
+
+These are the rules that decide whether a change is right, as opposed to how the app is put together —
+that is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Comments
+
+Terse. One or two sentences, no paragraphs, no multi-line essays. Keep XML docs on public members but
+keep them short. Say *why* where it is not obvious; never restate what the code already says.
+
+### Soft-fail: what a fallback owes you
+
+"Degrades to a neutral fallback" is the rule. Four ways it gets broken:
+
+- **A fallback must not be a confident wrong answer.** `0` is neutral only where `0` is impossible as a
+  real reading. It is not neutral for a utilisation percentage — `MetricChannel` stops polling after a
+  failure, so a `0%` sits there claiming an idle machine for the session. Use `Placeholders.NoReading`.
+- **A fallback must not be unreachable.** A sampler that catches its own failure and returns zero never
+  lets `MetricChannel` call `_onFailed`, so the placeholder can never appear. Samplers **throw**; the
+  channel turns that into the placeholder. Returning a zero *measurement* is different and fine.
+- **A fallback must leave the surface in one piece.** Build into a local and swap at the end, so
+  everything that can throw happens before anything on screen is touched.
+- **A `catch` must not be wider than its comment.** Filter it:
+  `catch (Exception e) when (e is ArgumentException or Win32Exception)`. Keep the `try` no wider than
+  the failable call. Every bare `catch { }` carries a comment saying why nothing is done.
+
+**Who logs:** providers, samplers and services, through `Services/Diagnostics/Log`. View models and
+code-behind do not — the provider that failed has already logged it with more context.
+
+**A sanity window is a shared constant, not a per-reader one** (`GpuSensorRange`,
+`DiskTemperatureRange`). They stay separate from each other on purpose: a drive at 130 °C is a bad
+reading, a GPU at 130 °C is a hot one.
+
+### Platform readers
+
+- **Never substitute a near-miss.** Where a platform has no source for a value, return `null` and let
+  the surface render "—". Settled examples: the Performance tab's Handles tile on Linux, a maximum CPU
+  clock from `/proc/cpuinfo`, SMBIOS-only board fields, SMART-only drive health, per-process GPU on
+  Linux.
+- **Reporting "not known" as `0` is only safe when `0` is impossible.** It fails for a process owner:
+  `Uid` is `0` for root, so a denied read reported as `0` moves someone's process into System.
+- **A record keyed by a platform's identifier needs an equivalent derived, not invented.** Disks are
+  keyed by the kernel's `major:minor`, GPUs by PCI address, both taken from one shared derivation — if
+  two readers derived a key separately and disagreed, `DeviceInventory`'s intersection would empty and
+  every card would vanish with nothing logged.
+- **One file, one parser, named after the file.** Parse defensively: by index with a length check, by
+  explicit unit, and mind the traps — `/proc/net`'s host byte order (`0100007F` is `127.0.0.1`), the
+  parenthesised `comm` in `/proc/[pid]/stat`, octal escapes in `/proc/mounts`.
+- **A permission-gated file is not exposed at all** — `DmiIdReader` offers only world-readable keys.
+- Build `/proc` paths by string concatenation with forward slashes, never `Path.Combine`.
+
+**Unverifiable on CI:** neither the VM nor `ubuntu-latest` has a discrete GPU or a SMART-capable disk,
+so no Linux temperature, power or utilisation *value* has been checked against real hardware. What is
+verified is scale (millidegrees, microwatts, bytes, bare percent), that an absent source degrades to
+"—" rather than zero, and that enumeration and sampler agree on the adapter key. Finding no SATA drive
+temperature is the expected outcome, not a defect.
+
+### Styles
+
+- **A style used by a second tab must be promoted** to `SharedStyles.axaml`. Four tabs had independently
+  defined `colHead` and drifted to three variants of it.
+- **A shared style can only be overridden by a local one, never the reverse.** Avalonia ranks styles by
+  how close their host is to the control, so a `<UserControl.Styles>` rule beats an app-level rule
+  regardless of selector specificity. `Border.settingRow` set `Background="Transparent"` locally, which
+  silently outranked `Border.revealFlash.highlighted` and left Settings with no reveal flash — build,
+  format and 2246 tests all green. After promoting a style, delete the local same-property setter.
+- **Layer rather than restate.** `Classes="bare rowRun"`, `Classes="card selectable"` — not a new style
+  repeating six setters.
+- **Dimensions are adopted by contact, not by sweep.** New code uses the `Dimensions.axaml` tokens; a
+  view converts only lines it was already editing. A literal that has a token is a defect; one that
+  does not is fine until a second site needs it. The corollary bites hardest: **a token with no call
+  site should not exist.** `Dimensions.axaml` shipped with eighteen keys and nine users; the nine
+  spare ones were guesses at what would be wanted, which is the same aspirational cruft the rule
+  exists to stop. Add a token when the second site asks for it, not before.
+- A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
+  that feature (the Network tab's `ConsolePanel`).
+
+### Testing
+
+- **A fake must be able to break its contract on demand.** A fake that only ever succeeds makes its
+  subject's `catch` unreachable, so the soft-fail rule goes unverified. Every shared fake has an opt-in
+  failure mode (`FakeProcFileSystem.ThrowOn`, `FakeGpuUsageSampler.Throwing`, …).
+- **Test the denial against a fixture that would otherwise succeed.** A provider handed an *empty* fake
+  returns the same `Unknown` it returns when denied, through a different path — so the test passes
+  whether or not the `catch` exists. Stage a working fixture first, then deny it.
+- **Pure logic belongs outside a platform-gated class**, or it never runs on the Linux CI leg.
+- **Never assert a measured width or height.** Font metrics differ between the two CI legs; pass
+  dimensions into the arithmetic instead, as `ChartAxis` and `WidgetBoardLayout` do.
+
+### Quality gates
+
+- `.editorconfig`: four-space indent, file-scoped namespaces, K&R braces, broad `var`. Usings
+  alphabetical with `System` **not** first.
+- The build sets `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild` and `AnalysisLevel=latest`, so a
+  style or platform-compatibility issue fails the build.
+- CI runs `dotnet format --verify-no-changes` before building, then the suite with coverage, on
+  `windows-latest` and `ubuntu-latest` in Debug and Release.
+- Build and test with `--artifacts-path`: a running app or an IDE holding `bin/` causes MSB3027.
 
 ## Working Style
 

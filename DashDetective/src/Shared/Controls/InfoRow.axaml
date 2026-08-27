@@ -2,8 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="DashDetective.Shared.Controls.InfoRow"
              x:Name="Root" x:CompileBindings="False">
-    <!-- A key/value line with a bottom hairline. Used in System Information and future spec lists. -->
-    <Border Classes="infoRow">
+    <!-- A key/value line with a bottom hairline. Used in System Information and future spec lists.
+         Mono and Flush are forwarded onto the inner Border as classes, so the variants are styled in
+         SharedStyles beside the base row rather than re-declared per tab. -->
+    <Border Classes="infoRow" Classes.mono="{Binding #Root.Mono}" Classes.flush="{Binding #Root.Flush}">
         <Grid ColumnDefinitions="Auto,*">
             <TextBlock Classes="infoKey" Text="{Binding #Root.Key}"/>
             <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding #Root.Value}"/>

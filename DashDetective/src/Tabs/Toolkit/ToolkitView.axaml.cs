@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,10 +13,6 @@ using System.Linq;
 namespace DashDetective.Tabs.Toolkit;
 
 public partial class ToolkitView : UserControl {
-    /// <summary>How long a revealed row stays tinted before fading back (the fade itself is the
-    /// <c>cmdRow</c> style's brush transition).</summary>
-    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(1.6);
-
     /// <summary>How long a copied row's glyph stays accented before fading back.</summary>
     private static readonly TimeSpan CopiedDuration = TimeSpan.FromSeconds(1);
 
@@ -73,7 +70,7 @@ public partial class ToolkitView : UserControl {
 
             rows[0].BringIntoView();
             foreach (var row in rows)
-                Flash(row);
+                RevealFlash.Flash(row);
         }, DispatcherPriority.Loaded);
     }
 
@@ -81,13 +78,6 @@ public partial class ToolkitView : UserControl {
         [.. this.GetVisualDescendants()
                .OfType<Border>()
                .Where(border => border.Tag is string tag && tag == command)];
-
-    // Tint, then untint on a one-shot timer; the style's transition turns the untint into a fade.
-    private static void Flash(Border row) {
-        row.Classes.Remove("highlighted");
-        row.Classes.Add("highlighted");
-        DispatcherTimer.RunOnce(() => row.Classes.Remove("highlighted"), HighlightDuration);
-    }
 
     /// <summary>
     /// Copies the row's command to the clipboard. Lives here rather than in the view model because the

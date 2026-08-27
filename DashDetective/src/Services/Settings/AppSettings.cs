@@ -72,6 +72,11 @@ public sealed record AppSettings {
     /// stored command becomes a row, and a row runs only when it is clicked.</summary>
     public string CustomCommands { get; init; } = "";
 
+    /// <summary>Each page's widget order, encoded by <c>WidgetOrders</c>. Opaque here for the same
+    /// reason as the three above: this record — and the settings file — stay free of any knowledge of
+    /// what a widget is.</summary>
+    public string WidgetOrders { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();

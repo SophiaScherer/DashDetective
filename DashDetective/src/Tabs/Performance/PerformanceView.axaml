@@ -15,55 +15,31 @@
     <UserControl.Styles>
         <!-- The chrome-less click wrapper is the shared Button.bare (src/Shared/Styles/SharedStyles). -->
 
-        <!-- Resource selector cards: a name + sub-label on the left, a tinted value on the right.
-             Selected uses AccentSoft fill + Accent border (the design comp's cyan highlight). -->
-        <Style Selector="Border.resCard">
-            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="12,10"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="Border.resCard:pointerover">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-        </Style>
-        <Style Selector="Border.resCard.selected">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="Border.resCard TextBlock.resName">
+        <!-- Resource selector cards: a name + sub-label on the left, a tinted value on the right. The
+             surface, hover and selected states are the shared Border.card + .selectable; only the four
+             text roles inside one stay local, since no other tab lists devices this way. -->
+        <Style Selector="TextBlock.resName">
             <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
-        <Style Selector="Border.resCard TextBlock.resSub">
+        <Style Selector="TextBlock.resSub">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
-        <Style Selector="Border.resCard TextBlock.resVal">
+        <Style Selector="TextBlock.resVal">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.resCard TextBlock.resUnit">
+        <Style Selector="TextBlock.resUnit">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="VerticalAlignment" Value="Bottom"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
         </Style>
 
-        <!-- Detail stat tiles: a small label over a larger value. -->
-        <Style Selector="Border.statTile TextBlock.statLabel">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-        </Style>
-        <Style Selector="Border.statTile TextBlock.statValue">
-            <Setter Property="FontSize" Value="17"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
-        </Style>
     </UserControl.Styles>
 
     <Grid RowDefinitions="Auto,*">
@@ -108,7 +84,7 @@
                     <DataTemplate x:DataType="vm:ResourceRow">
                         <Button Classes="bare" Command="{Binding SelectCommand}"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-                            <Border Classes="resCard" Classes.selected="{Binding IsSelected}"
+                            <Border Classes="card selectable" Classes.selected="{Binding IsSelected}"
                                     ToolTip.Tip="{Binding NoteTip}">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
@@ -138,32 +114,31 @@
 
             <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
                  in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
-            <Border Classes="panel">
+            <controls:WidgetPanel WidgetId="performance.chart"
+                                  Title="{Binding SelectedResource.Name}">
+                <!-- The jump link goes in HeaderLead so it sits against the name rather than making the
+                     title itself clickable: a bare title offers no resting cue that it goes anywhere.
+                     Hidden on a resource with no home tab (HasLink), the same way the Overall/Detailed
+                     toggle below is gated on SupportsDetail. -->
+                <controls:WidgetPanel.HeaderLead>
+                    <Button Classes="link" Margin="10,0,0,0"
+                            IsVisible="{Binding SelectedResource.HasLink}"
+                            Command="{Binding SelectedResource.Link.Command}"
+                            ToolTip.Tip="Open this device on the tab that owns it">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding SelectedResource.Link.Label}"
+                                       VerticalAlignment="Center"/>
+                            <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
+                                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                  VerticalAlignment="Center"
+                                  Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                        </StackPanel>
+                    </Button>
+                </controls:WidgetPanel.HeaderLead>
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Classes="cardSub" Text="{Binding SelectedResource.Spec}"/>
+                </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="8">
-                    <!-- Name · jump link · spec. The link takes its own Auto column beside the name rather
-                         than making the title clickable: a bare title offers no resting cue that it goes
-                         anywhere. Hidden on a resource with no home tab (HasLink), the same way the
-                         Overall/Detailed toggle below is gated on SupportsDetail. -->
-                    <Grid ColumnDefinitions="Auto,Auto,*">
-                        <TextBlock Grid.Column="0" Classes="panelTitle"
-                                   Text="{Binding SelectedResource.Name}"/>
-                        <Button Grid.Column="1" Classes="link" Margin="10,0,0,0"
-                                IsVisible="{Binding SelectedResource.HasLink}"
-                                Command="{Binding SelectedResource.Link.Command}"
-                                ToolTip.Tip="Open this device on the tab that owns it">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding SelectedResource.Link.Label}"
-                                           VerticalAlignment="Center"/>
-                                <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
-                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                                      VerticalAlignment="Center"
-                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
-                            </StackPanel>
-                        </Button>
-                        <TextBlock Grid.Column="2" Classes="cardSub" VerticalAlignment="Center"
-                                   HorizontalAlignment="Right"
-                                   Text="{Binding SelectedResource.Spec}"/>
-                    </Grid>
                     <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
                          supports it: CPU logical processors / GPU engines). -->
                     <Grid ColumnDefinitions="*,Auto">
@@ -249,7 +224,7 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
 
             <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most, six
                  for CPU. Uncapped like the Dashboard card strip, so a wide pane gains columns rather than
@@ -262,10 +237,10 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:StatTile">
-                        <Border Classes="card statTile">
+                        <Border Classes="card">
                             <StackPanel Spacing="4">
-                                <TextBlock Classes="statLabel" Text="{Binding Label}"/>
-                                <TextBlock Classes="statValue" Text="{Binding Value}"/>
+                                <TextBlock Classes="tileLabel" Text="{Binding Label}"/>
+                                <TextBlock Classes="tileValue" Text="{Binding Value}"/>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

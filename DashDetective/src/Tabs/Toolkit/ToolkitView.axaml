@@ -40,17 +40,13 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
 
-        <!-- The search-reveal tint, on its own layer behind the row's content. It carries the
-             transition — and has no hover rule of its own — so the flash still fades out rather than
-             blinking off, exactly as SettingsView's settingRow does. -->
+        <!-- The search-reveal tint, on its own layer behind the row's content, because cmdRow carries a
+             hover rule that a transition would smear. The transition and tint colour are the shared
+             Border.revealFlash; only this layer's own chrome is local. The tint is driven by the PARENT
+             row's .highlighted, so the shared .highlighted rule stays inert here. -->
         <Style Selector="Border.revealFlash">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="IsHitTestVisible" Value="False"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
         </Style>
         <Style Selector="Border.cmdRow.highlighted Border.revealFlash">
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
@@ -206,11 +202,10 @@
                         IsVisible="{Binding !Form.IsOpen}"
                         Command="{Binding Form.OpenCommand}"/>
 
-                <Border Classes="panel" IsVisible="{Binding Form.IsOpen}">
+                <controls:WidgetPanel WidgetId="toolkit.form" IsVisible="{Binding Form.IsOpen}"
+                                      Title="{Binding Form.Heading}">
                     <StackPanel Spacing="12" DataContext="{Binding Form}"
                                 x:DataType="vm:ToolkitCommandFormViewModel">
-                        <TextBlock Classes="panelTitle" Text="{Binding Heading}"/>
-
                         <!-- Type first: it decides what the payload field below is even called, so
                              picking it last would mean re-reading the form. Chips rather than a
                              drop-down — every short pick in this app is chips. -->
@@ -320,7 +315,7 @@
                                     Command="{Binding SaveCommand}"/>
                         </StackPanel>
                     </StackPanel>
-                </Border>
+                </controls:WidgetPanel>
 
             <Panel>
                 <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding HasCommands}">
@@ -587,24 +582,20 @@
         <!-- Pinned beside the list rather than scrolling with it: the comp's sticky panel, which
              Avalonia has no equivalent for, so the two columns each own their scrolling. Running a
              command and capturing its output is not part of this UI-only pass, so it stays empty. -->
-        <Border Grid.Column="1" Classes="panel" Padding="14">
-            <Grid RowDefinitions="Auto,*" RowSpacing="10">
-                <!-- Both actions are disabled while the log is empty: there is nothing to clear and
-                     nothing to save, and a picker over an empty log would only waste a click. -->
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                    <TextBlock Text="Execution Log" Classes="panelTitle" FontSize="13"
-                               Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Classes="bare linkAction" Content="Export"
+        <controls:WidgetPanel Grid.Column="1" WidgetId="toolkit.log" Title="Execution Log">
+            <!-- Both actions are disabled while the log is empty: there is nothing to clear and
+                 nothing to save, and a picker over an empty log would only waste a click. -->
+            <controls:WidgetPanel.HeaderContent>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Classes="bare linkAction" Content="Export"
                             Click="OnExportLogClick" IsEnabled="{Binding HasLog}"
-                            ToolTip.Tip="Save the log to a text file"
-                            VerticalAlignment="Center"/>
-                    <Button Grid.Column="2" Classes="bare linkAction" Content="Clear"
-                            Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"
-                            VerticalAlignment="Center"/>
-                </Grid>
-
-                <Border Grid.Row="1" Background="{StaticResource ConsoleBg}" CornerRadius="6"
-                        Padding="10" ClipToBounds="True">
+                            ToolTip.Tip="Save the log to a text file"/>
+                    <Button Classes="bare linkAction" Content="Clear"
+                            Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"/>
+                </StackPanel>
+            </controls:WidgetPanel.HeaderContent>
+            <Border Background="{StaticResource ConsoleBg}" CornerRadius="6"
+                    Padding="10" ClipToBounds="True">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <Panel>
                             <ItemsControl ItemsSource="{Binding Log}" IsVisible="{Binding HasLog}">
@@ -629,9 +620,8 @@
                                        Text="Output from commands you run will appear here."/>
                         </Panel>
                     </ScrollViewer>
-                </Border>
-            </Grid>
-        </Border>
+            </Border>
+        </controls:WidgetPanel>
         </Grid>
     </Grid>
 </UserControl>

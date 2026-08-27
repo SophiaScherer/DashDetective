@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              x:Class="DashDetective.Tabs.Network.ConsolePanel"
              x:Name="Root" x:CompileBindings="False">
     <!-- A target field, its submit button, and two lines of terminal output. The Ping and DNS Lookup
@@ -8,10 +9,9 @@
 
          Tab-local by the repo's promotion rule: both users are the Network tab. The console TOKENS are
          app-level (Palette.axaml) because the Toolkit tab draws them too — this panel is not. -->
-    <Border Classes="panel">
-        <StackPanel Spacing="10">
-            <TextBlock Classes="panelTitle" Text="{Binding #Root.Title}"/>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+    <controls:WidgetPanel WidgetId="{Binding #Root.WidgetId}" Title="{Binding #Root.Title}">
+        <DockPanel LastChildFill="True">
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,10" ColumnDefinitions="*,Auto" ColumnSpacing="6">
                 <Border Grid.Column="0" Classes="field">
                     <TextBox Text="{Binding #Root.Target, Mode=TwoWay}"
                              PlaceholderText="{Binding #Root.Placeholder}">
@@ -23,15 +23,20 @@
                 <Button Grid.Column="1" Classes="go" Content="{Binding #Root.ButtonText}"
                         Command="{Binding #Root.SubmitCommand}"/>
             </Grid>
-            <Border Background="{StaticResource ConsoleBg}" CornerRadius="6" Padding="10">
-                <StackPanel Spacing="3">
+            <!-- LineHeight is fixed rather than left to the font, so the capacity arithmetic is
+                 exact and reads the same on both platforms. -->
+            <Border x:Name="ConsoleBox" Background="{StaticResource ConsoleBg}" CornerRadius="6"
+                    Padding="10" ClipToBounds="True" SizeChanged="OnConsoleBoxSizeChanged">
+                <!-- Top-aligned: output grows down from the first line with the summary under it, so an
+                     idle console reads the same as it did before the box started filling the widget. -->
+                <StackPanel Spacing="3" VerticalAlignment="Top">
                     <TextBlock Text="{Binding #Root.ConsoleText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="11" Foreground="{Binding #Root.ConsoleBrush}"
-                               TextWrapping="NoWrap"/>
+                               FontSize="11" LineHeight="15" TextWrapping="NoWrap"
+                               Foreground="{Binding #Root.ConsoleBrush}"/>
                     <TextBlock Text="{Binding #Root.FooterText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="11" Foreground="{Binding #Root.FooterBrush}"/>
+                               FontSize="11" LineHeight="15" Foreground="{Binding #Root.FooterBrush}"/>
                 </StackPanel>
             </Border>
-        </StackPanel>
-    </Border>
+        </DockPanel>
+    </controls:WidgetPanel>
 </UserControl>

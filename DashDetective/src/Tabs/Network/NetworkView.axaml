@@ -25,19 +25,6 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- One IP Configuration key/value row: muted key on the left, monospace value on the right. -->
-        <Style Selector="TextBlock.ipKey">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="TextBlock.ipVal">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
         <!-- TextBlock.colHead and Border.field are shared (src/Shared/Styles/SharedStyles.axaml); the
              connections table and the Ping/DNS targets use them as-is. Button.go stays here: it is the
              field's submit partner and no other tab has one. Its height tracks Border.field. -->
@@ -56,19 +43,6 @@
         </Style>
         <!-- Pager buttons: the current page number accented, and the four skip/step arrows dimmed at
              either end via the disabled state. No ellipsis — every page number fits on one row. -->
-        <!-- Reveal flash for an adapter arrived at from the Performance tab. The transition sits directly
-             on the row: it carries no :pointerover, so there is nothing for a hover to smear. -->
-        <Style Selector="Border.adapterRow">
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.4"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.adapterRow.highlighted">
-            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
-        </Style>
-
         <!-- Skip/step arrows bracketing the page numbers. Same 30px box and hover as pageLink so the row
              reads as one control, with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
              surface transparent, since Fluent's default disabled state paints a filled box. -->
@@ -124,14 +98,12 @@
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="16">
-
-        <!-- ===== Row 1: Adapters · IP Configuration · Throughput. Three across while each clears
-             its minimum, then stacked full width. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border Classes="panel" MinWidth="260">
-                <StackPanel Spacing="8">
-                    <TextBlock Classes="panelTitle" Text="Adapters"/>
+    <!-- One board for the whole page. The caps are what stop this tab, the widest in the app, from
+         simply stretching on an ultrawide: the connections table past ~900 leaves its four columns
+         metres apart, so the surplus buys another column instead. -->
+    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding WidgetOrder, Mode=TwoWay}">
+            <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260"
+                                  layout:WidgetBoard.MaxSlotWidth="520" Title="Adapters">
                     <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
                          a machine with many adapters doesn't push the rest of the page off-screen. -->
                     <ScrollViewer MaxHeight="188"
@@ -144,7 +116,7 @@
                                          beside the row content (link speed) rather than over it. -->
                                     <!-- Tag carries the adapter name so a reveal from the Performance tab
                                          can find this row without a parallel list here. -->
-                                    <Border Classes="adapterRow" Tag="{Binding Name}"
+                                    <Border Classes="revealFlash" Tag="{Binding Name}"
                                             BorderBrush="{DynamicResource RowLine}"
                                             BorderThickness="0,0,0,1" Padding="0,9,14,9">
                                         <Grid ColumnDefinitions="Auto,*,Auto">
@@ -168,30 +140,24 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
-                </StackPanel>
-            </Border>
-            <Border Classes="panel" MinWidth="260">
-                <StackPanel Spacing="12">
-                    <TextBlock Classes="panelTitle" Text="IP Configuration"/>
-                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="ipKey" Text="IPv4 Address"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Ipv4}"/>
-                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="ipKey" Text="Subnet Mask"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.SubnetMask}"/>
-                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="ipKey" Text="Gateway"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Gateway}"/>
-                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="ipKey" Text="DNS"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dns}"/>
-                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="ipKey" Text="MAC"/>
-                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Mac}"/>
-                        <TextBlock Grid.Row="5" Grid.Column="0" Classes="ipKey" Text="DHCP"/>
-                        <TextBlock Grid.Row="5" Grid.Column="1" Classes="ipVal" Text="{Binding IpConfig.Dhcp}"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-            <Border layout:WeightedRowPanel.Weight="1.1" Classes="panel" MinWidth="280">
+            </controls:WidgetPanel>
+            <controls:WidgetPanel WidgetId="network.ipconfig" MinWidth="260"
+                                  layout:WidgetBoard.MaxSlotWidth="520" Title="IP Configuration">
+                    <!-- The shared InfoRow, in its mono variant so addresses stay column-aligned, and
+                         flush because this panel reads as one block rather than a table of rows. -->
+                    <StackPanel>
+                        <controls:InfoRow Mono="True" Flush="True" Key="IPv4 Address" Value="{Binding IpConfig.Ipv4}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="Subnet Mask" Value="{Binding IpConfig.SubnetMask}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="Gateway" Value="{Binding IpConfig.Gateway}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="DNS" Value="{Binding IpConfig.Dns}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="MAC" Value="{Binding IpConfig.Mac}"/>
+                        <controls:InfoRow Mono="True" Flush="True" Key="DHCP" Value="{Binding IpConfig.Dhcp}"/>
+                    </StackPanel>
+            </controls:WidgetPanel>
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.1" MinWidth="280"
+                                  layout:WidgetBoard.MaxSlotWidth="620"
+                                  WidgetId="network.throughput" Title="Throughput">
                 <StackPanel Spacing="10">
-                    <TextBlock Classes="panelTitle" Text="Throughput"/>
                     <!-- Both charts share one Y axis (ThroughputYMax), so their heights must match too:
                          equal Mbps must map to equal pixels for the comparison to be honest. The peak
                          caption on the right makes the shared ceiling legible. -->
@@ -237,38 +203,32 @@
                                             AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"/>
                     </StackPanel>
                 </StackPanel>
-            </Border>
-        </layout:WeightedRowPanel>
+            </controls:WidgetPanel>
 
-        <!-- ===== Row 2: Active Connections · (Ping + DNS). The connections table keeps the wider
-             share; below their minimums the two stack. -->
-        <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border layout:WeightedRowPanel.Weight="1.6" Classes="panel" MinWidth="420">
+            <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="420"
+                                  layout:WidgetBoard.MaxSlotWidth="900"
+                                  WidgetId="network.connections" Title="Active Connections">
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Text="{Binding ConnectionsSummary}" FontSize="11"
+                               Foreground="{DynamicResource TextSubtle}"/>
+                </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="{Binding ConnectionsSummary}" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
-                    </Grid>
-                    <!-- Column header. The 14px right margin matches the rows' gutter below so the columns
-                         stay aligned and the scrollbar sits in the shared gutter, not over the text. -->
-                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Margin="0,0,14,2">
-                        <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
-                        <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
-                        <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
-                        <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
-                    </Grid>
-                    <!-- Whole page scrolls, so bound the table's own scroller or it never engages. Kept
-                         compact enough that the panel + pager stay on-screen in the default (non-maximized)
-                         window rather than pushing the pager below the fold. -->
-                    <ScrollViewer x:Name="ConnectionsScroller" MaxHeight="240"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
+                    <!-- The whole page scrolls, so the table has to bound its own body or it never
+                         scrolls. 240 keeps the panel and its pager on-screen in the default window. -->
+                    <controls:WidgetTable x:Name="ConnectionsTable" MaxBodyHeight="240" BodyScrollBars="Auto">
+                        <controls:WidgetTable.Header>
+                            <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}"
+                                  Margin="0,0,0,2">
+                                <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
+                                <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
+                                <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
+                            </Grid>
+                        </controls:WidgetTable.Header>
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="30" Margin="0,0,14,0">
+                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="{StaticResource TableRowHeight}">
                                         <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -284,7 +244,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
+                    </controls:WidgetTable>
                     <!-- Pager: « ‹ 1 2 3 4 › » — the numbers with skip/step arrows bracketing them. Only
                          visible when there is more than one page. The arrows are bound straight to the view
                          model's commands rather than being items in PageLinks, which is cleared and rebuilt
@@ -318,12 +278,14 @@
                         </Button>
                     </StackPanel>
                 </StackPanel>
-            </Border>
-            <StackPanel Spacing="12" MinWidth="260">
+            </controls:WidgetPanel>
+
                 <!-- Editable target, seeded with this machine's own gateway. The monitor is opt-in: the
                      button starts and stops it, and Enter applies the target and starts. Nothing here
                      sends a packet until it is pressed — which is why Enter and the button differ. -->
-                <vm:ConsolePanel Title="Ping"
+                <vm:ConsolePanel WidgetId="network.ping" Title="Ping"
+                                  Capacity="{Binding PingConsoleLines, Mode=TwoWay}"
+                                  MinWidth="260" layout:WidgetBoard.MaxSlotWidth="480"
                                   Target="{Binding PingTarget, Mode=TwoWay}"
                                   Placeholder="Host or IP to ping"
                                   ButtonText="{Binding PingButtonText}"
@@ -335,7 +297,8 @@
                                   FooterBrush="{StaticResource ConsoleMuted}"/>
 
                 <!-- Editable host: Enter or the button re-resolves it, so both run the same command. -->
-                <vm:ConsolePanel Title="DNS Lookup"
+                <vm:ConsolePanel WidgetId="network.dns" Title="DNS Lookup"
+                                  MinWidth="260" layout:WidgetBoard.MaxSlotWidth="480"
                                   Target="{Binding DnsHost, Mode=TwoWay}"
                                   Placeholder="Host name to resolve"
                                   ButtonText="Look up"
@@ -345,7 +308,5 @@
                                   ConsoleBrush="{StaticResource ConsoleFg}"
                                   FooterText="{Binding DnsFooter}"
                                   FooterBrush="{StaticResource ConsoleBlue}"/>
-            </StackPanel>
-        </layout:WeightedRowPanel>
-    </StackPanel>
+    </layout:WidgetBoard>
 </UserControl>

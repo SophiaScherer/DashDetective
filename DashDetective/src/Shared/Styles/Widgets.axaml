@@ -1,0 +1,91 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DashDetective.Shared.Controls">
+    <!-- The WidgetPanel template. TemplateBinding throughout, which is what satisfies compiled
+         bindings without an x:DataType. The surface repeats Border.panel's setters because a
+         templated child cannot pick up a class the call site never writes. -->
+    <Style Selector="controls|WidgetPanel">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{DynamicResource PanelBackground}"
+                        BorderBrush="{DynamicResource Hairline}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusPanel}"
+                        Padding="{StaticResource PanelPadding}">
+                    <DockPanel LastChildFill="True">
+                        <!-- Title | HeaderLead | HeaderContent (right). Each reserves room only when set. -->
+                        <StackPanel x:Name="PART_Header" DockPanel.Dock="Top" Spacing="2"
+                                    Margin="{StaticResource WidgetHeaderMargin}">
+                            <Grid ColumnDefinitions="Auto,Auto,*">
+                                <TextBlock Grid.Column="0" Classes="panelTitle"
+                                           VerticalAlignment="Center"
+                                           Text="{TemplateBinding Title}"
+                                           IsVisible="{TemplateBinding Title,
+                                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
+                                                  Content="{TemplateBinding HeaderLead}"
+                                                  IsVisible="{TemplateBinding HeaderLead,
+                                                              Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <ContentPresenter Grid.Column="2" VerticalAlignment="Center"
+                                                  HorizontalAlignment="Right"
+                                                  Content="{TemplateBinding HeaderContent}"
+                                                  IsVisible="{TemplateBinding HeaderContent,
+                                                              Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                            </Grid>
+                            <TextBlock Classes="cardSub" Text="{TemplateBinding Subtitle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       IsVisible="{TemplateBinding Subtitle,
+                                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </DockPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- Picked up: lifted above its neighbours and accented, so the gap it left reads as the target. -->
+    <Style Selector="controls|WidgetPanel.dragging">
+        <Setter Property="Opacity" Value="0.92"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel.dragging /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="BoxShadow" Value="0 10 28 0 #55000000"/>
+    </Style>
+
+    <!-- The header is the drag handle, so say so on hover. -->
+    <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header:pointerover">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- WidgetTable: header above a body that scrolls, both inset by the same scrollbar gutter. -->
+    <Style Selector="controls|WidgetTable">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DockPanel LastChildFill="True">
+                    <ContentPresenter x:Name="PART_TableHeader" DockPanel.Dock="Top"
+                                      Content="{TemplateBinding Header}"
+                                      Margin="{TemplateBinding Gutter}"/>
+                    <ScrollViewer x:Name="PART_BodyScroll" MaxHeight="{TemplateBinding MaxBodyHeight}"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="{TemplateBinding BodyScrollBars}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="{TemplateBinding Gutter}"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- A widget with no heading at all: drop the header's bottom margin so the body starts at the
+         panel's own padding rather than 10px below it. -->
+    <Style Selector="controls|WidgetPanel.headless /template/ StackPanel#PART_Header">
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+</Styles>

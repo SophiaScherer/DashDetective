@@ -30,6 +30,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Palette.axaml"/>
+                <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Dimensions.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
@@ -38,5 +39,6 @@
         <FluentTheme />
         <StyleInclude Source="avares://DashDetective/src/Shared/Styles/SharedStyles.axaml"/>
         <StyleInclude Source="avares://DashDetective/src/Shared/Styles/Layout.axaml"/>
+        <StyleInclude Source="avares://DashDetective/src/Shared/Styles/Widgets.axaml"/>
     </Application.Styles>
 </Application>

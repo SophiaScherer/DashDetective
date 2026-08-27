@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Media;
+using DashDetective.Shared.Controls;
 using System.Windows.Input;
 
 namespace DashDetective.Tabs.Network;
@@ -13,9 +14,14 @@ namespace DashDetective.Tabs.Network;
 /// Kept in the Network tab folder rather than <c>src/Shared</c>: both users are this one feature, which
 /// is the promotion bar the architecture doc sets.
 /// </summary>
-public partial class ConsolePanel : UserControl {
+public partial class ConsolePanel : UserControl, IWidgetIdentity {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<ConsolePanel, string?>(nameof(Title));
+
+    /// <summary>Forwarded to the inner WidgetPanel: the two instances are separate widgets, so each
+    /// needs its own identity rather than sharing this control's.</summary>
+    public static readonly StyledProperty<string?> WidgetIdProperty =
+        AvaloniaProperty.Register<ConsolePanel, string?>(nameof(WidgetId));
 
     public static readonly StyledProperty<string> TargetProperty =
         AvaloniaProperty.Register<ConsolePanel, string>(
@@ -49,6 +55,12 @@ public partial class ConsolePanel : UserControl {
     public static readonly StyledProperty<IBrush?> FooterBrushProperty =
         AvaloniaProperty.Register<ConsolePanel, IBrush?>(nameof(FooterBrush));
 
+    /// <summary>Output lines the box has room for, reported back so the source can keep that much
+    /// history. Two-way: the panel measures, the view model decides what to do about it.</summary>
+    public static readonly StyledProperty<int> CapacityProperty =
+        AvaloniaProperty.Register<ConsolePanel, int>(
+            nameof(Capacity), PingMonitor.MinLines, defaultBindingMode: BindingMode.TwoWay);
+
     public ConsolePanel() {
         InitializeComponent();
     }
@@ -56,6 +68,11 @@ public partial class ConsolePanel : UserControl {
     public string? Title {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    public string? WidgetId {
+        get => GetValue(WidgetIdProperty);
+        set => SetValue(WidgetIdProperty, value);
     }
 
     public string Target {
@@ -102,4 +119,18 @@ public partial class ConsolePanel : UserControl {
         get => GetValue(FooterBrushProperty);
         set => SetValue(FooterBrushProperty, value);
     }
+
+    public int Capacity {
+        get => GetValue(CapacityProperty);
+        set => SetValue(CapacityProperty, value);
+    }
+
+    // Matches the console TextBlocks' LineHeight, and the box's 10px padding plus the footer line and
+    // its 3px gap.
+    private const double LineHeight = 15;
+    private const double Reserved = 20 + LineHeight + 3;
+
+    private void OnConsoleBoxSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        Capacity = ConsoleCapacity.LinesForHeight(e.NewSize.Height, LineHeight, Reserved,
+                                                  PingMonitor.MinLines, PingMonitor.MaxLines);
 }

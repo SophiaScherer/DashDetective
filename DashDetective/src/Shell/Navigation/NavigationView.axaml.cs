@@ -5,6 +5,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using DashDetective.Shared;
 using System;
 
 namespace DashDetective.Shell.Navigation;
@@ -23,7 +24,6 @@ public partial class NavigationView : UserControl {
     private NavigationViewModel? _viewModel;
 
     // Drag-to-dock state.
-    private const double DragThreshold = 6;      // px of movement before a press becomes a drag
     private bool _dragPending;                   // pointer is down on the brand, not yet a drag
     private bool _dragging;                      // past the threshold: previewing/committing a dock
     private Point _pressPoint;                   // press location, in overlay coordinates
@@ -85,7 +85,7 @@ public partial class NavigationView : UserControl {
 
         if (!_dragging) {
             var delta = point - _pressPoint;
-            if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold)
+            if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
                 return;
             BeginDrag();
         }
