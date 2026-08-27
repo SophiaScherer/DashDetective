@@ -265,6 +265,41 @@ public class WidgetBoardLayoutTests {
         }
     }
 
+    // ===== Drop index =====
+
+    // Two rows of three 300px slots, 100px tall.
+    private static Rect2[] Grid() => new[] {
+        new Rect2(0, 0, 300, 100), new Rect2(316, 0, 300, 100), new Rect2(632, 0, 300, 100),
+        new Rect2(0, 116, 300, 100), new Rect2(316, 116, 300, 100), new Rect2(632, 116, 300, 100),
+    };
+
+    private static readonly int[] GridRows = { 3, 6 };
+
+    [Theory]
+    [InlineData(10, 50, 0)]      // left of the first slot's midpoint
+    [InlineData(200, 50, 1)]     // past it, so it lands after the first
+    [InlineData(800, 50, 3)]     // past every midpoint on row one
+    [InlineData(10, 150, 3)]     // start of row two
+    [InlineData(800, 150, 6)]    // end of row two
+    public void DropIndex_PicksTheSlotThePointerHasPassed(double x, double y, int expected) {
+        Assert.Equal(expected, WidgetBoardLayout.DropIndex(Grid(), GridRows, x, y));
+    }
+
+    [Fact]
+    public void DropIndex_AboveTheBoard_ClampsToTheFirstRow() {
+        Assert.Equal(0, WidgetBoardLayout.DropIndex(Grid(), GridRows, 10, -400));
+    }
+
+    [Fact]
+    public void DropIndex_BelowTheBoard_ClampsToTheLastRow() {
+        Assert.Equal(6, WidgetBoardLayout.DropIndex(Grid(), GridRows, 900, 5000));
+    }
+
+    [Fact]
+    public void DropIndex_Empty_IsZero() {
+        Assert.Equal(0, WidgetBoardLayout.DropIndex(Array.Empty<Rect2>(), Array.Empty<int>(), 10, 10));
+    }
+
     /// <summary>Whether the row has more content width than its caps can between them absorb, which
     /// is the point at which the caps give way rather than banking the rest as whitespace.</summary>
     private static bool ExceedsEveryCap(ReadOnlySpan<WidgetSlot> row, double width) {

@@ -1,14 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:DashDetective.Shared.Controls">
-    <!--
-      The WidgetPanel template. Every binding is a TemplateBinding, which is what lets a custom
-      control's template satisfy AvaloniaUseCompiledBindingsByDefault without an x:DataType, and
-      keeps the no-reflection rule that ViewLocator's explicit switch also exists to hold.
-
-      The surface repeats Border.panel's setters rather than wrapping a Border.panel, because a
-      templated child cannot pick up a class the call site never writes.
-    -->
+    <!-- The WidgetPanel template. TemplateBinding throughout, which is what satisfies compiled
+         bindings without an x:DataType. The surface repeats Border.panel's setters because a
+         templated child cannot pick up a class the call site never writes. -->
     <Style Selector="controls|WidgetPanel">
         <Setter Property="Template">
             <ControlTemplate>
@@ -18,9 +13,7 @@
                         CornerRadius="{StaticResource RadiusPanel}"
                         Padding="{StaticResource PanelPadding}">
                     <DockPanel LastChildFill="True">
-                        <!-- Header. Auto,Auto,* so the title keeps its width, HeaderLead sits against it,
-                             and HeaderContent takes the rest and aligns right. Each slot reserves room
-                             only when set, so a title-only widget draws a plain heading. -->
+                        <!-- Title | HeaderLead | HeaderContent (right). Each reserves room only when set. -->
                         <StackPanel x:Name="PART_Header" DockPanel.Dock="Top" Spacing="2"
                                     Margin="{StaticResource WidgetHeaderMargin}">
                             <Grid ColumnDefinitions="Auto,Auto,*">
@@ -50,6 +43,24 @@
                 </Border>
             </ControlTemplate>
         </Setter>
+    </Style>
+
+    <!-- Picked up: lifted above its neighbours and accented, so the gap it left reads as the target. -->
+    <Style Selector="controls|WidgetPanel.dragging">
+        <Setter Property="ZIndex" Value="10"/>
+        <Setter Property="Opacity" Value="0.92"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel.dragging /template/ Border">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="BoxShadow" Value="0 10 28 0 #55000000"/>
+    </Style>
+
+    <!-- The header is the drag handle, so say so on hover. -->
+    <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header:pointerover">
+        <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
     <!-- A widget with no heading at all: drop the header's bottom margin so the body starts at the

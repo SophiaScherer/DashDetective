@@ -5,18 +5,11 @@ namespace DashDetective.Shared.Controls;
 
 /// <summary>
 /// One widget: the panel surface, its header row, and whatever body the call site puts inside it.
-/// Replaces the hand-rolled <c>Border Classes="panel"</c> + <c>StackPanel</c> +
-/// <c>TextBlock Classes="panelTitle"</c> assembly that every tab had been writing out in full, each
-/// with its own header grid and its own header-to-body gap (8, 10 and 12 for the same shape).
+/// Replaces the hand-rolled Border + StackPanel + panelTitle assembly every tab wrote out in full.
 ///
-/// A <see cref="ContentControl"/> rather than a <c>UserControl</c> with properties (the
-/// <see cref="StatCard"/> pattern) because a widget's body is arbitrary markup: a UserControl's own
-/// Content is taken by its .axaml root, so the body would need a second content property and every
-/// call site would have to name it. It is also not a <c>HeaderedContentControl</c>, which offers two
-/// slots where a header here needs three — see <see cref="HeaderLead"/>.
-///
-/// The template lives in src/Shared/Styles/Widgets.axaml, following the one ControlTemplate the repo
-/// already had (SharedStyles' <c>ToggleButton.toggle</c>), so no ControlTheme is introduced.
+/// A <see cref="ContentControl"/>, not the <see cref="StatCard"/> UserControl pattern, because the
+/// body is arbitrary markup; not a <c>HeaderedContentControl</c>, which gives two slots where this
+/// needs three. Template in src/Shared/Styles/Widgets.axaml.
 /// </summary>
 public class WidgetPanel : ContentControl {
     public static readonly StyledProperty<string?> TitleProperty =
@@ -34,23 +27,20 @@ public class WidgetPanel : ContentControl {
     public static readonly StyledProperty<string?> WidgetIdProperty =
         AvaloniaProperty.Register<WidgetPanel, string?>(nameof(WidgetId));
 
-    /// <summary>The widget's name, drawn as the shared <c>panelTitle</c>. Empty on a panel that is a
-    /// surface rather than a titled widget, which collapses the row.</summary>
+    /// <summary>The widget's name, drawn as the shared <c>panelTitle</c>. Empty collapses it.</summary>
     public string? Title {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
     }
 
-    /// <summary>A caption directly under the title (what the widget is showing, or over what span).
-    /// Sits tight to the title rather than in the body, so it reads as part of the heading.</summary>
+    /// <summary>Caption under the title, tight to it so it reads as part of the heading.</summary>
     public string? Subtitle {
         get => GetValue(SubtitleProperty);
         set => SetValue(SubtitleProperty, value);
     }
 
-    /// <summary>Content immediately after the title, left-aligned — the Performance tab's jump link and
-    /// the Storage tab's drive picker, both of which belong to the title rather than to the far end of
-    /// the row. This is the third slot a HeaderedContentControl could not give.</summary>
+    /// <summary>Content against the title: Performance's jump link, Storage's drive picker. The
+    /// third slot a HeaderedContentControl could not give.</summary>
     public object? HeaderLead {
         get => GetValue(HeaderLeadProperty);
         set => SetValue(HeaderLeadProperty, value);
@@ -62,8 +52,8 @@ public class WidgetPanel : ContentControl {
         set => SetValue(HeaderContentProperty, value);
     }
 
-    /// <summary>Stable identity for this widget, as <c>{page}.{slug}</c>. Set at the call site so a
-    /// saved layout can name a widget without the page keeping a parallel list.</summary>
+    /// <summary>Stable identity, as <c>{page}.{slug}</c>, for naming this widget in a saved
+    /// layout.</summary>
     public string? WidgetId {
         get => GetValue(WidgetIdProperty);
         set => SetValue(WidgetIdProperty, value);

@@ -1734,6 +1734,102 @@ types on Windows, then delete it.
   *selection* rules out of `Icons` (as `NavigationViewModel.ChevronPointing` → `ChevronDirection` does)
   and leave `Icons` a plain geometry lookup, so the rule stays testable and the geometry never loads.
 
+## Code conventions
+
+These are the rules that decide whether a change is right, as opposed to how the app is put together —
+that is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### Comments
+
+Terse. One or two sentences, no paragraphs, no multi-line essays. Keep XML docs on public members but
+keep them short. Say *why* where it is not obvious; never restate what the code already says.
+
+### Soft-fail: what a fallback owes you
+
+"Degrades to a neutral fallback" is the rule. Four ways it gets broken:
+
+- **A fallback must not be a confident wrong answer.** `0` is neutral only where `0` is impossible as a
+  real reading. It is not neutral for a utilisation percentage — `MetricChannel` stops polling after a
+  failure, so a `0%` sits there claiming an idle machine for the session. Use `Placeholders.NoReading`.
+- **A fallback must not be unreachable.** A sampler that catches its own failure and returns zero never
+  lets `MetricChannel` call `_onFailed`, so the placeholder can never appear. Samplers **throw**; the
+  channel turns that into the placeholder. Returning a zero *measurement* is different and fine.
+- **A fallback must leave the surface in one piece.** Build into a local and swap at the end, so
+  everything that can throw happens before anything on screen is touched.
+- **A `catch` must not be wider than its comment.** Filter it:
+  `catch (Exception e) when (e is ArgumentException or Win32Exception)`. Keep the `try` no wider than
+  the failable call. Every bare `catch { }` carries a comment saying why nothing is done.
+
+**Who logs:** providers, samplers and services, through `Services/Diagnostics/Log`. View models and
+code-behind do not — the provider that failed has already logged it with more context.
+
+**A sanity window is a shared constant, not a per-reader one** (`GpuSensorRange`,
+`DiskTemperatureRange`). They stay separate from each other on purpose: a drive at 130 °C is a bad
+reading, a GPU at 130 °C is a hot one.
+
+### Platform readers
+
+- **Never substitute a near-miss.** Where a platform has no source for a value, return `null` and let
+  the surface render "—". Settled examples: the Performance tab's Handles tile on Linux, a maximum CPU
+  clock from `/proc/cpuinfo`, SMBIOS-only board fields, SMART-only drive health, per-process GPU on
+  Linux.
+- **Reporting "not known" as `0` is only safe when `0` is impossible.** It fails for a process owner:
+  `Uid` is `0` for root, so a denied read reported as `0` moves someone's process into System.
+- **A record keyed by a platform's identifier needs an equivalent derived, not invented.** Disks are
+  keyed by the kernel's `major:minor`, GPUs by PCI address, both taken from one shared derivation — if
+  two readers derived a key separately and disagreed, `DeviceInventory`'s intersection would empty and
+  every card would vanish with nothing logged.
+- **One file, one parser, named after the file.** Parse defensively: by index with a length check, by
+  explicit unit, and mind the traps — `/proc/net`'s host byte order (`0100007F` is `127.0.0.1`), the
+  parenthesised `comm` in `/proc/[pid]/stat`, octal escapes in `/proc/mounts`.
+- **A permission-gated file is not exposed at all** — `DmiIdReader` offers only world-readable keys.
+- Build `/proc` paths by string concatenation with forward slashes, never `Path.Combine`.
+
+**Unverifiable on CI:** neither the VM nor `ubuntu-latest` has a discrete GPU or a SMART-capable disk,
+so no Linux temperature, power or utilisation *value* has been checked against real hardware. What is
+verified is scale (millidegrees, microwatts, bytes, bare percent), that an absent source degrades to
+"—" rather than zero, and that enumeration and sampler agree on the adapter key. Finding no SATA drive
+temperature is the expected outcome, not a defect.
+
+### Styles
+
+- **A style used by a second tab must be promoted** to `SharedStyles.axaml`. Four tabs had independently
+  defined `colHead` and drifted to three variants of it.
+- **A shared style can only be overridden by a local one, never the reverse.** Avalonia ranks styles by
+  how close their host is to the control, so a `<UserControl.Styles>` rule beats an app-level rule
+  regardless of selector specificity. `Border.settingRow` set `Background="Transparent"` locally, which
+  silently outranked `Border.revealFlash.highlighted` and left Settings with no reveal flash — build,
+  format and 2246 tests all green. After promoting a style, delete the local same-property setter.
+- **Layer rather than restate.** `Classes="bare rowRun"`, `Classes="card selectable"` — not a new style
+  repeating six setters.
+- **Dimensions are adopted by contact, not by sweep.** New code uses the `Dimensions.axaml` tokens; a
+  view converts only lines it was already editing. A literal that has a token is a defect; one that
+  does not is fine until a second site needs it.
+- A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
+  that feature (the Network tab's `ConsolePanel`).
+
+### Testing
+
+- **A fake must be able to break its contract on demand.** A fake that only ever succeeds makes its
+  subject's `catch` unreachable, so the soft-fail rule goes unverified. Every shared fake has an opt-in
+  failure mode (`FakeProcFileSystem.ThrowOn`, `FakeGpuUsageSampler.Throwing`, …).
+- **Test the denial against a fixture that would otherwise succeed.** A provider handed an *empty* fake
+  returns the same `Unknown` it returns when denied, through a different path — so the test passes
+  whether or not the `catch` exists. Stage a working fixture first, then deny it.
+- **Pure logic belongs outside a platform-gated class**, or it never runs on the Linux CI leg.
+- **Never assert a measured width or height.** Font metrics differ between the two CI legs; pass
+  dimensions into the arithmetic instead, as `ChartAxis` and `WidgetBoardLayout` do.
+
+### Quality gates
+
+- `.editorconfig`: four-space indent, file-scoped namespaces, K&R braces, broad `var`. Usings
+  alphabetical with `System` **not** first.
+- The build sets `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild` and `AnalysisLevel=latest`, so a
+  style or platform-compatibility issue fails the build.
+- CI runs `dotnet format --verify-no-changes` before building, then the suite with coverage, on
+  `windows-latest` and `ubuntu-latest` in Debug and Release.
+- Build and test with `--artifacts-path`: a running app or an IDE holding `bin/` causes MSB3027.
+
 ## Working Style
 
 - One detail at a time. Prefer small, focused changes over broad sweeps.

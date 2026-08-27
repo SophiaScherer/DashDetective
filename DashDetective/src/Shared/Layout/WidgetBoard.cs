@@ -1,34 +1,32 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
+using DashDetective.Shared;
+using DashDetective.Shared.Controls;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DashDetective.Shared.Layout;
 
 /// <summary>
-/// A page's widgets as one flow: packs them into rows that fit the window, caps how wide any one of
-/// them gets, and spends the width left over on another column rather than on a wider widget.
+/// A page's widgets as one flow: packed into rows that fit the window, capped in width, and
+/// draggable by their headers. Replaces the fixed rows each page used to author, whose frozen
+/// membership is why a wide window stretched every panel instead of gaining a column.
 ///
-/// Replaces the <c>StackPanel</c> of two or three <see cref="WeightedRowPanel"/>s each page used to
-/// author. Row membership was frozen in that markup, which is what made an ultrawide simply stretch
-/// every panel — and what would make dragging a widget from one row to another impossible. The board
-/// owns the whole page, so both fall out of one arithmetic (<see cref="WidgetBoardLayout"/>).
-///
-/// <see cref="MaxSlotWidthProperty"/> is attached here rather than being each child's own
-/// <c>MaxWidth</c> on purpose: Avalonia's arrange clamps a stretched child to its MaxWidth and then
-/// *centres* it in the slot, which would leave the dead margin down each side that the cap exists to
-/// avoid. Making the board the only clamper keeps alignment out of it. <c>MinWidth</c> stays the
-/// child's own, for the reason <see cref="WeightedRowPanel"/> already gives: one source of truth, and
-/// Avalonia keeps honouring it inside the child's own measure.
+/// The cap is attached here rather than being the child's own <c>MaxWidth</c>: Avalonia's arrange
+/// clamps a stretched child to MaxWidth and then centres it, leaving a dead margin down each side.
+/// <c>MinWidth</c> stays the child's own, so there is one source of truth.
 /// </summary>
 public class WidgetBoard : Panel {
-    /// <summary>This child's share of its row. Row-local — it means "this much of whatever shares my
-    /// row", so a drag that changes the row's membership changes what it buys. Keep them near 1.</summary>
+    /// <summary>This child's share of its row. Row-local, so a drag changes what it buys.</summary>
     public static readonly AttachedProperty<double> WeightProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, double>("Weight", 1.0);
 
-    /// <summary>The width past which this widget stops being readable. Unset means no cap, which also
-    /// means the row it sits in can never be judged too roomy.</summary>
+    /// <summary>Width past which this widget stops being readable. Unset means no cap.</summary>
     public static readonly AttachedProperty<double> MaxSlotWidthProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, double>(
             "MaxSlotWidth", double.PositiveInfinity);
@@ -37,8 +35,7 @@ public class WidgetBoard : Panel {
     public static readonly AttachedProperty<bool> BreakBeforeProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, bool>("BreakBefore");
 
-    /// <summary>This child owns its row: a card strip or a wide table meant to span the page. Also
-    /// what pins a non-widget child in place, since nothing can be packed beside it.</summary>
+    /// <summary>This child owns its row, which is also what pins a non-widget child in place.</summary>
     public static readonly AttachedProperty<bool> StretchProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, bool>("Stretch");
 
@@ -53,6 +50,17 @@ public class WidgetBoard : Panel {
     private double[] _slotWidths = Array.Empty<double>();
     private List<int> _rowEnds = new();
     private double[] _rowHeights = Array.Empty<double>();
+    private Rect2[] _slotRects = Array.Empty<Rect2>();
+
+    // _order is the board's ordering of Children, _preview the order being tried mid-drag. A drag
+    // never mutates Children: that is re-entrant mid-layout and would detach a live Sparkline.
+    private readonly List<int> _order = new();
+    private readonly List<int> _preview = new();
+    private bool _dragPending;
+    private bool _dragging;
+    private Point _pressPoint;
+    private Point _pointer;
+    private WidgetPanel? _dragged;
 
     static WidgetBoard() {
         AffectsParentMeasure<WidgetBoard>(
@@ -89,6 +97,151 @@ public class WidgetBoard : Panel {
     public static bool GetStretch(Control control) => control.GetValue(StretchProperty);
 
     public static void SetStretch(Control control, bool value) => control.SetValue(StretchProperty, value);
+
+    /// <summary>Raised with the new widget-id order once a drag commits.</summary>
+    public event Action<IReadOnlyList<string>>? OrderChanged;
+
+    // ----- Drag to reorder -----
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnAttachedToVisualTree(e);
+        AddHandler(PointerPressedEvent, OnPreviewPressed, RoutingStrategies.Tunnel);
+        AddHandler(PointerMovedEvent, OnPointerMove, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, OnPointerUp, RoutingStrategies.Tunnel);
+        AddHandler(PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Tunnel);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
+        RemoveHandler(PointerPressedEvent, OnPreviewPressed);
+        RemoveHandler(PointerMovedEvent, OnPointerMove);
+        RemoveHandler(PointerReleasedEvent, OnPointerUp);
+        RemoveHandler(PointerCaptureLostEvent, OnCaptureLost);
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnPreviewPressed(object? sender, PointerPressedEventArgs e) {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+        if (e.Source is not Visual source || !HitHeader(source, out var panel))
+            return;
+        if (!_visible.Contains(panel))
+            return;
+
+        _dragged = panel;
+        _pressPoint = e.GetPosition(this);
+        _dragPending = true;
+        e.Pointer.Capture(this);
+    }
+
+    private void OnPointerMove(object? sender, PointerEventArgs e) {
+        if (!_dragPending || _dragged is null)
+            return;
+
+        _pointer = e.GetPosition(this);
+        if (!_dragging) {
+            var delta = _pointer - _pressPoint;
+            if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
+                return;
+            _dragging = true;
+            _preview.Clear();
+            _preview.AddRange(_order);
+            _dragged.Classes.Add("dragging");
+        }
+
+        // Re-pack under the order being tried, so the others shift as the drag moves.
+        if (MovePreviewTo(DropTarget()))
+            InvalidateMeasure();
+        InvalidateArrange();
+    }
+
+    private void OnPointerUp(object? sender, PointerReleasedEventArgs e) {
+        if (_dragging) {
+            _order.Clear();
+            _order.AddRange(_preview);
+            var ids = _visible.Select(WidgetIdOf).Where(id => id.Length > 0).ToList();
+            if (ids.Count > 0)
+                OrderChanged?.Invoke(ids);
+        }
+
+        e.Pointer.Capture(null);
+        EndDrag();
+    }
+
+    /// <summary>Where the pointer says the dragged widget belongs, in the preview order.</summary>
+    private int DropTarget() {
+        var drop = WidgetBoardLayout.DropIndex(
+            _slotRects.AsSpan(0, _visible.Count),
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
+            _pointer.X, _pointer.Y);
+
+        var current = _dragged is null ? -1 : _visible.IndexOf(_dragged);
+        return drop > current ? drop - 1 : drop;
+    }
+
+    /// <summary>Moves the dragged widget in the preview order; false when it is already there, so a
+    /// wobble does not re-pack every frame.</summary>
+    private bool MovePreviewTo(int target) {
+        if (_dragged is null)
+            return false;
+
+        var child = Children.IndexOf(_dragged);
+        var from = _preview.IndexOf(child);
+        if (from < 0)
+            return false;
+
+        target = Math.Clamp(target, 0, _preview.Count - 1);
+        if (target == from)
+            return false;
+
+        _preview.RemoveAt(from);
+        _preview.Insert(target, child);
+        return true;
+    }
+
+    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) => EndDrag();
+
+    /// <summary>The press must hit a header and miss every control in it — Storage keeps a drive
+    /// picker up there, which a drag would otherwise swallow.</summary>
+    private static bool HitHeader(Visual source, out WidgetPanel panel) {
+        panel = null!;
+        var header = false;
+        foreach (var node in source.GetSelfAndVisualAncestors()) {
+            switch (node) {
+                case Button or ToggleButton or TextBox or ComboBox or ScrollBar:
+                    return false;
+                case Panel { Name: "PART_Header" }:
+                    header = true;
+                    break;
+                case WidgetPanel found:
+                    panel = found;
+                    return header;
+            }
+        }
+        return false;
+    }
+
+    // Reached from release and from lost capture alike, so the lifted state can never stick.
+    private void EndDrag() {
+        _dragged?.Classes.Remove("dragging");
+        _dragged = null;
+        _dragging = false;
+        _dragPending = false;
+        InvalidateMeasure();
+        InvalidateArrange();
+    }
+
+    private void EnsureOrder() {
+        if (_order.Count == Children.Count)
+            return;
+        _order.Clear();
+        for (var i = 0; i < Children.Count; i++)
+            _order.Add(i);
+    }
+
+    private static string WidgetIdOf(Control control) => control switch {
+        WidgetPanel panel => panel.WidgetId ?? "",
+        _ => "",
+    };
 
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();
@@ -155,7 +308,17 @@ public class WidgetBoard : Panel {
 
             var x = 0.0;
             for (var i = 0; i < count; i++) {
-                _visible[start + i].Arrange(new Rect(x, y, rowWidths[i], _rowHeights[r]));
+                var index = start + i;
+                var box = new Rect(x, y, rowWidths[i], _rowHeights[r]);
+                _slotRects[index] = new Rect2(box.X, box.Y, box.Width, box.Height);
+
+                // Follows the pointer from its previewed slot, keeping its place in Children so
+                // nothing is reparented and no binding is torn down.
+                if (_dragging && ReferenceEquals(_visible[index], _dragged))
+                    box = box.WithX(box.X + _pointer.X - _pressPoint.X)
+                             .WithY(box.Y + _pointer.Y - _pressPoint.Y);
+
+                _visible[index].Arrange(box);
                 x += rowWidths[i] + ColumnSpacing;
             }
 
@@ -166,19 +329,20 @@ public class WidgetBoard : Panel {
         return finalSize;
     }
 
-    /// <summary>Collapsed children are skipped entirely, so a hidden widget neither takes a slot nor
-    /// shifts the row's proportions.</summary>
+    /// <summary>Collapsed children are skipped, so a hidden widget takes no slot.</summary>
     private void CollectVisible() {
+        EnsureOrder();
         _visible.Clear();
-        foreach (var child in Children)
-            if (child.IsVisible)
-                _visible.Add(child);
+        foreach (var index in _dragging ? _preview : _order)
+            if (index < Children.Count && Children[index].IsVisible)
+                _visible.Add(Children[index]);
     }
 
     private void BuildSlots() {
         if (_slots.Length < _visible.Count) {
             _slots = new WidgetSlot[_visible.Count];
             _slotWidths = new double[_visible.Count];
+            _slotRects = new Rect2[_visible.Count];
         }
 
         for (var i = 0; i < _visible.Count; i++) {

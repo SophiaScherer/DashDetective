@@ -4,15 +4,16 @@ using System.Collections.Generic;
 namespace DashDetective.Shared.Layout;
 
 /// <summary>One widget's inputs to the board's arithmetic.</summary>
-/// <param name="Weight">Share of the row this widget takes. Row-local: it means "this much of
-/// whatever shares my row", so it changes meaning when the row's membership does.</param>
-/// <param name="MinWidth">The width below which the widget stops being readable.</param>
-/// <param name="MaxWidth">The width above which it stops being readable the other way — a table
-/// stretched across an ultrawide leaves its columns metres apart.
-/// <see cref="double.PositiveInfinity"/> for no cap.</param>
-/// <param name="BreakBefore">Start a new row at this widget even if the previous one had room.</param>
-/// <param name="Stretch">This widget owns its row: a card strip or a wide table that is meant to span
-/// the page rather than sit beside anything.</param>
+/// <param name="Weight">Share of its row. Row-local, so it changes meaning when the row does.</param>
+/// <param name="MinWidth">Below this the widget stops being readable.</param>
+/// <param name="MaxWidth">Above this it stops being readable the other way. Infinity for no cap.</param>
+/// <param name="BreakBefore">Start a new row here even where the previous one had room.</param>
+/// <param name="Stretch">This widget owns its row (a card strip, a full-width table).</param>
+/// <summary>An arranged widget's box, declared here so the drop arithmetic stays Avalonia-free.</summary>
+public readonly record struct Rect2(double Left, double Top, double Width, double Height) {
+    public double Bottom => Top + Height;
+}
+
 public readonly record struct WidgetSlot(
     double Weight,
     double MinWidth,
@@ -21,23 +22,14 @@ public readonly record struct WidgetSlot(
     bool Stretch = false);
 
 /// <summary>
-/// Row packing and width arithmetic for <see cref="WidgetBoard"/>. Answers the two questions the panel
-/// then only has to arrange: which widgets share a row, and how wide each one is.
+/// Which widgets share a row, and how wide each one is. A row keeps pulling the next widget in while
+/// it is still too roomy, so surplus width buys a column rather than a wider widget.
 ///
-/// The cap is the point of the whole class: a wide window should buy more columns, not wider widgets.
-/// Left to stretch, the Network tab's connections table runs past 2000px on an ultrawide with four
-/// columns of whitespace between its headings. So a row keeps pulling the next widget in while it is
-/// still too roomy — while the width it has exceeds what its members can readably use — and stops as
-/// soon as they can. That is what turns surplus width into another column.
-///
-/// Rows pack greedily and in declared order, never reordered to pack better: the user drags widgets
-/// into an order and has to be able to predict where one lands. Each row's proportional split is
-/// <see cref="WeightedRowLayout"/>'s, so that arithmetic and its tests stay the one source of truth.
-/// Kept free of Avalonia types so it is testable without a layout pass.
+/// Packs greedily in declared order (a dragged widget has to land where the user put it), defers each
+/// split to <see cref="WeightedRowLayout"/>, and holds no Avalonia types so it tests without layout.
 /// </summary>
 public static class WidgetBoardLayout {
-    // Widths arrive from layout arithmetic (padding and gutters already subtracted), so an exact fit
-    // can land a hair under. The same nudge FlowLayout applies, for the same reason.
+    // An exact fit can land a hair under after gutters are subtracted; the nudge FlowLayout also uses.
     private const double Epsilon = 1e-6;
 
     /// <summary>The index just past each row: row <c>r</c> holds slots
@@ -70,11 +62,8 @@ public static class WidgetBoardLayout {
         return rowEnds;
     }
 
-    /// <summary>Pulls a lone last widget back into the row above when it still clears every minimum
-    /// there. Without this a page whose widget count does not divide evenly ends on one widget
-    /// spanning the full width beside a capped neighbour above it, which reads as a mistake rather
-    /// than a layout. Only the last row, and only one merge: anything more would start reordering
-    /// what the packing deliberately kept in place.</summary>
+    /// <summary>Pulls a lone last widget up into the row above when it still clears every minimum
+    /// there, so a page does not end on one panel spanning the width beside a capped neighbour.</summary>
     private static void MergeTrailingOrphan(ReadOnlySpan<WidgetSlot> slots, double availableWidth,
                                             double columnSpacing, List<int> rowEnds) {
         if (rowEnds.Count < 2)
@@ -84,9 +73,7 @@ public static class WidgetBoardLayout {
         if (slots.Length - lastStart != 1 || slots[lastStart].Stretch || slots[lastStart].BreakBefore)
             return;
 
-        // Only where the whole merged row is capped. A widget that declares no ceiling was left to own
-        // its row on purpose, and pulling the orphan up beside it would override that with a rule the
-        // cap system never applied to it in the first place.
+        // Only where the whole merged row is capped: an uncapped widget owns its row on purpose.
         var previousStart = rowEnds.Count >= 3 ? rowEnds[^3] : 0;
         foreach (var slot in slots[previousStart..])
             if (slot.Stretch || double.IsPositiveInfinity(slot.MaxWidth))
@@ -140,17 +127,8 @@ public static class WidgetBoardLayout {
     }
 
     /// <summary>
-    /// Divides one row across its slots, into <paramref name="widths"/>.
-    ///
-    /// Split by weight, clamp each slot to its own range, then hand the width the clamped slots gave
-    /// back to those still free, in proportion. Clamping one can push another over its cap, so this
-    /// repeats until nothing new clamps — at most once per slot, since a clamped slot never unclamps.
-    ///
-    /// A cap is what a widget can readably USE, not a hard ceiling: once every slot has hit one and
-    /// width is still left, the leftover is shared out in proportion anyway. By then the row is as
-    /// full as it will get — <see cref="PackRows"/> already spent every chance to buy a column with
-    /// that width — and half an empty screen is worse than a wide panel. This is the case a page with
-    /// only two widgets hits on an ultrawide.
+    /// Divides one row across its slots: split by weight, clamp each to its own range, then share the
+    /// width the clamped ones gave back among those still free, repeating until nothing new clamps.
     /// </summary>
     public static void SplitRow(ReadOnlySpan<WidgetSlot> slots, double availableWidth,
                                 double columnSpacing, Span<double> widths) {
@@ -217,21 +195,47 @@ public static class WidgetBoardLayout {
             used += widths[i];
         var leftover = content - used;
 
-        // Too narrow to honour the minimums at all: overflow at them rather than driving a width
-        // negative. The caller is inside a ScrollViewer, and a minimum is the point below which the
-        // widget stopped being readable anyway.
+        // Too narrow for the minimums: overflow at them rather than driving a width negative.
         if (leftover < -Epsilon)
             return;
 
-        // Every slot is capped and width still remains, so the caps give way entirely and the row is
-        // just the weighted split. Banking the leftover as a gutter instead would put most of a 3000px
-        // page into one gap, which is the unused whitespace the caps were introduced to get rid of.
+        // Caps are what a widget can readably use, not a ceiling: once every slot has hit one and
+        // width remains, they give way. Banking it as a gutter would leave most of the page empty.
         if (leftover > Epsilon) {
             WeightedRowLayout.Split(content, weights, widths);
             return;
         }
 
         widths[count - 1] += leftover;
+    }
+
+    /// <summary>Where a widget dragged to (<paramref name="x"/>, <paramref name="y"/>) would be
+    /// inserted: the row whose band holds the pointer, then the first slot whose midpoint is right of
+    /// it.</summary>
+    public static int DropIndex(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
+        if (slots.Length == 0)
+            return 0;
+
+        var row = rowEnds.Length - 1;
+        var start = 0;
+        for (var r = 0; r < rowEnds.Length; r++) {
+            var end = rowEnds[r];
+            if (y < slots[end - 1].Bottom) {
+                row = r;
+                break;
+            }
+            start = end;
+        }
+
+        // start tracks the row before the one chosen when the loop ran to the end, so recompute it.
+        start = row == 0 ? 0 : rowEnds[row - 1];
+        var rowEnd = rowEnds[row];
+
+        for (var i = start; i < rowEnd; i++)
+            if (x < slots[i].Left + slots[i].Width / 2)
+                return i;
+
+        return rowEnd;
     }
 
     private static double Cap(WidgetSlot slot) =>
