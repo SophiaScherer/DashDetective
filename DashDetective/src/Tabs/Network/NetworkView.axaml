@@ -213,24 +213,22 @@
                                Foreground="{DynamicResource TextSubtle}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="10">
-                    <!-- Column header. The 14px right margin matches the rows' gutter below so the columns
-                         stay aligned and the scrollbar sits in the shared gutter, not over the text. -->
-                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Margin="0,0,14,2">
-                        <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
-                        <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
-                        <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
-                        <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
-                    </Grid>
-                    <!-- Whole page scrolls, so bound the table's own scroller or it never engages. Kept
-                         compact enough that the panel + pager stay on-screen in the default (non-maximized)
-                         window rather than pushing the pager below the fold. -->
-                    <ScrollViewer x:Name="ConnectionsScroller" MaxHeight="240"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
+                    <!-- The whole page scrolls, so the table has to bound its own body or it never
+                         scrolls. 240 keeps the panel and its pager on-screen in the default window. -->
+                    <controls:WidgetTable x:Name="ConnectionsTable" MaxBodyHeight="240" BodyScrollBars="Auto">
+                        <controls:WidgetTable.Header>
+                            <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}"
+                                  Margin="0,0,0,2">
+                                <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
+                                <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
+                                <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
+                            </Grid>
+                        </controls:WidgetTable.Header>
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="30" Margin="0,0,14,0">
+                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="30">
                                         <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -246,7 +244,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
+                    </controls:WidgetTable>
                     <!-- Pager: « ‹ 1 2 3 4 › » — the numbers with skip/step arrows bracketing them. Only
                          visible when there is more than one page. The arrows are bound straight to the view
                          model's commands rather than being items in PageLinks, which is cleared and rebuilt

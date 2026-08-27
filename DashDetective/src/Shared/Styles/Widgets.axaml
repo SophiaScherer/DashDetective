@@ -62,6 +62,26 @@
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
+    <!-- WidgetTable: header above a body that scrolls, both inset by the same scrollbar gutter. -->
+    <Style Selector="controls|WidgetTable">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DockPanel LastChildFill="True">
+                    <ContentPresenter x:Name="PART_TableHeader" DockPanel.Dock="Top"
+                                      Content="{TemplateBinding Header}"
+                                      Margin="{TemplateBinding Gutter}"/>
+                    <ScrollViewer x:Name="PART_BodyScroll" MaxHeight="{TemplateBinding MaxBodyHeight}"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="{TemplateBinding BodyScrollBars}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="{TemplateBinding Gutter}"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
     <!-- A widget with no heading at all: drop the header's bottom margin so the body starts at the
          panel's own padding rather than 10px below it. -->
     <Style Selector="controls|WidgetPanel.headless /template/ StackPanel#PART_Header">

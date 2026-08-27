@@ -32,8 +32,7 @@ public partial class NetworkView : UserControl {
         }
     }
 
-    private void ScrollConnectionsToTop() =>
-        ConnectionsScroller.Offset = new Vector(ConnectionsScroller.Offset.X, 0);
+    private void ScrollConnectionsToTop() => ConnectionsTable.ScrollToTop();
 
     /// <summary>
     /// Scrolls the revealed adapter's row into view and flashes it. The Adapters panel has no selection of

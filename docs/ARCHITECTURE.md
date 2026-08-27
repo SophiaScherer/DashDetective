@@ -107,6 +107,12 @@ saved order against what a page declares now drops ids it no longer has and keep
 at its declared position, so a later release does not drop a new widget at the bottom of a layout the
 user arranged once.
 
+**`WidgetTable`** (`src/Shared/Controls`) is the chrome a table inside a widget needs: a header that
+stays above a body that scrolls, with the scrollbar gutter applied to both so the columns cannot drift.
+Columns, sorting and the row template stay with the call site. Only Network's connections table and
+Storage's partitions use it — Processes and File Explorer measure their column drops off their own
+header grid's width, and share little else.
+
 Other layout panels: `UniformFlowPanel` (equal columns that wrap rather than shrink) and
 `GridColumns`/`TableColumns` (bindable column definitions, and dropping columns as a table narrows).
 
