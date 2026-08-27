@@ -101,7 +101,7 @@
     <!-- One board for the whole page. The caps are what stop this tab, the widest in the app, from
          simply stretching on an ultrawide: the connections table past ~900 leaves its four columns
          metres apart, so the surplus buys another column instead. -->
-    <layout:WidgetBoard ColumnSpacing="16" RowSpacing="16">
+    <layout:WidgetBoard ColumnSpacing="16" RowSpacing="16" Order="{Binding WidgetOrder, Mode=TwoWay}">
             <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260"
                                   layout:WidgetBoard.MaxSlotWidth="520" Title="Adapters">
                     <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so

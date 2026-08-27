@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Media;
+using DashDetective.Shared.Controls;
 using System.Windows.Input;
 
 namespace DashDetective.Tabs.Network;
@@ -13,7 +14,7 @@ namespace DashDetective.Tabs.Network;
 /// Kept in the Network tab folder rather than <c>src/Shared</c>: both users are this one feature, which
 /// is the promotion bar the architecture doc sets.
 /// </summary>
-public partial class ConsolePanel : UserControl {
+public partial class ConsolePanel : UserControl, IWidgetIdentity {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<ConsolePanel, string?>(nameof(Title));
 

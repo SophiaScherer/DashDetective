@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -45,6 +46,13 @@ public class WidgetBoard : Panel {
     public static readonly StyledProperty<double> RowSpacingProperty =
         AvaloniaProperty.Register<WidgetBoard, double>(nameof(RowSpacing));
 
+    /// <summary>The widget ids in display order, two-way so a drag reports its result back to the page
+    /// that persists it. Ids the board does not have are ignored; ones it has that are missing keep
+    /// their declared position.</summary>
+    public static readonly StyledProperty<IReadOnlyList<string>?> OrderProperty =
+        AvaloniaProperty.Register<WidgetBoard, IReadOnlyList<string>?>(
+            nameof(Order), defaultBindingMode: BindingMode.TwoWay);
+
     private readonly List<Control> _visible = new();
     private WidgetSlot[] _slots = Array.Empty<WidgetSlot>();
     private double[] _slotWidths = Array.Empty<double>();
@@ -60,7 +68,9 @@ public class WidgetBoard : Panel {
     private bool _dragging;
     private Point _pressPoint;
     private Point _pointer;
-    private WidgetPanel? _dragged;
+    private Control? _dragged;
+    private WidgetPanel? _draggedPanel;
+    private bool _applyingOrder;
 
     static WidgetBoard() {
         AffectsParentMeasure<WidgetBoard>(
@@ -78,6 +88,43 @@ public class WidgetBoard : Panel {
     public double RowSpacing {
         get => GetValue(RowSpacingProperty);
         set => SetValue(RowSpacingProperty, value);
+    }
+
+    public IReadOnlyList<string>? Order {
+        get => GetValue(OrderProperty);
+        set => SetValue(OrderProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
+        base.OnPropertyChanged(change);
+        if (change.Property == OrderProperty && !_applyingOrder)
+            ApplySavedOrder(Order);
+    }
+
+    /// <summary>Reorders the board to a saved order, keeping any widget the save does not name at its
+    /// declared position.</summary>
+    private void ApplySavedOrder(IReadOnlyList<string>? saved) {
+        if (saved is null || saved.Count == 0 || Children.Count == 0)
+            return;
+
+        var declared = new List<string>(Children.Count);
+        foreach (var child in Children)
+            declared.Add(WidgetIdOf(child));
+
+        var resolved = WidgetOrders.Resolve(declared.FindAll(id => id.Length > 0), saved);
+        var position = new Dictionary<string, int>();
+        for (var i = 0; i < resolved.Count; i++)
+            position[resolved[i]] = i;
+
+        // A child with no id (a card strip) keeps its declared index, so it cannot be dragged past.
+        EnsureOrder();
+        _order.Sort((a, b) => Key(a).CompareTo(Key(b)));
+        InvalidateMeasure();
+
+        double Key(int index) =>
+            declared[index].Length > 0 && position.TryGetValue(declared[index], out var rank)
+                ? rank
+                : index;
     }
 
     public static double GetWeight(Control control) => control.GetValue(WeightProperty);
@@ -124,10 +171,13 @@ public class WidgetBoard : Panel {
             return;
         if (e.Source is not Visual source || !HitHeader(source, out var panel))
             return;
-        if (!_visible.Contains(panel))
+
+        var child = BoardChildOf(panel);
+        if (child is null || !_visible.Contains(child))
             return;
 
-        _dragged = panel;
+        _dragged = child;
+        _draggedPanel = panel;
         _pressPoint = e.GetPosition(this);
         _dragPending = true;
         e.Pointer.Capture(this);
@@ -145,7 +195,8 @@ public class WidgetBoard : Panel {
             _dragging = true;
             _preview.Clear();
             _preview.AddRange(_order);
-            _dragged.Classes.Add("dragging");
+            _draggedPanel?.Classes.Add("dragging");
+            _dragged.ZIndex = 10;
         }
 
         // Re-pack under the order being tried, so the others shift as the drag moves.
@@ -159,8 +210,12 @@ public class WidgetBoard : Panel {
             _order.Clear();
             _order.AddRange(_preview);
             var ids = _visible.Select(WidgetIdOf).Where(id => id.Length > 0).ToList();
-            if (ids.Count > 0)
+            if (ids.Count > 0) {
+                _applyingOrder = true;
+                Order = ids;
+                _applyingOrder = false;
                 OrderChanged?.Invoke(ids);
+            }
         }
 
         e.Pointer.Capture(null);
@@ -222,7 +277,10 @@ public class WidgetBoard : Panel {
 
     // Reached from release and from lost capture alike, so the lifted state can never stick.
     private void EndDrag() {
-        _dragged?.Classes.Remove("dragging");
+        _draggedPanel?.Classes.Remove("dragging");
+        if (_dragged is not null)
+            _dragged.ZIndex = 0;
+        _draggedPanel = null;
         _dragged = null;
         _dragging = false;
         _dragPending = false;
@@ -238,10 +296,17 @@ public class WidgetBoard : Panel {
             _order.Add(i);
     }
 
-    private static string WidgetIdOf(Control control) => control switch {
-        WidgetPanel panel => panel.WidgetId ?? "",
-        _ => "",
-    };
+    /// <summary>The board's own child containing this control — not always the control itself, since
+    /// a ConsolePanel wraps the WidgetPanel whose header was pressed.</summary>
+    private Control? BoardChildOf(Control control) {
+        for (Visual? node = control; node is not null; node = node.GetVisualParent())
+            if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this))
+                return candidate;
+        return null;
+    }
+
+    private static string WidgetIdOf(Control control) =>
+        control is IWidgetIdentity identity ? identity.WidgetId ?? "" : "";
 
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();

@@ -47,7 +47,6 @@
 
     <!-- Picked up: lifted above its neighbours and accented, so the gap it left reads as the target. -->
     <Style Selector="controls|WidgetPanel.dragging">
-        <Setter Property="ZIndex" Value="10"/>
         <Setter Property="Opacity" Value="0.92"/>
     </Style>
     <Style Selector="controls|WidgetPanel.dragging /template/ Border">

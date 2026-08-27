@@ -11,7 +11,7 @@ namespace DashDetective.Shared.Controls;
 /// body is arbitrary markup; not a <c>HeaderedContentControl</c>, which gives two slots where this
 /// needs three. Template in src/Shared/Styles/Widgets.axaml.
 /// </summary>
-public class WidgetPanel : ContentControl {
+public class WidgetPanel : ContentControl, IWidgetIdentity {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<WidgetPanel, string?>(nameof(Title));
 

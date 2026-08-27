@@ -102,6 +102,11 @@ another column rather than a wider widget. Widgets are dragged by their headers 
 re-packs live. The arithmetic is `WidgetBoardLayout`, free of Avalonia types and unit-tested without a
 layout pass.
 
+The order is persisted per page by `WidgetOrders`, keyed by widget id rather than index. Resolving a
+saved order against what a page declares now drops ids it no longer has and keeps a newly added widget
+at its declared position, so a later release does not drop a new widget at the bottom of a layout the
+user arranged once.
+
 Other layout panels: `UniformFlowPanel` (equal columns that wrap rather than shrink) and
 `GridColumns`/`TableColumns` (bindable column definitions, and dropping columns as a table narrows).
 

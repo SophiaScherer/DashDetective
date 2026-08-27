@@ -21,7 +21,27 @@ namespace DashDetective.Tabs.Dashboard;
 /// by subscribing to the shared <see cref="SystemMetricsService"/> — the samplers are shared across
 /// pages; each surface keeps its own rolling history and rebuilds its chart in the subscription callback.
 /// </summary>
-public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable {
+public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable, IReorderablePage {
+    /// <summary>Key this page's widget order is persisted under.</summary>
+    public string PageKey => "dashboard";
+
+    private IReadOnlyList<string> _widgetOrder = [];
+
+    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
+    public IReadOnlyList<string> WidgetOrder {
+        get => _widgetOrder;
+        set {
+            if (ReferenceEquals(_widgetOrder, value))
+                return;
+            _widgetOrder = value ?? [];
+            OnPropertyChanged();
+            WidgetOrderChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
+    public event Action? WidgetOrderChanged;
+
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 

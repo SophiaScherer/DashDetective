@@ -26,7 +26,27 @@ namespace DashDetective.Tabs.Network;
 /// — a bigger rate always draws taller, whichever direction it's in. Other panels (adapters,
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
-public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable {
+public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable, IReorderablePage {
+    /// <summary>Key this page's widget order is persisted under.</summary>
+    public string PageKey => "network";
+
+    private IReadOnlyList<string> _widgetOrder = [];
+
+    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
+    public IReadOnlyList<string> WidgetOrder {
+        get => _widgetOrder;
+        set {
+            if (ReferenceEquals(_widgetOrder, value))
+                return;
+            _widgetOrder = value ?? [];
+            OnPropertyChanged();
+            WidgetOrderChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
+    public event Action? WidgetOrderChanged;
+
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
