@@ -172,10 +172,23 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         Completion = null;
     }
 
-    /// <summary>Puts the caret in the box (Ctrl+F) and opens the dropdown.</summary>
+    /// <summary>Whether the field is showing at all. Collapsed it is a single toolbar icon, which is
+    /// what gives the page title its room back on a narrow window. Not persisted: it is where the user
+    /// is right now, not a preference.</summary>
+    [ObservableProperty] private bool _isExpanded;
+
+    /// <summary>Shows the field and puts the caret in it — the icon, Ctrl+F and a search result's
+    /// Reveal all arrive here.</summary>
     public void Focus() {
+        IsExpanded = true;
         OpenDropdown();
         FocusRequested?.Invoke();
+    }
+
+    /// <summary>Puts the field away, unless the user has typed something worth keeping on screen.</summary>
+    public void CollapseIfIdle() {
+        if (!IsOpen && Text.Length == 0)
+            IsExpanded = false;
     }
 
     /// <summary>The box took focus by some other route — the user clicked into it. Opens the same
@@ -294,6 +307,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     private void Dismiss() {
         Text = "";
         Close();
+        IsExpanded = false;
     }
 
     // ----- Keyboard -----

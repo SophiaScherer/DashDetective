@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
              xmlns:search="using:DashDetective.Shell.Search"
              mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="34"
              x:DataType="search:UniversalSearchViewModel"
@@ -38,6 +39,21 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
 
+        <!-- Collapsed state: the same 34px icon button as Refresh and Export beside it, so the
+             toolbar reads as one row of actions until the field is asked for. -->
+        <Style Selector="Button.searchIcon">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.searchIcon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
+
         <!-- The category tag at the right of a row (Page / Setting / Process / File). -->
         <Style Selector="Border.resultTag">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
@@ -48,12 +64,24 @@
     </UserControl.Styles>
 
     <Panel>
+        <!-- Collapsed: an icon in the toolbar's action row. Clicking it shows the field and takes the
+             caret, the same entry point Ctrl+F uses. -->
+        <Button Classes="searchIcon" IsVisible="{Binding !IsExpanded}"
+                ToolTip.Tip="Search (Ctrl+F)" Click="OnExpandClick"
+                HorizontalAlignment="Right" VerticalAlignment="Center">
+            <Path Width="16" Height="16" Stretch="Uniform" Data="{x:Static nav:Icons.Search}"
+                  Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.5" StrokeLineCap="Round"/>
+        </Button>
+
         <!-- PointerPressed as well as GotFocus: after picking a result the caret stays in the box, so
              clicking it again raises no focus event and the dropdown would never come back. Both events
              bubble out of the field's inner box, so they still reach these handlers.
              Tab fills in the best result's name; Enter is bound inside the field because the shortcut
              layer deliberately leaves Enter to whatever text box has focus. -->
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
+                              IsVisible="{Binding IsExpanded}"
+                              MinWidth="180" MaxWidth="320"
+                              HorizontalAlignment="Right" VerticalAlignment="Center"
                               PointerPressed="OnFieldPressed"
                               GotFocus="OnSearchBoxGotFocus"
                               LostFocus="OnSearchBoxLostFocus"

@@ -120,7 +120,7 @@
                                  the title and actions keep their room; the dropdown follows via the
                                  popup's width binding. -->
                             <search:UniversalSearchView DataContext="{Binding Search}"
-                                                        MinWidth="180" MaxWidth="320" Margin="16,0"
+                                                        Margin="16,0"
                                                         HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </DockPanel>
                     </Grid>

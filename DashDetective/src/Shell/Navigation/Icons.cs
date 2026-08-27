@@ -71,6 +71,10 @@ public static class Icons {
     // A circled question mark (the Help affordance): the outer ring, the hook, and the dot beneath it.
     // The dot is a round-cap degenerate segment (as in Storage's activity dots) so it draws from the
     // same stroke as the rest of the glyph.
+    /// <summary>Magnifier. Drawn by the SearchField and by the toolbar's collapsed search button.</summary>
+    public static readonly Geometry Search = Geometry.Parse(
+        "M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14");
+
     public static readonly Geometry Help = Geometry.Parse(
         "M9,2 A7,7 0 1 1 8.99,2 Z " +
         "M6.8,7 A2.2,2.2 0 1 1 9.9,9 C9.2,9.5 8.9,9.8 8.9,10.6 " +

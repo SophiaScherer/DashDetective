@@ -43,7 +43,20 @@ public partial class UniversalSearchView : UserControl {
         WatchForOutsideClick();
     }
 
-    private void OnSearchBoxLostFocus(object? sender, RoutedEventArgs e) => StopWatchingForOutsideClick();
+    private void OnSearchBoxLostFocus(object? sender, RoutedEventArgs e) {
+        StopWatchingForOutsideClick();
+
+        // Put the field away again if nothing is left in it. Posted because focus moving between the
+        // box's own parts reports a loss before the gain, and collapsing on that would eat the click.
+        Dispatcher.UIThread.Post(() => {
+            if (!SearchBox.IsKeyboardFocusWithin)
+                (DataContext as UniversalSearchViewModel)?.CollapseIfIdle();
+        }, DispatcherPriority.Input);
+    }
+
+    // The collapsed icon and Ctrl+F are the same entry point: show the field and take the caret.
+    private void OnExpandClick(object? sender, RoutedEventArgs e) =>
+        (DataContext as UniversalSearchViewModel)?.Focus();
 
     // The same, for a click on a box that already has focus — which is the state the field is left in
     // after a result is picked, and where GotFocus alone leaves the dropdown unreachable by mouse. The

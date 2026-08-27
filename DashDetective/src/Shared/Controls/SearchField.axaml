@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
              x:Class="DashDetective.Shared.Controls.SearchField"
              x:Name="Root" x:CompileBindings="False">
     <!-- The app's search / filter field: magnifier, input, and a × that appears once something is typed.
@@ -18,7 +19,7 @@
             <Path Grid.Column="0" Stretch="Uniform" VerticalAlignment="Center"
                   Width="{Binding #Root.IconSize}" Height="{Binding #Root.IconSize}"
                   Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.4" StrokeLineCap="Round"
-                  Data="M7,7 m-4.5,0 a4.5,4.5 0 1 0 9,0 a4.5,4.5 0 1 0 -9,0 M10.5,10.5 L14,14"/>
+                  Data="{x:Static nav:Icons.Search}"/>
 
             <controls:GhostCompletionBox Grid.Column="1" x:Name="Box"
                                          Margin="{Binding #Root.IconGap}"
