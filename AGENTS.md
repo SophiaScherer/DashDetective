@@ -35,7 +35,8 @@ self-scrolling patterns)** (full write-ups in *Appendix — Completed Feature De
 **File Explorer**, **Network**, **Processes**, **Performance**, **Hardware**, **Storage** (live —
 drives/health view; status below), **Toolkit** (live; status below) and **Keyboard shortcuts**
 (status below). Two cross-cutting passes are also complete (repo-hygiene / portfolio pass;
-de-duplication / composition refactor) — write-ups in the Appendix.
+de-duplication / composition refactor) — write-ups in the Appendix. A third, the **widget system**, is
+below: it changes how every page is laid out, so read it before touching a view.
 
 **Toolkit — implementation status** (LIVE):
 
@@ -278,6 +279,36 @@ own 1 Hz clock timer, which is not gated.
 
 Closing the window also **says so once** — see `/Shell/TrayNotice` in *Folder Structure*.
 
+### Widget system — SHIPPED (branch `widgitUpdates`, 2026-08)
+
+**A widget is a `WidgetPanel`, and a page's widgets are children of one `WidgetBoard`.** Nineteen
+widgets across seven tabs were hand-rolled `Border Classes="panel"` + `StackPanel` + `panelTitle`; that
+shape now exists once. Five rules, all load-bearing:
+
+1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
+   `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
+   `Border Classes="panel"` is a *surface* — a pane, the Help modal, a drive card — not a widget.
+2. **A page's widgets go in one `WidgetBoard`, never fixed rows.** The board packs rows to fit and caps
+   each widget with `WidgetBoard.MaxSlotWidth`, so a wide window buys another column rather than a wider
+   widget. `MaxSlotWidth` is attached to the board, not the child's own `MaxWidth`, because Avalonia
+   clamps a stretched child and then *centres* it.
+3. **Order is dragged by the header and persisted by widget id**, never by index. `WidgetOrders.Resolve`
+   drops ids a page no longer has and keeps a newly added widget at its declared position.
+4. **The board must never touch `Panel.Children`.** Reorder is an arrange-time permutation over its own
+   index list; mutating `Children` mid-layout is re-entrant and detaches a live `Sparkline` from its feed.
+5. **A tunneling input handler must only undo what it started.** `WidgetBoard.OnPointerUp` once released
+   the pointer capture on *any* release, which stripped the capture a button took on its own press —
+   every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
+   screenshots all clean. Guard on the press you actually claimed.
+
+Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
+connections and Storage partitions only; Processes and File Explorer measure column drops off their own
+header width and were deliberately left alone), the collapsing toolbar search, the Ping console filling
+its widget and keeping as much scrollback as fits, and `Dimensions.axaml`.
+
+**Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
+is doing design work first — do not start it without a task.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.
@@ -444,8 +475,26 @@ currently exist.
                                  ResourceDictionary.ThemeDictionaries; accent + chart-series keys
                                  sit top-level and are swapped at runtime — see Theming below)
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
-                                 paneSplitter (draggable divider between resizable panes)…)
+                                 paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
+                                 tileLabel/tileValue, card.selectable…)
+        Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
+                                 so always {StaticResource}. A token with no call site should not exist)
+        Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
+                                 which is what satisfies compiled bindings without an x:DataType)
+      /Layout
+        WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
+                                 so surplus buys a column, and drags by the header to reorder)
+        WidgetBoardLayout.cs    (its arithmetic + DropIndex — no Avalonia types, so it tests without layout)
+        WidgetOrders.cs         (per-page order codec + the resolver that survives a widget being added,
+                                 removed or renamed)
+        UniformFlowPanel, FlowLayout, GridColumns, TableColumns, WeightedRowLayout
       /Controls
+        WidgetPanel, WidgetTable
+                                       (WidgetPanel is one widget: surface, header row, body. Title /
+                                        Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
+                                        Border Classes="panel" is a SURFACE, not a widget.
+                                        WidgetTable is a table's chrome: header above a scrolling body,
+                                        one gutter for both. Columns and sorting stay at the call site)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
@@ -465,7 +514,8 @@ currently exist.
                                         in its own colour beside its name; an entry with no label takes
                                         no room, so the same control serves a single-series chart.
                                         InfoRow is a key/value row; long values wrap to multiple
-                                        lines (flush-right) instead of clipping — see SharedStyles infoVal)
+                                        lines (flush-right) instead of clipping — see SharedStyles infoVal.
+                                        Its Mono and Flush variants back the Network tab's IP config)
     /Services                   (cross-cutting app services)
       /Settings
         AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
