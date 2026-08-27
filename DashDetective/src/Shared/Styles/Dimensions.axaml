@@ -5,11 +5,7 @@
          Palette.axaml's brushes these are always consumed with {StaticResource}. -->
 
     <!-- ===== Spacing ===== -->
-    <!-- SpacePage separates widgets; the rest are rhythms inside one. -->
-    <sys:Double x:Key="SpaceHair">4</sys:Double>
-    <sys:Double x:Key="SpaceTight">8</sys:Double>
-    <sys:Double x:Key="SpaceSnug">10</sys:Double>
-    <sys:Double x:Key="SpacePanel">12</sys:Double>
+    <!-- The gap between widgets, and the gap between a page's sections. -->
     <sys:Double x:Key="SpacePage">16</sys:Double>
 
     <!-- ===== Insets ===== -->
@@ -27,11 +23,7 @@
     <CornerRadius x:Key="RadiusHair">4</CornerRadius>
 
     <!-- ===== Widget and table metrics ===== -->
-    <!-- TableGutter is the right inset a table's header and rows share, so the scrollbar sits beside
-         the content rather than over it. Both must use the one value or the columns misalign. -->
     <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
-    <sys:Double x:Key="WidgetGutter">16</sys:Double>
-    <sys:Double x:Key="TableGutter">14</sys:Double>
     <sys:Double x:Key="FieldHeight">32</sys:Double>
     <sys:Double x:Key="TableRowHeight">30</sys:Double>
 </ResourceDictionary>

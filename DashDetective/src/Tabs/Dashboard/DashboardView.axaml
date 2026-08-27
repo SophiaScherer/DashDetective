@@ -24,7 +24,7 @@
     <!-- One board for the whole page rather than a stack of fixed rows: that is what lets a wide
          window buy another column instead of stretching every panel, and what will let a widget be
          dragged from one row to another. -->
-    <layout:WidgetBoard ColumnSpacing="16" RowSpacing="16" Order="{Binding WidgetOrder, Mode=TwoWay}">
+    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding WidgetOrder, Mode=TwoWay}">
 
         <!-- ===== Stat cards: one per detected device, grouped by kind (CPUs → Memory → GPUs → Disks
              → Network). As many per row as fit at 150px each — the width at which the label, value

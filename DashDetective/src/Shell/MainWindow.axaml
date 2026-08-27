@@ -153,9 +153,9 @@
                          Padding here would make the last chunk of a long page unreachable. -->
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                   IsVisible="{Binding !CurrentPageSelfScrolls}">
-                        <ContentControl Margin="22,20,22,30" Content="{Binding ScrollingPage}"/>
+                        <ContentControl Margin="{StaticResource PageInset}" Content="{Binding ScrollingPage}"/>
                     </ScrollViewer>
-                    <ContentControl Margin="22,20,22,30"
+                    <ContentControl Margin="{StaticResource PageInset}"
                                     Content="{Binding SelfScrollingPage}"
                                     IsVisible="{Binding CurrentPageSelfScrolls}"/>
                 </Panel>

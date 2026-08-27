@@ -1804,7 +1804,10 @@ temperature is the expected outcome, not a defect.
   repeating six setters.
 - **Dimensions are adopted by contact, not by sweep.** New code uses the `Dimensions.axaml` tokens; a
   view converts only lines it was already editing. A literal that has a token is a defect; one that
-  does not is fine until a second site needs it.
+  does not is fine until a second site needs it. The corollary bites hardest: **a token with no call
+  site should not exist.** `Dimensions.axaml` shipped with eighteen keys and nine users; the nine
+  spare ones were guesses at what would be wanted, which is the same aspirational cruft the rule
+  exists to stop. Add a token when the second site asks for it, not before.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 
