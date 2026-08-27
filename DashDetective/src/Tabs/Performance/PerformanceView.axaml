@@ -114,32 +114,31 @@
 
             <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
                  in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
-            <Border Classes="panel">
+            <controls:WidgetPanel WidgetId="performance.chart"
+                                  Title="{Binding SelectedResource.Name}">
+                <!-- The jump link goes in HeaderLead so it sits against the name rather than making the
+                     title itself clickable: a bare title offers no resting cue that it goes anywhere.
+                     Hidden on a resource with no home tab (HasLink), the same way the Overall/Detailed
+                     toggle below is gated on SupportsDetail. -->
+                <controls:WidgetPanel.HeaderLead>
+                    <Button Classes="link" Margin="10,0,0,0"
+                            IsVisible="{Binding SelectedResource.HasLink}"
+                            Command="{Binding SelectedResource.Link.Command}"
+                            ToolTip.Tip="Open this device on the tab that owns it">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding SelectedResource.Link.Label}"
+                                       VerticalAlignment="Center"/>
+                            <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
+                                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                  VerticalAlignment="Center"
+                                  Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                        </StackPanel>
+                    </Button>
+                </controls:WidgetPanel.HeaderLead>
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Classes="cardSub" Text="{Binding SelectedResource.Spec}"/>
+                </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="8">
-                    <!-- Name · jump link · spec. The link takes its own Auto column beside the name rather
-                         than making the title clickable: a bare title offers no resting cue that it goes
-                         anywhere. Hidden on a resource with no home tab (HasLink), the same way the
-                         Overall/Detailed toggle below is gated on SupportsDetail. -->
-                    <Grid ColumnDefinitions="Auto,Auto,*">
-                        <TextBlock Grid.Column="0" Classes="panelTitle"
-                                   Text="{Binding SelectedResource.Name}"/>
-                        <Button Grid.Column="1" Classes="link" Margin="10,0,0,0"
-                                IsVisible="{Binding SelectedResource.HasLink}"
-                                Command="{Binding SelectedResource.Link.Command}"
-                                ToolTip.Tip="Open this device on the tab that owns it">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding SelectedResource.Link.Label}"
-                                           VerticalAlignment="Center"/>
-                                <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
-                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                                      VerticalAlignment="Center"
-                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
-                            </StackPanel>
-                        </Button>
-                        <TextBlock Grid.Column="2" Classes="cardSub" VerticalAlignment="Center"
-                                   HorizontalAlignment="Right"
-                                   Text="{Binding SelectedResource.Spec}"/>
-                    </Grid>
                     <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
                          supports it: CPU logical processors / GPU engines). -->
                     <Grid ColumnDefinitions="*,Auto">
@@ -225,7 +224,7 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
 
             <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most, six
                  for CPU. Uncapped like the Dashboard card strip, so a wide pane gains columns rather than

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:settings="using:DashDetective.Tabs.Settings"
              xmlns:nav="using:DashDetective.Shell.Navigation"
              mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="720"
@@ -63,9 +64,8 @@
     <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
 
         <!-- ===== Appearance ===== -->
-        <Border Classes="panel" Padding="18">
+        <controls:WidgetPanel WidgetId="settings.appearance" Title="Appearance">
             <StackPanel Spacing="16">
-                <TextBlock Classes="panelTitle" Text="Appearance"/>
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Theme}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
@@ -128,14 +128,13 @@
                 </Grid>
                 </Border>
             </StackPanel>
-        </Border>
+        </controls:WidgetPanel>
 
         <!-- ===== Navigation ===== -->
         <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the bar's
              hover chevron, its right-click dock menu and the drag-to-dock gesture. -->
-        <Border Classes="panel" Padding="18">
+        <controls:WidgetPanel WidgetId="settings.navigation" Title="Navigation">
             <StackPanel Spacing="16">
-                <TextBlock Classes="panelTitle" Text="Navigation"/>
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.NavPosition}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
@@ -188,12 +187,11 @@
                     </Grid>
                 </Border>
             </StackPanel>
-        </Border>
+        </controls:WidgetPanel>
 
         <!-- ===== Monitoring ===== -->
-        <Border Classes="panel" Padding="18">
+        <controls:WidgetPanel WidgetId="settings.monitoring" Title="Monitoring">
             <StackPanel Spacing="16">
-                <TextBlock Classes="panelTitle" Text="Monitoring"/>
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.RefreshInterval}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
@@ -272,12 +270,11 @@
                     </Grid>
                 </Border>
             </StackPanel>
-        </Border>
+        </controls:WidgetPanel>
 
         <!-- ===== Export & Data ===== -->
-        <Border Classes="panel" Padding="18">
+        <controls:WidgetPanel WidgetId="settings.export" Title="{Binding Catalog.ExportData.Section}">
             <StackPanel Spacing="14">
-                <TextBlock Classes="panelTitle" Text="{Binding Catalog.ExportData.Section}"/>
                 <!-- The three actions share one search entry, so the row tag sits on the group rather
                      than on any one button. -->
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ExportData}">
@@ -288,7 +285,7 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
-        </Border>
+        </controls:WidgetPanel>
 
         <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextFaint}"
                    Text="{Binding VersionText}"/>

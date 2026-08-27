@@ -1,0 +1,61 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DashDetective.Shared.Controls">
+    <!--
+      The WidgetPanel template. Every binding is a TemplateBinding, which is what lets a custom
+      control's template satisfy AvaloniaUseCompiledBindingsByDefault without an x:DataType, and
+      keeps the no-reflection rule that ViewLocator's explicit switch also exists to hold.
+
+      The surface repeats Border.panel's setters rather than wrapping a Border.panel, because a
+      templated child cannot pick up a class the call site never writes.
+    -->
+    <Style Selector="controls|WidgetPanel">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{DynamicResource PanelBackground}"
+                        BorderBrush="{DynamicResource Hairline}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusPanel}"
+                        Padding="{StaticResource PanelPadding}">
+                    <DockPanel LastChildFill="True">
+                        <!-- Header. Auto,Auto,* so the title keeps its width, HeaderLead sits against it,
+                             and HeaderContent takes the rest and aligns right. Each slot reserves room
+                             only when set, so a title-only widget draws a plain heading. -->
+                        <StackPanel x:Name="PART_Header" DockPanel.Dock="Top" Spacing="2"
+                                    Margin="{StaticResource WidgetHeaderMargin}">
+                            <Grid ColumnDefinitions="Auto,Auto,*">
+                                <TextBlock Grid.Column="0" Classes="panelTitle"
+                                           VerticalAlignment="Center"
+                                           Text="{TemplateBinding Title}"
+                                           IsVisible="{TemplateBinding Title,
+                                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
+                                                  Content="{TemplateBinding HeaderLead}"
+                                                  IsVisible="{TemplateBinding HeaderLead,
+                                                              Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <ContentPresenter Grid.Column="2" VerticalAlignment="Center"
+                                                  HorizontalAlignment="Right"
+                                                  Content="{TemplateBinding HeaderContent}"
+                                                  IsVisible="{TemplateBinding HeaderContent,
+                                                              Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                            </Grid>
+                            <TextBlock Classes="cardSub" Text="{TemplateBinding Subtitle}"
+                                       TextTrimming="CharacterEllipsis"
+                                       IsVisible="{TemplateBinding Subtitle,
+                                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </DockPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- A widget with no heading at all: drop the header's bottom margin so the body starts at the
+         panel's own padding rather than 10px below it. -->
+    <Style Selector="controls|WidgetPanel.headless /template/ StackPanel#PART_Header">
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+</Styles>

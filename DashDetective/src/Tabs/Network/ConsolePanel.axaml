@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              x:Class="DashDetective.Tabs.Network.ConsolePanel"
              x:Name="Root" x:CompileBindings="False">
     <!-- A target field, its submit button, and two lines of terminal output. The Ping and DNS Lookup
@@ -8,9 +9,8 @@
 
          Tab-local by the repo's promotion rule: both users are the Network tab. The console TOKENS are
          app-level (Palette.axaml) because the Toolkit tab draws them too — this panel is not. -->
-    <Border Classes="panel">
+    <controls:WidgetPanel WidgetId="{Binding #Root.WidgetId}" Title="{Binding #Root.Title}">
         <StackPanel Spacing="10">
-            <TextBlock Classes="panelTitle" Text="{Binding #Root.Title}"/>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                 <Border Grid.Column="0" Classes="field">
                     <TextBox Text="{Binding #Root.Target, Mode=TwoWay}"
@@ -33,5 +33,5 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-    </Border>
+    </controls:WidgetPanel>
 </UserControl>

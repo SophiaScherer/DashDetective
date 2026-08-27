@@ -527,6 +527,34 @@ Reusable widgets live in `src/Shared/Controls`:
   so verbose vendor strings (e.g. a full BIOS manufacturer name) are shown in full.
 - **`ExpandablePathRow`** — an `InfoRow` variant for long filesystem paths, which expands to show the
   full value rather than truncating it.
+- **`WidgetPanel`** — one widget: the panel surface, its header row, and the body the call site puts
+  inside it. Nineteen widgets across seven tabs had each written out the same
+  `Border Classes="panel"` + `StackPanel` + `TextBlock Classes="panelTitle"` assembly, with their own
+  header grids and three different header-to-body gaps (8, 10, 12) for one shape.
+
+`WidgetPanel` is a **`ContentControl` whose template lives in a `Style` setter**
+(`src/Shared/Styles/Widgets.axaml`), following the one `ControlTemplate` the repo already had —
+SharedStyles' `ToggleButton.toggle`. It is deliberately *not* the `StatCard` pattern (a `UserControl`
+with properties): that works only for controls whose content is entirely scalar, because a
+UserControl's own `Content` is consumed by its `.axaml` root, so an arbitrary body would need a
+second content property that all nineteen call sites then have to name. It is also not a
+`HeaderedContentControl`, which offers two slots where a widget header needs three:
+
+- `Title` — the name, drawn as the shared `panelTitle`.
+- `HeaderLead` — content *against* the title: Performance's "View in Hardware" jump link, Storage's
+  drive picker. Both belong to the title, not to the far end of the row.
+- `HeaderContent` — content at the far end: a live readout, a row count, the log's Export/Clear pair.
+
+plus `Subtitle` for the caption that sits tight under the heading, and `WidgetId` (`{page}.{slug}`),
+the stable identity a saved layout names a widget by. Every binding in the template is a
+`TemplateBinding`, which is what lets a custom control's template satisfy
+`AvaloniaUseCompiledBindingsByDefault` without an `x:DataType`, and slot visibility uses the static
+`ObjectConverters`/`StringConverters` rather than a resource-keyed `IValueConverter` — the same
+no-reflection rule `ViewLocator`'s explicit switch exists to hold.
+
+A `Border Classes="panel"` that survives is a **surface, not a widget** — the File Explorer panes, the
+Processes table, a Storage drive card, the Help modal. The distinction is the header: a panel with a
+title is a `WidgetPanel`.
 
 The geometry and wording behind the charts are kept out of the controls in `src/Shared/Charts`:
 **`MetricHistory`** is the rolling buffer and its fill count, **`ChartScale`** resolves the Y axis,

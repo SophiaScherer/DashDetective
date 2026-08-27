@@ -17,6 +17,11 @@ public partial class ConsolePanel : UserControl {
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<ConsolePanel, string?>(nameof(Title));
 
+    /// <summary>Forwarded to the inner WidgetPanel: the two instances are separate widgets, so each
+    /// needs its own identity rather than sharing this control's.</summary>
+    public static readonly StyledProperty<string?> WidgetIdProperty =
+        AvaloniaProperty.Register<ConsolePanel, string?>(nameof(WidgetId));
+
     public static readonly StyledProperty<string> TargetProperty =
         AvaloniaProperty.Register<ConsolePanel, string>(
             nameof(Target), defaultValue: "", defaultBindingMode: BindingMode.TwoWay);
@@ -56,6 +61,11 @@ public partial class ConsolePanel : UserControl {
     public string? Title {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    public string? WidgetId {
+        get => GetValue(WidgetIdProperty);
+        set => SetValue(WidgetIdProperty, value);
     }
 
     public string Target {

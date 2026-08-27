@@ -50,47 +50,36 @@
              Stacking hands each chart the full width back, so its 3.2 ratio recovers instead of
              staying pinned at the chartPanel height floor. -->
         <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border Classes="panel" MinWidth="340">
-                <StackPanel Spacing="10">
-                    <StackPanel Spacing="2">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0" Classes="panelTitle" Text="CPU Utilization"/>
-                            <TextBlock Grid.Column="1" Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
-                        </Grid>
-                        <TextBlock Classes="cardSub" Text="{Binding CpuChartCaption}"/>
-                    </StackPanel>
-                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
-                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"
-                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                        StatusText="{Binding CpuChartStatus}"/>
-                </StackPanel>
-            </Border>
-            <Border Classes="panel" MinWidth="340">
-                <StackPanel Spacing="10">
-                    <StackPanel Spacing="2">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0" Classes="panelTitle" Text="Memory Utilization"/>
-                            <TextBlock Grid.Column="1" Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
-                        </Grid>
-                        <TextBlock Classes="cardSub" Text="{Binding MemoryChartCaption}"/>
-                    </StackPanel>
-                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
-                                        YMin="0" YMax="100" Points="{Binding MemoryPoints}"
-                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                        StatusText="{Binding MemoryChartStatus}"/>
-                </StackPanel>
-            </Border>
+            <controls:WidgetPanel WidgetId="dashboard.cpu" MinWidth="340"
+                                  Title="CPU Utilization" Subtitle="{Binding CpuChartCaption}">
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
+                </controls:WidgetPanel.HeaderContent>
+                <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
+                                    YMin="0" YMax="100" Points="{Binding CpuPoints}"
+                                    AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                    AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                    StatusText="{Binding CpuChartStatus}"/>
+            </controls:WidgetPanel>
+            <controls:WidgetPanel WidgetId="dashboard.memory" MinWidth="340"
+                                  Title="Memory Utilization" Subtitle="{Binding MemoryChartCaption}">
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
+                </controls:WidgetPanel.HeaderContent>
+                <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
+                                    YMin="0" YMax="100" Points="{Binding MemoryPoints}"
+                                    AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                    AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                    StatusText="{Binding MemoryChartStatus}"/>
+            </controls:WidgetPanel>
         </layout:WeightedRowPanel>
 
         <!-- ===== System info + Network throughput. System info keeps the wider share while both
              panels clear their minimums; below that they stack. -->
         <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
 
-            <Border layout:WeightedRowPanel.Weight="1.35" Classes="panel" MinWidth="420">
-                <StackPanel Spacing="8">
-                    <TextBlock Classes="panelTitle" Text="System Information"/>
+            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.35" MinWidth="420"
+                                  WidgetId="dashboard.system" Title="System Information">
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
                         <StackPanel Grid.Column="0">
                             <controls:InfoRow Key="OS" Value="{Binding OsText}"/>
@@ -107,15 +96,13 @@
                             <controls:InfoRow Key="Motherboard" Value="{Binding MotherboardText}"/>
                         </StackPanel>
                     </Grid>
-                </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
 
-            <Border Classes="panel" MinWidth="300">
+            <controls:WidgetPanel WidgetId="dashboard.network" MinWidth="300" Title="Network Throughput">
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="12">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Network Throughput"/>
-                        <TextBlock Grid.Column="1" Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
-                    </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <StackPanel Spacing="1">
                             <TextBlock Text="↓ Download" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
@@ -154,7 +141,7 @@
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                         StatusText="{Binding NetworkChartStatus}"/>
                 </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
         </layout:WeightedRowPanel>
     </StackPanel>
 </UserControl>

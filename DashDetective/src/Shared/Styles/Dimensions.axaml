@@ -38,9 +38,11 @@
     <CornerRadius x:Key="RadiusHair">4</CornerRadius>
 
     <!-- ===== Widget and table metrics ===== -->
-    <!-- TableGutter is the right inset a table's header and rows share so the vertical scrollbar sits
-         beside the content instead of over it; both must use the one value or the columns misalign. -->
-    <sys:Double x:Key="WidgetHeaderGap">10</sys:Double>
+    <!-- WidgetHeaderMargin is the gap under a widget's heading, which the tabs had drawn as 8, 10 and
+         12 for the same shape. TableGutter is the right inset a table's header and rows share so the
+         vertical scrollbar sits beside the content instead of over it; both must use the one value or
+         the columns misalign. -->
+    <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
     <sys:Double x:Key="WidgetGutter">16</sys:Double>
     <sys:Double x:Key="TableGutter">14</sys:Double>
     <sys:Double x:Key="FieldHeight">32</sys:Double>

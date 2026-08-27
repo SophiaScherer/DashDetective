@@ -39,5 +39,6 @@
         <FluentTheme />
         <StyleInclude Source="avares://DashDetective/src/Shared/Styles/SharedStyles.axaml"/>
         <StyleInclude Source="avares://DashDetective/src/Shared/Styles/Layout.axaml"/>
+        <StyleInclude Source="avares://DashDetective/src/Shared/Styles/Widgets.axaml"/>
     </Application.Styles>
 </Application>

@@ -103,9 +103,7 @@
         <!-- ===== Row 1: Adapters · IP Configuration · Throughput. Three across while each clears
              its minimum, then stacked full width. -->
         <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border Classes="panel" MinWidth="260">
-                <StackPanel Spacing="8">
-                    <TextBlock Classes="panelTitle" Text="Adapters"/>
+            <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260" Title="Adapters">
                     <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
                          a machine with many adapters doesn't push the rest of the page off-screen. -->
                     <ScrollViewer MaxHeight="188"
@@ -142,11 +140,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
-                </StackPanel>
-            </Border>
-            <Border Classes="panel" MinWidth="260">
-                <StackPanel Spacing="12">
-                    <TextBlock Classes="panelTitle" Text="IP Configuration"/>
+            </controls:WidgetPanel>
+            <controls:WidgetPanel WidgetId="network.ipconfig" MinWidth="260" Title="IP Configuration">
                     <!-- The shared InfoRow, in its mono variant so addresses stay column-aligned, and
                          flush because this panel reads as one block rather than a table of rows. -->
                     <StackPanel>
@@ -157,11 +152,10 @@
                         <controls:InfoRow Mono="True" Flush="True" Key="MAC" Value="{Binding IpConfig.Mac}"/>
                         <controls:InfoRow Mono="True" Flush="True" Key="DHCP" Value="{Binding IpConfig.Dhcp}"/>
                     </StackPanel>
-                </StackPanel>
-            </Border>
-            <Border layout:WeightedRowPanel.Weight="1.1" Classes="panel" MinWidth="280">
+            </controls:WidgetPanel>
+            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.1" MinWidth="280"
+                                  WidgetId="network.throughput" Title="Throughput">
                 <StackPanel Spacing="10">
-                    <TextBlock Classes="panelTitle" Text="Throughput"/>
                     <!-- Both charts share one Y axis (ThroughputYMax), so their heights must match too:
                          equal Mbps must map to equal pixels for the comparison to be honest. The peak
                          caption on the right makes the shared ceiling legible. -->
@@ -207,20 +201,19 @@
                                             AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"/>
                     </StackPanel>
                 </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
         </layout:WeightedRowPanel>
 
         <!-- ===== Row 2: Active Connections · (Ping + DNS). The connections table keeps the wider
              share; below their minimums the two stack. -->
         <layout:WeightedRowPanel ColumnSpacing="16" RowSpacing="16">
-            <Border layout:WeightedRowPanel.Weight="1.6" Classes="panel" MinWidth="420">
+            <controls:WidgetPanel layout:WeightedRowPanel.Weight="1.6" MinWidth="420"
+                                  WidgetId="network.connections" Title="Active Connections">
+                <controls:WidgetPanel.HeaderContent>
+                    <TextBlock Text="{Binding ConnectionsSummary}" FontSize="11"
+                               Foreground="{DynamicResource TextSubtle}"/>
+                </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="panelTitle" Text="Active Connections"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1" Text="{Binding ConnectionsSummary}" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource TextSubtle}"/>
-                    </Grid>
                     <!-- Column header. The 14px right margin matches the rows' gutter below so the columns
                          stay aligned and the scrollbar sits in the shared gutter, not over the text. -->
                     <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Margin="0,0,14,2">
@@ -288,12 +281,12 @@
                         </Button>
                     </StackPanel>
                 </StackPanel>
-            </Border>
+            </controls:WidgetPanel>
             <StackPanel Spacing="12" MinWidth="260">
                 <!-- Editable target, seeded with this machine's own gateway. The monitor is opt-in: the
                      button starts and stops it, and Enter applies the target and starts. Nothing here
                      sends a packet until it is pressed — which is why Enter and the button differ. -->
-                <vm:ConsolePanel Title="Ping"
+                <vm:ConsolePanel WidgetId="network.ping" Title="Ping"
                                   Target="{Binding PingTarget, Mode=TwoWay}"
                                   Placeholder="Host or IP to ping"
                                   ButtonText="{Binding PingButtonText}"
@@ -305,7 +298,7 @@
                                   FooterBrush="{StaticResource ConsoleMuted}"/>
 
                 <!-- Editable host: Enter or the button re-resolves it, so both run the same command. -->
-                <vm:ConsolePanel Title="DNS Lookup"
+                <vm:ConsolePanel WidgetId="network.dns" Title="DNS Lookup"
                                   Target="{Binding DnsHost, Mode=TwoWay}"
                                   Placeholder="Host name to resolve"
                                   ButtonText="Look up"
