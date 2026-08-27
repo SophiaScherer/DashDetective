@@ -120,6 +120,19 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     public string ThroughputChartCaption { get; } =
         $"Receive and send over {ChartWindow.Describe(WindowSeconds, SampleInterval)}";
 
+    /// <summary>Output lines the Ping console has room for, reported by the panel from the height the
+    /// board gave it. Pushed into the monitor so a taller widget shows more history, not empty space.</summary>
+    public int PingConsoleLines {
+        get => _pingMonitor.LineCount;
+        set {
+            if (_pingMonitor.LineCount == value)
+                return;
+            _pingMonitor.LineCount = value;
+            OnPropertyChanged();
+            PingConsole = _pingMonitor.ConsoleText;
+        }
+    }
+
     /// <summary>The oldest end of the charts' time axis, e.g. "−60s".</summary>
     public string ChartRangeStart { get; } = ChartWindow.StartLabel(WindowSeconds, SampleInterval);
 

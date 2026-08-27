@@ -55,6 +55,12 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
     public static readonly StyledProperty<IBrush?> FooterBrushProperty =
         AvaloniaProperty.Register<ConsolePanel, IBrush?>(nameof(FooterBrush));
 
+    /// <summary>Output lines the box has room for, reported back so the source can keep that much
+    /// history. Two-way: the panel measures, the view model decides what to do about it.</summary>
+    public static readonly StyledProperty<int> CapacityProperty =
+        AvaloniaProperty.Register<ConsolePanel, int>(
+            nameof(Capacity), PingMonitor.MinLines, defaultBindingMode: BindingMode.TwoWay);
+
     public ConsolePanel() {
         InitializeComponent();
     }
@@ -113,4 +119,18 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
         get => GetValue(FooterBrushProperty);
         set => SetValue(FooterBrushProperty, value);
     }
+
+    public int Capacity {
+        get => GetValue(CapacityProperty);
+        set => SetValue(CapacityProperty, value);
+    }
+
+    // Matches the console TextBlocks' LineHeight, and the box's 10px padding plus the footer line and
+    // its 3px gap.
+    private const double LineHeight = 15;
+    private const double Reserved = 20 + LineHeight + 3;
+
+    private void OnConsoleBoxSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        Capacity = ConsoleCapacity.LinesForHeight(e.NewSize.Height, LineHeight, Reserved,
+                                                  PingMonitor.MinLines, PingMonitor.MaxLines);
 }

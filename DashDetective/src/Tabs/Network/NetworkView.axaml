@@ -284,6 +284,7 @@
                      button starts and stops it, and Enter applies the target and starts. Nothing here
                      sends a packet until it is pressed — which is why Enter and the button differ. -->
                 <vm:ConsolePanel WidgetId="network.ping" Title="Ping"
+                                  Capacity="{Binding PingConsoleLines, Mode=TwoWay}"
                                   MinWidth="260" layout:WidgetBoard.MaxSlotWidth="480"
                                   Target="{Binding PingTarget, Mode=TwoWay}"
                                   Placeholder="Host or IP to ping"

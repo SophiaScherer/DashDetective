@@ -206,6 +206,11 @@ public class WidgetBoard : Panel {
     }
 
     private void OnPointerUp(object? sender, PointerReleasedEventArgs e) {
+        // Only a press this board claimed may release the capture. Releasing unconditionally strips the
+        // capture a button took on its own press, and it then never sees the release that clicks it.
+        if (!_dragPending)
+            return;
+
         if (_dragging) {
             _order.Clear();
             _order.AddRange(_preview);
@@ -253,7 +258,10 @@ public class WidgetBoard : Panel {
         return true;
     }
 
-    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) => EndDrag();
+    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
+        if (_dragPending)
+            EndDrag();
+    }
 
     /// <summary>The press must hit a header and miss every control in it — Storage keeps a drive
     /// picker up there, which a drag would otherwise swallow.</summary>
