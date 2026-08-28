@@ -384,16 +384,13 @@
                          is what the view model measures against when deciding how many still fit. -->
                     <Grid ColumnSpacing="8" SizeChanged="OnTableSizeChanged"
                           layout:GridColumns.Definitions="{Binding ColumnLayout}">
-                        <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"
-                                                       HorizontalAlignment="Left"/>
+                        <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"/>
                         <controls:SortableColumnHeader Grid.Column="1" Text="TYPE" Column="{Binding TypeSort}"
-                                                       HorizontalAlignment="Left"
                                                        IsVisible="{Binding ShowTypeColumn}"/>
                         <controls:SortableColumnHeader Grid.Column="2" Text="MODIFIED" Column="{Binding ModifiedSort}"
-                                                       HorizontalAlignment="Left"
                                                        IsVisible="{Binding ShowModifiedColumn}"/>
                         <controls:SortableColumnHeader Grid.Column="3" Text="SIZE" Column="{Binding SizeSort}"
-                                                       HorizontalAlignment="Right" ArrowFirst="True"/>
+                                                       ContentAlignment="Right" ArrowFirst="True"/>
                     </Grid>
                 </Border>
 

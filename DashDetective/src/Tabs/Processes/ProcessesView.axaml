@@ -69,20 +69,20 @@
              it INSIDE the slot: a click there missed the button, fell through to the row's Tapped, and
              selected instead of expanding. Stretch fills the cell; the negative margin then bleeds over the
              row's own 8px vertical padding, which the cell does not cover. The margin is negative so it does
-             NOT feed back into measure — a MinHeight would make every row taller instead. KEEP THE -8 IN STEP
+             NOT feed back into measure — a MinHeight would make every row taller instead. KEEP THE -5 IN STEP
              WITH Border.procRow's Padding below. -->
         <Style Selector="Button.chev">
             <Setter Property="Width" Value="16"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,-8"/>
+            <Setter Property="Margin" Value="0,-5"/>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
         <Style Selector="Border.groupHead">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="Padding" Value="16,5"/>
         </Style>
         <Style Selector="Border.groupHead TextBlock">
             <Setter Property="FontSize" Value="11.5"/>
@@ -96,7 +96,7 @@
              Setting it in the style keeps the whole row hit-testable for Tapped while letting the
              triggers below override it. -->
         <Style Selector="Border.procRow">
-            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Padding" Value="16,5"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -270,28 +270,25 @@
                  padding (16→30) reserves that scrollbar gutter so the header's star columns compute
                  over the same width as the rows and stay aligned with them (the gutter pattern from
                  the Network table). -->
-            <Border Grid.Row="1" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
+            <Border Grid.Row="1" Padding="16,8,30,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
                 <!-- This grid's width is exactly what the columns get, so it (not the outer panel) is
                      what the view model measures against when deciding how many still fit. -->
                 <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4"
                       SizeChanged="OnTableSizeChanged">
-                    <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"
-                                                   HorizontalAlignment="Left"/>
-                    <controls:SortableColumnHeader Grid.Column="1" Text="PID" Column="{Binding PidSort}"
-                                                   HorizontalAlignment="Left"/>
+                    <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="1" Text="PID" Column="{Binding PidSort}"/>
                     <controls:SortableColumnHeader Grid.Column="2" Text="STATUS" Column="{Binding StatusSort}"
-                                                   HorizontalAlignment="Left"
                                                    IsVisible="{Binding ShowStatusColumn}"/>
                     <controls:SortableColumnHeader Grid.Column="3" Text="CPU" Column="{Binding CpuSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"/>
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
                     <controls:SortableColumnHeader Grid.Column="4" Text="MEMORY" Column="{Binding MemorySort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"/>
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
                     <controls:SortableColumnHeader Grid.Column="5" Text="DISK" Column="{Binding DiskSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"
+                                                   ContentAlignment="Right" ArrowFirst="True"
                                                    IsVisible="{Binding ShowDiskColumn}"/>
                     <controls:SortableColumnHeader Grid.Column="6" Text="GPU" Column="{Binding GpuSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"
+                                                   ContentAlignment="Right" ArrowFirst="True"
                                                    IsVisible="{Binding ShowGpuColumn}"/>
                 </Grid>
             </Border>
