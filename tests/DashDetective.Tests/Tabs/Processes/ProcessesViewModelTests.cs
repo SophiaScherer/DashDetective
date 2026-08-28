@@ -1,5 +1,6 @@
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Shared;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tests.Fakes;
 using System;
@@ -556,6 +557,51 @@ public class ProcessesViewModelTests {
         viewModel.RequestEndTaskCommand.Execute(null);
 
         Assert.False(viewModel.ConfirmVisible);
+    }
+
+    // ----- First load -----
+
+    /// <summary>Before the first enumeration comes back the page must not claim anything: an empty list
+    /// and a confident "0" read as a machine running no processes.</summary>
+    [Fact]
+    public async Task HasLoaded_IsFalseUntilTheFirstEnumerationLands() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([Proc(100, 0, "editor.exe", ProcessCategory.App)]) {
+            Gate = new TaskCompletionSource(),
+        };
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        var load = viewModel.LoadAsync();
+        Assert.False(viewModel.HasLoaded);
+        Assert.Equal(Placeholders.NoReading, viewModel.TotalProcessesText);
+        Assert.Equal(Placeholders.NoReading, viewModel.ThreadsText);
+
+        provider.Gate.SetResult();
+        await load;
+
+        Assert.True(viewModel.HasLoaded);
+        Assert.Equal("1", viewModel.TotalProcessesText);
+    }
+
+    /// <summary>A page that failed still has an answer — an empty list, honestly labelled. Leaving
+    /// HasLoaded false would sit under the placeholder for the rest of the session.</summary>
+    [Fact]
+    public async Task HasLoaded_IsTrueAfterAFailedEnumerationToo() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([]) {
+            Fail = new InvalidOperationException("the enumeration broke"),
+        };
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.HasLoaded);
+        Assert.Empty(viewModel.Apps);
+        Assert.Equal(Placeholders.NoReading, viewModel.TotalProcessesText);
     }
 
     // ----- Collapsible groups -----

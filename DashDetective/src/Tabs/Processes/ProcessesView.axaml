@@ -19,6 +19,25 @@
              layout is defined once instead of copy-pasted per group; it must stay in sync with the
              sticky header's column definition above. Bindings are compiled (x:DataType); the row tap
              is handled in code-behind (OnRowTapped). -->
+        <!-- Placeholder row, drawn until the first enumeration lands. It borrows the real row's padding
+             and the live column widths, so the bars sit in the columns the header names and the list
+             does not jump when the data arrives. The bars are anonymous, so they do not care which
+             column the user has dragged where. -->
+        <DataTemplate x:Key="SkeletonRowTemplate">
+            <Border Classes="procRow">
+                <Grid ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding #Page.((vm:ProcessesViewModel)DataContext).ColumnLayout}">
+                    <Border Grid.Column="0" Classes="skeleton" Width="150" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="1" Classes="skeleton" Width="38" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="2" Classes="skeleton" Width="46" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="3" Classes="skeleton" Width="32" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="4" Classes="skeleton" Width="48" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="5" Classes="skeleton" Width="30" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="6" Classes="skeleton" Width="26" HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
         <!-- The row context menu. Declared ONCE and shared by every row rather than sitting inside the
              row template, which would build one flyout and its items per row — a few thousand controls
              for a list this long. Nothing in it binds to a row: the right-click selects first, so every
@@ -146,6 +165,24 @@
         <!-- "Some" is a dash on the soft fill, so it never reads as a tick. -->
         <Style Selector="Button.checkBox.some TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+
+        <!-- A placeholder bar. The pulse is what makes the block read as "still coming" rather than as
+             a rendering fault; without it a static grey table looks broken. -->
+        <Style Selector="Border.skeleton">
+            <Setter Property="Height" Value="9"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.skeleton">
+            <Style.Animations>
+                <Animation Duration="0:0:1.3" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
@@ -395,7 +432,14 @@
             <ScrollViewer Grid.Row="1" x:Name="ProcessListScroll"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+                <Panel>
+                <!-- Placeholder rows until the page has an answer, so the tab renders immediately
+                     instead of showing an empty list that reads as "no processes running". -->
+                <ItemsControl IsVisible="{Binding !HasLoaded}"
+                              ItemsSource="{Binding SkeletonRows}"
+                              ItemTemplate="{StaticResource SkeletonRowTemplate}"/>
+
+                <StackPanel IsVisible="{Binding HasLoaded}">
                     <!-- Apps -->
                     <Border Classes="groupHead">
                         <StackPanel Orientation="Horizontal">
@@ -486,6 +530,7 @@
                     <ItemsControl ItemsSource="{Binding WindowsProcesses}" IsVisible="{Binding !WindowsCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
                 </StackPanel>
+                </Panel>
             </ScrollViewer>
 
             </Grid>

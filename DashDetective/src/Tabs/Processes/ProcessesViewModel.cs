@@ -107,7 +107,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     // ----- Summary strip -----
 
     /// <summary>Total live process count, for the Processes summary card.</summary>
-    [ObservableProperty] private string _totalProcessesText = "0";
+    [ObservableProperty] private string _totalProcessesText = Placeholders.NoReading;
 
     /// <summary>Per-group breakdown under the total (e.g. "10 apps · 310 background").</summary>
     [ObservableProperty] private string _processBreakdownText = "";
@@ -119,7 +119,16 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     [ObservableProperty] private string _memoryUsageText = "0%";
 
     /// <summary>Total thread count across all processes (e.g. "2,418").</summary>
-    [ObservableProperty] private string _threadsText = "0";
+    [ObservableProperty] private string _threadsText = Placeholders.NoReading;
+
+    /// <summary>Whether the first enumeration has come back. Until it has, the table shows placeholder
+    /// rows: an empty list is indistinguishable from a machine running no processes, which is a claim
+    /// this page should not make before it has looked.</summary>
+    [ObservableProperty] private bool _hasLoaded;
+
+    /// <summary>How many placeholder rows to draw while waiting. A fixed count — there is no data yet
+    /// to derive one from, and this is roughly a screenful.</summary>
+    public static IReadOnlyList<int> SkeletonRows { get; } = Enumerable.Range(0, 14).ToArray();
 
     // ----- Table columns -----
 
@@ -464,9 +473,17 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             AppsHeader = "Apps";
             BackgroundHeader = "Background processes";
             WindowsHeader = ProcessGroupNames.SystemHeader;
-            TotalProcessesText = "0";
+            // Not "0": the enumeration failed, so the count is unknown, not zero — the same reading
+            // the CPU and memory feeds already report when their sampler gives up.
+            TotalProcessesText = Placeholders.NoReading;
             ProcessBreakdownText = "";
-            ThreadsText = "0";
+            ThreadsText = Placeholders.NoReading;
+        } finally {
+            // Set on success AND on failure, never on cancellation. It marks "this page has an answer",
+            // and a page that failed has one — an empty list, honestly labelled. Leaving it false would
+            // sit under the skeleton for the rest of the session pretending to still be working.
+            if (!token.IsCancellationRequested)
+                HasLoaded = true;
         }
     }
 
