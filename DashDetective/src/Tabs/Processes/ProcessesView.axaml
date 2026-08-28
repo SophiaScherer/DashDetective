@@ -34,7 +34,7 @@
 
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
             <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped"
-                    ContextFlyout="{StaticResource RowMenu}">
+                    DoubleTapped="OnRowDoubleTapped" ContextFlyout="{StaticResource RowMenu}">
                 <!-- Columns come from the page view model, not the row, so every row and the sticky
                      header share one definition and one order, and stay aligned. Each cell's
                      Grid.Column is bound too: dragging a header moves the cells rather than rebuilding
@@ -152,11 +152,23 @@
         <Style Selector="Border.groupHead">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
             <Setter Property="Padding" Value="16,5"/>
+            <!-- Folding a group puts two headings back to back; without a rule between them the two
+                 tinted bands read as one. -->
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
         <Style Selector="Border.groupHead TextBlock">
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+
+        <!-- The group heading's fold chevron, sized below its caption. This must stay BELOW the
+             groupHead rule above: the glyph matches both selectors, and Avalonia settles that by
+             declaration order rather than specificity — declared first, the caption's 11.5 would win. -->
+        <Style Selector="TextBlock.groupChev">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
 
         <!-- Data rows. Background is Transparent here (a base style), NOT set locally on the row
@@ -400,10 +412,18 @@
                                     </Panel>
                                 </Border>
                             </Button>
-                            <TextBlock Text="{Binding AppsHeader}"/>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.App}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding AppsChevron}"/>
+                                    <TextBlock Text="{Binding AppsHeader}"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Apps}"
+                    <ItemsControl ItemsSource="{Binding Apps}" IsVisible="{Binding !AppsCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Background -->
@@ -422,10 +442,18 @@
                                     </Panel>
                                 </Border>
                             </Button>
-                            <TextBlock Text="{Binding BackgroundHeader}"/>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.Background}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding BackgroundChevron}"/>
+                                    <TextBlock Text="{Binding BackgroundHeader}"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Background}"
+                    <ItemsControl ItemsSource="{Binding Background}" IsVisible="{Binding !BackgroundCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Windows processes -->
@@ -444,10 +472,18 @@
                                     </Panel>
                                 </Border>
                             </Button>
-                            <TextBlock Text="{Binding WindowsHeader}"/>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.Windows}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding WindowsChevron}"/>
+                                    <TextBlock Text="{Binding WindowsHeader}"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding WindowsProcesses}"
+                    <ItemsControl ItemsSource="{Binding WindowsProcesses}" IsVisible="{Binding !WindowsCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
                 </StackPanel>
             </ScrollViewer>

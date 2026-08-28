@@ -293,6 +293,24 @@ public partial class ProcessesView : UserControl {
         return null;
     }
 
+    // Double-clicking anywhere on a row does what its chevron does — the gesture a tree is expected to
+    // answer. A row with no children ignores it (ToggleExpand's own guard). The single taps that make up
+    // the double still select, which is what the user sees happen first.
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e) {
+        if (OwnsItsOwnGesture(e.Source as Visual))
+            return;
+        if (sender is Control { DataContext: ProcessRow row } && DataContext is ProcessesViewModel vm)
+            vm.ToggleExpand(row);
+    }
+
+    // A group heading folds its section shut. The rows stay where they are — only the list is hidden —
+    // so the heading's count and its select-all box keep meaning the same thing.
+    private void OnGroupToggleClick(object? sender, RoutedEventArgs e) {
+        if (sender is Button { Tag: ProcessCategory category } && DataContext is ProcessesViewModel vm)
+            vm.ToggleGroup(category);
+        e.Handled = true;
+    }
+
     // The chevron expands/collapses a multi-process app's children. Handled here (like the row tap) as
     // it has no XAML command binding. Marked handled so it doesn't also select the row via the Border's
     // Tapped, keeping expand and select independent.

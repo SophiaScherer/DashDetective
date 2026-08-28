@@ -64,6 +64,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// the expand/collapse chevrons can re-flatten the visible rows without rebuilding the tree.</summary>
     private IReadOnlyList<ProcessNode> _lastRoots = Array.Empty<ProcessNode>();
 
+    /// <summary>Groups the user has folded shut. Their rows stay in their collections — a collapsed
+    /// group still counts, still filters and still selects; only the list is hidden.</summary>
+    private readonly HashSet<ProcessCategory> _collapsedGroups = new();
+
     /// <summary>PIDs whose children are currently revealed. The authoritative expand state (rows are
     /// transient — the keyed diff recreates them), so it survives polls and re-sorts.</summary>
     private readonly HashSet<int> _expandedPids = new();
@@ -227,6 +231,31 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Whether the primary row can be expanded — enables the context menu's expand item.</summary>
     public bool SelectedHasChildren => SelectedRow?.HasChildren == true;
+
+    // Whether each group is folded shut, and the ▾/▸ its header shows.
+    public bool AppsCollapsed => _collapsedGroups.Contains(ProcessCategory.App);
+    public bool BackgroundCollapsed => _collapsedGroups.Contains(ProcessCategory.Background);
+    public bool WindowsCollapsed => _collapsedGroups.Contains(ProcessCategory.Windows);
+
+    public string AppsChevron => ChevronFor(AppsCollapsed);
+    public string BackgroundChevron => ChevronFor(BackgroundCollapsed);
+    public string WindowsChevron => ChevronFor(WindowsCollapsed);
+
+    private static string ChevronFor(bool collapsed) => collapsed ? "▸" : "▾";
+
+    /// <summary>Folds a group shut, or opens it again — its header. Session state, like the expanded
+    /// PIDs; nothing is re-read, only hidden.</summary>
+    public void ToggleGroup(ProcessCategory category) {
+        if (!_collapsedGroups.Remove(category))
+            _collapsedGroups.Add(category);
+
+        OnPropertyChanged(nameof(AppsCollapsed));
+        OnPropertyChanged(nameof(BackgroundCollapsed));
+        OnPropertyChanged(nameof(WindowsCollapsed));
+        OnPropertyChanged(nameof(AppsChevron));
+        OnPropertyChanged(nameof(BackgroundChevron));
+        OnPropertyChanged(nameof(WindowsChevron));
+    }
 
     // The group headers' select-all boxes: ticked when the group holds every visible row, dashed when
     // it holds only part of it. Two booleans rather than one nullable because they drive style classes.

@@ -558,6 +558,53 @@ public class ProcessesViewModelTests {
         Assert.False(viewModel.ConfirmVisible);
     }
 
+    // ----- Collapsible groups -----
+
+    [Fact]
+    public async Task ToggleGroup_FoldsAndUnfoldsJustThatGroup() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+
+        Assert.True(viewModel.AppsCollapsed);
+        Assert.False(viewModel.BackgroundCollapsed);
+        Assert.False(viewModel.WindowsCollapsed);
+        Assert.Equal("▸", viewModel.AppsChevron);
+        Assert.Equal("▾", viewModel.BackgroundChevron);
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+        Assert.False(viewModel.AppsCollapsed);
+        Assert.Equal("▾", viewModel.AppsChevron);
+    }
+
+    /// <summary>Folding hides the list, it does not empty it: the heading's count, the filter and the
+    /// selection all keep meaning the same thing while a group is shut.</summary>
+    [Fact]
+    public async Task ToggleGroup_LeavesTheRowsAndTheirSelectionAlone() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+
+        Assert.Equal(2, viewModel.Apps.Count);
+        Assert.Equal([100, 200], viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(viewModel.AppsAllSelected);
+        Assert.Contains("Apps · 2", viewModel.AppsHeader);
+    }
+
+    [Fact]
+    public async Task ToggleGroup_SurvivesAPoll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.ToggleGroup(ProcessCategory.Windows);
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.WindowsCollapsed);
+    }
+
     /// <summary>Records what End task asked to kill, and refuses whatever it is told to.</summary>
     private sealed class FakeProcessTerminator : IProcessTerminator {
         public List<int> Ended { get; } = [];
