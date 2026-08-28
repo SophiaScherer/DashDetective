@@ -112,8 +112,8 @@ user arranged once.
 **`WidgetTable`** (`src/Shared/Controls`) is the chrome a table inside a widget needs: a header that
 stays above a body that scrolls, with the scrollbar gutter applied to both so the columns cannot drift.
 Columns, sorting and the row template stay with the call site. Only Network's connections table and
-Storage's partitions use it — Processes and File Explorer measure their column drops off their own
-header grid's width, and share little else.
+Storage's partitions use it — File Explorer measures its column drops off its own header grid's width,
+Processes scrolls sideways rather than dropping columns at all, and they share little else.
 
 Other layout panels: `UniformFlowPanel` (equal columns that wrap rather than shrink) and
 `GridColumns`/`TableColumns` (bindable column definitions, and dropping columns as a table narrows).

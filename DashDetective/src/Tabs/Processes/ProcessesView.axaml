@@ -357,19 +357,12 @@
                  claim the right edge in declaration order, so Properties is outermost. -->
             <Border Grid.Row="0" Padding="16,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <DockPanel LastChildFill="False">
-                    <!-- Tab fills in a running process name from what has been typed. -->
-                    <controls:SearchField x:Name="FilterBox" DockPanel.Dock="Left"
-                                          VerticalAlignment="Center"
-                                          Width="300" Height="30"
-                                          IconSize="13" TextSize="12.5"
-                                          ContentPadding="10,0" IconGap="8,0,0,0"
-                                          PlaceholderText="Filter by name or PID"
-                                          ClearToolTip="Clear filter"
-                                          Text="{Binding FilterText, Mode=TwoWay}"
-                                          Completion="{Binding FilterCompletion}"
-                                          ClearCommand="{Binding ClearFilterCommand}"/>
-
+                <!-- The actions are declared BEFORE the filter, and the filter is the fill child, so
+                     the buttons claim their natural width first and the field gives up space as the
+                     window narrows. The other way round, the field held its 300px and "End task" was
+                     clipped to two letters. Docked children take the right edge in declaration order,
+                     so Options ends up outermost. -->
+                <DockPanel LastChildFill="True">
                     <!-- View options. Overlay-free popup keeps the rest of the window hoverable;
                          close-on-outside-click is emulated in code-behind, the same way File Explorer's
                          options flyout does it. -->
@@ -412,6 +405,18 @@
                                TextAlignment="Right" TextWrapping="Wrap"
                                Foreground="{StaticResource Orange}" Text="{Binding ActionMessage}"
                                IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                    <!-- Tab fills in a running process name from what has been typed. -->
+                    <controls:SearchField x:Name="FilterBox" HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          MaxWidth="300" Height="30"
+                                          IconSize="13" TextSize="12.5"
+                                          ContentPadding="10,0" IconGap="8,0,0,0"
+                                          PlaceholderText="Filter by name or PID"
+                                          ClearToolTip="Clear filter"
+                                          Text="{Binding FilterText, Mode=TwoWay}"
+                                          Completion="{Binding FilterCompletion}"
+                                          ClearCommand="{Binding ClearFilterCommand}"/>
                 </DockPanel>
             </Border>
 
