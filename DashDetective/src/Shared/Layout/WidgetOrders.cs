@@ -61,43 +61,9 @@ public static class WidgetOrders {
         return orders;
     }
 
-    /// <summary>
-    /// The order to actually show, given what the page declares now and what was saved. A saved id the
-    /// page no longer has is dropped; one the page has gained keeps its declared position relative to
-    /// its neighbours rather than being appended, so a widget added in a later release lands where its
-    /// author put it instead of at the bottom of a layout the user arranged once and forgot.
-    /// </summary>
-    public static IReadOnlyList<string> Resolve(IReadOnlyList<string> declared, IReadOnlyList<string> saved) {
-        if (declared.Count == 0 || saved.Count == 0)
-            return declared;
-
-        var rank = new Dictionary<string, double>();
-        for (var i = 0; i < saved.Count; i++)
-            rank.TryAdd(saved[i], i);
-
-        // An id absent from the save sits just after whichever declared neighbour precedes it, so a
-        // stable sort keeps it beside the widgets it was authored next to.
-        var ranked = new List<(string Id, double Rank, int Declared)>(declared.Count);
-        var previous = -1.0;
-        var epsilon = 0.0;
-        var seen = new HashSet<string>();
-
-        for (var i = 0; i < declared.Count; i++) {
-            var id = declared[i];
-            if (string.IsNullOrWhiteSpace(id) || !seen.Add(id))
-                continue;
-
-            if (rank.TryGetValue(id, out var savedRank)) {
-                previous = savedRank;
-                epsilon = 0;
-                ranked.Add((id, savedRank, i));
-            } else {
-                epsilon += 1e-3;
-                ranked.Add((id, previous + epsilon, i));
-            }
-        }
-
-        ranked.Sort((a, b) => a.Rank != b.Rank ? a.Rank.CompareTo(b.Rank) : a.Declared.CompareTo(b.Declared));
-        return ranked.ConvertAll(entry => entry.Id);
-    }
+    /// <summary>The order to actually show, given what the page declares now and what was saved. The
+    /// arithmetic is <see cref="OrderResolver"/>'s — the Processes table's columns resolve the same
+    /// way.</summary>
+    public static IReadOnlyList<string> Resolve(IReadOnlyList<string> declared, IReadOnlyList<string> saved) =>
+        OrderResolver.Resolve(declared, saved);
 }

@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using DashDetective.Shared;
+using DashDetective.Shared.Controls;
 using System;
 using System.Linq;
 
@@ -16,6 +18,113 @@ public partial class ProcessesView : UserControl {
     public ProcessesView() {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        // Tunnel, because every header cell is a button and would otherwise consume the press.
+        HeaderColumns.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
+        HeaderColumns.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
+        HeaderColumns.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
+        HeaderColumns.AddHandler(PointerCaptureLostEvent, OnHeaderCaptureLost, RoutingStrategies.Tunnel);
+    }
+
+    // ----- Column reorder -----
+    //
+    // Dragging a header cell moves its column. Modelled on WidgetBoard's drag: tunneling handlers and
+    // PointerDrag.Threshold before a press counts as a drag. It differs in ONE load-bearing way — the
+    // capture is taken when the drag starts, not on the press. Capturing on the press would strip the
+    // capture the header button takes for its own click, and every column would stop sorting.
+
+    private ProcessColumnId _draggedColumn;
+    private Point _pressPoint;
+    private bool _dragPending;
+    private bool _dragging;
+
+    private void OnHeaderPressed(object? sender, PointerPressedEventArgs e) {
+        if (_viewModel is null || !e.GetCurrentPoint(HeaderColumns).Properties.IsLeftButtonPressed)
+            return;
+        if (e.Source is not Visual source)
+            return;
+
+        var cell = source.GetSelfAndVisualAncestors().OfType<SortableColumnHeader>().FirstOrDefault();
+        if (cell is null)
+            return;
+
+        var column = _viewModel.ColumnAt(Grid.GetColumn(cell));
+        if (column == ProcessColumns.Pinned)
+            return;
+
+        _draggedColumn = column;
+        _pressPoint = e.GetPosition(HeaderColumns);
+        _dragPending = true;
+    }
+
+    private void OnHeaderMoved(object? sender, PointerEventArgs e) {
+        if (!_dragPending || _viewModel is null)
+            return;
+
+        var point = e.GetPosition(HeaderColumns);
+        if (!_dragging) {
+            if (Math.Abs(point.X - _pressPoint.X) < PointerDrag.Threshold)
+                return;
+
+            // Taking the capture here cancels the header button's click, which is exactly right: the
+            // user is dragging the column, not asking to sort by it.
+            _dragging = true;
+            e.Pointer.Capture(HeaderColumns);
+        }
+
+        // Move as the pointer travels, so the columns preview the result. The view model stays quiet
+        // about it — only the release reports an order worth saving.
+        _viewModel.MoveColumn(_draggedColumn, DropIndex(point.X));
+    }
+
+    private void OnHeaderReleased(object? sender, PointerReleasedEventArgs e) {
+        // Only a drag this view started may release the capture. A plain click never took one, and
+        // clearing it here would strip the capture the header button took to raise its own click.
+        if (!_dragging) {
+            _dragPending = false;
+            return;
+        }
+
+        e.Pointer.Capture(null);
+        // This release ends a drag, not a click, so it must not also sort by the column it landed on.
+        e.Handled = true;
+        _dragging = false;
+        _dragPending = false;
+        _viewModel?.CommitColumnOrder();
+    }
+
+    // Fires for the header button losing its capture to the drag as well, so it only ends the drag
+    // when the capture that went is the one the drag itself took.
+    private void OnHeaderCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
+        if (_dragging && !ReferenceEquals(e.Pointer.Captured, HeaderColumns)) {
+            _dragging = false;
+            _dragPending = false;
+        }
+    }
+
+    /// <summary>The column position the pointer is over. Index 0 holds the pinned column, so it is
+    /// never a drop target; a pointer past either end lands on the nearest column that is.</summary>
+    private int DropIndex(double x) {
+        var leftmost = (Index: 1, Edge: double.PositiveInfinity);
+        var rightmost = (Index: 1, Edge: double.NegativeInfinity);
+
+        foreach (var child in HeaderColumns.Children) {
+            if (child is not Control cell)
+                continue;
+
+            var index = Grid.GetColumn(cell);
+            if (index < 1)
+                continue;
+
+            if (x >= cell.Bounds.X && x < cell.Bounds.Right)
+                return index;
+            if (cell.Bounds.X < leftmost.Edge)
+                leftmost = (index, cell.Bounds.X);
+            if (cell.Bounds.Right > rightmost.Edge)
+                rightmost = (index, cell.Bounds.Right);
+        }
+
+        return x < leftmost.Edge ? leftmost.Index : rightmost.Index;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e) {

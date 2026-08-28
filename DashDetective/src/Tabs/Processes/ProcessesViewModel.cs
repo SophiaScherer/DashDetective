@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Processes;
@@ -119,10 +120,88 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     // ----- Table columns -----
 
-    /// <summary>The table's ColumnDefinitions. The sticky header and the shared row template both bind
-    /// to this, so they cannot fall out of alignment. Every column is always present — a table too
-    /// narrow for them scrolls sideways rather than dropping any.</summary>
-    public string ColumnLayout => ProcessTableLayout.Definitions;
+    /// <summary>The columns left to right. The user drags the header cells to change this; it is
+    /// persisted by column name, so a release that adds or drops a column cannot re-point a saved
+    /// order at different ones.</summary>
+    private readonly List<ProcessColumnId> _columnOrder = new(ProcessColumns.DefaultOrder);
+
+    /// <summary>Raised once a column drag or a reset settles, so the shell persists the new order.
+    /// Deliberately NOT raised per pointer move — the drag previews live, and saving every frame of it
+    /// would write the settings file dozens of times for one gesture.</summary>
+    public event Action? ColumnOrderChanged;
+
+    /// <summary>The column order, for the shell to seed from settings and read back. Assigning
+    /// resolves what was saved against the columns the table declares now.</summary>
+    public IReadOnlyList<ProcessColumnId> ColumnOrder {
+        get => _columnOrder;
+        set {
+            _columnOrder.Clear();
+            _columnOrder.AddRange(ProcessColumnOrder.Resolve(value));
+            NotifyColumnsChanged();
+        }
+    }
+
+    /// <summary>The table's ColumnDefinitions in the current order. The sticky header and the shared
+    /// row template both bind to this, so they cannot fall out of alignment. Every column is always
+    /// present — a table too narrow for them scrolls sideways rather than dropping any.</summary>
+    public string ColumnLayout => ProcessTableLayout.Definitions(_columnOrder);
+
+    // Where each cell sits. The header cells and the row template bind their Grid.Column to these, so a
+    // reorder moves the cells rather than rebuilding the table.
+    public int NameColumn => _columnOrder.IndexOf(ProcessColumnId.Name);
+    public int PidColumn => _columnOrder.IndexOf(ProcessColumnId.Pid);
+    public int StatusColumn => _columnOrder.IndexOf(ProcessColumnId.Status);
+    public int CpuColumn => _columnOrder.IndexOf(ProcessColumnId.Cpu);
+    public int MemoryColumn => _columnOrder.IndexOf(ProcessColumnId.Memory);
+    public int DiskColumn => _columnOrder.IndexOf(ProcessColumnId.Disk);
+    public int GpuColumn => _columnOrder.IndexOf(ProcessColumnId.Gpu);
+
+    /// <summary>The column shown at <paramref name="index"/>, for the header's drag hit-testing.</summary>
+    public ProcessColumnId ColumnAt(int index) => _columnOrder[Math.Clamp(index, 0, _columnOrder.Count - 1)];
+
+    /// <summary>Moves a column to a new position, for the header drag. Returns false when nothing
+    /// moved, so a wobble mid-drag doesn't re-notify every frame. Silent by design — the drag calls
+    /// this on each move to preview the result and <see cref="CommitColumnOrder"/> once on release.</summary>
+    public bool MoveColumn(ProcessColumnId id, int target) {
+        // The pinned column neither moves nor is displaced: index 0 is not a drop target.
+        if (id == ProcessColumns.Pinned)
+            return false;
+
+        var from = _columnOrder.IndexOf(id);
+        target = Math.Clamp(target, 1, _columnOrder.Count - 1);
+        if (from < 1 || from == target)
+            return false;
+
+        _columnOrder.RemoveAt(from);
+        _columnOrder.Insert(target, id);
+        NotifyColumnsChanged();
+        return true;
+    }
+
+    /// <summary>Reports the order settled on, so the shell persists it once per gesture.</summary>
+    public void CommitColumnOrder() => ColumnOrderChanged?.Invoke();
+
+    /// <summary>Puts the columns back the way the table ships, for the Reset control.</summary>
+    public void ResetColumnOrder() {
+        if (_columnOrder.SequenceEqual(ProcessColumns.DefaultOrder))
+            return;
+
+        _columnOrder.Clear();
+        _columnOrder.AddRange(ProcessColumns.DefaultOrder);
+        NotifyColumnsChanged();
+        CommitColumnOrder();
+    }
+
+    private void NotifyColumnsChanged() {
+        OnPropertyChanged(nameof(ColumnLayout));
+        OnPropertyChanged(nameof(NameColumn));
+        OnPropertyChanged(nameof(PidColumn));
+        OnPropertyChanged(nameof(StatusColumn));
+        OnPropertyChanged(nameof(CpuColumn));
+        OnPropertyChanged(nameof(MemoryColumn));
+        OnPropertyChanged(nameof(DiskColumn));
+        OnPropertyChanged(nameof(GpuColumn));
+    }
 
     // ----- Selection + actions -----
 

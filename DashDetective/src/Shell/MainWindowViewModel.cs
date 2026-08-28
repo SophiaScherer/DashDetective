@@ -149,6 +149,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
         _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
+        _processes.ColumnOrderChanged += Persist;
         foreach (var page in ReorderablePages)
             page.WidgetOrderChanged += Persist;
         _metrics.AlertActiveChanged += OnAlertActiveChanged;
@@ -243,6 +244,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _metrics.AlertsEnabled = settings.ResourceAlerts;
         _recents.Load(settings.RecentSearches);
 
+        _processes.ColumnOrder = ProcessColumnOrder.Decode(settings.ProcessColumns);
+
         var orders = WidgetOrders.Decode(settings.WidgetOrders);
         foreach (var page in ReorderablePages)
             if (orders.TryGetValue(page.PageKey, out var order))
@@ -299,6 +302,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
         WidgetOrders = EncodeWidgetOrders(),
+        ProcessColumns = ProcessColumnOrder.Encode(_processes.ColumnOrder),
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>

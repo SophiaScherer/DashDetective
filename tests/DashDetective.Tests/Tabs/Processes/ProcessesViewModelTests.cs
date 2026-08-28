@@ -171,6 +171,101 @@ public class ProcessesViewModelTests {
         Assert.Equal((new IntPtr(4242), 1234), Assert.Single(interop.Calls));
     }
 
+    // ----- Column order -----
+
+    [Fact]
+    public void ColumnOrder_StartsAsDeclared() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.Equal(ProcessColumns.DefaultOrder, viewModel.ColumnOrder);
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.PidColumn);
+        Assert.Equal(6, viewModel.GpuColumn);
+    }
+
+    [Fact]
+    public void MoveColumn_MovesTheCellsWithIt() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.True(viewModel.MoveColumn(ProcessColumnId.Gpu, 1));
+
+        Assert.Equal(1, viewModel.GpuColumn);
+        Assert.Equal(2, viewModel.PidColumn);
+        Assert.Equal("2.4*,0.85*,0.7*,1*,0.85*,0.85*,0.85*", viewModel.ColumnLayout);
+    }
+
+    /// <summary>The drag calls MoveColumn on every pointer move, so a wobble that lands on the column's
+    /// current position must not churn bindings.</summary>
+    [Fact]
+    public void MoveColumn_ToWhereItAlreadyIs_DoesNothing() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.False(viewModel.MoveColumn(ProcessColumnId.Pid, 1));
+    }
+
+    /// <summary>Name owns the tree indent and the chevron, so it neither moves nor is displaced.</summary>
+    [Fact]
+    public void MoveColumn_LeavesThePinnedColumnAlone() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.False(viewModel.MoveColumn(ProcessColumnId.Name, 3));
+        Assert.True(viewModel.MoveColumn(ProcessColumnId.Cpu, 0));
+
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.CpuColumn);
+    }
+
+    /// <summary>A drag reports once, on release — not on every pointer move, which would rewrite the
+    /// settings file dozens of times for one gesture.</summary>
+    [Fact]
+    public void MoveColumn_IsSilentUntilTheOrderIsCommitted() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+        var reported = 0;
+        viewModel.ColumnOrderChanged += () => reported++;
+
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 2);
+        Assert.Equal(0, reported);
+
+        viewModel.CommitColumnOrder();
+        Assert.Equal(1, reported);
+    }
+
+    [Fact]
+    public void ResetColumnOrder_RestoresTheDeclaredOrderAndReportsIt() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+        var reported = 0;
+        viewModel.ColumnOrderChanged += () => reported++;
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
+
+        viewModel.ResetColumnOrder();
+
+        Assert.Equal(ProcessColumns.DefaultOrder, viewModel.ColumnOrder);
+        Assert.Equal(1, reported);
+
+        // Already default: nothing to report the second time.
+        viewModel.ResetColumnOrder();
+        Assert.Equal(1, reported);
+    }
+
+    [Fact]
+    public void ColumnOrder_Assigned_ResolvesAgainstTheColumnsTheTableHasNow() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        // A save from a release that had no Disk or GPU column, with Name written last.
+        viewModel.ColumnOrder = new[] {
+            ProcessColumnId.Cpu, ProcessColumnId.Pid, ProcessColumnId.Status,
+            ProcessColumnId.Memory, ProcessColumnId.Name,
+        };
+
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.CpuColumn);
+        Assert.Equal(2, viewModel.PidColumn);
+        // Disk and GPU were never saved, so they keep their declared place after Memory.
+        Assert.Equal(5, viewModel.DiskColumn);
+        Assert.Equal(6, viewModel.GpuColumn);
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }

@@ -7,6 +7,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:ProcessesViewModel"
+             x:Name="Page"
              x:Class="DashDetective.Tabs.Processes.ProcessesView">
 
     <!-- Live process table, split into Apps and Background groups. Self-scrolling: the header stays
@@ -21,13 +22,17 @@
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
             <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
                 <!-- Columns come from the page view model, not the row, so every row and the sticky
-                     header share one definition and stay aligned. -->
+                     header share one definition and one order, and stay aligned. Each cell's
+                     Grid.Column is bound too: dragging a header moves the cells rather than rebuilding
+                     the table. -->
                 <Grid ColumnSpacing="4"
-                      layout:GridColumns.Definitions="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ColumnLayout}">
+                      layout:GridColumns.Definitions="{Binding #Page.((vm:ProcessesViewModel)DataContext).ColumnLayout}">
                     <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
-                         inside column 0 so revealing children never shifts the other columns. The slot
-                         is reserved even without a chevron so parent and child names line up. -->
-                    <Grid Grid.Column="0" Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
+                         inside the name column so revealing children never shifts the other columns.
+                         The slot is reserved even without a chevron so parent and child names line
+                         up. Name is pinned leftmost, so this cell never moves. -->
+                    <Grid Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).NameColumn}"
+                          Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
                         <Button Grid.Column="0" Classes="bare chev" Click="OnChevronClick"
                                 IsVisible="{Binding HasChildren}">
                             <TextBlock Text="{Binding ChevronGlyph}"/>
@@ -37,15 +42,21 @@
                         <TextBlock Grid.Column="2" Classes="cellName" VerticalAlignment="Center"
                                    Text="{Binding Name}"/>
                     </Grid>
-                    <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).PidColumn}"
+                               Classes="cellPid" Text="{Binding PidText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).StatusColumn}"
+                               Text="{Binding Status}" FontSize="11.5"
                                Foreground="{Binding StatusBrush}"/>
-                    <TextBlock Grid.Column="3" Classes="cpuCell"
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).CpuColumn}"
+                               Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
                                Text="{Binding CpuText}"/>
-                    <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
-                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).MemoryColumn}"
+                               Classes="cellNum" Text="{Binding MemoryText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).DiskColumn}"
+                               Classes="cellNum" Text="{Binding DiskText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).GpuColumn}"
+                               Classes="cellNum" Text="{Binding GpuText}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -284,17 +295,20 @@
                  aligned with them (the gutter pattern from the Network table). -->
             <Border Grid.Row="0" Padding="16,8,30,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4">
-                    <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"/>
-                    <controls:SortableColumnHeader Grid.Column="1" Text="PID" Column="{Binding PidSort}"/>
-                    <controls:SortableColumnHeader Grid.Column="2" Text="STATUS" Column="{Binding StatusSort}"/>
-                    <controls:SortableColumnHeader Grid.Column="3" Text="CPU" Column="{Binding CpuSort}"
+                <!-- Named so the code-behind can hook the column drag; the cells inside are buttons, so
+                     the drag has to tunnel past them. -->
+                <Grid x:Name="HeaderColumns" ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding ColumnLayout}">
+                    <controls:SortableColumnHeader Grid.Column="{Binding NameColumn}" Text="NAME" Column="{Binding NameSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding PidColumn}" Text="PID" Column="{Binding PidSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding StatusColumn}" Text="STATUS" Column="{Binding StatusSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding CpuColumn}" Text="CPU" Column="{Binding CpuSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
-                    <controls:SortableColumnHeader Grid.Column="4" Text="MEMORY" Column="{Binding MemorySort}"
+                    <controls:SortableColumnHeader Grid.Column="{Binding MemoryColumn}" Text="MEMORY" Column="{Binding MemorySort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
-                    <controls:SortableColumnHeader Grid.Column="5" Text="DISK" Column="{Binding DiskSort}"
+                    <controls:SortableColumnHeader Grid.Column="{Binding DiskColumn}" Text="DISK" Column="{Binding DiskSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
-                    <controls:SortableColumnHeader Grid.Column="6" Text="GPU" Column="{Binding GpuSort}"
+                    <controls:SortableColumnHeader Grid.Column="{Binding GpuColumn}" Text="GPU" Column="{Binding GpuSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
                 </Grid>
             </Border>

@@ -77,6 +77,11 @@ public sealed record AppSettings {
     /// what a widget is.</summary>
     public string WidgetOrders { get; init; } = "";
 
+    /// <summary>The Processes table's column order, encoded by <c>ProcessColumnOrder</c>. Opaque here
+    /// for the same reason as the four above: this record — and the settings file — stay free of any
+    /// knowledge of what a process column is.</summary>
+    public string ProcessColumns { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();
