@@ -203,6 +203,36 @@
         <Setter Property="Background" Value="Transparent"/>
     </Style>
 
+    <!-- ===== Checkboxes ===== -->
+    <!-- Recolours the Fluent CheckBox to the theme: hairline box, accent fill when checked. Promoted
+         here from File Explorer's view-options flyout once the Processes table wanted the same box for
+         its row and group selection. -->
+    <Style Selector="CheckBox.optionCheck">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="CheckBox.optionCheck /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+    </Style>
+    <Style Selector="CheckBox.optionCheck:pointerover /template/ Border#NormalRectangle">
+        <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+    </Style>
+    <Style Selector="CheckBox.optionCheck:checked /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="CheckBox.optionCheck:checked:pointerover /template/ Border#NormalRectangle">
+        <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <Style Selector="CheckBox.optionCheck:checked /template/ Path#CheckGlyph">
+        <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
+    </Style>
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>

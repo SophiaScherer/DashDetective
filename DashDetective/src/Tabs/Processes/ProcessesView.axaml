@@ -32,14 +32,20 @@
                          The slot is reserved even without a chevron so parent and child names line
                          up. Name is pinned leftmost, so this cell never moves. -->
                     <Grid Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).NameColumn}"
-                          Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
-                        <Button Grid.Column="0" Classes="bare chev" Click="OnChevronClick"
+                          Margin="{Binding IndentMargin}" ColumnDefinitions="Auto,16,Auto,*">
+                        <Button Grid.Column="0" Classes="bare checkBox" Classes.on="{Binding IsSelected}"
+                                Click="OnRowCheckClick">
+                            <Border>
+                                <TextBlock Text="✓" IsVisible="{Binding IsSelected}"/>
+                            </Border>
+                        </Button>
+                        <Button Grid.Column="1" Classes="bare chev" Click="OnChevronClick"
                                 IsVisible="{Binding HasChildren}">
                             <TextBlock Text="{Binding ChevronGlyph}"/>
                         </Button>
-                        <Ellipse Grid.Column="1" Width="7" Height="7" Margin="0,0,9,0"
+                        <Ellipse Grid.Column="2" Width="7" Height="7" Margin="0,0,9,0"
                                  VerticalAlignment="Center" Fill="{Binding StatusBrush}"/>
-                        <TextBlock Grid.Column="2" Classes="cellName" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="3" Classes="cellName" VerticalAlignment="Center"
                                    Text="{Binding Name}"/>
                     </Grid>
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).PidColumn}"
@@ -85,6 +91,47 @@
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,-5"/>
+        </Style>
+
+        <!-- Selection box, on rows and on group headers. Hand-drawn on the shared Button.bare rather
+             than a Fluent CheckBox, for the same reason the chevron is: that template carries a fixed
+             20px box and its own minimum height, which set the row height between them and undid the
+             tightening the rest of this file does. Told to be 15px, this one is 15px.
+             .on is every row selected, .some is a group holding only part of its rows. -->
+        <Style Selector="Button.checkBox">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Margin" Value="0,0,9,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.checkBox Border">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+        </Style>
+        <Style Selector="Button.checkBox:pointerover Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+        </Style>
+        <Style Selector="Button.checkBox.on Border">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Button.checkBox.some Border">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Button.checkBox TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- "Some" is a dash on the soft fill, so it never reads as a tick. -->
+        <Style Selector="Button.checkBox.some TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
@@ -320,21 +367,66 @@
                 <StackPanel>
                     <!-- Apps -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding AppsHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding AppsAllSelected}"
+                                    Classes.some="{Binding AppsSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.App}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding AppsAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding AppsSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <TextBlock Text="{Binding AppsHeader}"/>
+                        </StackPanel>
                     </Border>
                     <ItemsControl ItemsSource="{Binding Apps}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Background -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding BackgroundHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding BackgroundAllSelected}"
+                                    Classes.some="{Binding BackgroundSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.Background}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding BackgroundAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding BackgroundSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <TextBlock Text="{Binding BackgroundHeader}"/>
+                        </StackPanel>
                     </Border>
                     <ItemsControl ItemsSource="{Binding Background}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Windows processes -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding WindowsHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding WindowsAllSelected}"
+                                    Classes.some="{Binding WindowsSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.Windows}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding WindowsAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding WindowsSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <TextBlock Text="{Binding WindowsHeader}"/>
+                        </StackPanel>
                     </Border>
                     <ItemsControl ItemsSource="{Binding WindowsProcesses}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>

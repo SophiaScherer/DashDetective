@@ -205,12 +205,32 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     // ----- Selection + actions -----
 
-    /// <summary>The currently selected row (across both groups), or null. Drives End task / Properties
-    /// enablement and the row highlight.</summary>
+    /// <summary>The selected PIDs. Authoritative — rows are transient (the keyed diff recreates them),
+    /// so like <see cref="_expandedPids"/> the set is what survives a poll, a re-sort and a filter.</summary>
+    private readonly HashSet<int> _selectedPids = new();
+
+    /// <summary>Where a Shift-click measures its range from: the row a plain or Ctrl-click last landed
+    /// on. Zero when there is nothing to measure from.</summary>
+    private int _anchorPid;
+
+    /// <summary>The primary row — the last one clicked. The selection can hold many; the things that can
+    /// only act on one (Properties' shell dialog) act on this.</summary>
     [ObservableProperty] private ProcessRow? _selectedRow;
 
-    /// <summary>Whether a row is selected — enables the End task and Properties buttons.</summary>
-    public bool HasSelection => SelectedRow is not null;
+    /// <summary>Whether anything is selected — enables the End task and Properties buttons.</summary>
+    public bool HasSelection => _selectedPids.Count > 0;
+
+    /// <summary>How many processes are selected.</summary>
+    public int SelectionCount => _selectedPids.Count;
+
+    // The group headers' select-all boxes: ticked when the group holds every visible row, dashed when
+    // it holds only part of it. Two booleans rather than one nullable because they drive style classes.
+    public bool AppsAllSelected => IsAllSelected(Apps);
+    public bool AppsSomeSelected => IsSomeSelected(Apps);
+    public bool BackgroundAllSelected => IsAllSelected(Background);
+    public bool BackgroundSomeSelected => IsSomeSelected(Background);
+    public bool WindowsAllSelected => IsAllSelected(WindowsProcesses);
+    public bool WindowsSomeSelected => IsSomeSelected(WindowsProcesses);
 
     /// <summary>Whether the End-task confirmation overlay is showing.</summary>
     [ObservableProperty] private bool _confirmVisible;
@@ -222,7 +242,6 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// selection or successful action.</summary>
     [ObservableProperty] private string _actionMessage = "";
 
-    partial void OnSelectedRowChanged(ProcessRow? value) => OnPropertyChanged(nameof(HasSelection));
 
     // ----- Filtering -----
 
@@ -439,6 +458,21 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _expandedPids.IntersectWith(expandable);
     }
 
+    /// <summary>Drops selected PIDs that no longer name a live process, so the set doesn't accumulate
+    /// stale entries across polls — the same job <see cref="PruneExpanded"/> does for expansion.</summary>
+    private void PruneSelection() {
+        if (_selectedPids.Count == 0)
+            return;
+
+        var live = new HashSet<int>(_lastSnapshot.Count);
+        foreach (var info in _lastSnapshot)
+            live.Add(info.Pid);
+
+        _selectedPids.IntersectWith(live);
+        if (!_selectedPids.Contains(_anchorPid))
+            _anchorPid = 0;
+    }
+
     private static void CollectExpandable(IReadOnlyList<ProcessNode> nodes, HashSet<int> into) {
         foreach (var node in nodes) {
             if (node.HasChildren) {
@@ -478,12 +512,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         Reconcile(Background, backgroundRows);
         Reconcile(WindowsProcesses, windowsRows);
 
-        // If the selected process has exited, the diff removed its row — drop the dangling selection.
-        if (SelectedRow is not null && !Apps.Contains(SelectedRow) &&
-            !Background.Contains(SelectedRow) && !WindowsProcesses.Contains(SelectedRow)) {
-            SelectedRow.IsSelected = false;
-            SelectedRow = null;
-        }
+        // Selection is pruned against the LIVE processes, not the visible rows: a row hidden by the
+        // filter is still a running process the user picked, and narrowing the list must not silently
+        // drop it. Only an exited process leaves the selection.
+        PruneSelection();
+        ApplySelection();
 
         // Group headers and the summary count top-level entries (roots), not the expanded rows, so the
         // numbers stay put when a group is expanded.
@@ -669,16 +702,152 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             static (row, model) => row.Update(model.Info, model.Depth, model.HasChildren, model.IsExpanded),
             static model => new ProcessRow(model.Info, model.Depth, model.HasChildren, model.IsExpanded));
 
-    /// <summary>Selects a row (single selection across both groups), clearing the previous one. Driven
-    /// from the view code-behind on tap, like File Explorer's row selection.</summary>
-    public void SelectRow(ProcessRow row) {
-        if (ReferenceEquals(SelectedRow, row))
-            return;
-        if (SelectedRow is not null)
-            SelectedRow.IsSelected = false;
-        row.IsSelected = true;
+    /// <summary>Selects one row, dropping whatever was selected before. Driven from the view code-behind
+    /// on tap, like File Explorer's row selection.</summary>
+    public void SelectRow(ProcessRow row) => SelectRow(row, extend: false, range: false);
+
+    /// <summary>
+    /// Selects a row the way the modifier keys ask for: plain replaces the selection, Ctrl
+    /// (<paramref name="extend"/>) adds or removes just this row, Shift (<paramref name="range"/>) takes
+    /// everything between the anchor and this row.
+    /// </summary>
+    public void SelectRow(ProcessRow row, bool extend, bool range) {
+        if (range && _anchorPid != 0) {
+            SelectRange(_anchorPid, row.Pid);
+        } else if (extend) {
+            if (!_selectedPids.Remove(row.Pid))
+                _selectedPids.Add(row.Pid);
+            _anchorPid = row.Pid;
+        } else {
+            _selectedPids.Clear();
+            _selectedPids.Add(row.Pid);
+            _anchorPid = row.Pid;
+        }
+
         SelectedRow = row;
+        ApplySelection();
         ActionMessage = "";
+    }
+
+    /// <summary>Adds or removes one row, leaving the rest of the selection alone — the row checkbox, and
+    /// what a Ctrl-click does.</summary>
+    public void ToggleSelected(ProcessRow row) => SelectRow(row, extend: true, range: false);
+
+    /// <summary>Replaces the selection with every visible row between two PIDs inclusive, in display
+    /// order across all three groups — a Shift-click, and what a drag down the list tracks.</summary>
+    public void SelectRange(int fromPid, int toPid) {
+        var rows = VisibleRows();
+        var from = rows.FindIndex(row => row.Pid == fromPid);
+        var to = rows.FindIndex(row => row.Pid == toPid);
+        if (from < 0 || to < 0)
+            return;
+
+        if (from > to)
+            (from, to) = (to, from);
+
+        _selectedPids.Clear();
+        for (var i = from; i <= to; i++)
+            _selectedPids.Add(rows[i].Pid);
+
+        ApplySelection();
+        ActionMessage = "";
+    }
+
+    /// <summary>Selects or clears every visible row in one group — the select-all checkbox on its
+    /// header. Only what the filter has left on screen, which is what the header's count says too.</summary>
+    public void SetGroupSelected(ProcessCategory category, bool selected) {
+        foreach (var row in GroupFor(category)) {
+            if (selected)
+                _selectedPids.Add(row.Pid);
+            else
+                _selectedPids.Remove(row.Pid);
+        }
+
+        ApplySelection();
+        ActionMessage = "";
+    }
+
+    /// <summary>Drops the whole selection.</summary>
+    public void ClearSelection() {
+        if (_selectedPids.Count == 0)
+            return;
+
+        _selectedPids.Clear();
+        _anchorPid = 0;
+        SelectedRow = null;
+        ApplySelection();
+    }
+
+    /// <summary>The selected PIDs, for the actions that operate on all of them.</summary>
+    public IReadOnlyCollection<int> SelectedPids => _selectedPids;
+
+    private ObservableCollection<ProcessRow> GroupFor(ProcessCategory category) => category switch {
+        ProcessCategory.App => Apps,
+        ProcessCategory.Windows => WindowsProcesses,
+        _ => Background,
+    };
+
+    /// <summary>Every row on screen, top to bottom, so a range spans the group boundaries the way the
+    /// eye reads them.</summary>
+    private List<ProcessRow> VisibleRows() {
+        var rows = new List<ProcessRow>(Apps.Count + Background.Count + WindowsProcesses.Count);
+        rows.AddRange(Apps);
+        rows.AddRange(Background);
+        rows.AddRange(WindowsProcesses);
+        return rows;
+    }
+
+    /// <summary>Pushes the selection set onto the rows and re-notifies everything derived from it. The
+    /// set leads and the rows follow, so a row recreated by the next poll comes back selected.</summary>
+    private void ApplySelection() {
+        foreach (var group in new[] { Apps, Background, WindowsProcesses })
+            foreach (var row in group)
+                row.IsSelected = _selectedPids.Contains(row.Pid);
+
+        // The primary row can be left pointing at a process that is no longer in the selection at all
+        // (a Ctrl-click that removed it); fall back to any row still selected so Properties has a target.
+        if (SelectedRow is not null && !_selectedPids.Contains(SelectedRow.Pid))
+            SelectedRow = FirstSelected();
+
+        OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(SelectionCount));
+        OnPropertyChanged(nameof(AppsAllSelected));
+        OnPropertyChanged(nameof(AppsSomeSelected));
+        OnPropertyChanged(nameof(BackgroundAllSelected));
+        OnPropertyChanged(nameof(BackgroundSomeSelected));
+        OnPropertyChanged(nameof(WindowsAllSelected));
+        OnPropertyChanged(nameof(WindowsSomeSelected));
+    }
+
+    private ProcessRow? FirstSelected() {
+        foreach (var row in VisibleRows())
+            if (row.IsSelected)
+                return row;
+        return null;
+    }
+
+    /// <summary>Whether every visible row in a group is selected — what the header's checkbox toggles
+    /// against. Read by the view instead of the box's own state, which has already advanced by the time
+    /// the click handler runs.</summary>
+    public bool IsGroupFullySelected(ProcessCategory category) => IsAllSelected(GroupFor(category));
+
+    /// <summary>Whether every visible row in a group is selected. An empty group reads as unselected
+    /// rather than "all", so its box isn't ticked with nothing under it.</summary>
+    private bool IsAllSelected(ObservableCollection<ProcessRow> group) =>
+        group.Count > 0 && SelectedIn(group) == group.Count;
+
+    /// <summary>Whether a group holds some but not all of its visible rows.</summary>
+    private bool IsSomeSelected(ObservableCollection<ProcessRow> group) {
+        var selected = SelectedIn(group);
+        return selected > 0 && selected < group.Count;
+    }
+
+    private int SelectedIn(ObservableCollection<ProcessRow> group) {
+        var selected = 0;
+        foreach (var row in group)
+            if (_selectedPids.Contains(row.Pid))
+                selected++;
+        return selected;
     }
 
     /// <summary>End task button: shows the confirmation overlay for the selected process (killing a
@@ -718,9 +887,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             return;
         }
 
+        _selectedPids.Remove(row.Pid);
         if (!Apps.Remove(row) && !Background.Remove(row))
             WindowsProcesses.Remove(row);
         SelectedRow = null;
+        ApplySelection();
         ActionMessage = "";
     }
 

@@ -121,37 +121,6 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- ===== View-option checkboxes ===== -->
-        <!-- Recolours the Fluent CheckBox to the theme: hairline box, accent fill when checked.
-             Shared by every checkbox in the Options flyout; promote to SharedStyles if reused
-             outside this view. -->
-        <Style Selector="CheckBox.optionCheck">
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="4"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:pointerover /template/ Border#NormalRectangle">
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource Accent}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked:pointerover /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentHover}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked /template/ Path#CheckGlyph">
-            <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
-        </Style>
-
         <!-- ===== Options toggle button ===== -->
         <!-- A ToggleButton drives the view-options popup open/closed. Chrome matches the breadcrumb
              field; the Fluent checked/hover fills are overridden so it always reads as a plain

@@ -266,6 +266,178 @@ public class ProcessesViewModelTests {
         Assert.Equal(6, viewModel.GpuColumn);
     }
 
+    // ----- Selection -----
+
+    private static (ProcessesViewModel ViewModel, ControllableSnapshotProvider Provider) Selectable() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(100, 0, "editor.exe", ProcessCategory.App),
+            Proc(200, 0, "browser.exe", ProcessCategory.App),
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(400, 0, "tray.exe", ProcessCategory.Background),
+            Proc(500, 0, "svchost.exe", ProcessCategory.Windows),
+        ]);
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop()), provider);
+    }
+
+    private static ProcessRow Row(ProcessesViewModel viewModel, int pid) =>
+        viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
+                 .Single(row => row.Pid == pid);
+
+    [Fact]
+    public async Task SelectRow_Plain_ReplacesTheSelection() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300));
+
+        Assert.Equal(new[] { 300 }, viewModel.SelectedPids);
+        Assert.False(Row(viewModel, 100).IsSelected);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    [Fact]
+    public async Task SelectRow_WithControl_AddsThenRemovesTheOneRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(2, viewModel.SelectionCount);
+
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
+    }
+
+    /// <summary>A range reads the way the eye does — down the screen, straight through the group
+    /// headings, not per group.</summary>
+    [Fact]
+    public async Task SelectRow_WithShift_TakesTheRunAcrossGroups() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        // browser.exe sorts above editor.exe, so Apps read browser, editor.
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 400), extend: false, range: true);
+
+        Assert.Equal(new[] { 100, 300, 400 }, viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task SelectRange_Backwards_SelectsTheSameRun() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRange(400, 100);
+
+        Assert.Equal(new[] { 100, 300, 400 }, viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task SetGroupSelected_TakesAndClearsTheWholeGroup() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        Assert.Equal(new[] { 100, 200 }, viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(viewModel.AppsAllSelected);
+        Assert.False(viewModel.AppsSomeSelected);
+        Assert.False(viewModel.BackgroundAllSelected);
+
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: false);
+        Assert.Empty(viewModel.SelectedPids);
+    }
+
+    [Fact]
+    public async Task GroupState_PartlySelected_ReadsAsSomeNotAll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        Assert.False(viewModel.AppsAllSelected);
+        Assert.True(viewModel.AppsSomeSelected);
+        Assert.False(viewModel.IsGroupFullySelected(ProcessCategory.App));
+    }
+
+    /// <summary>An empty group must not read as "all selected" — its box would be ticked with nothing
+    /// under it.</summary>
+    [Fact]
+    public async Task GroupState_EmptyGroup_ReadsAsNeither() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.FilterText = "svchost";
+
+        Assert.Empty(viewModel.Apps);
+        Assert.False(viewModel.AppsAllSelected);
+        Assert.False(viewModel.AppsSomeSelected);
+    }
+
+    /// <summary>Rows are recreated by the keyed diff, so the set has to be what survives a poll.</summary>
+    [Fact]
+    public async Task Selection_SurvivesAPoll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(new[] { 100, 300 }, viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(Row(viewModel, 100).IsSelected);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    /// <summary>Narrowing the list is not a reason to lose a process the user picked; only exiting is.</summary>
+    [Fact]
+    public async Task Selection_SurvivesTheFilterHidingTheRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        viewModel.FilterText = "svchost";
+        Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
+
+        viewModel.FilterText = "";
+        Assert.True(Row(viewModel, 100).IsSelected);
+    }
+
+    [Fact]
+    public async Task Selection_DropsAProcessThatHasExited() {
+        var (viewModel, provider) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        provider.Processes = [
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(500, 0, "svchost.exe", ProcessCategory.Windows),
+        ];
+        await viewModel.LoadAsync();
+
+        Assert.Equal(new[] { 300 }, viewModel.SelectedPids);
+        Assert.True(viewModel.HasSelection);
+    }
+
+    [Fact]
+    public async Task ClearSelection_EmptiesEverythingDerivedFromIt() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+
+        viewModel.ClearSelection();
+
+        Assert.False(viewModel.HasSelection);
+        Assert.Equal(0, viewModel.SelectionCount);
+        Assert.Null(viewModel.SelectedRow);
+        Assert.False(Row(viewModel, 100).IsSelected);
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }
@@ -277,12 +449,15 @@ public class ProcessesViewModelTests {
         public TaskCompletionSource? Gate { get; set; }
         public Exception? Fail { get; set; }
 
+        /// <summary>What the next poll returns, so a test can retire a process mid-run.</summary>
+        public IReadOnlyList<ProcessInfo> Processes { get; set; } = processes;
+
         public async Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) {
             if (Gate is { } gate)
                 await gate.Task;
             if (Fail is { } failure)
                 throw failure;
-            return processes;
+            return Processes;
         }
     }
 

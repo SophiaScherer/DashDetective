@@ -24,6 +24,12 @@ public partial class ProcessesView : UserControl {
         HeaderColumns.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerCaptureLostEvent, OnHeaderCaptureLost, RoutingStrategies.Tunnel);
+
+        // Same reason: the rows carry their own tap gesture, which would otherwise eat the press.
+        ProcessListScroll.AddHandler(PointerPressedEvent, OnListPressed, RoutingStrategies.Tunnel);
+        ProcessListScroll.AddHandler(PointerMovedEvent, OnListMoved, RoutingStrategies.Tunnel);
+        ProcessListScroll.AddHandler(PointerReleasedEvent, OnListReleased, RoutingStrategies.Tunnel);
+        ProcessListScroll.AddHandler(PointerCaptureLostEvent, OnListCaptureLost, RoutingStrategies.Tunnel);
     }
 
     // ----- Column reorder -----
@@ -151,15 +157,124 @@ public partial class ProcessesView : UserControl {
 
     // Tap selects the row (drives the highlight + End task / Properties enablement). Handled here
     // rather than in the view model because a row tap has no XAML command binding — the same pattern
-    // as File Explorer's row selection.
+    // as File Explorer's row selection. Ctrl adds or removes the one row, Shift takes the run from the
+    // last row clicked.
     private void OnRowTapped(object? sender, TappedEventArgs e) {
-        // A tap on the chevron expands/collapses (OnChevronClick) and must not also select the row —
-        // the Tapped gesture bubbles from the button, so skip selection when it originated there.
-        if (e.Source is Visual source &&
-            source.GetSelfAndVisualAncestors().OfType<Button>().Any(b => b.Classes.Contains("chev")))
+        // The chevron and the checkbox own their own gestures, and the Tapped bubbles up from both, so
+        // a tap that started in either must not also re-select the row.
+        if (OwnsItsOwnGesture(e.Source as Visual))
             return;
         if (sender is Control { DataContext: ProcessRow row } && DataContext is ProcessesViewModel vm)
-            vm.SelectRow(row);
+            vm.SelectRow(row,
+                         extend: e.KeyModifiers.HasFlag(KeyModifiers.Control),
+                         range: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+    }
+
+    // The row's checkbox adds or removes just that row. The view model decides and the binding pushes
+    // the answer back, so the box's own toggle never becomes the truth.
+    private void OnRowCheckClick(object? sender, RoutedEventArgs e) {
+        if (sender is Control { DataContext: ProcessRow row } && DataContext is ProcessesViewModel vm)
+            vm.ToggleSelected(row);
+        e.Handled = true;
+    }
+
+    // A group header's three-state box selects the whole group, or clears it when it already holds all
+    // of it. The decision reads the view model rather than the box, whose own state has already
+    // advanced by the time this runs.
+    private void OnGroupCheckClick(object? sender, RoutedEventArgs e) {
+        if (sender is Button { Tag: ProcessCategory category } && DataContext is ProcessesViewModel vm)
+            vm.SetGroupSelected(category, !vm.IsGroupFullySelected(category));
+        e.Handled = true;
+    }
+
+    /// <summary>Whether a pointer landed on something inside the row that handles its own click — the
+    /// expand chevron or the selection checkbox.</summary>
+    private static bool OwnsItsOwnGesture(Visual? source) {
+        if (source is null)
+            return false;
+
+        foreach (var node in source.GetSelfAndVisualAncestors()) {
+            if (node is Button button && (button.Classes.Contains("chev") || button.Classes.Contains("checkBox")))
+                return true;
+            if (node is Border border && border.Classes.Contains("procRow"))
+                return false;
+        }
+
+        return false;
+    }
+
+    // ----- Drag to select a range -----
+    //
+    // Press on a row and drag down the list to take the run between them. Same shape as the column
+    // drag: tunneling handlers, the capture taken only once the movement is a real drag, and released
+    // only if this view took it.
+
+    private int _rangePressPid;
+    private Point _rangePressPoint;
+    private bool _rangePending;
+    private bool _rangeDragging;
+
+    private void OnListPressed(object? sender, PointerPressedEventArgs e) {
+        if (!e.GetCurrentPoint(ProcessListScroll).Properties.IsLeftButtonPressed)
+            return;
+        if (OwnsItsOwnGesture(e.Source as Visual) || RowAt(e.Source as Visual) is not { } row)
+            return;
+
+        _rangePressPid = row.Pid;
+        _rangePressPoint = e.GetPosition(ProcessListScroll);
+        _rangePending = true;
+    }
+
+    private void OnListMoved(object? sender, PointerEventArgs e) {
+        if (!_rangePending || DataContext is not ProcessesViewModel vm)
+            return;
+
+        var point = e.GetPosition(ProcessListScroll);
+        if (!_rangeDragging) {
+            if (Math.Abs(point.Y - _rangePressPoint.Y) < PointerDrag.Threshold)
+                return;
+
+            // Taking the capture here cancels the row's own tap, which is what a drag should do.
+            _rangeDragging = true;
+            e.Pointer.Capture(ProcessListScroll);
+        }
+
+        if (RowAt(ProcessListScroll.InputHitTest(point) as Visual) is { } row)
+            vm.SelectRange(_rangePressPid, row.Pid);
+    }
+
+    private void OnListReleased(object? sender, PointerReleasedEventArgs e) {
+        // A plain click never took a capture; clearing one here would strip whatever did take it.
+        if (!_rangeDragging) {
+            _rangePending = false;
+            return;
+        }
+
+        e.Pointer.Capture(null);
+        e.Handled = true;
+        _rangeDragging = false;
+        _rangePending = false;
+    }
+
+    // Also fires for the row losing its capture to the drag, so it only ends the drag when the capture
+    // that went is the one the drag itself took.
+    private void OnListCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
+        if (_rangeDragging && !ReferenceEquals(e.Pointer.Captured, ProcessListScroll)) {
+            _rangeDragging = false;
+            _rangePending = false;
+        }
+    }
+
+    /// <summary>The row a visual sits in, or null when it sits in none.</summary>
+    private static ProcessRow? RowAt(Visual? source) {
+        if (source is null)
+            return null;
+
+        foreach (var node in source.GetSelfAndVisualAncestors())
+            if (node is Border { DataContext: ProcessRow row } border && border.Classes.Contains("procRow"))
+                return row;
+
+        return null;
     }
 
     // The chevron expands/collapses a multi-process app's children. Handled here (like the row tap) as
