@@ -121,67 +121,6 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- ===== View-option checkboxes ===== -->
-        <!-- Recolours the Fluent CheckBox to the theme: hairline box, accent fill when checked.
-             Shared by every checkbox in the Options flyout; promote to SharedStyles if reused
-             outside this view. -->
-        <Style Selector="CheckBox.optionCheck">
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="4"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:pointerover /template/ Border#NormalRectangle">
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource Accent}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked:pointerover /template/ Border#NormalRectangle">
-            <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentHover}"/>
-        </Style>
-        <Style Selector="CheckBox.optionCheck:checked /template/ Path#CheckGlyph">
-            <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
-        </Style>
-
-        <!-- ===== Options toggle button ===== -->
-        <!-- A ToggleButton drives the view-options popup open/closed. Chrome matches the breadcrumb
-             field; the Fluent checked/hover fills are overridden so it always reads as a plain
-             button rather than an accent-filled toggle. -->
-        <Style Selector="ToggleButton.optionsToggle">
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="12,7"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <!-- Open state: subtle fill so the toggle reads as active, never the accent default. -->
-        <Style Selector="ToggleButton.optionsToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-
         <!-- Back / forward / up, beside the breadcrumb. Disabled state dims the glyph so the
              end of the trail (and a drive root) reads at a glance. -->
         <Style Selector="Button.navBtn">
@@ -384,16 +323,13 @@
                          is what the view model measures against when deciding how many still fit. -->
                     <Grid ColumnSpacing="8" SizeChanged="OnTableSizeChanged"
                           layout:GridColumns.Definitions="{Binding ColumnLayout}">
-                        <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"
-                                                       HorizontalAlignment="Left"/>
+                        <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"/>
                         <controls:SortableColumnHeader Grid.Column="1" Text="TYPE" Column="{Binding TypeSort}"
-                                                       HorizontalAlignment="Left"
                                                        IsVisible="{Binding ShowTypeColumn}"/>
                         <controls:SortableColumnHeader Grid.Column="2" Text="MODIFIED" Column="{Binding ModifiedSort}"
-                                                       HorizontalAlignment="Left"
                                                        IsVisible="{Binding ShowModifiedColumn}"/>
                         <controls:SortableColumnHeader Grid.Column="3" Text="SIZE" Column="{Binding SizeSort}"
-                                                       HorizontalAlignment="Right" ArrowFirst="True"/>
+                                                       ContentAlignment="Right" ArrowFirst="True"/>
                     </Grid>
                 </Border>
 

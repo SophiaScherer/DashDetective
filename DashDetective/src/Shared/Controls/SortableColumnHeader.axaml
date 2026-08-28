@@ -5,8 +5,12 @@
     <!-- One sortable column header: a chrome-less button wrapping the label and its ↑/↓ arrow, so the
          whole cell is the click target. The active column tints both to the accent (colHead.active).
          Numeric columns are right-aligned and lead with the arrow, so the digits below stay flush to the
-         column edge — those set HorizontalAlignment="Right" ArrowFirst="True" on this control. -->
+         column edge — those set ContentAlignment="Right" ArrowFirst="True" on this control.
+
+         Alignment is a property here rather than the caller's own HorizontalAlignment: aligning the
+         control itself shrinks it to its text, leaving the rest of the cell dead to the click. -->
     <Button Classes="bare" HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="{Binding #Root.ContentAlignment}"
             Command="{Binding #Root.Column.SortCommand}">
         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
             <TextBlock Classes="sortArrow" Text="{Binding #Root.Column.Arrow}"

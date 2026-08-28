@@ -1,68 +1,56 @@
 using DashDetective.Tabs.Processes;
+using System.Collections.Generic;
 using Xunit;
 
 namespace DashDetective.Tests.Tabs.Processes;
 
-/// <summary>Covers <see cref="ProcessTableLayout"/>: the drop order, the four columns that never
-/// drop, and that the definitions string always keeps seven slots so cell indices stay fixed.</summary>
+/// <summary>Covers <see cref="ProcessTableLayout"/>: every column is always present, the definitions
+/// follow the order they are asked for, and the minimum table width below which the table scrolls
+/// sideways rather than dropping one.</summary>
 public class ProcessTableLayoutTests {
-    // Widths the table's panel actually gets: ~838 at the 1180px design size, ~638 at 980.
-    private const double DesignWidth = 838;
-    private const double NarrowWidth = 638;
-
     [Fact]
-    public void Definitions_DesignWidth_KeepsAllSeven() {
-        Assert.Equal("2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*", ProcessTableLayout.Definitions(DesignWidth));
-        Assert.Equal(7, ProcessTableLayout.VisibleCount(DesignWidth));
+    public void Definitions_InDeclaredOrder_KeepAllSevenColumns() {
+        Assert.Equal("2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*",
+                     ProcessTableLayout.Definitions(ProcessColumns.DefaultOrder));
     }
 
     [Fact]
-    public void Definitions_At980_StillKeepsAllSeven() {
-        // The columns are tight but readable here, so nothing should drop yet.
-        Assert.Equal(7, ProcessTableLayout.VisibleCount(NarrowWidth));
+    public void Definitions_FollowTheOrderTheyAreGiven() {
+        // The weights travel with their columns, so a dragged column keeps the width it had.
+        IReadOnlyList<ProcessColumnId> order = new[] {
+            ProcessColumnId.Name, ProcessColumnId.Cpu, ProcessColumnId.Pid,
+            ProcessColumnId.Status, ProcessColumnId.Memory, ProcessColumnId.Disk, ProcessColumnId.Gpu,
+        };
+
+        Assert.Equal("2.4*,0.85*,0.7*,1*,0.85*,0.85*,0.85*", ProcessTableLayout.Definitions(order));
     }
 
     [Fact]
-    public void Definitions_DropsGpuFirst() {
-        // All seven need 552 + 24 = 576; six need 496 + 20 = 516.
-        Assert.Equal("2.4*,0.7*,1*,0.85*,0.85*,0.85*,0*", ProcessTableLayout.Definitions(560));
+    public void Definitions_AlwaysHaveOneSlotPerColumn() {
+        Assert.Equal(ProcessColumns.Count,
+                     ProcessTableLayout.Definitions(ProcessColumns.DefaultOrder).Split(',').Length);
     }
 
     [Fact]
-    public void Definitions_ThenDropsDisk() {
-        // Five need 430 + 16 = 446.
-        Assert.Equal("2.4*,0.7*,1*,0.85*,0.85*,0*,0*", ProcessTableLayout.Definitions(500));
+    public void MinTableWidth_ClearsEveryColumnMinimum() {
+        // At exactly the minimum width, the weighted split must still give every column at least the
+        // width ProcessColumns asks for — that is what makes it the scroll threshold.
+        var order = ProcessColumns.DefaultOrder;
+        var content = ProcessTableLayout.MinTableWidth - ProcessTableLayout.Spacing * (order.Count - 1);
+        var total = 0d;
+        foreach (var id in order)
+            total += ProcessColumns.WeightOf(id);
+
+        foreach (var id in order) {
+            var share = content * ProcessColumns.WeightOf(id) / total;
+            Assert.True(share >= ProcessColumns.MinWidthOf(id) - 0.001,
+                        $"{id} got {share}, needs {ProcessColumns.MinWidthOf(id)}");
+        }
     }
 
     [Fact]
-    public void Definitions_ThenDropsStatus() {
-        Assert.Equal("2.4*,0.7*,0*,0.85*,0.85*,0*,0*", ProcessTableLayout.Definitions(400));
-    }
-
-    [Fact]
-    public void Definitions_AlwaysHaveSevenSlots() {
-        // Cell Grid.Column indices are static, so the slot count must never change.
-        foreach (var width in new double[] { 200, 400, 500, 560, 638, 838, 5000 })
-            Assert.Equal(7, ProcessTableLayout.Definitions(width).Split(',').Length);
-    }
-
-    [Fact]
-    public void VisibleCount_VeryNarrow_NeverDropsBelowFour() {
-        Assert.Equal(4, ProcessTableLayout.VisibleCount(50));
-    }
-
-    [Fact]
-    public void Flags_FollowTheDropOrder() {
-        Assert.True(ProcessTableLayout.ShowGpu(DesignWidth));
-        Assert.True(ProcessTableLayout.ShowDisk(DesignWidth));
-        Assert.True(ProcessTableLayout.ShowStatus(DesignWidth));
-
-        Assert.False(ProcessTableLayout.ShowGpu(560));
-        Assert.True(ProcessTableLayout.ShowDisk(560));
-
-        Assert.False(ProcessTableLayout.ShowDisk(500));
-        Assert.True(ProcessTableLayout.ShowStatus(500));
-
-        Assert.False(ProcessTableLayout.ShowStatus(400));
+    public void MinTableWidth_IsDrivenByTheTightestColumn() {
+        // CPU has the worst minimum-to-weight ratio (72 / 0.85), so it is what sets the threshold.
+        Assert.Equal(72d / 0.85 * 7.5 + 24, ProcessTableLayout.MinTableWidth, 3);
     }
 }

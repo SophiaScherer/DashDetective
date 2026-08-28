@@ -42,6 +42,11 @@ public sealed class SettingsStoreTests : IDisposable {
             // Carries the ASCII record separator the pin encoder uses, so the round trip proves JSON
             // escapes and restores it rather than eating a control character.
             PinnedCommands = "%temp%\u001Eipconfig /all",
+            ProcessColumns = "Name\u001FCpu\u001FPid",
+            ProcessesRememberCollapsed = true,
+            ProcessesRememberSort = true,
+            ProcessesCollapsedSections = "Background\u001FWindows",
+            ProcessesSort = "Cpu\u001FDesc",
         };
 
         using (var store = new SettingsStore(_path)) {

@@ -1,5 +1,6 @@
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Shared;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tests.Fakes;
 using System;
@@ -171,6 +172,577 @@ public class ProcessesViewModelTests {
         Assert.Equal((new IntPtr(4242), 1234), Assert.Single(interop.Calls));
     }
 
+    // ----- Column order -----
+
+    [Fact]
+    public void ColumnOrder_StartsAsDeclared() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.Equal(ProcessColumns.DefaultOrder, viewModel.ColumnOrder);
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.PidColumn);
+        Assert.Equal(6, viewModel.GpuColumn);
+    }
+
+    [Fact]
+    public void MoveColumn_MovesTheCellsWithIt() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.True(viewModel.MoveColumn(ProcessColumnId.Gpu, 1));
+
+        Assert.Equal(1, viewModel.GpuColumn);
+        Assert.Equal(2, viewModel.PidColumn);
+        Assert.Equal("2.4*,0.85*,0.7*,1*,0.85*,0.85*,0.85*", viewModel.ColumnLayout);
+    }
+
+    /// <summary>The drag calls MoveColumn on every pointer move, so a wobble that lands on the column's
+    /// current position must not churn bindings.</summary>
+    [Fact]
+    public void MoveColumn_ToWhereItAlreadyIs_DoesNothing() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.False(viewModel.MoveColumn(ProcessColumnId.Pid, 1));
+    }
+
+    /// <summary>Name owns the tree indent and the chevron, so it neither moves nor is displaced.</summary>
+    [Fact]
+    public void MoveColumn_LeavesThePinnedColumnAlone() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        Assert.False(viewModel.MoveColumn(ProcessColumnId.Name, 3));
+        Assert.True(viewModel.MoveColumn(ProcessColumnId.Cpu, 0));
+
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.CpuColumn);
+    }
+
+    /// <summary>A drag reports once, on release — not on every pointer move, which would rewrite the
+    /// settings file dozens of times for one gesture.</summary>
+    [Fact]
+    public void MoveColumn_IsSilentUntilTheOrderIsCommitted() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 2);
+        Assert.Equal(0, reported);
+
+        viewModel.CommitColumnOrder();
+        Assert.Equal(1, reported);
+    }
+
+    [Fact]
+    public void ResetColumnOrder_RestoresTheDeclaredOrderAndReportsIt() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+        viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
+
+        viewModel.ResetColumnOrder();
+
+        Assert.Equal(ProcessColumns.DefaultOrder, viewModel.ColumnOrder);
+        Assert.Equal(1, reported);
+
+        // Already default: nothing to report the second time.
+        viewModel.ResetColumnOrder();
+        Assert.Equal(1, reported);
+    }
+
+    [Fact]
+    public void ColumnOrder_Assigned_ResolvesAgainstTheColumnsTheTableHasNow() {
+        var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
+
+        // A save from a release that had no Disk or GPU column, with Name written last.
+        viewModel.ColumnOrder = new[] {
+            ProcessColumnId.Cpu, ProcessColumnId.Pid, ProcessColumnId.Status,
+            ProcessColumnId.Memory, ProcessColumnId.Name,
+        };
+
+        Assert.Equal(0, viewModel.NameColumn);
+        Assert.Equal(1, viewModel.CpuColumn);
+        Assert.Equal(2, viewModel.PidColumn);
+        // Disk and GPU were never saved, so they keep their declared place after Memory.
+        Assert.Equal(5, viewModel.DiskColumn);
+        Assert.Equal(6, viewModel.GpuColumn);
+    }
+
+    // ----- Selection -----
+
+    private static (ProcessesViewModel ViewModel, ControllableSnapshotProvider Provider) Selectable() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(100, 0, "editor.exe", ProcessCategory.App),
+            Proc(200, 0, "browser.exe", ProcessCategory.App),
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(400, 0, "tray.exe", ProcessCategory.Background),
+            Proc(500, 0, "svchost.exe", ProcessCategory.Windows),
+        ]);
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop()), provider);
+    }
+
+    private static ProcessRow Row(ProcessesViewModel viewModel, int pid) =>
+        viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
+                 .Single(row => row.Pid == pid);
+
+    [Fact]
+    public async Task SelectRow_Plain_ReplacesTheSelection() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300));
+
+        Assert.Equal(new[] { 300 }, viewModel.SelectedPids);
+        Assert.False(Row(viewModel, 100).IsSelected);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    [Fact]
+    public async Task SelectRow_WithControl_AddsThenRemovesTheOneRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(2, viewModel.SelectionCount);
+
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
+    }
+
+    /// <summary>A range reads the way the eye does — down the screen, straight through the group
+    /// headings, not per group.</summary>
+    [Fact]
+    public async Task SelectRow_WithShift_TakesTheRunAcrossGroups() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        // browser.exe sorts above editor.exe, so Apps read browser, editor.
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 400), extend: false, range: true);
+
+        Assert.Equal(new[] { 100, 300, 400 }, viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task SelectRange_Backwards_SelectsTheSameRun() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRange(400, 100);
+
+        Assert.Equal(new[] { 100, 300, 400 }, viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task SetGroupSelected_TakesAndClearsTheWholeGroup() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        Assert.Equal(new[] { 100, 200 }, viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(viewModel.AppsAllSelected);
+        Assert.False(viewModel.AppsSomeSelected);
+        Assert.False(viewModel.BackgroundAllSelected);
+
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: false);
+        Assert.Empty(viewModel.SelectedPids);
+    }
+
+    [Fact]
+    public async Task GroupState_PartlySelected_ReadsAsSomeNotAll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        Assert.False(viewModel.AppsAllSelected);
+        Assert.True(viewModel.AppsSomeSelected);
+        Assert.False(viewModel.IsGroupFullySelected(ProcessCategory.App));
+    }
+
+    /// <summary>An empty group must not read as "all selected" — its box would be ticked with nothing
+    /// under it.</summary>
+    [Fact]
+    public async Task GroupState_EmptyGroup_ReadsAsNeither() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.FilterText = "svchost";
+
+        Assert.Empty(viewModel.Apps);
+        Assert.False(viewModel.AppsAllSelected);
+        Assert.False(viewModel.AppsSomeSelected);
+    }
+
+    /// <summary>Rows are recreated by the keyed diff, so the set has to be what survives a poll.</summary>
+    [Fact]
+    public async Task Selection_SurvivesAPoll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(new[] { 100, 300 }, viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(Row(viewModel, 100).IsSelected);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    /// <summary>Narrowing the list is not a reason to lose a process the user picked; only exiting is.</summary>
+    [Fact]
+    public async Task Selection_SurvivesTheFilterHidingTheRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        viewModel.FilterText = "svchost";
+        Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
+
+        viewModel.FilterText = "";
+        Assert.True(Row(viewModel, 100).IsSelected);
+    }
+
+    [Fact]
+    public async Task Selection_DropsAProcessThatHasExited() {
+        var (viewModel, provider) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        provider.Processes = [
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(500, 0, "svchost.exe", ProcessCategory.Windows),
+        ];
+        await viewModel.LoadAsync();
+
+        Assert.Equal(new[] { 300 }, viewModel.SelectedPids);
+        Assert.True(viewModel.HasSelection);
+    }
+
+    [Fact]
+    public async Task ClearSelection_EmptiesEverythingDerivedFromIt() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+
+        viewModel.ClearSelection();
+
+        Assert.False(viewModel.HasSelection);
+        Assert.Equal(0, viewModel.SelectionCount);
+        Assert.Null(viewModel.SelectedRow);
+        Assert.False(Row(viewModel, 100).IsSelected);
+    }
+
+    // ----- End task -----
+
+    private static (ProcessesViewModel ViewModel, FakeProcessTerminator Terminator) Endable() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(100, 0, "editor.exe", ProcessCategory.App),
+            Proc(200, 0, "browser.exe", ProcessCategory.App),
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(400, 0, "tray.exe", ProcessCategory.Background),
+        ]);
+        var terminator = new FakeProcessTerminator();
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop(), terminator), terminator);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_EndsEverySelectedProcess() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100, 300], terminator.Ended.OrderBy(pid => pid));
+        Assert.Empty(viewModel.SelectedPids);
+        Assert.Equal("", viewModel.ActionMessage);
+        Assert.DoesNotContain(viewModel.Apps, row => row.Pid == 100);
+        Assert.DoesNotContain(viewModel.Background, row => row.Pid == 300);
+    }
+
+    /// <summary>One protected process must not stop the rest — Task Manager's own behaviour, and the
+    /// only sane one when the user asked for five.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_OneRefusal_StillEndsTheOthersAndCountsIt() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(300);
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100, 200, 300], terminator.Ended.OrderBy(pid => pid));
+        // The refusal keeps its row and its place in the selection; the other two are gone.
+        Assert.Equal([300], viewModel.SelectedPids);
+        // One failure is named rather than counted — the name is what tells the user which it was.
+        Assert.Equal("Couldn't end helper.exe", viewModel.ActionMessage);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_SeveralRefusals_CountsThemAgainstWhatWasAsked() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(100);
+        terminator.Refuse.Add(300);
+        // browser.exe sorts first, so this range is every row on screen.
+        viewModel.SelectRange(200, 400);
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal("Couldn't end 2 of 4 processes", viewModel.ActionMessage);
+        Assert.Equal([100, 300], viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_SingleRefusal_NamesTheProcess() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(100);
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal("Couldn't end editor.exe", viewModel.ActionMessage);
+    }
+
+    /// <summary>The selection outlives the filter, so what it holds is what gets ended — including a
+    /// process currently filtered out of sight.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_EndsASelectedProcessTheFilterIsHiding() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.FilterText = "helper";
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100], terminator.Ended);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_ReadsAsOneProcessOrMany() {
+        var (viewModel, _) = Endable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.RequestEndTaskCommand.Execute(null);
+        Assert.True(viewModel.ConfirmVisible);
+        Assert.Contains("editor.exe", viewModel.ConfirmText);
+
+        viewModel.CancelEndTaskCommand.Execute(null);
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        viewModel.RequestEndTaskCommand.Execute(null);
+        Assert.Contains("these 2 processes", viewModel.ConfirmText);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_WithNothingSelected_ShowsNothing() {
+        var (viewModel, _) = Endable();
+        await viewModel.LoadAsync();
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.False(viewModel.ConfirmVisible);
+    }
+
+    // ----- First load -----
+
+    /// <summary>Before the first enumeration comes back the page must not claim anything: an empty list
+    /// and a confident "0" read as a machine running no processes.</summary>
+    [Fact]
+    public async Task HasLoaded_IsFalseUntilTheFirstEnumerationLands() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([Proc(100, 0, "editor.exe", ProcessCategory.App)]) {
+            Gate = new TaskCompletionSource(),
+        };
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        var load = viewModel.LoadAsync();
+        Assert.False(viewModel.HasLoaded);
+        Assert.Equal(Placeholders.NoReading, viewModel.TotalProcessesText);
+        Assert.Equal(Placeholders.NoReading, viewModel.ThreadsText);
+
+        provider.Gate.SetResult();
+        await load;
+
+        Assert.True(viewModel.HasLoaded);
+        Assert.Equal("1", viewModel.TotalProcessesText);
+    }
+
+    /// <summary>A page that failed still has an answer — an empty list, honestly labelled. Leaving
+    /// HasLoaded false would sit under the placeholder for the rest of the session.</summary>
+    [Fact]
+    public async Task HasLoaded_IsTrueAfterAFailedEnumerationToo() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([]) {
+            Fail = new InvalidOperationException("the enumeration broke"),
+        };
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.HasLoaded);
+        Assert.Empty(viewModel.Apps);
+        Assert.Equal(Placeholders.NoReading, viewModel.TotalProcessesText);
+    }
+
+    // ----- Remembered preferences -----
+
+    /// <summary>Off by default: folding a section or re-sorting must not quietly become a preference.</summary>
+    [Fact]
+    public async Task RememberToggles_StartOff() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        Assert.False(viewModel.RememberCollapsedGroups);
+        Assert.False(viewModel.RememberSort);
+    }
+
+    [Fact]
+    public async Task ToggleGroup_ReportsOnlyWhileCollapsedSectionsAreRemembered() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+        Assert.Equal(0, reported);
+
+        // Switching the toggle on is itself worth saving.
+        viewModel.RememberCollapsedGroups = true;
+        Assert.Equal(1, reported);
+
+        viewModel.ToggleGroup(ProcessCategory.Background);
+        Assert.Equal(2, reported);
+    }
+
+    [Fact]
+    public async Task Sorting_ReportsOnlyWhileTheSortIsRemembered() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.CpuSort.SortCommand.Execute(null);
+        Assert.Equal(0, reported);
+
+        viewModel.RememberSort = true;
+        Assert.Equal(1, reported);
+
+        viewModel.MemorySort.SortCommand.Execute(null);
+        Assert.Equal(2, reported);
+
+        // Alt+arrow sets the direction on the column already sorted, and counts the same way.
+        viewModel.SetSortDirection(ascending: true);
+        Assert.Equal(3, reported);
+    }
+
+    /// <summary>Seeding a saved sort must not write straight back to the settings file.</summary>
+    [Fact]
+    public async Task SortKeyAndDirection_AssignedFromSettings_AreQuiet() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.RememberSort = true;
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.SortKey = ProcessSortKey.Memory;
+        viewModel.SortAscending = false;
+
+        Assert.Equal(0, reported);
+        Assert.Equal(ProcessSortKey.Memory, viewModel.SortKey);
+        Assert.False(viewModel.SortAscending);
+        Assert.True(viewModel.MemorySort.IsActive);
+    }
+
+    [Fact]
+    public async Task CollapsedGroups_AssignedFromSettings_AreApplied() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.CollapsedGroups = new[] { ProcessCategory.Background, ProcessCategory.Windows };
+
+        Assert.False(viewModel.AppsCollapsed);
+        Assert.True(viewModel.BackgroundCollapsed);
+        Assert.True(viewModel.WindowsCollapsed);
+    }
+
+    // ----- Collapsible groups -----
+
+    [Fact]
+    public async Task ToggleGroup_FoldsAndUnfoldsJustThatGroup() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+
+        Assert.True(viewModel.AppsCollapsed);
+        Assert.False(viewModel.BackgroundCollapsed);
+        Assert.False(viewModel.WindowsCollapsed);
+        Assert.Equal("▸", viewModel.AppsChevron);
+        Assert.Equal("▾", viewModel.BackgroundChevron);
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+        Assert.False(viewModel.AppsCollapsed);
+        Assert.Equal("▾", viewModel.AppsChevron);
+    }
+
+    /// <summary>Folding hides the list, it does not empty it: the heading's count, the filter and the
+    /// selection all keep meaning the same thing while a group is shut.</summary>
+    [Fact]
+    public async Task ToggleGroup_LeavesTheRowsAndTheirSelectionAlone() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+
+        Assert.Equal(2, viewModel.Apps.Count);
+        Assert.Equal([100, 200], viewModel.SelectedPids.OrderBy(pid => pid));
+        Assert.True(viewModel.AppsAllSelected);
+        Assert.Contains("Apps · 2", viewModel.AppsHeader);
+    }
+
+    [Fact]
+    public async Task ToggleGroup_SurvivesAPoll() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.ToggleGroup(ProcessCategory.Windows);
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.WindowsCollapsed);
+    }
+
+    /// <summary>Records what End task asked to kill, and refuses whatever it is told to.</summary>
+    private sealed class FakeProcessTerminator : IProcessTerminator {
+        public List<int> Ended { get; } = [];
+        public HashSet<int> Refuse { get; } = [];
+
+        public bool TryEnd(int pid) {
+            Ended.Add(pid);
+            return !Refuse.Contains(pid);
+        }
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }
@@ -182,12 +754,15 @@ public class ProcessesViewModelTests {
         public TaskCompletionSource? Gate { get; set; }
         public Exception? Fail { get; set; }
 
+        /// <summary>What the next poll returns, so a test can retire a process mid-run.</summary>
+        public IReadOnlyList<ProcessInfo> Processes { get; set; } = processes;
+
         public async Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) {
             if (Gate is { } gate)
                 await gate.Task;
             if (Fail is { } failure)
                 throw failure;
-            return processes;
+            return Processes;
         }
     }
 

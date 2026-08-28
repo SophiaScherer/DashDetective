@@ -7,6 +7,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="720"
              x:DataType="vm:ProcessesViewModel"
+             x:Name="Page"
              x:Class="DashDetective.Tabs.Processes.ProcessesView">
 
     <!-- Live process table, split into Apps and Background groups. Self-scrolling: the header stays
@@ -18,37 +19,83 @@
              layout is defined once instead of copy-pasted per group; it must stay in sync with the
              sticky header's column definition above. Bindings are compiled (x:DataType); the row tap
              is handled in code-behind (OnRowTapped). -->
-        <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
-            <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
-                <!-- Columns come from the page view model, not the row, so every row and the sticky
-                     header share one definition and stay aligned. -->
+        <!-- Placeholder row, drawn until the first enumeration lands. It borrows the real row's padding
+             and the live column widths, so the bars sit in the columns the header names and the list
+             does not jump when the data arrives. The bars are anonymous, so they do not care which
+             column the user has dragged where. -->
+        <DataTemplate x:Key="SkeletonRowTemplate">
+            <Border Classes="procRow">
                 <Grid ColumnSpacing="4"
-                      layout:GridColumns.Definitions="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ColumnLayout}">
+                      layout:GridColumns.Definitions="{Binding #Page.((vm:ProcessesViewModel)DataContext).ColumnLayout}">
+                    <Border Grid.Column="0" Classes="skeleton" Width="150" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="1" Classes="skeleton" Width="38" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="2" Classes="skeleton" Width="46" HorizontalAlignment="Left"/>
+                    <Border Grid.Column="3" Classes="skeleton" Width="32" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="4" Classes="skeleton" Width="48" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="5" Classes="skeleton" Width="30" HorizontalAlignment="Right"/>
+                    <Border Grid.Column="6" Classes="skeleton" Width="26" HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- The row context menu. Declared ONCE and shared by every row rather than sitting inside the
+             row template, which would build one flyout and its items per row — a few thousand controls
+             for a list this long. Nothing in it binds to a row: the right-click selects first, so every
+             item acts on the page's selection. -->
+        <MenuFlyout x:Key="RowMenu">
+            <MenuItem Header="End task" Click="OnMenuEndTask"/>
+            <MenuItem Header="Properties" Click="OnMenuProperties"/>
+            <Separator/>
+            <MenuItem Header="Expand / collapse" Click="OnMenuToggleExpand"
+                      IsEnabled="{Binding SelectedHasChildren}"/>
+            <MenuItem Header="Copy PID" Click="OnMenuCopyPid"/>
+        </MenuFlyout>
+
+        <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
+            <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped"
+                    DoubleTapped="OnRowDoubleTapped" ContextFlyout="{StaticResource RowMenu}">
+                <!-- Columns come from the page view model, not the row, so every row and the sticky
+                     header share one definition and one order, and stay aligned. Each cell's
+                     Grid.Column is bound too: dragging a header moves the cells rather than rebuilding
+                     the table. -->
+                <Grid ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding #Page.((vm:ProcessesViewModel)DataContext).ColumnLayout}">
                     <!-- Name cell: a depth indent + a fixed 16px chevron slot + status dot + name, all
-                         inside column 0 so revealing children never shifts the other columns. The slot
-                         is reserved even without a chevron so parent and child names line up. -->
-                    <Grid Grid.Column="0" Margin="{Binding IndentMargin}" ColumnDefinitions="16,Auto,*">
-                        <Button Grid.Column="0" Classes="bare chev" Click="OnChevronClick"
+                         inside the name column so revealing children never shifts the other columns.
+                         The slot is reserved even without a chevron so parent and child names line
+                         up. Name is pinned leftmost, so this cell never moves. -->
+                    <Grid Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).NameColumn}"
+                          Margin="{Binding IndentMargin}" ColumnDefinitions="Auto,16,Auto,*">
+                        <Button Grid.Column="0" Classes="bare checkBox" Classes.on="{Binding IsSelected}"
+                                Click="OnRowCheckClick">
+                            <Border>
+                                <TextBlock Text="✓" IsVisible="{Binding IsSelected}"/>
+                            </Border>
+                        </Button>
+                        <Button Grid.Column="1" Classes="bare chev" Click="OnChevronClick"
                                 IsVisible="{Binding HasChildren}">
                             <TextBlock Text="{Binding ChevronGlyph}"/>
                         </Button>
-                        <Ellipse Grid.Column="1" Width="7" Height="7" Margin="0,0,9,0"
+                        <Ellipse Grid.Column="2" Width="7" Height="7" Margin="0,0,9,0"
                                  VerticalAlignment="Center" Fill="{Binding StatusBrush}"/>
-                        <TextBlock Grid.Column="2" Classes="cellName" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="3" Classes="cellName" VerticalAlignment="Center"
                                    Text="{Binding Name}"/>
                     </Grid>
-                    <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                               Foreground="{Binding StatusBrush}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowStatusColumn}"/>
-                    <TextBlock Grid.Column="3" Classes="cpuCell"
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).PidColumn}"
+                               Classes="cellPid" Text="{Binding PidText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).StatusColumn}"
+                               Text="{Binding Status}" FontSize="11.5"
+                               Foreground="{Binding StatusBrush}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).CpuColumn}"
+                               Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
                                Text="{Binding CpuText}"/>
-                    <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowDiskColumn}"/>
-                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowGpuColumn}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).MemoryColumn}"
+                               Classes="cellNum" Text="{Binding MemoryText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).DiskColumn}"
+                               Classes="cellNum" Text="{Binding DiskText}"/>
+                    <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).GpuColumn}"
+                               Classes="cellNum" Text="{Binding GpuText}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -69,25 +116,96 @@
              it INSIDE the slot: a click there missed the button, fell through to the row's Tapped, and
              selected instead of expanding. Stretch fills the cell; the negative margin then bleeds over the
              row's own 8px vertical padding, which the cell does not cover. The margin is negative so it does
-             NOT feed back into measure — a MinHeight would make every row taller instead. KEEP THE -8 IN STEP
+             NOT feed back into measure — a MinHeight would make every row taller instead. KEEP THE -5 IN STEP
              WITH Border.procRow's Padding below. -->
         <Style Selector="Button.chev">
             <Setter Property="Width" Value="16"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,-8"/>
+            <Setter Property="Margin" Value="0,-5"/>
+        </Style>
+
+        <!-- Selection box, on rows and on group headers. Hand-drawn on the shared Button.bare rather
+             than a Fluent CheckBox, for the same reason the chevron is: that template carries a fixed
+             20px box and its own minimum height, which set the row height between them and undid the
+             tightening the rest of this file does. Told to be 15px, this one is 15px.
+             .on is every row selected, .some is a group holding only part of its rows. -->
+        <Style Selector="Button.checkBox">
+            <Setter Property="Width" Value="15"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="Margin" Value="0,0,9,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.checkBox Border">
+            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+        </Style>
+        <Style Selector="Button.checkBox:pointerover Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+        </Style>
+        <Style Selector="Button.checkBox.on Border">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Button.checkBox.some Border">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Button.checkBox TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- "Some" is a dash on the soft fill, so it never reads as a tick. -->
+        <Style Selector="Button.checkBox.some TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+
+        <!-- A placeholder bar. The pulse is what makes the block read as "still coming" rather than as
+             a rendering fault; without it a static grey table looks broken. -->
+        <Style Selector="Border.skeleton">
+            <Setter Property="Height" Value="9"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.skeleton">
+            <Style.Animations>
+                <Animation Duration="0:0:1.3" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
         </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
         <Style Selector="Border.groupHead">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="Padding" Value="16,5"/>
+            <!-- Folding a group puts two headings back to back; without a rule between them the two
+                 tinted bands read as one. -->
+            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
         <Style Selector="Border.groupHead TextBlock">
             <Setter Property="FontSize" Value="11.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+
+        <!-- The group heading's fold chevron, sized below its caption. This must stay BELOW the
+             groupHead rule above: the glyph matches both selectors, and Avalonia settles that by
+             declaration order rather than specificity — declared first, the caption's 11.5 would win. -->
+        <Style Selector="TextBlock.groupChev">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
 
         <!-- Data rows. Background is Transparent here (a base style), NOT set locally on the row
@@ -96,7 +214,7 @@
              Setting it in the style keeps the whole row hit-testable for Tapped while letting the
              triggers below override it. -->
         <Style Selector="Border.procRow">
-            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Padding" Value="16,5"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -195,21 +313,7 @@
 
         <!-- ===== Summary strip: the action buttons keep their natural width on the right and the
              four cards flow in whatever space is left, wrapping rather than being squeezed. -->
-        <DockPanel Grid.Row="0" LastChildFill="True">
-            <!-- End task / Properties act on the selected row; disabled until one is picked. -->
-            <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="6" Margin="12,0,0,0">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="endTask" Content="End task"
-                            Command="{Binding RequestEndTaskCommand}"
-                            IsEnabled="{Binding HasSelection}"/>
-                    <Button Classes="action" Content="Properties"
-                            Click="OnPropertiesClick" IsEnabled="{Binding HasSelection}"/>
-                </StackPanel>
-                <TextBlock Classes="cardSub" HorizontalAlignment="Right"
-                           Foreground="#ff8a5c" Text="{Binding ActionMessage}"
-                           IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-            </StackPanel>
-
+        <Panel Grid.Row="0">
             <layout:UniformFlowPanel MinItemWidth="130" ColumnSpacing="12" RowSpacing="12">
             <Border Classes="card">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -241,87 +345,229 @@
                 </StackPanel>
             </Border>
             </layout:UniformFlowPanel>
-        </DockPanel>
+        </Panel>
 
         <!-- ===== Process table ===== -->
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Grid RowDefinitions="Auto,*">
 
-            <!-- Filter bar. Narrows the three groups to matching processes; Ctrl+F or "/" puts the
-                 caret here and Esc clears it. Same field chrome as the toolbar's search box. -->
-            <Border Grid.Row="0" Padding="16,10" BorderBrush="{DynamicResource Hairline}"
+            <!-- Filter and actions. The filter narrows the three groups to matching processes; Ctrl+F
+                 or "/" puts the caret here and Esc clears it. End task and Properties sit on this row
+                 rather than up in the summary strip, beside the rows they act on. Docked children
+                 claim the right edge in declaration order, so Properties is outermost. -->
+            <Border Grid.Row="0" Padding="16,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <!-- Tab fills in a running process name from what has been typed. -->
-                <controls:SearchField x:Name="FilterBox" HorizontalAlignment="Left"
-                                      Width="300" Height="30"
-                                      IconSize="13" TextSize="12.5"
-                                      ContentPadding="10,0" IconGap="8,0,0,0"
-                                      PlaceholderText="Filter by name or PID"
-                                      ClearToolTip="Clear filter"
-                                      Text="{Binding FilterText, Mode=TwoWay}"
-                                      Completion="{Binding FilterCompletion}"
-                                      ClearCommand="{Binding ClearFilterCommand}"/>
+                <!-- The actions are declared BEFORE the filter, and the filter is the fill child, so
+                     the buttons claim their natural width first and the field gives up space as the
+                     window narrows. The other way round, the field held its 300px and "End task" was
+                     clipped to two letters. Docked children take the right edge in declaration order,
+                     so Options ends up outermost. -->
+                <DockPanel LastChildFill="True">
+                    <!-- View options. Overlay-free popup keeps the rest of the window hoverable;
+                         close-on-outside-click is emulated in code-behind, the same way File Explorer's
+                         options flyout does it. -->
+                    <Panel DockPanel.Dock="Right" Margin="8,0,0,0">
+                        <ToggleButton x:Name="OptionsButton" Classes="optionsToggle" Content="Options ▾"/>
+                        <Popup x:Name="OptionsPopup" PlacementTarget="{Binding #OptionsButton}"
+                               Placement="BottomEdgeAlignedRight" VerticalOffset="6"
+                               IsLightDismissEnabled="False"
+                               IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
+                            <Border Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12" BoxShadow="0 8 24 0 #22000000">
+                                <StackPanel Spacing="10">
+                                    <!-- Both start off: folding a section or re-sorting is usually a
+                                         glance rather than a preference. -->
+                                    <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
+                                              IsChecked="{Binding RememberCollapsedGroups}"/>
+                                    <CheckBox Classes="optionCheck" Content="Remember sort order"
+                                              IsChecked="{Binding RememberSort}"/>
+                                    <Border Height="1" Background="{DynamicResource Hairline}"/>
+                                    <!-- The column order IS remembered by default, so this is the way back. -->
+                                    <Button Classes="action" Content="Reset column order"
+                                            HorizontalAlignment="Stretch"
+                                            Command="{Binding ResetColumnOrderCommand}"/>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Panel>
+
+                    <Button DockPanel.Dock="Right" Classes="action" Content="Properties"
+                            Margin="8,0,0,0" Click="OnPropertiesClick"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <Button DockPanel.Dock="Right" Classes="endTask" Content="End task"
+                            Command="{Binding RequestEndTaskCommand}"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <TextBlock DockPanel.Dock="Right" Classes="cardSub" VerticalAlignment="Center"
+                               Margin="12,0" Text="{Binding SelectionText}"
+                               IsVisible="{Binding HasSelection}"/>
+                    <TextBlock DockPanel.Dock="Right" Classes="cardSub" VerticalAlignment="Center"
+                               TextAlignment="Right" TextWrapping="Wrap"
+                               Foreground="{StaticResource Orange}" Text="{Binding ActionMessage}"
+                               IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                    <!-- Tab fills in a running process name from what has been typed. -->
+                    <controls:SearchField x:Name="FilterBox" HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          MaxWidth="300" Height="30"
+                                          IconSize="13" TextSize="12.5"
+                                          ContentPadding="10,0" IconGap="8,0,0,0"
+                                          PlaceholderText="Filter by name or PID"
+                                          ClearToolTip="Clear filter"
+                                          Text="{Binding FilterText, Mode=TwoWay}"
+                                          Completion="{Binding FilterCompletion}"
+                                          ClearCommand="{Binding ClearFilterCommand}"/>
+                </DockPanel>
             </Border>
+
+            <!-- Header + rows share one horizontal scroller, so a window too narrow for every
+                 column scrolls sideways instead of dropping columns, and the header always stays over
+                 the cells it labels. The inner grid's MinWidth is the width at which the weighted
+                 split still clears every column's minimum; below that the scrollbar appears.
+                 VerticalScrollBarVisibility is Disabled here so this viewer only measures width — the
+                 rows keep their own vertical ScrollViewer inside it, which is what keeps the header
+                 fixed while the list scrolls. -->
+            <ScrollViewer Grid.Row="1" x:Name="TableScroll" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+            <!-- Width is pinned to the viewport rather than left to the content: a horizontal scroller
+                 measures its child with infinite width, and a TextTrimming cell reports its FULL text
+                 width there, so one long process name would widen the table past the window and leave
+                 the scrollbar up for good. MinWidth then takes over once the window is narrower than
+                 the columns need. -->
+            <Grid RowDefinitions="Auto,*" MinWidth="{x:Static vm:ProcessTableLayout.MinTableWidth}"
+                  Width="{Binding #TableScroll.Viewport.Width}">
 
             <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
                  the label; right-aligned numeric columns put it before, so it always sits inward.
-                 The header lives OUTSIDE the ScrollViewer, so it spans the full panel width while the
-                 rows inside are narrowed by the always-on vertical scrollbar. The extra 14px of right
-                 padding (16→30) reserves that scrollbar gutter so the header's star columns compute
-                 over the same width as the rows and stay aligned with them (the gutter pattern from
-                 the Network table). -->
-            <Border Grid.Row="1" Padding="16,11,30,11" BorderBrush="{DynamicResource Hairline}"
+                 The extra 14px of right padding (16→30) reserves the row list's vertical-scrollbar
+                 gutter so the header's star columns compute over the same width as the rows and stay
+                 aligned with them (the gutter pattern from the Network table). -->
+            <Border Grid.Row="0" Padding="16,8,30,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <!-- This grid's width is exactly what the columns get, so it (not the outer panel) is
-                     what the view model measures against when deciding how many still fit. -->
-                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4"
-                      SizeChanged="OnTableSizeChanged">
-                    <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"
-                                                   HorizontalAlignment="Left"/>
-                    <controls:SortableColumnHeader Grid.Column="1" Text="PID" Column="{Binding PidSort}"
-                                                   HorizontalAlignment="Left"/>
-                    <controls:SortableColumnHeader Grid.Column="2" Text="STATUS" Column="{Binding StatusSort}"
-                                                   HorizontalAlignment="Left"
-                                                   IsVisible="{Binding ShowStatusColumn}"/>
-                    <controls:SortableColumnHeader Grid.Column="3" Text="CPU" Column="{Binding CpuSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"/>
-                    <controls:SortableColumnHeader Grid.Column="4" Text="MEMORY" Column="{Binding MemorySort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"/>
-                    <controls:SortableColumnHeader Grid.Column="5" Text="DISK" Column="{Binding DiskSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"
-                                                   IsVisible="{Binding ShowDiskColumn}"/>
-                    <controls:SortableColumnHeader Grid.Column="6" Text="GPU" Column="{Binding GpuSort}"
-                                                   HorizontalAlignment="Right" ArrowFirst="True"
-                                                   IsVisible="{Binding ShowGpuColumn}"/>
+                <!-- Named so the code-behind can hook the column drag; the cells inside are buttons, so
+                     the drag has to tunnel past them. -->
+                <Grid x:Name="HeaderColumns" ColumnSpacing="4"
+                      layout:GridColumns.Definitions="{Binding ColumnLayout}">
+                    <controls:SortableColumnHeader Grid.Column="{Binding NameColumn}" Text="NAME" Column="{Binding NameSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding PidColumn}" Text="PID" Column="{Binding PidSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding StatusColumn}" Text="STATUS" Column="{Binding StatusSort}"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding CpuColumn}" Text="CPU" Column="{Binding CpuSort}"
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding MemoryColumn}" Text="MEMORY" Column="{Binding MemorySort}"
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding DiskColumn}" Text="DISK" Column="{Binding DiskSort}"
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
+                    <controls:SortableColumnHeader Grid.Column="{Binding GpuColumn}" Text="GPU" Column="{Binding GpuSort}"
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
                 </Grid>
             </Border>
 
             <!-- Scrolling grouped list -->
-            <ScrollViewer Grid.Row="2" x:Name="ProcessListScroll"
+            <ScrollViewer Grid.Row="1" x:Name="ProcessListScroll"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+                <Panel>
+                <!-- Placeholder rows until the page has an answer, so the tab renders immediately
+                     instead of showing an empty list that reads as "no processes running". -->
+                <ItemsControl IsVisible="{Binding !HasLoaded}"
+                              ItemsSource="{Binding SkeletonRows}"
+                              ItemTemplate="{StaticResource SkeletonRowTemplate}"/>
+
+                <StackPanel IsVisible="{Binding HasLoaded}">
                     <!-- Apps -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding AppsHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding AppsAllSelected}"
+                                    Classes.some="{Binding AppsSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.App}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding AppsAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding AppsSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.App}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding AppsChevron}"/>
+                                    <TextBlock Text="{Binding AppsHeader}"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Apps}"
+                    <ItemsControl ItemsSource="{Binding Apps}" IsVisible="{Binding !AppsCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Background -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding BackgroundHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding BackgroundAllSelected}"
+                                    Classes.some="{Binding BackgroundSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.Background}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding BackgroundAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding BackgroundSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.Background}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding BackgroundChevron}"/>
+                                    <TextBlock Text="{Binding BackgroundHeader}"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding Background}"
+                    <ItemsControl ItemsSource="{Binding Background}" IsVisible="{Binding !BackgroundCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
 
                     <!-- Windows processes -->
                     <Border Classes="groupHead">
-                        <TextBlock Text="{Binding WindowsHeader}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="bare checkBox" Click="OnGroupCheckClick"
+                                    Classes.on="{Binding WindowsAllSelected}"
+                                    Classes.some="{Binding WindowsSomeSelected}"
+                                    Tag="{x:Static vm:ProcessCategory.Windows}"
+                                    ToolTip.Tip="Select every process in this group">
+                                <Border>
+                                    <!-- Both glyphs are laid on one Panel; exactly one is ever visible. -->
+                                    <Panel>
+                                        <TextBlock Text="✓" IsVisible="{Binding WindowsAllSelected}"/>
+                                        <TextBlock Text="–" IsVisible="{Binding WindowsSomeSelected}"/>
+                                    </Panel>
+                                </Border>
+                            </Button>
+                            <!-- The chevron and the caption are one button, so the whole heading folds
+                                 the group. The select-all box beside it keeps its own click. -->
+                            <Button Classes="bare" Click="OnGroupToggleClick"
+                                    Tag="{x:Static vm:ProcessCategory.Windows}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="groupChev" Text="{Binding WindowsChevron}"/>
+                                    <TextBlock Text="{Binding WindowsHeader}"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Border>
-                    <ItemsControl ItemsSource="{Binding WindowsProcesses}"
+                    <ItemsControl ItemsSource="{Binding WindowsProcesses}" IsVisible="{Binding !WindowsCollapsed}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
                 </StackPanel>
+                </Panel>
+            </ScrollViewer>
+
+            </Grid>
             </ScrollViewer>
         </Grid>
         </Border>

@@ -302,9 +302,10 @@ shape now exists once. Five rules, all load-bearing:
    screenshots all clean. Guard on the press you actually claimed.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
-connections and Storage partitions only; Processes and File Explorer measure column drops off their own
-header width and were deliberately left alone), the collapsing toolbar search, the Ping console filling
-its widget and keeping as much scrollback as fits, and `Dimensions.axaml`.
+connections and Storage partitions only; File Explorer measures column drops off its own header width and
+was deliberately left alone, and **Processes no longer drops columns at all** — see its own section below),
+the collapsing toolbar search, the Ping console filling its widget and keeping as much scrollback as fits,
+and `Dimensions.axaml`.
 
 **Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
 is doing design work first — do not start it without a task.
@@ -427,6 +428,9 @@ currently exist.
       CollectionReconciler.cs  (generic keyed diff of an ordered snapshot into an ObservableCollection —
                                 drop/update/move/insert in place, no flicker; shared by the Network
                                 connections table + the Processes list)
+      EnumListCodec.cs         (a list of enum values as one persistable string, stored BY NAME so a
+                                release that inserts a member cannot re-point a saved record. Reached by
+                                the Processes column order and its collapsed sections)
       TrayIntegration.cs       (whether closing may hide to a tray icon rather than exit. WINDOWS ONLY:
                                 stock GNOME runs no StatusNotifierItem host, and the setting is ON BY
                                 DEFAULT, so honouring it there hides the window behind an icon that never
@@ -485,8 +489,11 @@ currently exist.
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
                                  so surplus buys a column, and drags by the header to reorder)
         WidgetBoardLayout.cs    (its arithmetic + DropIndex — no Avalonia types, so it tests without layout)
-        WidgetOrders.cs         (per-page order codec + the resolver that survives a widget being added,
-                                 removed or renamed)
+        WidgetOrders.cs         (per-page order codec; the resolver that survives a widget being added,
+                                 removed or renamed now lives in OrderResolver.cs, which this delegates
+                                 to — the Processes columns want the same semantics)
+        OrderResolver.cs        (that resolver, knowing only ids: drop what is gone, keep what is new
+                                 beside the neighbours its author put it next to)
         UniformFlowPanel, FlowLayout, GridColumns, TableColumns, WeightedRowLayout
       /Controls
         WidgetPanel, WidgetTable
@@ -1375,8 +1382,19 @@ currently exist.
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
                                  from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
                                  ILiveSamplingPage/IActivatablePage/IDisposable.)
-      /Processes                (the tab itself is described under Feature notes; only its platform seam
-                                 is mapped here)
+      /Processes                (the tab itself is described under Feature notes; only its seams and the
+                                 column model are mapped here)
+                                ProcessColumnId.cs      (enum: the seven columns, declaration order =
+                                                         the order the table ships in)
+                                ProcessColumns.cs       (one table of per-column minimum width + weight,
+                                                         and the pinned column. Indexed BY THE ENUM, so
+                                                         the two must stay in the same order — asserted)
+                                ProcessColumnOrder.cs   (codec + Resolve for the user's column order.
+                                                         Encoding is EnumListCodec's; only Resolve, which
+                                                         forces the pinned column leftmost, is local)
+                                ProcessSortState.cs     (codec for the remembered sort column+direction)
+                                IProcessTerminator.cs   (seam: ends a process. Exists so End task is
+                                                         testable — see ProcessTerminator.cs beside it)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.
@@ -2296,8 +2314,8 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   + `ProcessCategory`), per-process **PID / status / CPU % / Memory / Disk / GPU %**, **sortable
   column headers**, a summary strip (**process counts per group**, **total CPU %**, **total
   Memory %**, **total thread count**), **End task** (behind a confirmation overlay — killing a
-  process is destructive), and native **Properties** (the exe's shell property sheet), both acting on
-  the selected row. Multi-process apps **collapse into a single entry** with aggregate metrics,
+  process is destructive) acting on the whole selection, and native **Properties** (the exe's shell
+  property sheet) acting on the primary row. Multi-process apps **collapse into a single entry** with aggregate metrics,
   expandable via a chevron: `ProcessTreeBuilder` nests a
   process under its parent only when the parent is in the snapshot **and shares the same image name**,
   so Edge's ~27 `msedge.exe` helpers fold into one Edge row while unrelated apps aren't swallowed under
@@ -2335,7 +2353,74 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a
   permanent "—" the column was deleted outright: header, data cell, sort key and all. This is **not
   deferred work** — do not re-add the column or build toward it without an explicit task. The table is
-  7 columns. Follows the shared page-lifecycle pattern (constructed once in the shell; `IRefreshablePage` +
+  7 columns.
+  **Reworked on branch `performanceTabUpdates` (2026-08)** — nine gaps closed in eight phases (plan:
+  `C:\Users\User\.claude\plans\below-is-a-list-elegant-hamming.md`). What changed, and the decisions
+  behind it that must not be quietly undone:
+  - **Columns never drop; the table scrolls.** `ProcessTableLayout` lost its four drop-tier definition
+    strings and its `ShowStatus`/`ShowDisk`/`ShowGpu` flags. The header and the rows now share one
+    horizontal `ScrollViewer` whose content is floored by `MinTableWidth` (from the shared
+    `WeightedRowLayout.RequiredWidth`, so one piece of arithmetic answers "does this weighted row still
+    fit" for the widget board and this table alike). **The scrolled content's Width is pinned to the
+    viewport on purpose:** a horizontal scroller measures its child with infinite width, where a
+    `TextTrimming` cell reports its FULL text width — without the pin, one long process name widens the
+    table past the window and leaves the scrollbar up for good. *Known cosmetic cost:* in a narrow window
+    the row list's vertical scrollbar is inside the scrolled content, so it sits off screen until you
+    scroll right (the wheel still works). Pinning it to the viewport means taking it out of the
+    shared-width content, which is exactly what the header's 30px gutter exists to keep aligned.
+  - **Columns are drag-reorderable and persisted.** `ProcessColumnId` + `ProcessColumns` (one table of
+    per-column minimum width and weight) + `ProcessColumnOrder` (the codec). Each cell binds its
+    `Grid.Column` to a view-model index, so a reorder moves cells rather than rebuilding the table.
+    **Name is pinned leftmost and is not draggable** — it owns the tree indent, the expand chevron and the
+    selection box, and a hierarchy indented from the middle of the table is unreadable.
+    **The header drag takes its pointer capture on the first move past the threshold, NOT on the press.**
+    Header cells are buttons; capturing on the press strips the capture the button takes for its own
+    click and every column stops sorting. `MoveColumn` is silent so the drag can preview live; only the
+    release calls `CommitColumnOrder`, or one gesture rewrites `settings.json` dozens of times.
+  - **Multi-select.** A `HashSet<int>` of selected PIDs is authoritative — rows are transient, so like
+    `_expandedPids` the set is what survives a poll, a re-sort and a filter. A box per row, Ctrl-click,
+    Shift-range and a drag down the list all feed it, and a box on each group header takes the group.
+    Ranges read straight down the screen, through the group headings, not per group. **Selection is
+    pruned against the LIVE processes, not the visible rows:** a row the filter is hiding is still a
+    process the user picked, and only exiting drops it. `SelectedRow` survives as the *primary* row, for
+    the things that can only act on one (Properties' shell dialog).
+  - **The selection boxes are hand-drawn on `Button.bare`, not Fluent `CheckBox`es.** That template
+    carries a fixed 20px box and its own minimum height, which between them added 16px to every row;
+    constraining it clipped the box into a lozenge with no tick rather than scaling it. Do not "simplify"
+    them back to a `CheckBox`. (`CheckBox.optionCheck` is still the right control in the options popup,
+    where the row height does not matter.)
+  - **End task ends the whole selection**, carries on past a protected or already-exited process, and
+    names a single failure while counting several. It works over the selected **PIDs**, not the visible
+    rows, for the same reason the pruning does. The kill sits behind `IProcessTerminator` purely so it is
+    testable — it used to be a bare `Process.Kill()` no test could reach without killing something on the
+    machine running the suite.
+  - **The actions live on the table's filter row**, not the summary strip, beside the rows they act on and
+    next to a selection count. Rows also carry a context menu (End task / Properties / Expand-collapse /
+    Copy PID) **declared once and shared**, never per row — a per-row `MenuFlyout` would build a few
+    thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
+    into the selection first, **on the tunneling press**, so it lands before the flyout opens.
+    `ContextRequested` was tried for that and silently never fired.
+  - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
+    and nothing else — the count, the filter and the selection keep meaning the same thing.
+  - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
+    running". `HasLoaded` is set on success AND on failure, never on cancellation: a page that failed has
+    an answer, whereas a cancelled read means the user left and nothing was learned. The summary reads
+    `Placeholders.NoReading` rather than `0` until then, and on failure, since the count is unknown, not
+    zero. There is deliberately **no grace period** (unlike File Explorer's load strip): that exists to
+    stop a spinner flashing on a fast transition, and this is the page's initial state.
+  - **What is remembered, and what is not.** Column order is persisted by default, with a Reset in the
+    Options popup. Folding and sorting are **opt-in** (`RememberCollapsedGroups` / `RememberSort`), since
+    both are usually a glance rather than a preference. Each reports a change only while its toggle is on,
+    nothing is written for a toggle that is off, and seeding a saved value on startup is quiet so it does
+    not write straight back. `PreferencesChanged` is the one event the shell hooks to `Persist`.
+  - **Row density** was tightened (`procRow` padding 16,5). `Button.chev`'s negative margin must stay in
+    step with it, as its own comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
+    sites used to align the *control*, which shrank it to its label and left the rest of the column dead
+    to a click.
+  Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
+  `EnumListCodec`, and the promotion of `CheckBox.optionCheck` and `ToggleButton.optionsToggle` to
+  `SharedStyles` (their File Explorer copies deleted — a local style silently outranks the shared one).
+  Follows the shared page-lifecycle pattern (constructed once in the shell; `IRefreshablePage` +
   `ILiveSamplingPage` + `IActivatablePage` + `IDisposable` + `ISelfScrollingPage`), the Network tab's keyed-diff live table
   (via the shared `CollectionReconciler`, so rows are reused and the list doesn't flicker), and the
   File Explorer sortable-header + Properties patterns. The list polls on its own 2 s timer

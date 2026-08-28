@@ -1,48 +1,51 @@
 using DashDetective.Shared.Layout;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 
 namespace DashDetective.Tabs.Processes;
 
 /// <summary>
-/// The Processes table's responsive column set. Columns drop as the panel narrows — GPU first, then
-/// Disk, then Status — while Name, PID, CPU and Memory always stay.
+/// The Processes table's column arithmetic. Every column is always shown: below the width at which the
+/// weighted split still clears each column's minimum, the table scrolls sideways instead of dropping
+/// columns, so no reading is ever taken off screen.
 ///
-/// Hidden columns keep their place in the definitions string at zero width rather than being removed,
-/// so every cell's Grid.Column index stays fixed and the header and the row template cannot drift
-/// out of alignment.
+/// The header and the shared row template both size off <see cref="Definitions"/>, so they cannot
+/// drift out of alignment. Metrics come from <see cref="ProcessColumns"/>.
 /// </summary>
 public static class ProcessTableLayout {
     /// <summary>Gap between columns, matching the table's ColumnSpacing.</summary>
     internal const double Spacing = 4;
 
-    /// <summary>Minimum widths in drop order: the four that always stay, then Status, Disk, GPU.
-    /// Each is below the width that column already gets at the 1180px design size, so no column
-    /// disappears at a width where it used to be perfectly readable.</summary>
-    internal static readonly double[] Minimums = { 180, 52, 58, 72, 68, 66, 56 };
+    /// <summary>The table's ColumnDefinitions for a column order — the weights permuted to match it,
+    /// so reordering the columns is a matter of what this string says and nothing else.</summary>
+    public static string Definitions(IReadOnlyList<ProcessColumnId> order) {
+        var builder = new StringBuilder();
+        foreach (var id in order) {
+            if (builder.Length > 0)
+                builder.Append(',');
+            builder.Append(ProcessColumns.WeightOf(id).ToString(CultureInfo.InvariantCulture)).Append('*');
+        }
 
-    private const int Required = 4;
+        return builder.ToString();
+    }
 
-    private const string All = "2.4*,0.7*,1*,0.85*,0.85*,0.85*,0.85*";
-    private const string NoGpu = "2.4*,0.7*,1*,0.85*,0.85*,0.85*,0*";
-    private const string NoDisk = "2.4*,0.7*,1*,0.85*,0.85*,0*,0*";
-    private const string NoStatus = "2.4*,0.7*,0*,0.85*,0.85*,0*,0*";
+    /// <summary>The narrowest the table may be laid out at: the width where the weighted split still
+    /// meets every column's minimum, plus the gaps between them. Narrower than this and the table
+    /// scrolls horizontally. Order-independent — the same columns are present either way. Shares
+    /// <see cref="WeightedRowLayout.RequiredWidth"/> with the widget board, so one piece of arithmetic
+    /// answers "does this weighted row still fit".</summary>
+    public static double MinTableWidth { get; } = RequiredWidth();
 
-    /// <summary>Columns that fit <paramref name="width"/>, between 4 and 7.</summary>
-    public static int VisibleCount(double width) =>
-        TableColumns.VisibleColumns(width, Minimums, Spacing, Required);
+    private static double RequiredWidth() {
+        var order = ProcessColumns.DefaultOrder;
+        var weights = new double[order.Count];
+        var minimums = new double[order.Count];
+        for (var i = 0; i < order.Count; i++) {
+            weights[i] = ProcessColumns.WeightOf(order[i]);
+            minimums[i] = ProcessColumns.MinWidthOf(order[i]);
+        }
 
-    public static bool ShowStatus(double width) => VisibleCount(width) >= 5;
-
-    public static bool ShowDisk(double width) => VisibleCount(width) >= 6;
-
-    public static bool ShowGpu(double width) => VisibleCount(width) >= 7;
-
-    /// <summary>The ColumnDefinitions string for <paramref name="width"/>. Always seven columns; the
-    /// dropped ones are zero-width. The header and the shared row template both use this, so they
-    /// stay aligned by construction.</summary>
-    public static string Definitions(double width) => VisibleCount(width) switch {
-        >= 7 => All,
-        6 => NoGpu,
-        5 => NoDisk,
-        _ => NoStatus,
-    };
+        return WeightedRowLayout.RequiredWidth(weights, minimums) + Spacing * (order.Count - 1);
+    }
 }

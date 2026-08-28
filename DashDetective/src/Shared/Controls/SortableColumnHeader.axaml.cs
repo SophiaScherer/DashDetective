@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 
 namespace DashDetective.Shared.Controls;
 
@@ -17,6 +18,10 @@ public partial class SortableColumnHeader : UserControl {
 
     public static readonly StyledProperty<bool> ArrowFirstProperty =
         AvaloniaProperty.Register<SortableColumnHeader, bool>(nameof(ArrowFirst));
+
+    public static readonly StyledProperty<HorizontalAlignment> ContentAlignmentProperty =
+        AvaloniaProperty.Register<SortableColumnHeader, HorizontalAlignment>(
+            nameof(ContentAlignment), HorizontalAlignment.Left);
 
     public SortableColumnHeader() {
         InitializeComponent();
@@ -39,5 +44,13 @@ public partial class SortableColumnHeader : UserControl {
     public bool ArrowFirst {
         get => GetValue(ArrowFirstProperty);
         set => SetValue(ArrowFirstProperty, value);
+    }
+
+    /// <summary>Where the label sits inside the cell. Set this rather than the control's own
+    /// HorizontalAlignment: aligning the control shrinks it to its text, so only the glyphs stay
+    /// clickable and the rest of the column stops sorting.</summary>
+    public HorizontalAlignment ContentAlignment {
+        get => GetValue(ContentAlignmentProperty);
+        set => SetValue(ContentAlignmentProperty, value);
     }
 }
