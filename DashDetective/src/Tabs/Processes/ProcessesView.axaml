@@ -39,16 +39,13 @@
                     </Grid>
                     <TextBlock Grid.Column="1" Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11.5"
-                               Foreground="{Binding StatusBrush}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowStatusColumn}"/>
+                               Foreground="{Binding StatusBrush}"/>
                     <TextBlock Grid.Column="3" Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
                                Text="{Binding CpuText}"/>
                     <TextBlock Grid.Column="4" Classes="cellNum" Text="{Binding MemoryText}"/>
-                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowDiskColumn}"/>
-                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"
-                               IsVisible="{Binding $parent[UserControl].((vm:ProcessesViewModel)DataContext).ShowGpuColumn}"/>
+                    <TextBlock Grid.Column="5" Classes="cellNum" Text="{Binding DiskText}"/>
+                    <TextBlock Grid.Column="6" Classes="cellNum" Text="{Binding GpuText}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -245,7 +242,7 @@
 
         <!-- ===== Process table ===== -->
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Grid RowDefinitions="Auto,*">
 
             <!-- Filter bar. Narrows the three groups to matching processes; Ctrl+F or "/" puts the
                  caret here and Esc clears it. Same field chrome as the toolbar's search box. -->
@@ -263,38 +260,47 @@
                                       ClearCommand="{Binding ClearFilterCommand}"/>
             </Border>
 
+            <!-- Header + rows share one horizontal scroller, so a window too narrow for every
+                 column scrolls sideways instead of dropping columns, and the header always stays over
+                 the cells it labels. The inner grid's MinWidth is the width at which the weighted
+                 split still clears every column's minimum; below that the scrollbar appears.
+                 VerticalScrollBarVisibility is Disabled here so this viewer only measures width — the
+                 rows keep their own vertical ScrollViewer inside it, which is what keeps the header
+                 fixed while the list scrolls. -->
+            <ScrollViewer Grid.Row="1" x:Name="TableScroll" HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+            <!-- Width is pinned to the viewport rather than left to the content: a horizontal scroller
+                 measures its child with infinite width, and a TextTrimming cell reports its FULL text
+                 width there, so one long process name would widen the table past the window and leave
+                 the scrollbar up for good. MinWidth then takes over once the window is narrower than
+                 the columns need. -->
+            <Grid RowDefinitions="Auto,*" MinWidth="{x:Static vm:ProcessTableLayout.MinTableWidth}"
+                  Width="{Binding #TableScroll.Viewport.Width}">
+
             <!-- Sticky column header: each cell sorts by its column. Left columns put the arrow after
                  the label; right-aligned numeric columns put it before, so it always sits inward.
-                 The header lives OUTSIDE the ScrollViewer, so it spans the full panel width while the
-                 rows inside are narrowed by the always-on vertical scrollbar. The extra 14px of right
-                 padding (16→30) reserves that scrollbar gutter so the header's star columns compute
-                 over the same width as the rows and stay aligned with them (the gutter pattern from
-                 the Network table). -->
-            <Border Grid.Row="1" Padding="16,8,30,8" BorderBrush="{DynamicResource Hairline}"
+                 The extra 14px of right padding (16→30) reserves the row list's vertical-scrollbar
+                 gutter so the header's star columns compute over the same width as the rows and stay
+                 aligned with them (the gutter pattern from the Network table). -->
+            <Border Grid.Row="0" Padding="16,8,30,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <!-- This grid's width is exactly what the columns get, so it (not the outer panel) is
-                     what the view model measures against when deciding how many still fit. -->
-                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4"
-                      SizeChanged="OnTableSizeChanged">
+                <Grid layout:GridColumns.Definitions="{Binding ColumnLayout}" ColumnSpacing="4">
                     <controls:SortableColumnHeader Grid.Column="0" Text="NAME" Column="{Binding NameSort}"/>
                     <controls:SortableColumnHeader Grid.Column="1" Text="PID" Column="{Binding PidSort}"/>
-                    <controls:SortableColumnHeader Grid.Column="2" Text="STATUS" Column="{Binding StatusSort}"
-                                                   IsVisible="{Binding ShowStatusColumn}"/>
+                    <controls:SortableColumnHeader Grid.Column="2" Text="STATUS" Column="{Binding StatusSort}"/>
                     <controls:SortableColumnHeader Grid.Column="3" Text="CPU" Column="{Binding CpuSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
                     <controls:SortableColumnHeader Grid.Column="4" Text="MEMORY" Column="{Binding MemorySort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>
                     <controls:SortableColumnHeader Grid.Column="5" Text="DISK" Column="{Binding DiskSort}"
-                                                   ContentAlignment="Right" ArrowFirst="True"
-                                                   IsVisible="{Binding ShowDiskColumn}"/>
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
                     <controls:SortableColumnHeader Grid.Column="6" Text="GPU" Column="{Binding GpuSort}"
-                                                   ContentAlignment="Right" ArrowFirst="True"
-                                                   IsVisible="{Binding ShowGpuColumn}"/>
+                                                   ContentAlignment="Right" ArrowFirst="True"/>
                 </Grid>
             </Border>
 
             <!-- Scrolling grouped list -->
-            <ScrollViewer Grid.Row="2" x:Name="ProcessListScroll"
+            <ScrollViewer Grid.Row="1" x:Name="ProcessListScroll"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel>
@@ -319,6 +325,9 @@
                     <ItemsControl ItemsSource="{Binding WindowsProcesses}"
                                   ItemTemplate="{StaticResource ProcRowTemplate}"/>
                 </StackPanel>
+            </ScrollViewer>
+
+            </Grid>
             </ScrollViewer>
         </Grid>
         </Border>

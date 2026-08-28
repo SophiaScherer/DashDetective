@@ -117,41 +117,12 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Total thread count across all processes (e.g. "2,418").</summary>
     [ObservableProperty] private string _threadsText = "0";
 
-    // ----- Responsive table columns -----
+    // ----- Table columns -----
 
-    // Starts unconstrained so the table shows every column on the first layout pass, before the view
-    // has reported a width; it narrows from there if the real width turns out to be smaller.
-    private double _tableWidth = double.PositiveInfinity;
-    private int _visibleColumns = ProcessTableLayout.Minimums.Length;
-
-    /// <summary>The table's ColumnDefinitions at the current width. The sticky header and the shared
-    /// row template both bind to this, so they cannot fall out of alignment.</summary>
-    public string ColumnLayout => ProcessTableLayout.Definitions(_tableWidth);
-
-    public bool ShowStatusColumn => ProcessTableLayout.ShowStatus(_tableWidth);
-
-    public bool ShowDiskColumn => ProcessTableLayout.ShowDisk(_tableWidth);
-
-    public bool ShowGpuColumn => ProcessTableLayout.ShowGpu(_tableWidth);
-
-    /// <summary>Reports the width the table is laid out in; the view pushes this because there is no
-    /// converter-free path from an element's bounds to a view model. Only re-notifies when the column
-    /// set actually changes, so dragging the window doesn't churn bindings on every pixel.</summary>
-    public void SetTableWidth(double width) {
-        if (!double.IsFinite(width) || width <= 0)
-            return;
-
-        _tableWidth = width;
-        var visible = ProcessTableLayout.VisibleCount(width);
-        if (visible == _visibleColumns)
-            return;
-
-        _visibleColumns = visible;
-        OnPropertyChanged(nameof(ColumnLayout));
-        OnPropertyChanged(nameof(ShowStatusColumn));
-        OnPropertyChanged(nameof(ShowDiskColumn));
-        OnPropertyChanged(nameof(ShowGpuColumn));
-    }
+    /// <summary>The table's ColumnDefinitions. The sticky header and the shared row template both bind
+    /// to this, so they cannot fall out of alignment. Every column is always present — a table too
+    /// narrow for them scrolls sideways rather than dropping any.</summary>
+    public string ColumnLayout => ProcessTableLayout.Definitions;
 
     // ----- Selection + actions -----
 

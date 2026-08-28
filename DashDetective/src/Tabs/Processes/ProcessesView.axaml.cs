@@ -18,11 +18,6 @@ public partial class ProcessesView : UserControl {
         DataContextChanged += OnDataContextChanged;
     }
 
-    // The table's own width decides which columns still fit. Reported from the view because there is
-    // no converter-free path from an element's size to a view model property.
-    private void OnTableSizeChanged(object? sender, SizeChangedEventArgs e) =>
-        _viewModel?.SetTableWidth(e.NewSize.Width);
-
     private void OnDataContextChanged(object? sender, EventArgs e) {
         if (_viewModel is not null) {
             _viewModel.FilterFocusRequested -= FocusFilter;
