@@ -370,6 +370,35 @@
                                           Completion="{Binding FilterCompletion}"
                                           ClearCommand="{Binding ClearFilterCommand}"/>
 
+                    <!-- View options. Overlay-free popup keeps the rest of the window hoverable;
+                         close-on-outside-click is emulated in code-behind, the same way File Explorer's
+                         options flyout does it. -->
+                    <Panel DockPanel.Dock="Right" Margin="8,0,0,0">
+                        <ToggleButton x:Name="OptionsButton" Classes="optionsToggle" Content="Options ▾"/>
+                        <Popup x:Name="OptionsPopup" PlacementTarget="{Binding #OptionsButton}"
+                               Placement="BottomEdgeAlignedRight" VerticalOffset="6"
+                               IsLightDismissEnabled="False"
+                               IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
+                            <Border Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12" BoxShadow="0 8 24 0 #22000000">
+                                <StackPanel Spacing="10">
+                                    <!-- Both start off: folding a section or re-sorting is usually a
+                                         glance rather than a preference. -->
+                                    <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
+                                              IsChecked="{Binding RememberCollapsedGroups}"/>
+                                    <CheckBox Classes="optionCheck" Content="Remember sort order"
+                                              IsChecked="{Binding RememberSort}"/>
+                                    <Border Height="1" Background="{DynamicResource Hairline}"/>
+                                    <!-- The column order IS remembered by default, so this is the way back. -->
+                                    <Button Classes="action" Content="Reset column order"
+                                            HorizontalAlignment="Stretch"
+                                            Command="{Binding ResetColumnOrderCommand}"/>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Panel>
+
                     <Button DockPanel.Dock="Right" Classes="action" Content="Properties"
                             Margin="8,0,0,0" Click="OnPropertiesClick"
                             IsEnabled="{Binding HasSelection}"/>

@@ -137,10 +137,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// order at different ones.</summary>
     private readonly List<ProcessColumnId> _columnOrder = new(ProcessColumns.DefaultOrder);
 
-    /// <summary>Raised once a column drag or a reset settles, so the shell persists the new order.
-    /// Deliberately NOT raised per pointer move — the drag previews live, and saving every frame of it
-    /// would write the settings file dozens of times for one gesture.</summary>
-    public event Action? ColumnOrderChanged;
+    /// <summary>Raised when something this page persists settles: the column order, the remember
+    /// toggles, and — only while the matching toggle is on — the collapsed sections and the sort.
+    /// Deliberately NOT raised per pointer move during a column drag: that previews live, and saving
+    /// every frame of it would write the settings file dozens of times for one gesture.</summary>
+    public event Action? PreferencesChanged;
 
     /// <summary>The column order, for the shell to seed from settings and read back. Assigning
     /// resolves what was saved against the columns the table declares now.</summary>
@@ -191,9 +192,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>Reports the order settled on, so the shell persists it once per gesture.</summary>
-    public void CommitColumnOrder() => ColumnOrderChanged?.Invoke();
+    public void CommitColumnOrder() => PreferencesChanged?.Invoke();
 
     /// <summary>Puts the columns back the way the table ships, for the Reset control.</summary>
+    [RelayCommand]
     public void ResetColumnOrder() {
         if (_columnOrder.SequenceEqual(ProcessColumns.DefaultOrder))
             return;
@@ -252,12 +254,67 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     private static string ChevronFor(bool collapsed) => collapsed ? "▸" : "▾";
 
-    /// <summary>Folds a group shut, or opens it again — its header. Session state, like the expanded
-    /// PIDs; nothing is re-read, only hidden.</summary>
+    /// <summary>Whether folded sections come back after a restart. Off by default: the fold is a
+    /// glance-at-something gesture more often than a preference, so it starts fresh unless the user
+    /// says otherwise — the shape File Explorer's "Show hidden" option has.</summary>
+    [ObservableProperty] private bool _rememberCollapsedGroups;
+
+    /// <summary>Whether the sort column and direction come back after a restart. Off by default, for
+    /// the same reason as <see cref="RememberCollapsedGroups"/>.</summary>
+    [ObservableProperty] private bool _rememberSort;
+
+    partial void OnRememberCollapsedGroupsChanged(bool value) => PreferencesChanged?.Invoke();
+
+    partial void OnRememberSortChanged(bool value) => PreferencesChanged?.Invoke();
+
+    /// <summary>The folded sections, for the shell to seed from settings and read back.</summary>
+    public IReadOnlyCollection<ProcessCategory> CollapsedGroups {
+        get => _collapsedGroups;
+        set {
+            _collapsedGroups.Clear();
+            foreach (var category in value)
+                _collapsedGroups.Add(category);
+            NotifyGroupsChanged();
+        }
+    }
+
+    /// <summary>The active sort column, for the shell to seed from settings and read back. Assigning
+    /// re-sorts but stays quiet, so seeding a saved sort does not write it straight back.</summary>
+    public ProcessSortKey SortKey {
+        get => _sortKey;
+        set {
+            if (_sortKey == value)
+                return;
+            _sortKey = value;
+            UpdateSortIndicators();
+            RebuildVisibleRows();
+        }
+    }
+
+    /// <summary>The active sort direction. Assigning is quiet, like <see cref="SortKey"/>.</summary>
+    public bool SortAscending {
+        get => _ascending;
+        set {
+            if (_ascending == value)
+                return;
+            _ascending = value;
+            UpdateSortIndicators();
+            RebuildVisibleRows();
+        }
+    }
+
+    /// <summary>Folds a group shut, or opens it again — its header. Session state unless the user has
+    /// asked for it to be remembered; nothing is re-read, only hidden.</summary>
     public void ToggleGroup(ProcessCategory category) {
         if (!_collapsedGroups.Remove(category))
             _collapsedGroups.Add(category);
 
+        NotifyGroupsChanged();
+        if (RememberCollapsedGroups)
+            PreferencesChanged?.Invoke();
+    }
+
+    private void NotifyGroupsChanged() {
         OnPropertyChanged(nameof(AppsCollapsed));
         OnPropertyChanged(nameof(BackgroundCollapsed));
         OnPropertyChanged(nameof(WindowsCollapsed));
@@ -693,6 +750,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         }
         UpdateSortIndicators();
         RebuildVisibleRows();
+        if (RememberSort)
+            PreferencesChanged?.Invoke();
     }
 
     /// <summary>Sets the direction on whichever column is already sorted, leaving the column itself
@@ -703,6 +762,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             _ascending = ascending;
             UpdateSortIndicators();
             RebuildVisibleRows();
+            if (RememberSort)
+                PreferencesChanged?.Invoke();
         }
 
         return true;

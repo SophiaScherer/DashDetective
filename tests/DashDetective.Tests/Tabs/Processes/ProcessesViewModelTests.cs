@@ -222,7 +222,7 @@ public class ProcessesViewModelTests {
     public void MoveColumn_IsSilentUntilTheOrderIsCommitted() {
         var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
         var reported = 0;
-        viewModel.ColumnOrderChanged += () => reported++;
+        viewModel.PreferencesChanged += () => reported++;
 
         viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
         viewModel.MoveColumn(ProcessColumnId.Gpu, 2);
@@ -236,7 +236,7 @@ public class ProcessesViewModelTests {
     public void ResetColumnOrder_RestoresTheDeclaredOrderAndReportsIt() {
         var (viewModel, _) = Create(Proc(100, 0, "editor.exe", ProcessCategory.App));
         var reported = 0;
-        viewModel.ColumnOrderChanged += () => reported++;
+        viewModel.PreferencesChanged += () => reported++;
         viewModel.MoveColumn(ProcessColumnId.Gpu, 1);
 
         viewModel.ResetColumnOrder();
@@ -602,6 +602,87 @@ public class ProcessesViewModelTests {
         Assert.True(viewModel.HasLoaded);
         Assert.Empty(viewModel.Apps);
         Assert.Equal(Placeholders.NoReading, viewModel.TotalProcessesText);
+    }
+
+    // ----- Remembered preferences -----
+
+    /// <summary>Off by default: folding a section or re-sorting must not quietly become a preference.</summary>
+    [Fact]
+    public async Task RememberToggles_StartOff() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        Assert.False(viewModel.RememberCollapsedGroups);
+        Assert.False(viewModel.RememberSort);
+    }
+
+    [Fact]
+    public async Task ToggleGroup_ReportsOnlyWhileCollapsedSectionsAreRemembered() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.ToggleGroup(ProcessCategory.App);
+        Assert.Equal(0, reported);
+
+        // Switching the toggle on is itself worth saving.
+        viewModel.RememberCollapsedGroups = true;
+        Assert.Equal(1, reported);
+
+        viewModel.ToggleGroup(ProcessCategory.Background);
+        Assert.Equal(2, reported);
+    }
+
+    [Fact]
+    public async Task Sorting_ReportsOnlyWhileTheSortIsRemembered() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.CpuSort.SortCommand.Execute(null);
+        Assert.Equal(0, reported);
+
+        viewModel.RememberSort = true;
+        Assert.Equal(1, reported);
+
+        viewModel.MemorySort.SortCommand.Execute(null);
+        Assert.Equal(2, reported);
+
+        // Alt+arrow sets the direction on the column already sorted, and counts the same way.
+        viewModel.SetSortDirection(ascending: true);
+        Assert.Equal(3, reported);
+    }
+
+    /// <summary>Seeding a saved sort must not write straight back to the settings file.</summary>
+    [Fact]
+    public async Task SortKeyAndDirection_AssignedFromSettings_AreQuiet() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.RememberSort = true;
+        var reported = 0;
+        viewModel.PreferencesChanged += () => reported++;
+
+        viewModel.SortKey = ProcessSortKey.Memory;
+        viewModel.SortAscending = false;
+
+        Assert.Equal(0, reported);
+        Assert.Equal(ProcessSortKey.Memory, viewModel.SortKey);
+        Assert.False(viewModel.SortAscending);
+        Assert.True(viewModel.MemorySort.IsActive);
+    }
+
+    [Fact]
+    public async Task CollapsedGroups_AssignedFromSettings_AreApplied() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        viewModel.CollapsedGroups = new[] { ProcessCategory.Background, ProcessCategory.Windows };
+
+        Assert.False(viewModel.AppsCollapsed);
+        Assert.True(viewModel.BackgroundCollapsed);
+        Assert.True(viewModel.WindowsCollapsed);
     }
 
     // ----- Collapsible groups -----

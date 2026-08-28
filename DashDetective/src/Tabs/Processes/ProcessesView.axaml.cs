@@ -31,6 +31,9 @@ public partial class ProcessesView : UserControl {
         ProcessListScroll.AddHandler(PointerMovedEvent, OnListMoved, RoutingStrategies.Tunnel);
         ProcessListScroll.AddHandler(PointerReleasedEvent, OnListReleased, RoutingStrategies.Tunnel);
         ProcessListScroll.AddHandler(PointerCaptureLostEvent, OnListCaptureLost, RoutingStrategies.Tunnel);
+
+        OptionsPopup.Opened += OnOptionsPopupOpened;
+        OptionsPopup.Closed += OnOptionsPopupClosed;
     }
 
     // ----- Column reorder -----
@@ -330,6 +333,36 @@ public partial class ProcessesView : UserControl {
 
         var handle = TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         vm.ShowProperties(handle, row.Pid);
+    }
+
+    // ----- View options popup -----
+    //
+    // The popup is not light-dismissed, so the rest of the window stays hoverable while it is open;
+    // closing it on an outside press is done by hand, exactly as File Explorer's options flyout does.
+
+    private void OnOptionsPopupOpened(object? sender, EventArgs e) =>
+        TopLevel.GetTopLevel(this)?.AddHandler(
+            InputElement.PointerPressedEvent, OnWindowPointerPressed,
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+
+    private void OnOptionsPopupClosed(object? sender, EventArgs e) =>
+        TopLevel.GetTopLevel(this)?.RemoveHandler(
+            InputElement.PointerPressedEvent, OnWindowPointerPressed);
+
+    private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e) {
+        if (e.Source is not Visual source)
+            return;
+
+        // Leave the toggle to close itself (otherwise we'd close, then its click reopens), and ignore
+        // presses inside the popup so its checkboxes stay clickable.
+        if (OptionsButton.IsVisualAncestorOf(source))
+            return;
+        if (OptionsPopup.Child is Visual child && child.IsVisualAncestorOf(source))
+            return;
+
+        // Uncheck via the toggle so its state and the popup stay in sync; the press itself is left
+        // unhandled so it still acts on whatever it landed on.
+        OptionsButton.IsChecked = false;
     }
 
     // ----- Row context menu -----

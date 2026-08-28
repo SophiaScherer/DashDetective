@@ -82,6 +82,22 @@ public sealed record AppSettings {
     /// knowledge of what a process column is.</summary>
     public string ProcessColumns { get; init; } = "";
 
+    /// <summary>Processes tab: bring folded sections back after a restart. Off by default — folding a
+    /// section is usually a glance, not a preference.</summary>
+    public bool ProcessesRememberCollapsed { get; init; }
+
+    /// <summary>Processes tab: bring the sort column and direction back after a restart. Off by
+    /// default, for the same reason as <see cref="ProcessesRememberCollapsed"/>.</summary>
+    public bool ProcessesRememberSort { get; init; }
+
+    /// <summary>The Processes sections left folded, encoded by <c>EnumListCodec</c>. Written only while
+    /// <see cref="ProcessesRememberCollapsed"/> is on. Opaque here, like the four above.</summary>
+    public string ProcessesCollapsedSections { get; init; } = "";
+
+    /// <summary>The Processes sort column and direction, encoded by <c>ProcessSortState</c>. Written
+    /// only while <see cref="ProcessesRememberSort"/> is on. Opaque here, like the four above.</summary>
+    public string ProcessesSort { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();

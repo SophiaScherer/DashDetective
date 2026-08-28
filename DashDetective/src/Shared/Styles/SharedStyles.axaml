@@ -233,6 +233,36 @@
     <Style Selector="CheckBox.optionCheck:checked /template/ Path#CheckGlyph">
         <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
     </Style>
+    <!-- ===== Options toggle button ===== -->
+    <!-- A ToggleButton drives a view-options popup open/closed. Chrome matches a field; the Fluent
+         checked/hover fills are overridden so it always reads as a plain button rather than an
+         accent-filled toggle. Promoted here from File Explorer once Processes wanted the same control. -->
+    <Style Selector="ToggleButton.optionsToggle">
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="ToggleButton.optionsToggle /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+    </Style>
+    <Style Selector="ToggleButton.optionsToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+    </Style>
+    <!-- Open state: subtle fill so the toggle reads as active, never the accent default. -->
+    <Style Selector="ToggleButton.optionsToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+    </Style>
+    <Style Selector="ToggleButton.optionsToggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
+    </Style>
+
     <!-- ===== Context menus ===== -->
     <!-- The app's first right-click menu (the Processes row menu). Fluent's own is a pale sheet that
          reads as another application's; this puts it on the same card surface, hairline and text ramp

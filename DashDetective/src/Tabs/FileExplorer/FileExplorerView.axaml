@@ -121,36 +121,6 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- ===== Options toggle button ===== -->
-        <!-- A ToggleButton drives the view-options popup open/closed. Chrome matches the breadcrumb
-             field; the Fluent checked/hover fills are overridden so it always reads as a plain
-             button rather than an accent-filled toggle. -->
-        <Style Selector="ToggleButton.optionsToggle">
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="12,7"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <!-- Open state: subtle fill so the toggle reads as active, never the accent default. -->
-        <Style Selector="ToggleButton.optionsToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-        <Style Selector="ToggleButton.optionsToggle:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource TextTertiary}"/>
-        </Style>
-
         <!-- Back / forward / up, beside the breadcrumb. Disabled state dims the glyph so the
              end of the trail (and a drive root) reads at a glance. -->
         <Style Selector="Button.navBtn">

@@ -149,7 +149,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
         _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
-        _processes.ColumnOrderChanged += Persist;
+        _processes.PreferencesChanged += Persist;
         foreach (var page in ReorderablePages)
             page.WidgetOrderChanged += Persist;
         _metrics.AlertActiveChanged += OnAlertActiveChanged;
@@ -246,6 +246,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         _processes.ColumnOrder = ProcessColumnOrder.Decode(settings.ProcessColumns);
 
+        // The remember toggles are applied before what they gate, so a saved fold or sort only lands
+        // when the user actually asked for it to be kept.
+        _processes.RememberCollapsedGroups = settings.ProcessesRememberCollapsed;
+        _processes.RememberSort = settings.ProcessesRememberSort;
+        if (settings.ProcessesRememberCollapsed)
+            _processes.CollapsedGroups = EnumListCodec.Decode<ProcessCategory>(settings.ProcessesCollapsedSections);
+        if (settings.ProcessesRememberSort &&
+            ProcessSortState.TryDecode(settings.ProcessesSort, out var sortKey, out var sortAscending)) {
+            _processes.SortKey = sortKey;
+            _processes.SortAscending = sortAscending;
+        }
+
         var orders = WidgetOrders.Decode(settings.WidgetOrders);
         foreach (var page in ReorderablePages)
             if (orders.TryGetValue(page.PageKey, out var order))
@@ -303,6 +315,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         RecentSearches = _recents.Encode(),
         WidgetOrders = EncodeWidgetOrders(),
         ProcessColumns = ProcessColumnOrder.Encode(_processes.ColumnOrder),
+        ProcessesRememberCollapsed = _processes.RememberCollapsedGroups,
+        ProcessesRememberSort = _processes.RememberSort,
+        // Nothing is written for a toggle that is off, so switching one on later starts from the
+        // page's own default rather than from whatever it happened to be showing months ago.
+        ProcessesCollapsedSections = _processes.RememberCollapsedGroups
+            ? EnumListCodec.Encode(_processes.CollapsedGroups)
+            : "",
+        ProcessesSort = _processes.RememberSort
+            ? ProcessSortState.Encode(_processes.SortKey, _processes.SortAscending)
+            : "",
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>

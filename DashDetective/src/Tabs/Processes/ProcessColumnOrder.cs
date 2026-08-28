@@ -1,7 +1,7 @@
+using DashDetective.Shared;
 using DashDetective.Shared.Layout;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace DashDetective.Tabs.Processes;
 
@@ -14,39 +14,13 @@ namespace DashDetective.Tabs.Processes;
 /// releases must not silently re-point a saved order at different columns.
 /// </summary>
 public static class ProcessColumnOrder {
-    // An ASCII unit separator. A control character, so it cannot occur in a column name, which is what
-    // makes joining without escaping safe.
-    private const char Separator = (char)0x1F;
-
     /// <summary>The order as one persistable string.</summary>
-    public static string Encode(IReadOnlyList<ProcessColumnId> order) {
-        var builder = new StringBuilder();
-        var seen = new HashSet<ProcessColumnId>();
-        foreach (var id in order) {
-            if (!seen.Add(id))
-                continue;
-            if (builder.Length > 0)
-                builder.Append(Separator);
-            builder.Append(id.ToString());
-        }
-
-        return builder.ToString();
-    }
+    public static string Encode(IReadOnlyList<ProcessColumnId> order) => EnumListCodec.Encode(order);
 
     /// <summary>The saved order read back. Total: a name no column answers to — a hand-edit, or a
     /// column since removed — is dropped rather than thrown on.</summary>
-    public static IReadOnlyList<ProcessColumnId> Decode(string? encoded) {
-        var order = new List<ProcessColumnId>(ProcessColumns.Count);
-        if (string.IsNullOrEmpty(encoded))
-            return order;
-
-        var seen = new HashSet<ProcessColumnId>();
-        foreach (var field in encoded.Split(Separator))
-            if (Enum.TryParse<ProcessColumnId>(field, out var id) && Enum.IsDefined(id) && seen.Add(id))
-                order.Add(id);
-
-        return order;
-    }
+    public static IReadOnlyList<ProcessColumnId> Decode(string? encoded) =>
+        EnumListCodec.Decode<ProcessColumnId>(encoded);
 
     /// <summary>The order to actually show: <paramref name="saved"/> reconciled against the columns the
     /// table declares now (via the shared <see cref="OrderResolver"/>), with the pinned column forced
