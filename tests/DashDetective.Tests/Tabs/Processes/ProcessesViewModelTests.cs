@@ -438,6 +438,137 @@ public class ProcessesViewModelTests {
         Assert.False(Row(viewModel, 100).IsSelected);
     }
 
+    // ----- End task -----
+
+    private static (ProcessesViewModel ViewModel, FakeProcessTerminator Terminator) Endable() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(100, 0, "editor.exe", ProcessCategory.App),
+            Proc(200, 0, "browser.exe", ProcessCategory.App),
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+            Proc(400, 0, "tray.exe", ProcessCategory.Background),
+        ]);
+        var terminator = new FakeProcessTerminator();
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop(), terminator), terminator);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_EndsEverySelectedProcess() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100, 300], terminator.Ended.OrderBy(pid => pid));
+        Assert.Empty(viewModel.SelectedPids);
+        Assert.Equal("", viewModel.ActionMessage);
+        Assert.DoesNotContain(viewModel.Apps, row => row.Pid == 100);
+        Assert.DoesNotContain(viewModel.Background, row => row.Pid == 300);
+    }
+
+    /// <summary>One protected process must not stop the rest — Task Manager's own behaviour, and the
+    /// only sane one when the user asked for five.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_OneRefusal_StillEndsTheOthersAndCountsIt() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(300);
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100, 200, 300], terminator.Ended.OrderBy(pid => pid));
+        // The refusal keeps its row and its place in the selection; the other two are gone.
+        Assert.Equal([300], viewModel.SelectedPids);
+        // One failure is named rather than counted — the name is what tells the user which it was.
+        Assert.Equal("Couldn't end helper.exe", viewModel.ActionMessage);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_SeveralRefusals_CountsThemAgainstWhatWasAsked() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(100);
+        terminator.Refuse.Add(300);
+        // browser.exe sorts first, so this range is every row on screen.
+        viewModel.SelectRange(200, 400);
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal("Couldn't end 2 of 4 processes", viewModel.ActionMessage);
+        Assert.Equal([100, 300], viewModel.SelectedPids.OrderBy(pid => pid));
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_SingleRefusal_NamesTheProcess() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        terminator.Refuse.Add(100);
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal("Couldn't end editor.exe", viewModel.ActionMessage);
+    }
+
+    /// <summary>The selection outlives the filter, so what it holds is what gets ended — including a
+    /// process currently filtered out of sight.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_EndsASelectedProcessTheFilterIsHiding() {
+        var (viewModel, terminator) = Endable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.FilterText = "helper";
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([100], terminator.Ended);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_ReadsAsOneProcessOrMany() {
+        var (viewModel, _) = Endable();
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.RequestEndTaskCommand.Execute(null);
+        Assert.True(viewModel.ConfirmVisible);
+        Assert.Contains("editor.exe", viewModel.ConfirmText);
+
+        viewModel.CancelEndTaskCommand.Execute(null);
+        viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
+        viewModel.RequestEndTaskCommand.Execute(null);
+        Assert.Contains("these 2 processes", viewModel.ConfirmText);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_WithNothingSelected_ShowsNothing() {
+        var (viewModel, _) = Endable();
+        await viewModel.LoadAsync();
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.False(viewModel.ConfirmVisible);
+    }
+
+    /// <summary>Records what End task asked to kill, and refuses whatever it is told to.</summary>
+    private sealed class FakeProcessTerminator : IProcessTerminator {
+        public List<int> Ended { get; } = [];
+        public HashSet<int> Refuse { get; } = [];
+
+        public bool TryEnd(int pid) {
+            Ended.Add(pid);
+            return !Refuse.Contains(pid);
+        }
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }

@@ -8,8 +8,6 @@ using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -43,6 +41,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly SystemMetricsService _service;
     private readonly IProcessSnapshotProvider _snapshots;
     private readonly IProcessInterop _interop;
+    private readonly IProcessTerminator _terminator;
     private readonly MetricSubscriptions _subscriptions;
     private readonly SamplingGate _gate;
 
@@ -223,6 +222,12 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>How many processes are selected.</summary>
     public int SelectionCount => _selectedPids.Count;
 
+    /// <summary>The selection caption beside the action buttons (e.g. "3 selected").</summary>
+    public string SelectionText => $"{SelectionCount.ToString(CultureInfo.InvariantCulture)} selected";
+
+    /// <summary>Whether the primary row can be expanded — enables the context menu's expand item.</summary>
+    public bool SelectedHasChildren => SelectedRow?.HasChildren == true;
+
     // The group headers' select-all boxes: ticked when the group holds every visible row, dashed when
     // it holds only part of it. Two booleans rather than one nullable because they drive style classes.
     public bool AppsAllSelected => IsAllSelected(Apps);
@@ -341,9 +346,10 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Test seam: the same page over explicit providers. The public ctor resolves the real ones,
     /// so the shell still builds this exactly as before.</summary>
     internal ProcessesViewModel(SystemMetricsService service, IProcessSnapshotProvider snapshots,
-                                IProcessInterop interop) {
+                                IProcessInterop interop, IProcessTerminator? terminator = null) {
         _snapshots = snapshots;
         _interop = interop;
+        _terminator = terminator ?? new ProcessTerminator();
 
         _service = service;
         NameSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Name, OnSort);
@@ -811,6 +817,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectionCount));
+        OnPropertyChanged(nameof(SelectionText));
+        OnPropertyChanged(nameof(SelectedHasChildren));
         OnPropertyChanged(nameof(AppsAllSelected));
         OnPropertyChanged(nameof(AppsSomeSelected));
         OnPropertyChanged(nameof(BackgroundAllSelected));
@@ -850,49 +858,85 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         return selected;
     }
 
-    /// <summary>End task button: shows the confirmation overlay for the selected process (killing a
+    /// <summary>End task button: shows the confirmation overlay for everything selected (killing a
     /// process is destructive, so it isn't done on a single click).</summary>
     [RelayCommand]
     private void RequestEndTask() {
-        if (SelectedRow is null)
+        if (!HasSelection)
             return;
-        ConfirmText = $"End “{SelectedRow.Name}”? Any unsaved work in this process will be lost.";
+
+        ConfirmText = SelectionCount == 1
+            ? $"End “{NameOf(_selectedPids.First())}”? Any unsaved work in this process will be lost."
+            : $"End these {SelectionCount.ToString(CultureInfo.InvariantCulture)} processes? " +
+              "Any unsaved work in them will be lost.";
         ConfirmVisible = true;
+    }
+
+    /// <summary>A process's name for a message. Visible rows first, falling back to the snapshot — a
+    /// selected process the filter is hiding still has to be nameable.</summary>
+    private string NameOf(int pid) {
+        foreach (var row in VisibleRows())
+            if (row.Pid == pid)
+                return row.Name;
+
+        foreach (var info in _lastSnapshot)
+            if (info.Pid == pid)
+                return info.Name;
+
+        return pid.ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>Dismisses the confirmation overlay without ending anything.</summary>
     [RelayCommand]
     private void CancelEndTask() => ConfirmVisible = false;
 
-    /// <summary>Confirms the End task: terminates the process and removes its row immediately (the next
-    /// poll keeps things consistent). Soft-fails on a protected/elevated process we can't kill without
-    /// admin, surfacing a brief message rather than throwing.</summary>
+    /// <summary>Confirms the End task: terminates every selected process and drops the rows immediately
+    /// (the next poll keeps things consistent). One protected or already-exited process does not stop
+    /// the rest — they are counted and reported together.
+    ///
+    /// It works over the selected PIDs rather than the visible rows, because the selection survives the
+    /// filter: a process the user picked and then filtered out of sight is still one they asked to end.</summary>
     [RelayCommand]
     private void ConfirmEndTask() {
         ConfirmVisible = false;
-        var row = SelectedRow;
-        if (row is null)
+        if (_selectedPids.Count == 0)
             return;
 
-        // Only the kill is guarded. The row removals used to sit inside this try as well, which meant a
-        // bug in the removal logic reported itself as "Couldn't end <process>" — a message blaming the
-        // machine for a fault in this file, after the process had in fact been killed.
-        try {
-            using var process = Process.GetProcessById(row.Pid);
-            process.Kill();
-        } catch (Exception e) when (e is ArgumentException or Win32Exception or InvalidOperationException) {
-            // Already exited (ArgumentException / InvalidOperationException) or access denied without
-            // elevation (Win32Exception).
-            ActionMessage = $"Couldn't end {row.Name}";
-            return;
+        var pids = new List<int>(_selectedPids);
+        var failed = new List<int>();
+        foreach (var pid in pids)
+            if (!_terminator.TryEnd(pid))
+                failed.Add(pid);
+
+        // Named before the rows go, since the row is where the name comes from.
+        ActionMessage = failed.Count switch {
+            0 => "",
+            1 => $"Couldn't end {NameOf(failed[0])}",
+            _ => $"Couldn't end {failed.Count.ToString(CultureInfo.InvariantCulture)} of " +
+                 $"{pids.Count.ToString(CultureInfo.InvariantCulture)} processes",
+        };
+
+        var stillThere = new HashSet<int>(failed);
+        foreach (var pid in pids) {
+            if (stillThere.Contains(pid))
+                continue;
+
+            _selectedPids.Remove(pid);
+            RemoveRow(pid);
         }
 
-        _selectedPids.Remove(row.Pid);
-        if (!Apps.Remove(row) && !Background.Remove(row))
-            WindowsProcesses.Remove(row);
         SelectedRow = null;
         ApplySelection();
-        ActionMessage = "";
+    }
+
+    /// <summary>Drops a PID's row from whichever group holds it.</summary>
+    private void RemoveRow(int pid) {
+        foreach (var group in new[] { Apps, Background, WindowsProcesses })
+            for (var i = 0; i < group.Count; i++)
+                if (group[i].Pid == pid) {
+                    group.RemoveAt(i);
+                    return;
+                }
     }
 
     /// <summary>

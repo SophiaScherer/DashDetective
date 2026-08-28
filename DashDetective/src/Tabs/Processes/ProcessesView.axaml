@@ -19,8 +19,22 @@
              layout is defined once instead of copy-pasted per group; it must stay in sync with the
              sticky header's column definition above. Bindings are compiled (x:DataType); the row tap
              is handled in code-behind (OnRowTapped). -->
+        <!-- The row context menu. Declared ONCE and shared by every row rather than sitting inside the
+             row template, which would build one flyout and its items per row — a few thousand controls
+             for a list this long. Nothing in it binds to a row: the right-click selects first, so every
+             item acts on the page's selection. -->
+        <MenuFlyout x:Key="RowMenu">
+            <MenuItem Header="End task" Click="OnMenuEndTask"/>
+            <MenuItem Header="Properties" Click="OnMenuProperties"/>
+            <Separator/>
+            <MenuItem Header="Expand / collapse" Click="OnMenuToggleExpand"
+                      IsEnabled="{Binding SelectedHasChildren}"/>
+            <MenuItem Header="Copy PID" Click="OnMenuCopyPid"/>
+        </MenuFlyout>
+
         <DataTemplate x:Key="ProcRowTemplate" x:DataType="vm:ProcessRow">
-            <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped">
+            <Border Classes="procRow" Classes.selected="{Binding IsSelected}" Tapped="OnRowTapped"
+                    ContextFlyout="{StaticResource RowMenu}">
                 <!-- Columns come from the page view model, not the row, so every row and the sticky
                      header share one definition and one order, and stay aligned. Each cell's
                      Grid.Column is bound too: dragging a header moves the cells rather than rebuilding
@@ -250,21 +264,7 @@
 
         <!-- ===== Summary strip: the action buttons keep their natural width on the right and the
              four cards flow in whatever space is left, wrapping rather than being squeezed. -->
-        <DockPanel Grid.Row="0" LastChildFill="True">
-            <!-- End task / Properties act on the selected row; disabled until one is picked. -->
-            <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Spacing="6" Margin="12,0,0,0">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Classes="endTask" Content="End task"
-                            Command="{Binding RequestEndTaskCommand}"
-                            IsEnabled="{Binding HasSelection}"/>
-                    <Button Classes="action" Content="Properties"
-                            Click="OnPropertiesClick" IsEnabled="{Binding HasSelection}"/>
-                </StackPanel>
-                <TextBlock Classes="cardSub" HorizontalAlignment="Right"
-                           Foreground="#ff8a5c" Text="{Binding ActionMessage}"
-                           IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-            </StackPanel>
-
+        <Panel Grid.Row="0">
             <layout:UniformFlowPanel MinItemWidth="130" ColumnSpacing="12" RowSpacing="12">
             <Border Classes="card">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -296,26 +296,45 @@
                 </StackPanel>
             </Border>
             </layout:UniformFlowPanel>
-        </DockPanel>
+        </Panel>
 
         <!-- ===== Process table ===== -->
         <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
 
-            <!-- Filter bar. Narrows the three groups to matching processes; Ctrl+F or "/" puts the
-                 caret here and Esc clears it. Same field chrome as the toolbar's search box. -->
-            <Border Grid.Row="0" Padding="16,10" BorderBrush="{DynamicResource Hairline}"
+            <!-- Filter and actions. The filter narrows the three groups to matching processes; Ctrl+F
+                 or "/" puts the caret here and Esc clears it. End task and Properties sit on this row
+                 rather than up in the summary strip, beside the rows they act on. Docked children
+                 claim the right edge in declaration order, so Properties is outermost. -->
+            <Border Grid.Row="0" Padding="16,8" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="0,0,0,1" Background="{DynamicResource CardBackground}">
-                <!-- Tab fills in a running process name from what has been typed. -->
-                <controls:SearchField x:Name="FilterBox" HorizontalAlignment="Left"
-                                      Width="300" Height="30"
-                                      IconSize="13" TextSize="12.5"
-                                      ContentPadding="10,0" IconGap="8,0,0,0"
-                                      PlaceholderText="Filter by name or PID"
-                                      ClearToolTip="Clear filter"
-                                      Text="{Binding FilterText, Mode=TwoWay}"
-                                      Completion="{Binding FilterCompletion}"
-                                      ClearCommand="{Binding ClearFilterCommand}"/>
+                <DockPanel LastChildFill="False">
+                    <!-- Tab fills in a running process name from what has been typed. -->
+                    <controls:SearchField x:Name="FilterBox" DockPanel.Dock="Left"
+                                          VerticalAlignment="Center"
+                                          Width="300" Height="30"
+                                          IconSize="13" TextSize="12.5"
+                                          ContentPadding="10,0" IconGap="8,0,0,0"
+                                          PlaceholderText="Filter by name or PID"
+                                          ClearToolTip="Clear filter"
+                                          Text="{Binding FilterText, Mode=TwoWay}"
+                                          Completion="{Binding FilterCompletion}"
+                                          ClearCommand="{Binding ClearFilterCommand}"/>
+
+                    <Button DockPanel.Dock="Right" Classes="action" Content="Properties"
+                            Margin="8,0,0,0" Click="OnPropertiesClick"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <Button DockPanel.Dock="Right" Classes="endTask" Content="End task"
+                            Command="{Binding RequestEndTaskCommand}"
+                            IsEnabled="{Binding HasSelection}"/>
+                    <TextBlock DockPanel.Dock="Right" Classes="cardSub" VerticalAlignment="Center"
+                               Margin="12,0" Text="{Binding SelectionText}"
+                               IsVisible="{Binding HasSelection}"/>
+                    <TextBlock DockPanel.Dock="Right" Classes="cardSub" VerticalAlignment="Center"
+                               TextAlignment="Right" TextWrapping="Wrap"
+                               Foreground="{StaticResource Orange}" Text="{Binding ActionMessage}"
+                               IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </DockPanel>
             </Border>
 
             <!-- Header + rows share one horizontal scroller, so a window too narrow for every

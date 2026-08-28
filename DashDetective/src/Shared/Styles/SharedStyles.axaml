@@ -233,6 +233,35 @@
     <Style Selector="CheckBox.optionCheck:checked /template/ Path#CheckGlyph">
         <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
     </Style>
+    <!-- ===== Context menus ===== -->
+    <!-- The app's first right-click menu (the Processes row menu). Fluent's own is a pale sheet that
+         reads as another application's; this puts it on the same card surface, hairline and text ramp
+         as every other floating panel. -->
+    <Style Selector="MenuFlyoutPresenter">
+        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Padding" Value="4"/>
+    </Style>
+    <Style Selector="MenuFlyoutPresenter MenuItem">
+        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="MenuFlyoutPresenter MenuItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
+    <Style Selector="MenuFlyoutPresenter MenuItem:disabled">
+        <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
+    </Style>
+    <Style Selector="MenuFlyoutPresenter Separator">
+        <Setter Property="Background" Value="{DynamicResource Hairline}"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="6,4"/>
+    </Style>
+
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>

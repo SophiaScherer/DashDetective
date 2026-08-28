@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using DashDetective.Shared;
@@ -215,13 +216,28 @@ public partial class ProcessesView : UserControl {
     private bool _rangeDragging;
 
     private void OnListPressed(object? sender, PointerPressedEventArgs e) {
-        if (!e.GetCurrentPoint(ProcessListScroll).Properties.IsLeftButtonPressed)
+        if (DataContext is not ProcessesViewModel vm)
             return;
         if (OwnsItsOwnGesture(e.Source as Visual) || RowAt(e.Source as Visual) is not { } row)
             return;
 
+        var point = e.GetCurrentPoint(ProcessListScroll);
+
+        // A right-click opens the shared row menu, whose items act on the page's selection — so the row
+        // under the pointer has to be in it. Right-clicking inside an existing multi-selection leaves
+        // that selection alone; anywhere else replaces it with the row clicked. Done on the press, which
+        // tunnels, so it lands before the flyout opens.
+        if (point.Properties.IsRightButtonPressed) {
+            if (!row.IsSelected)
+                vm.SelectRow(row);
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed)
+            return;
+
         _rangePressPid = row.Pid;
-        _rangePressPoint = e.GetPosition(ProcessListScroll);
+        _rangePressPoint = point.Position;
         _rangePending = true;
     }
 
@@ -288,12 +304,44 @@ public partial class ProcessesView : UserControl {
 
     // The native Properties dialog needs the owning window handle, so it's invoked here rather than
     // from the view model (the same reason the Export and File Explorer Properties dialogs live in
-    // code-behind).
+    // code-behind). It shows the shell property sheet for one executable, so it acts on the primary
+    // row even when several are selected.
     private void OnPropertiesClick(object? sender, RoutedEventArgs e) {
         if (DataContext is not ProcessesViewModel { SelectedRow: { } row } vm)
             return;
 
         var handle = TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         vm.ShowProperties(handle, row.Pid);
+    }
+
+    // ----- Row context menu -----
+    //
+    // The menu is shared by every row, so its items act on the page's selection rather than on a row of
+    // their own. OnListPressed above is what makes that safe: the right-click puts the row in the
+    // selection before the menu opens.
+
+    private void OnMenuEndTask(object? sender, RoutedEventArgs e) {
+        if (DataContext is ProcessesViewModel vm)
+            vm.RequestEndTaskCommand.Execute(null);
+    }
+
+    private void OnMenuProperties(object? sender, RoutedEventArgs e) => OnPropertiesClick(sender, e);
+
+    private void OnMenuToggleExpand(object? sender, RoutedEventArgs e) {
+        if (DataContext is ProcessesViewModel { SelectedRow: { } row } vm)
+            vm.ToggleExpand(row);
+    }
+
+    private async void OnMenuCopyPid(object? sender, RoutedEventArgs e) {
+        if (DataContext is not ProcessesViewModel { SelectedRow: { } row })
+            return;
+        if (TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
+            return;
+
+        try {
+            await clipboard.SetTextAsync(row.PidText);
+        } catch (Exception) {
+            // Clipboard busy or denied by another app — the same silent give-up the Toolkit's copy makes.
+        }
     }
 }
