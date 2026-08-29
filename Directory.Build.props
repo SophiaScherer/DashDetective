@@ -1,0 +1,21 @@
+<!-- Shared build settings for every project in the repo. Imported automatically by the SDK before
+     each .csproj, so a project only restates a property to deliberately override it. -->
+<Project>
+    <PropertyGroup>
+        <!-- One neutral TFM for every platform: platform differences are decided at runtime by the
+             ForCurrentPlatform() provider seams, never by multi-targeting or #if. The test project
+             shares it so the suite runs everywhere the app builds. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+
+        <!-- Quality gates, applied to both projects so neither can drift. The neutral TFM above is
+             what makes the platform-compatibility analyzer (CA1416) a real gate rather than a no-op,
+             and AnalysisLevel=latest is what engages it. EnforceCodeStyleInBuild promotes the
+             .editorconfig code-style rules into the build, and TreatWarningsAsErrors makes any of
+             them (or a stray compiler warning) fail the build rather than slip through — CI's build
+             step passes no -warnaserror, so this is the gate. -->
+        <AnalysisLevel>latest</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+</Project>
