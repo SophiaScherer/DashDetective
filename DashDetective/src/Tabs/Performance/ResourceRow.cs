@@ -54,8 +54,19 @@ public partial class ResourceRow : ObservableObject {
     [ObservableProperty] private string _valueText;
 
     /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps"). Fixed for percentage
-    /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate.</summary>
+    /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate. Shared by both
+    /// headline values, which is what makes the pair directly comparable.</summary>
     [ObservableProperty] private string _unit;
+
+    /// <summary>The second headline value, for a resource whose figure is one of a pair (the adapter row's
+    /// send beside its receive). Shown only when <see cref="HasSecondSeries"/> is true.</summary>
+    [ObservableProperty] private string _valueText2 = "";
+
+    /// <summary>Direction glyphs drawn before each headline value ("↓" / "↑"), matching the arrows on the
+    /// Dashboard's network card. Empty for single-value rows, which draw neither.</summary>
+    public string ValueGlyph { get; init; } = "";
+
+    public string ValueGlyph2 { get; init; } = "";
 
     /// <summary>Which graph this row is, as fixed identity. The colour itself is not stored here: the
     /// view model resolves it from the current <see cref="ChartPalette"/> and re-applies it when the
@@ -97,16 +108,23 @@ public partial class ResourceRow : ObservableObject {
     /// so it never claims a scale the chart isn't drawn on.</summary>
     public string ChartSubject { get; init; } = "% Utilization";
 
+    /// <summary>What the value axis measures, drawn rotated beside its labels. Every resource but the
+    /// adapter is a percentage of itself; the adapter's ceiling is a rate.</summary>
+    public string AxisYTitle { get; init; } = "Utilization (%)";
+
     /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
     /// Observable because the window changes with the Settings refresh interval.</summary>
     [ObservableProperty] private string _chartCaption = "";
 
-    /// <summary>The chart's value labels. A percentage resource states a fixed 100 / 50 / 0; the network
-    /// row rewrites them each tick, since its ceiling follows the traffic — which is why these are
-    /// observable rather than fixed identity.</summary>
-    [ObservableProperty] private string _axisMaxLabel = "100%";
-    [ObservableProperty] private string _axisMidLabel = "50%";
-    [ObservableProperty] private string _axisMinLabel = "0";
+    /// <summary>Grid bands on the detail chart. The label set is one longer, so every label lands on a
+    /// line; it has to match the Sparkline's GridRows in the view.</summary>
+    public const int AxisDivisions = 4;
+
+    /// <summary>The chart's value labels, top to bottom. A percentage resource states a fixed 100 / 75 /
+    /// 50 / 25 / 0; the network row rewrites them each tick, since its ceiling follows the traffic — which
+    /// is why this is observable rather than fixed identity.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<string> _axisValueLabels = ChartAxis.PercentLabels(AxisDivisions);
 
     /// <summary>The cold-start line, cleared as soon as this row has a trace to show. Starts set: no row
     /// has a sample before its first tick. The initializer is qualified because this property's own name
@@ -150,8 +168,9 @@ public partial class ResourceRow : ObservableObject {
     /// gains it once the per-core sampler enumerates its logical processors on the first tick.</summary>
     [ObservableProperty] private bool _supportsDetail;
 
-    /// <summary>The "Detailed" segment's label, e.g. "Logical processors" (CPU) or "Individual engines"
-    /// (GPU). Only meaningful when <see cref="SupportsDetail"/> is true.</summary>
+    /// <summary>The "Detailed" segment's label, e.g. "Per core" (CPU) or "Per engine" (GPU). Pairs with the
+    /// fixed "Overall" beside it, so the two segments read as one scale. Only meaningful when
+    /// <see cref="SupportsDetail"/> is true.</summary>
     [ObservableProperty] private string _detailLabel = "";
 
     /// <summary>The per-subunit mini charts shown in the Detailed view (one per logical processor / engine).

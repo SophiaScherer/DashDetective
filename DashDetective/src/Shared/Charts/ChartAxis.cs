@@ -1,6 +1,8 @@
 using Avalonia;
 using DashDetective.Shared;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 namespace DashDetective.Shared.Charts;
 
@@ -28,13 +30,23 @@ public static class ChartAxis {
     public const double MinPlot = 8;
 
     /// <summary>The left gutter for value labels of the given widths, or 0 when there are none.</summary>
-    public static double Gutter(double top, double middle, double bottom) {
-        var widest = Math.Max(top, Math.Max(middle, bottom));
-        return widest > 0 ? widest + LabelGap : 0;
-    }
+    public static double Gutter(double top, double middle, double bottom) =>
+        Gutter(Math.Max(top, Math.Max(middle, bottom)));
+
+    /// <summary>The left gutter for a value axis whose widest label measures this, or 0 when it carries
+    /// none.</summary>
+    public static double Gutter(double widest) => widest > 0 ? widest + LabelGap : 0;
 
     /// <summary>The bottom footer for time labels of the given height, or 0 when there are none.</summary>
     public static double Footer(double textHeight) => textHeight > 0 ? textHeight + FooterGap : 0;
+
+    /// <summary>The extra left gutter a rotated y-axis title of this height needs, outside the one the value
+    /// labels take, or 0 when the chart carries no title.</summary>
+    public static double TitleGutter(double titleHeight) => titleHeight > 0 ? titleHeight + LabelGap : 0;
+
+    /// <summary>The extra bottom footer an x-axis title of this height needs, under the time labels, or 0
+    /// when the chart carries no title.</summary>
+    public static double TitleFooter(double titleHeight) => titleHeight > 0 ? titleHeight + FooterGap : 0;
 
     /// <summary>The area the grid and the series draw in, once the gutter and footer are taken out. A
     /// reservation too large for the control is given up rather than inverted — a chart squeezed to
@@ -64,9 +76,56 @@ public static class ChartAxis {
     /// nothing. Mirrors <see cref="DataRateFormatter"/>'s shared-unit rule, so the axis reads in the same
     /// unit as the readouts beside it.</summary>
     public static (string Top, string Middle, string Bottom) RateLabels(double axisMaxMbps) {
-        var unit = DataRateFormatter.UnitFor(axisMaxMbps);
-        var top = DataRateFormatter.FormatValue(DataRateFormatter.Convert(axisMaxMbps, unit));
-        var middle = DataRateFormatter.FormatValue(DataRateFormatter.Convert(axisMaxMbps / 2, unit));
-        return ($"{top} {DataRateFormatter.Label(unit)}", middle, "0");
+        var labels = RateLabels(axisMaxMbps, 2);
+        return (labels[0], labels[1], labels[2]);
     }
+
+    /// <summary>Throughput labels for a chart ruled into <paramref name="divisions"/> bands, top to bottom,
+    /// so every label lands on a grid line. Same shared-unit rule as the three-label form.</summary>
+    public static IReadOnlyList<string> RateLabels(double axisMaxMbps, int divisions) {
+        var unit = DataRateFormatter.UnitFor(axisMaxMbps);
+        return Labels(divisions, DataRateFormatter.Label(unit),
+            band => DataRateFormatter.FormatValue(
+                DataRateFormatter.Convert(axisMaxMbps * band / divisions, unit)));
+    }
+
+    /// <summary>Value labels for a percentage axis ruled into <paramref name="divisions"/> bands, top to
+    /// bottom: 4 gives "100%" … "0", and 1 gives the ends alone. The sign stays on every reading but the
+    /// zero, matching the fixed labels the other tabs' charts carry — it costs no gutter, since the top
+    /// label is the widest either way.</summary>
+    public static IReadOnlyList<string> PercentLabels(int divisions) =>
+        Labels(divisions, "%", band => Math.Round(100.0 * band / divisions)
+            .ToString(CultureInfo.InvariantCulture), unitOnTopOnly: false);
+
+    /// <summary>How many of <paramref name="desired"/> labels a plot of this extent can carry: the largest
+    /// count that both fits and still lands on the same grid lines, never below the two ends. Takes measured
+    /// extents rather than measuring, so the rule is testable without a render backend.</summary>
+    public static int FitLabelCount(double plotExtent, double labelExtent, int desired) {
+        if (desired <= 2 || labelExtent <= 0)
+            return desired;
+
+        for (var count = desired; count > 2; count--) {
+            if ((desired - 1) % (count - 1) == 0 && count * labelExtent <= plotExtent)
+                return count;
+        }
+        return 2;
+    }
+
+    /// <summary>Builds a top-to-bottom label set over <paramref name="divisions"/> bands. The bottom is a
+    /// bare "0" — a zero needs no unit on any scale.</summary>
+    private static IReadOnlyList<string> Labels(int divisions, string unit, Func<int, string> format,
+                                                bool unitOnTopOnly = true) {
+        var bands = Math.Max(1, divisions);
+        var labels = new string[bands + 1];
+        for (var i = 0; i < bands; i++) {
+            var value = format(bands - i);
+            labels[i] = i == 0 || !unitOnTopOnly ? $"{value}{Separator(unit)}{unit}" : value;
+        }
+        labels[bands] = "0";
+        return labels;
+    }
+
+    /// <summary>A rate unit is a word and takes a space ("80 Mbps"); a percent sign is a suffix and does
+    /// not ("100%").</summary>
+    private static string Separator(string unit) => unit == "%" ? "" : " ";
 }

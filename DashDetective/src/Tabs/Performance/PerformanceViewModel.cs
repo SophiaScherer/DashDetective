@@ -254,8 +254,12 @@ public partial class PerformanceViewModel : ViewModelBase,
             Series2 = ChartSeries.NetUp,
             LegendLabel1 = "Receive",
             LegendLabel2 = "Send",
+            ValueGlyph = "↓",
+            ValueGlyph2 = "↑",
+            ValueText2 = "0",
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
+            AxisYTitle = "Throughput",
             Link = NetworkLink(adapterName),
         };
 
@@ -664,9 +668,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyChartWindow();
     }
 
-    /// <summary>The oldest end of the chart's time axis, e.g. "−60s". One answer for the page: every
-    /// row's buffer is the same slot count on the same cadence.</summary>
-    [ObservableProperty] private string _chartRangeStart = "";
+    /// <summary>Grid columns on the detail chart divided by the time labels' band count: five bands put a
+    /// label under every second line, so a tick reads against the lattice behind it.</summary>
+    private const int TimeDivisions = 5;
+
+    /// <summary>The chart's time axis, oldest first. One answer for the page: every row's buffer is the
+    /// same slot count on the same cadence.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _chartTimeLabels = Array.Empty<string>();
 
     /// <summary>Rewrites every row's caption, and the shared time axis, for the current window. Called at
     /// construction, whenever the interval changes, and after new rows are built (they inherit the current
@@ -675,7 +683,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
         foreach (var row in Resources)
             row.ChartCaption = $"{row.ChartSubject} over {window}";
-        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
+        ChartTimeLabels = ChartWindow.TickLabels(WindowSeconds, _service.Interval, TimeDivisions);
     }
 
     /// <summary>Re-resolves every row's and sub-chart's tint from the current palette. Called wherever the
@@ -761,7 +769,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         }
 
         // Set SupportsDetail last (after the label + charts) so the toggle only appears once the grid is ready.
-        _cpuRow.DetailLabel = "Logical processors";
+        _cpuRow.DetailLabel = "Per core";
         _cpuRow.SubCharts = _cpuCores.ConvertAll(c => c.Chart);
         _cpuRow.SupportsDetail = true;
     }
@@ -856,7 +864,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         });
         gpu.Row.SubCharts = gpu.Engines.ConvertAll(e => e.Chart);
         if (!gpu.Row.SupportsDetail) {
-            gpu.Row.DetailLabel = "Individual engines";
+            gpu.Row.DetailLabel = "Per engine";
             gpu.Row.SupportsDetail = true;
         }
     }
@@ -946,6 +954,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Sampler-failure handler for the Network metric: shows neutral placeholders.</summary>
     private void OnNetworkFailed() {
         _networkRow.ValueText = "—";
+        _networkRow.ValueText2 = "—";
         _netReceiveTile.Value = "—";
         _netSendTile.Value = "—";
     }
@@ -955,6 +964,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // comparable — the rule DataRateFormatter prescribes for values on a shared axis.
         var (downValue, upValue, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
         _networkRow.ValueText = downValue;
+        _networkRow.ValueText2 = upValue;
         _networkRow.Unit = unit;
         _netReceiveTile.Value = $"{downValue} {unit}";
         _netSendTile.Value = $"{upValue} {unit}";
@@ -969,8 +979,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _networkRow.ChartStatus = ChartStatus.For(_downHistory);
 
         // The only row whose value labels move: both series share this ceiling, so one set describes them.
-        (_networkRow.AxisMaxLabel, _networkRow.AxisMidLabel, _networkRow.AxisMinLabel) =
-            ChartAxis.RateLabels(axis);
+        _networkRow.AxisValueLabels = ChartAxis.RateLabels(axis, ResourceRow.AxisDivisions);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }

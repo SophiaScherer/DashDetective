@@ -61,4 +61,25 @@ public class ChartWindowTests {
     public void EndLabel_IsTheNewestEnd() {
         Assert.Equal("now", ChartWindow.EndLabel);
     }
+
+    /// <summary>"ago" rides on the leftmost tick only, the way a unit rides on one value label — the rest
+    /// inherit its sense, and repeating it five times would crowd the footer for nothing.</summary>
+    [Fact]
+    public void TickLabels_SayAgoOnceAndCountDownToNow() {
+        Assert.Equal(new[] { "60s ago", "48s", "36s", "24s", "12s", "now" },
+            ChartWindow.TickLabels(60, TimeSpan.FromSeconds(1), 5));
+    }
+
+    /// <summary>The whole row turns over to minutes together, at the same 90-second mark the two ends do:
+    /// a footer mixing "5m ago" with "240s" would read as two different scales.</summary>
+    [Fact]
+    public void TickLabels_LongWindow_ReadInMinutesThroughout() {
+        Assert.Equal(new[] { "5m ago", "4m", "3m", "2m", "1m", "now" },
+            ChartWindow.TickLabels(60, TimeSpan.FromSeconds(5), 5));
+    }
+
+    [Fact]
+    public void TickLabels_OneBand_IsTheTwoEndsAlone() {
+        Assert.Equal(new[] { "60s ago", "now" }, ChartWindow.TickLabels(60, TimeSpan.FromSeconds(1), 1));
+    }
 }

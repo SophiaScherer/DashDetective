@@ -549,7 +549,12 @@ CPU %/Memory % come from the shared `SystemMetricsService`.
 drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
 Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
 (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
-strip (`StatTile` item VMs). Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
+strip (`StatTile` item VMs). The **rail scope** segments ("Primary" / "All devices", which collapse the
+multi-instance categories to one row each) head the rail itself: over the whole page they read as if they
+scoped the detail pane, which they never did. The **adapter row** shows both directions, "↓ receive" over
+"↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
+traffic. This is the one chart on which every grid line is labelled both ways, both axes are named, and the
+per-core / per-engine cells carry their two ends; see the charting grades in AGENTS.md. Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
 `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
 selectable-item pattern (`NavItem` / `FilterOption`) and shared styles. Series colours come from
 `ChartPalette` through `ThemeService.BrushFor`, keyed by each row's `ChartSeries` identity — this tab

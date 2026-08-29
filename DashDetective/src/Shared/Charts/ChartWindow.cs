@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace DashDetective.Shared.Charts;
@@ -28,6 +29,27 @@ public static class ChartWindow {
 
     /// <summary>The newest end of the range. A constant, but it belongs beside its opposite number.</summary>
     public const string EndLabel = "now";
+
+    /// <summary>The time axis for a chart ruled into <paramref name="divisions"/> bands, oldest first, so a
+    /// point partway along the plot can be placed rather than estimated between the two ends. "ago" rides on
+    /// the leftmost label only — the rest inherit its sense, the way a unit rides on one value label — and
+    /// the whole row reads in one unit, picked from the span at the same 90-second mark
+    /// <see cref="StartLabel"/> uses.</summary>
+    public static IReadOnlyList<string> TickLabels(int samples, TimeSpan interval, int divisions) {
+        var bands = Math.Max(1, divisions);
+        var seconds = Span(samples, interval).TotalSeconds;
+        var labels = new string[bands + 1];
+
+        labels[0] = StartLabel(samples, interval);
+        for (var i = 1; i < bands; i++) {
+            var elapsed = seconds * (bands - i) / bands;
+            labels[i] = seconds < 90
+                ? $"{Math.Round(elapsed).ToString(CultureInfo.InvariantCulture)}s"
+                : $"{Math.Round(elapsed / 60, 1).ToString("0.#", CultureInfo.InvariantCulture)}m";
+        }
+        labels[bands] = EndLabel;
+        return labels;
+    }
 
     /// <summary>The window as a caption fragment, e.g. "60 seconds" or "5 minutes". Whole minutes above
     /// 90 seconds (where a second count stops reading naturally), whole seconds below.</summary>

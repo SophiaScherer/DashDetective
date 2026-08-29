@@ -39,72 +39,110 @@
             <Setter Property="VerticalAlignment" Value="Bottom"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
         </Style>
+        <!-- A row showing a pair (receive over send) stacks two values where one used to sit, so it
+             steps down a size to keep the card the same height as the rest. Declared after .resVal, which
+             is what makes it win: Avalonia ranks equally-close styles by order, not specificity. -->
+        <Style Selector="TextBlock.resVal.pair">
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <!-- The shared segment sized for the rail: no other tab puts one in a 180px column, so the
+             narrower padding and type stay local (a local style outranks the shared Border.seg). -->
+        <Style Selector="Border.seg.compact">
+            <Setter Property="Padding" Value="8,5"/>
+        </Style>
+        <Style Selector="Border.seg.compact TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
 
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
+            <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
+            <ColumnDefinition Width="*"   MinWidth="360"/>                 <!-- detail pane -->
+        </Grid.ColumnDefinitions>
 
-        <!-- Rail scope: "Primary" shows one of each kind; "All devices" shows every detected instance
-             (e.g. all disks). Reuses the shared segmented-toggle styles (Border.segments / seg). -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
-            <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
-                       Text="Detected configuration"/>
-            <Border Grid.Column="1" Classes="segments">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Button Classes="bare" Command="{Binding SelectPrimaryScopeCommand}">
-                        <Border Classes="seg" Classes.selected="{Binding !ShowAllDevices}">
+        <!-- ===== Resource selector (left) ===== -->
+        <Grid Grid.Column="0" RowDefinitions="Auto,*">
+
+            <!-- Rail scope: "Primary" shows one of each kind; "All devices" shows every detected instance
+                 (e.g. all disks). It heads the rail because the rail is all it filters — over the whole
+                 page it read as if it scoped the detail pane too. Equal columns rather than a horizontal
+                 StackPanel, so the pair splits the rail at any splitter position. -->
+            <Border Grid.Row="0" Classes="segments" Margin="0,0,2,8"
+                    ToolTip.Tip="Show one device of each kind, or every device detected">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button Grid.Column="0" Classes="bare" Command="{Binding SelectPrimaryScopeCommand}"
+                            HorizontalContentAlignment="Stretch">
+                        <Border Classes="seg compact" Classes.selected="{Binding !ShowAllDevices}">
                             <TextBlock Text="Primary"/>
                         </Border>
                     </Button>
-                    <Button Classes="bare" Command="{Binding SelectAllScopeCommand}">
-                        <Border Classes="seg" Classes.selected="{Binding ShowAllDevices}">
+                    <Button Grid.Column="1" Classes="bare" Command="{Binding SelectAllScopeCommand}"
+                            HorizontalContentAlignment="Stretch">
+                        <Border Classes="seg compact" Classes.selected="{Binding ShowAllDevices}">
                             <TextBlock Text="All devices"/>
                         </Border>
                     </Button>
-                </StackPanel>
+                </Grid>
             </Border>
+
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Resources}" Margin="0,0,2,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="8"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ResourceRow">
+                            <Button Classes="bare" Command="{Binding SelectCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                <Border Classes="card selectable" Classes.selected="{Binding IsSelected}"
+                                        ToolTip.Tip="{Binding NoteTip}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Classes="resName" Text="{Binding Name}"/>
+                                            <TextBlock Classes="resSub" Text="{Binding Sub}"/>
+                                        </StackPanel>
+                                        <!-- One line per series, tinted like the chart it belongs to: an
+                                             adapter's card names the whole adapter, so a receive-only
+                                             figure under it described half its traffic. Both lines share
+                                             the Unit, which is already the larger of the pair's. -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="2"
+                                                        HorizontalAlignment="Right">
+                                                <TextBlock Classes="resUnit" Text="{Binding ValueGlyph}"
+                                                           IsVisible="{Binding HasSecondSeries}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                                <TextBlock Classes="resVal" Text="{Binding ValueText}"
+                                                           Classes.pair="{Binding HasSecondSeries}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                                <TextBlock Classes="resUnit" Text="{Binding Unit}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="2"
+                                                        HorizontalAlignment="Right"
+                                                        IsVisible="{Binding HasSecondSeries}">
+                                                <TextBlock Classes="resUnit" Text="{Binding ValueGlyph2}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                                <TextBlock Classes="resVal pair" Text="{Binding ValueText2}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                                <TextBlock Classes="resUnit" Text="{Binding Unit}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </Grid>
-
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" MinWidth="180" MaxWidth="360"/>  <!-- resource selector -->
-                <ColumnDefinition Width="Auto"/>                               <!-- splitter -->
-                <ColumnDefinition Width="*"   MinWidth="360"/>                 <!-- detail pane -->
-            </Grid.ColumnDefinitions>
-
-        <!-- ===== Resource selector (left) ===== -->
-        <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Resources}" Margin="0,0,2,0">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Spacing="8"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ResourceRow">
-                        <Button Classes="bare" Command="{Binding SelectCommand}"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-                            <Border Classes="card selectable" Classes.selected="{Binding IsSelected}"
-                                    ToolTip.Tip="{Binding NoteTip}">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Classes="resName" Text="{Binding Name}"/>
-                                        <TextBlock Classes="resSub" Text="{Binding Sub}"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
-                                                VerticalAlignment="Center">
-                                        <TextBlock Classes="resVal" Text="{Binding ValueText}"
-                                                   Foreground="{Binding ValueBrush}"/>
-                                        <TextBlock Classes="resUnit" Text="{Binding Unit}"
-                                                   Foreground="{Binding ValueBrush}"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
 
         <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
 
@@ -188,10 +226,10 @@
                                         Points="{Binding SelectedResource.Points}"
                                         Stroke2="{Binding SelectedResource.ValueBrush2}"
                                         Points2="{Binding SelectedResource.Points2}"
-                                        AxisMaxLabel="{Binding SelectedResource.AxisMaxLabel}"
-                                        AxisMidLabel="{Binding SelectedResource.AxisMidLabel}"
-                                        AxisMinLabel="{Binding SelectedResource.AxisMinLabel}"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
+                                        AxisTimeLabels="{Binding ChartTimeLabels}"
+                                        AxisYTitle="{Binding SelectedResource.AxisYTitle}"
+                                        AxisXTitle="Time"
                                         StatusText="{Binding SelectedResource.ChartStatus}"/>
 
                     <!-- Detailed: one mini chart per logical processor / engine. Uncapped like the
@@ -203,7 +241,7 @@
                         <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <layout:UniformFlowPanel MinItemWidth="110" ColumnSpacing="8" RowSpacing="8"/>
+                                    <layout:UniformFlowPanel MinItemWidth="140" ColumnSpacing="8" RowSpacing="8"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -216,7 +254,8 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                             <controls:Sparkline Classes="chartCell" Fill="True" ShowGrid="True"
                                                                 GridRows="2" GridColumns="6" YMin="0" YMax="100"
-                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"/>
+                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"
+                                                                AxisValueLabels="{Binding AxisLabels}"/>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -247,6 +286,5 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
-        </Grid>
     </Grid>
 </UserControl>
