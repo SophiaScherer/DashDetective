@@ -96,7 +96,7 @@
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Button Classes="toolIcon" ToolTip.Tip="Refresh (F5)" Command="{Binding RefreshCommand}">
+                            <Button Classes="toolIcon" ToolTip.Tip="{Binding RefreshToolTip}" Command="{Binding RefreshCommand}">
                                 <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                       Data="M13,8 a5,5 0 1 1 -1.5,-3.5 M13,2.5 V5 H10.5"/>
