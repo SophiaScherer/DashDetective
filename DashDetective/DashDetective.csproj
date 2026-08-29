@@ -24,18 +24,18 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="12.0.5"/>
-        <PackageReference Include="Avalonia.Desktop" Version="12.0.5"/>
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5"/>
-        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.5"/>
+        <PackageReference Include="Avalonia" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1"/>
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1"/>
         <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
             <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1"/>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
         <!-- Queries the Windows Search index (the Search.CollatorDSO OLE DB provider) for universal
              search's file results. Version-aligned with System.Management above. -->
-        <PackageReference Include="System.Data.OleDb" Version="10.0.9"/>
-        <PackageReference Include="System.Management" Version="10.0.9"/>
+        <PackageReference Include="System.Data.OleDb" Version="10.0.11"/>
+        <PackageReference Include="System.Management" Version="10.0.11"/>
     </ItemGroup>
 </Project>
