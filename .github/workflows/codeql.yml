@@ -1,0 +1,83 @@
+# CodeQL security analysis for the C# sources.
+#
+# This covers ground the in-build Roslyn analyzers cannot. The repo's platform gate is CA1416, and
+# that analyzer only sees annotated BCL APIs — a hand-written DllImport declaration carries no
+# annotation, so the ~21 interop files are invisible to it. CodeQL reads the extracted IL and
+# follows data flow through them, which is where the real coverage gain is.
+#
+# Alerts land in the Security -> Code scanning tab. They do not fail the run: this is a reporting
+# gate, and the build gate is dotnet-desktop.yml.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  # Query packs are updated independently of this repo, so re-scan unchanged code weekly.
+  schedule:
+    - cron: '27 5 * * 1'
+
+# Least privilege: only what uploading a SARIF result needs.
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  analyze:
+    name: Analyze C#
+    # Linux only. Both projects are on the neutral net10.0 TFM with no RuntimeIdentifier pin, and
+    # dotnet-desktop.yml already proves an ubuntu build, so a Windows leg would extract the same
+    # sources at twice the cost.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    # Same cache as the build workflow. setup-dotnet's own cache: true is not usable here — it wants
+    # a packages.lock.json, which this repo does not have.
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+        restore-keys: ${{ runner.os }}-nuget-
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        # Manual rather than autobuild: the build is a plain two-command dotnet build, and being
+        # explicit keeps it in step with dotnet-desktop.yml. build-mode none would extract without
+        # compiling, which resolves fewer types.
+        build-mode: manual
+        # security-extended over the default suite. The default queries largely re-find what
+        # TreatWarningsAsErrors already blocks; the extra value here is the dataflow queries over
+        # the Marshal/IntPtr traffic in the interop layer.
+        queries: security-extended
+
+    # CodeQL extracts by observing a real compile, so this cannot reuse the build workflow's output
+    # and cannot pass --no-build.
+    - name: Build
+      run: |
+        dotnet restore DashDetective.sln
+        dotnet build DashDetective.sln --configuration Release --no-restore
+
+    - name: Perform CodeQL analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:csharp"
