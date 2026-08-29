@@ -21,6 +21,16 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Least privilege: the job only reads the repo. upload-artifact needs no extra scope.
+permissions:
+  contents: read
+
+# One live run per branch. A new push to a pull request cancels the four legs still running for the
+# previous one; pushes to main are never cancelled, so every commit there keeps its own result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
 
   build:
@@ -49,6 +59,16 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
+
+    # Reuse the downloaded packages across runs. setup-dotnet's own cache: true is not usable here —
+    # it wants a packages.lock.json, which this repo does not have — so key on the files that decide
+    # what gets restored. A miss still restores; it just costs the download.
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+        restore-keys: ${{ runner.os }}-nuget-
 
     # Restore NuGet dependencies for the solution
     - name: Restore dependencies
