@@ -50,13 +50,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     # Install the .NET SDK (must match the project's TargetFramework: net10.0)
     - name: Install .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -64,7 +64,7 @@ jobs:
     # it wants a packages.lock.json, which this repo does not have — so key on the files that decide
     # what gets restored. A miss still restores; it just costs the download.
     - name: Cache NuGet packages
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
@@ -97,7 +97,7 @@ jobs:
     # Named per OS *and* configuration: all four legs upload now, and a name collision would fail the
     # run outright because if-no-files-found is an error.
     - name: Upload coverage report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: coverage-${{ matrix.os }}-${{ matrix.configuration }}
         path: coverage/**/coverage.cobertura.xml
@@ -113,7 +113,7 @@ jobs:
     # Upload the published output: https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload build artifacts
       if: matrix.os == 'windows-latest' && matrix.configuration == 'Release'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: DashDetective-${{ matrix.os }}
         path: publish
