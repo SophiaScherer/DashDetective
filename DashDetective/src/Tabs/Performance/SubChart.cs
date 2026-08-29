@@ -1,5 +1,7 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Shared.Charts;
+using System.Collections.Generic;
 
 namespace DashDetective.Tabs.Performance;
 
@@ -24,4 +26,9 @@ public partial class SubChart : ObservableObject {
 
     /// <summary>The 60-point history as a Sparkline "x,y x,y …" string, live-updated each tick.</summary>
     [ObservableProperty] private string _points = "";
+
+    /// <summary>The cell's value axis: its two ends and nothing between them. A cell is a third the height
+    /// of the chart above it, so a third reading would crowd the two that bound it — and it carries no time
+    /// row at all, the window being stated once in the caption over the grid.</summary>
+    public IReadOnlyList<string> AxisLabels { get; } = ChartAxis.PercentLabels(1);
 }

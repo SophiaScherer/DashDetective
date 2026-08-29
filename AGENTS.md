@@ -462,19 +462,34 @@ type glyphs must not follow an accent — "Healthy" is green whatever the user p
 panel charts label "50%" — so do not give one chart its own row count; a card ruled into halves marks
 different values than the chart beside it. Axis furniture is graded by how much room a chart has:
 
-- **A chart in a panel of its own** — `chartPanel`, `chartHero`, and the Network tab's `chartMini`
-  throughput traces — carries the lot: a caption of what it plots and over how long, three value labels,
-  the time range, and a `StatusText`. It is the enclosing panel that decides this, not the size class.
+- **The Performance detail chart** (`chartHero`) carries the lot, and is the only one that does: a caption
+  of what it plots and over how long, a label on **every** grid line both ways (`AxisValueLabels` /
+  `AxisTimeLabels`), both axis titles (`AxisYTitle` / `AxisXTitle`) and a `StatusText`. It has a pane to
+  itself, which is what pays for the furniture.
+- **A chart in a panel of its own** — `chartPanel` and the Network tab's `chartMini` throughput traces —
+  carries a caption, **three** value labels, the two ends of the time range, and a `StatusText`. It is the
+  enclosing panel that decides this, not the size class.
 - **Stat cards** (`chartMini` inside `StatCard`) carry the axis **ends only** and no time range — three
   labels would touch at a card's height and a footer would take most of the plot, and the cards share the
   window the panel charts below them state. Their ceiling is per-card (`DashboardCard.AxisMaxLabel`): most
   plot a percentage, but the network card fills to its own live peak, so a blanket "100%" lies on it.
-- **Per-core / per-engine cells** (`chartCell`) stay bare. They tile many-to-a-pane, and a gutter on each
-  would cost more than the labels are worth at that size.
+- **Per-core / per-engine cells** (`chartCell`) carry the axis **ends only** and no time range, on the stat
+  cards' reasoning: a cell is a third the height of the chart above it. They tiled bare until the grid
+  widened to fit a gutter (`MinItemWidth` 140), since a cell whose neighbour is at 90 % and whose own trace
+  is flat says nothing without one.
 
-Never hardcode a window in a caption: it is the refresh interval times the slot count, so say it through
-`ChartWindow.Describe` / `StartLabel`. The oldest end reads as elapsed time ("60s ago"), never as a
-negative offset — a leading minus suggests a value below zero on a chart whose y axis starts there.
+Grade by the room a chart has, and reserve nothing it does not use: every label property is opt-in and
+`ChartAxis` returns a zero gutter or footer for one that is empty, which is what keeps an unlabelled chart
+measuring exactly as it did before the furniture existed.
+
+Never hardcode a window in a caption or on a time axis: it is the refresh interval times the slot count, so
+say it through `ChartWindow.Describe` / `StartLabel` / `TickLabels`. The oldest end reads as elapsed time
+("60s ago"), never as a negative offset — a leading minus suggests a value below zero on a chart whose y
+axis starts there — and only the oldest label says "ago", the rest of the row inheriting its sense.
+
+A label set must land on the grid lines it is read against: `PercentLabels` / `RateLabels` / `TickLabels`
+take the band count, and `ChartAxis.FitLabelCount` drops a set too big for its plot to a sparser one that
+still lands on lines, never below the two ends.
 
 Namespaces follow folders: `DashDetective.Shared`, `DashDetective.Shared.Controls`,
 `DashDetective.Services.Theming`, `DashDetective.Shell`, `DashDetective.Shell.Navigation`,

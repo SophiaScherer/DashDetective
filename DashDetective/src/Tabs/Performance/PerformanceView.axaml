@@ -241,7 +241,7 @@
                         <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <layout:UniformFlowPanel MinItemWidth="110" ColumnSpacing="8" RowSpacing="8"/>
+                                    <layout:UniformFlowPanel MinItemWidth="140" ColumnSpacing="8" RowSpacing="8"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -254,7 +254,8 @@
                                                        TextTrimming="CharacterEllipsis"/>
                                             <controls:Sparkline Classes="chartCell" Fill="True" ShowGrid="True"
                                                                 GridRows="2" GridColumns="6" YMin="0" YMax="100"
-                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"/>
+                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"
+                                                                AxisValueLabels="{Binding AxisLabels}"/>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
