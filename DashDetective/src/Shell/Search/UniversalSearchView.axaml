@@ -102,7 +102,7 @@
                IsOpen="{Binding IsOpen}">
             <Border Background="{DynamicResource CardBackground}"
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                    CornerRadius="8" Padding="6" BoxShadow="0 8 24 0 #22000000">
+                    CornerRadius="8" Padding="6" BoxShadow="{StaticResource ShadowPopup}">
                 <Panel>
                     <!-- Exactly one of these three shows at a time (see the view model): a blank card
                          while the filesystem answers would read as "nothing found". -->

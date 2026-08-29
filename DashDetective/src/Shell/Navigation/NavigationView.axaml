@@ -376,11 +376,11 @@
                             ToolTip.Tip="{Binding UserTooltip}">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Offset="0" Color="#6ccb5f"/>
-                                <GradientStop Offset="1" Color="#3f9c8f"/>
+                                <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
+                                <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
                             </LinearGradientBrush>
                         </Border.Background>
-                        <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="#0e0e0e"
+                        <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 

@@ -130,10 +130,10 @@
                      "Resource alerts" setting is on. Auto-clears on recovery; the × dismisses the current
                      breach. Fixed amber so it reads as a warning in both themes. -->
                 <Border Grid.Row="1" IsVisible="{Binding AlertBannerVisible}"
-                        Background="#26E0A82E" BorderBrush="#59E0A82E" BorderThickness="0,0,0,1" Padding="18,9">
+                        Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                              Fill="#E0A82E" Data="M8,1 L15,14 H1 Z"/>
+                              Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
                         <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
                                    Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
                         <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"

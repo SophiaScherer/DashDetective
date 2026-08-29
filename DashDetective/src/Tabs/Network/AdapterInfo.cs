@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using DashDetective.Services.Theming;
 
 namespace DashDetective.Tabs.Network;
 
@@ -18,9 +19,9 @@ public enum AdapterKind {
 /// </summary>
 public sealed record AdapterInfo(
     string Name, string Description, string StatusText, string SpeedText, AdapterKind Kind) {
-    private static readonly IBrush ConnectedDot = new SolidColorBrush(Color.Parse("#6ccb5f"));
-    private static readonly IBrush VirtualDot = new SolidColorBrush(Color.Parse("#4cc2ff"));
-    private static readonly IBrush DisconnectedDot = new SolidColorBrush(Color.Parse("#9aa0a6"));
+    private static readonly IBrush ConnectedDot = SemanticBrushes.StatusGood;
+    private static readonly IBrush VirtualDot = SemanticBrushes.StatusInfo;
+    private static readonly IBrush DisconnectedDot = SemanticBrushes.StatusIdle;
 
     /// <summary>The status-dot brush for this adapter's kind (green/blue/grey).</summary>
     public IBrush DotBrush => Kind switch {

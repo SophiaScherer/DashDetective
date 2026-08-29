@@ -38,11 +38,11 @@
     <!-- Scrim. The fixed black-55% is deliberate: it reads as a dimmed window in both themes (same
          reasoning as the shell's fixed-amber alert banner). A non-null Background is also what makes
          the modal modal — it swallows pointer input bound for the window behind it. -->
-    <Border x:Name="Scrim" Background="#8C000000" PointerPressed="OnScrimPointerPressed">
+    <Border x:Name="Scrim" Background="{StaticResource ScrimBackground}" PointerPressed="OnScrimPointerPressed">
 
         <Border x:Name="Card" Classes="panel" Padding="0" Width="600" MaxHeight="640"
                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                BoxShadow="0 24 60 0 #80000000">
+                BoxShadow="{StaticResource ShadowModal}">
             <Grid RowDefinitions="Auto,*">
 
                 <!-- Header -->

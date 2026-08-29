@@ -269,10 +269,10 @@
             <Setter Property="TextAlignment" Value="Right"/>
         </Style>
         <Style Selector="TextBlock.cpuCell.med">
-            <Setter Property="Foreground" Value="#ffcf4d"/>
+            <Setter Property="Foreground" Value="{StaticResource StatusWarn}"/>
         </Style>
         <Style Selector="TextBlock.cpuCell.high">
-            <Setter Property="Foreground" Value="#ff8a5c"/>
+            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
         </Style>
 
         <!-- Summary-card value. -->
@@ -291,13 +291,13 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#29ff6b6b"/>
-            <Setter Property="BorderBrush" Value="#4dff6b6b"/>
-            <Setter Property="Foreground" Value="#ff8a5c"/>
+            <Setter Property="Background" Value="{StaticResource RedSoft}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RedLine}"/>
+            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
         </Style>
         <Style Selector="Button.endTask:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#3dff6b6b"/>
-            <Setter Property="BorderBrush" Value="#66ff6b6b"/>
+            <Setter Property="Background" Value="{StaticResource RedSoftHover}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource RedLineHover}"/>
         </Style>
         <Style Selector="Button.endTask:disabled">
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
@@ -341,7 +341,7 @@
             <Border Classes="card">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="THREADS"/>
-                    <TextBlock Classes="sumValue" Foreground="#6ccb5f" Text="{Binding ThreadsText}"/>
+                    <TextBlock Classes="sumValue" Foreground="{StaticResource Green}" Text="{Binding ThreadsText}"/>
                 </StackPanel>
             </Border>
             </layout:UniformFlowPanel>
@@ -374,7 +374,7 @@
                                IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
                             <Border Background="{DynamicResource CardBackground}"
                                     BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12" BoxShadow="0 8 24 0 #22000000">
+                                    CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
                                 <StackPanel Spacing="10">
                                     <!-- Both start off: folding a section or re-sorting is usually a
                                          glance rather than a preference. -->
@@ -575,11 +575,11 @@
         <!-- End-task confirmation overlay: a scrim + centred card, covering the page while open.
              Ending a process is destructive, so it needs an explicit confirm. -->
         <Panel Grid.Row="0" Grid.RowSpan="2" IsVisible="{Binding ConfirmVisible}">
-            <Border Background="#99000000"/>
+            <Border Background="{StaticResource ScrimBackground}"/>
             <Border HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380"
                     Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource Hairline}"
                     BorderThickness="1" CornerRadius="10" Padding="22"
-                    BoxShadow="0 12 40 0 #55000000">
+                    BoxShadow="{StaticResource ShadowModal}">
                 <StackPanel Spacing="14">
                     <TextBlock Text="End task" FontSize="15" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextStrong}"/>

@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using DashDetective.Services.Theming;
 
 namespace DashDetective.Tabs.Hardware;
 
@@ -6,9 +7,9 @@ namespace DashDetective.Tabs.Hardware;
 /// Feature-local glyph geometries and fixed accent colours for the Hardware cards, ported from the
 /// design comp's card icons. Kept tab-local (rather than the shell nav <c>Icons</c>) so the tab
 /// stays self-contained. Geometries are authored in an 18×18 space and drawn as stroked outlines,
-/// matching the shell icon convention. The colours are **fixed** legend-style tints (not the
-/// theme-swapped accent), so they read the same in light and dark — each card carries an icon
-/// foreground colour and a 14%-opacity tinted tile background (the comp's <c>rgba(…,0.14)</c>).
+/// matching the shell icon convention. The colours come from <see cref="SemanticBrushes"/> and are
+/// **fixed** legend-style tints (not the theme-swapped accent), so they read the same in light and
+/// dark — each card carries an icon foreground colour and the palette's soft tile background.
 /// </summary>
 public static class HardwareIcons {
     // ----- Glyphs (18×18, stroked) -----
@@ -34,23 +35,23 @@ public static class HardwareIcons {
         "M3.7,10.5 H14.3 A1.2,1.2 0 0 1 15.5,11.7 V13.3 A1.2,1.2 0 0 1 14.3,14.5 " +
         "H3.7 A1.2,1.2 0 0 1 2.5,13.3 V11.7 A1.2,1.2 0 0 1 3.7,10.5 Z");
 
-    // ----- Fixed per-card colours (foreground + 14%-tint tile background, as #AARRGGBB) -----
+    // ----- Fixed per-card colours (foreground + tinted tile background), from the shared palette -----
 
-    public static readonly IBrush Blue = Brush.Parse("#4cc2ff");
-    public static readonly IBrush BlueBg = Brush.Parse("#244cc2ff");
+    public static readonly IBrush Blue = SemanticBrushes.Blue;
+    public static readonly IBrush BlueBg = SemanticBrushes.BlueSoft;
 
-    public static readonly IBrush Green = Brush.Parse("#6ccb5f");
-    public static readonly IBrush GreenBg = Brush.Parse("#246ccb5f");
+    public static readonly IBrush Green = SemanticBrushes.Green;
+    public static readonly IBrush GreenBg = SemanticBrushes.GreenSoft;
 
-    public static readonly IBrush Purple = Brush.Parse("#c58fff");
-    public static readonly IBrush PurpleBg = Brush.Parse("#24c58fff");
+    public static readonly IBrush Purple = SemanticBrushes.Purple;
+    public static readonly IBrush PurpleBg = SemanticBrushes.PurpleSoft;
 
-    public static readonly IBrush Yellow = Brush.Parse("#ffcf4d");
-    public static readonly IBrush YellowBg = Brush.Parse("#24ffcf4d");
+    public static readonly IBrush Yellow = SemanticBrushes.Yellow;
+    public static readonly IBrush YellowBg = SemanticBrushes.YellowSoft;
 
-    public static readonly IBrush Orange = Brush.Parse("#ff8a5c");
-    public static readonly IBrush OrangeBg = Brush.Parse("#24ff8a5c");
+    public static readonly IBrush Orange = SemanticBrushes.Orange;
+    public static readonly IBrush OrangeBg = SemanticBrushes.OrangeSoft;
 
-    public static readonly IBrush Red = Brush.Parse("#ff6b6b");
-    public static readonly IBrush RedBg = Brush.Parse("#24ff6b6b");
+    public static readonly IBrush Red = SemanticBrushes.Red;
+    public static readonly IBrush RedBg = SemanticBrushes.RedSoft;
 }

@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using DashDetective.Tabs.FileExplorer;
@@ -120,17 +121,15 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         DiskChartCaption = $"% Active time over {ChartWindow.Describe(WindowSeconds, _service.Interval)}";
         ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
     }
-    // Fixed semantic brushes (theme/accent-independent, matching the design comp's palette) — parsed like
-    // MainWindowViewModel's live dots / PerformanceViewModel's legend brushes. The health colours use a
-    // soft (~0.16 alpha) tint of the same hue for the pill fill.
-    private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
-    private static readonly IBrush HealthyFg = Brush("#6ccb5f");   // green
-    private static readonly IBrush HealthyBg = Brush("#296ccb5f"); // green @ 16%
-    private static readonly IBrush CautionFg = Brush("#ffcf4d");   // amber
-    private static readonly IBrush CautionBg = Brush("#29ffcf4d"); // amber @ 16%
-    private static readonly IBrush BarBlue = Brush("#4cc2ff");
-    private static readonly IBrush BarGreen = Brush("#6ccb5f");
-    private static readonly IBrush BarAmber = Brush("#ffcf4d");
+    // Fixed semantic brushes (theme/accent-independent), from the shared palette. The health colours
+    // pair a hue with its soft tint for the pill fill.
+    private static readonly IBrush HealthyFg = SemanticBrushes.StatusGood;
+    private static readonly IBrush HealthyBg = SemanticBrushes.StatusGoodSoft;
+    private static readonly IBrush CautionFg = SemanticBrushes.StatusWarn;
+    private static readonly IBrush CautionBg = SemanticBrushes.StatusWarnSoft;
+    private static readonly IBrush BarBlue = SemanticBrushes.Blue;
+    private static readonly IBrush BarGreen = SemanticBrushes.Green;
+    private static readonly IBrush BarAmber = SemanticBrushes.Yellow;
 
     /// <summary>The drive summary cards shown in the top row (one per physical disk). Composed from
     /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/> at startup and rebuilt on Refresh;

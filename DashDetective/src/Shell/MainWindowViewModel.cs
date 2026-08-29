@@ -32,8 +32,8 @@ using System.Text;
 namespace DashDetective.Shell;
 
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
-    private static readonly IBrush LiveDot = new SolidColorBrush(Color.Parse("#6ccb5f"));
-    private static readonly IBrush PausedDot = new SolidColorBrush(Color.Parse("#9aa0a6"));
+    private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
+    private static readonly IBrush PausedDot = SemanticBrushes.StatusIdle;
 
     private const string AlertMessage = "High resource usage — CPU or memory has stayed above 90%.";
 

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Theming;
 using System;
 using System.Globalization;
 
@@ -15,8 +16,8 @@ namespace DashDetective.Tabs.Processes;
 /// the cell via style classes while the normal value keeps following the theme text ramp.
 /// </summary>
 public partial class ProcessRow : ObservableObject {
-    private static readonly IBrush RunningBrush = new SolidColorBrush(Color.Parse("#6ccb5f"));
-    private static readonly IBrush WarnBrush = new SolidColorBrush(Color.Parse("#ffcf4d"));
+    private static readonly IBrush RunningBrush = SemanticBrushes.StatusGood;
+    private static readonly IBrush WarnBrush = SemanticBrushes.StatusWarn;
 
     public ProcessRow(ProcessInfo info, int depth, bool hasChildren, bool isExpanded) {
         Pid = info.Pid;
