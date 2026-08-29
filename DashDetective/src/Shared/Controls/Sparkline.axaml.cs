@@ -21,8 +21,9 @@ namespace DashDetective.Shared.Controls;
 /// area beneath each line. Set <see cref="ShowGrid"/> to draw a faint lattice behind the data
 /// (<see cref="GridRows"/> × <see cref="GridColumns"/>, coloured by <see cref="GridBrush"/>).
 ///
-/// Fixed-range mode also carries optional axis furniture: three value labels down the left
-/// (<see cref="AxisMaxLabel"/> / <see cref="AxisMidLabel"/> / <see cref="AxisMinLabel"/>), the ends of the
+/// Fixed-range mode also carries optional axis furniture: value labels down the left — either three fixed
+/// ones (<see cref="AxisMaxLabel"/> / <see cref="AxisMidLabel"/> / <see cref="AxisMinLabel"/>) or a whole
+/// set on <see cref="AxisValueLabels"/>, one per grid line — the ends of the
 /// time range along the bottom (<see cref="AxisStartLabel"/> / <see cref="AxisEndLabel"/>) and a
 /// <see cref="StatusText"/> line over the plot for a chart with nothing to draw yet. Each reserves
 /// room only when it is set, so an unlabelled chart — every stat-card mini, every per-core cell — measures
@@ -78,6 +79,9 @@ public partial class Sparkline : UserControl {
 
     public static readonly StyledProperty<string?> AxisMinLabelProperty =
         AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisMinLabel));
+
+    public static readonly StyledProperty<IReadOnlyList<string>?> AxisValueLabelsProperty =
+        AvaloniaProperty.Register<Sparkline, IReadOnlyList<string>?>(nameof(AxisValueLabels));
 
     public static readonly StyledProperty<string?> AxisStartLabelProperty =
         AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisStartLabel));
@@ -205,6 +209,16 @@ public partial class Sparkline : UserControl {
         set => SetValue(AxisMinLabelProperty, value);
     }
 
+    /// <summary>The whole value axis at once, top to bottom, one label per grid line — the form a chart
+    /// with room for more than three readings uses. Set, it replaces
+    /// <see cref="AxisMaxLabel"/>/<see cref="AxisMidLabel"/>/<see cref="AxisMinLabel"/>; unset, those three
+    /// draw as before. A plot too short for the whole set drops back to a subset that still lands on grid
+    /// lines, never below its two ends.</summary>
+    public IReadOnlyList<string>? AxisValueLabels {
+        get => GetValue(AxisValueLabelsProperty);
+        set => SetValue(AxisValueLabelsProperty, value);
+    }
+
     /// <summary>Oldest end of the time range, e.g. "−60s". Empty draws no footer.</summary>
     public string? AxisStartLabel {
         get => GetValue(AxisStartLabelProperty);
@@ -257,7 +271,8 @@ public partial class Sparkline : UserControl {
                 || change.Property == ShowGridProperty || change.Property == GridRowsProperty
                 || change.Property == GridColumnsProperty || change.Property == GridBrushProperty
                 || change.Property == AxisMaxLabelProperty || change.Property == AxisMidLabelProperty
-                || change.Property == AxisMinLabelProperty || change.Property == AxisStartLabelProperty
+                || change.Property == AxisMinLabelProperty || change.Property == AxisValueLabelsProperty
+                || change.Property == AxisStartLabelProperty
                 || change.Property == AxisEndLabelProperty || change.Property == StatusTextProperty
                 || change.Property == AxisBrushProperty))
             InvalidateVisual();
@@ -274,21 +289,24 @@ public partial class Sparkline : UserControl {
 
         // Axis text is measured before anything is drawn: what it needs decides how much room the plot has.
         var brush = AxisBrush ?? ResolveResource("TextSubtle");
-        var top = Label(AxisMaxLabel, brush);
-        var middle = Label(AxisMidLabel, brush);
-        var bottom = Label(AxisMinLabel, brush);
+        var values = MeasureValueLabels(brush);
         var start = Label(AxisStartLabel, brush);
         var end = Label(AxisEndLabel, brush);
 
+        var widest = 0.0;
+        foreach (var (label, _) in values)
+            widest = Math.Max(widest, TextWidth(label));
+
         var plot = ChartAxis.PlotRect(w, h,
-            ChartAxis.Gutter(TextWidth(top), TextWidth(middle), TextWidth(bottom)),
+            ChartAxis.Gutter(widest),
             ChartAxis.Footer(Math.Max(TextHeight(start), TextHeight(end))));
 
         // The grid and the axis labels sit behind the data and show even before any samples arrive, so an
         // empty chart still says what its scale is.
         if (ShowGrid)
             DrawGrid(context, plot);
-        DrawAxisLabels(context, plot, top, middle, bottom, start, end);
+        DrawValueLabels(context, plot, values);
+        DrawTimeLabels(context, plot, start, end);
 
         DrawSeries(context, plot);
         DrawStatus(context, plot);
@@ -325,19 +343,52 @@ public partial class Sparkline : UserControl {
             DrawLine(context, _data2, Stroke2!, plot, maxX, span);
     }
 
-    /// <summary>Value labels down the left of the plot and the time-range ends beneath it. The outer two
-    /// value labels are pulled inside the plot's edges rather than centred on them, so neither is clipped.</summary>
-    private static void DrawAxisLabels(DrawingContext context, Rect plot, FormattedText? top,
-        FormattedText? middle, FormattedText? bottom, FormattedText? start, FormattedText? end) {
-        if (top is not null)
-            context.DrawText(top, new Point(plot.Left - ChartAxis.LabelGap - top.Width, plot.Top));
-        if (middle is not null)
-            context.DrawText(middle, new Point(plot.Left - ChartAxis.LabelGap - middle.Width,
-                plot.Center.Y - middle.Height / 2));
-        if (bottom is not null)
-            context.DrawText(bottom, new Point(plot.Left - ChartAxis.LabelGap - bottom.Width,
-                plot.Bottom - bottom.Height));
+    /// <summary>The value labels ready to draw, each with where it sits down the axis (0 = top, 1 = foot).
+    /// <see cref="AxisValueLabels"/> spaces its labels evenly; the three fixed properties keep their own
+    /// places, so a chart setting only two of them (every stat card) is unaffected by the list form.</summary>
+    private List<(FormattedText Label, double Position)> MeasureValueLabels(IBrush? brush) {
+        var measured = new List<(FormattedText, double)>();
+        var labels = AxisValueLabels;
 
+        if (labels is not { Count: > 0 }) {
+            Add(AxisMaxLabel, 0);
+            Add(AxisMidLabel, 0.5);
+            Add(AxisMinLabel, 1);
+            return measured;
+        }
+
+        for (var i = 0; i < labels.Count; i++)
+            Add(labels[i], labels.Count > 1 ? (double)i / (labels.Count - 1) : 0);
+        return measured;
+
+        void Add(string? value, double position) {
+            if (Label(value, brush) is { } label)
+                measured.Add((label, position));
+        }
+    }
+
+    /// <summary>Draws the value labels down the left of the plot, dropping to a sparser set that still lands
+    /// on grid lines when they would not all fit. The outer two are pulled inside the plot's edges rather
+    /// than centred on them, so neither is clipped.</summary>
+    private static void DrawValueLabels(DrawingContext context, Rect plot,
+        List<(FormattedText Label, double Position)> labels) {
+        if (labels.Count == 0)
+            return;
+
+        var height = labels[0].Label.Height;
+        var kept = ChartAxis.FitLabelCount(plot.Height, height, labels.Count);
+        var step = kept > 1 ? (labels.Count - 1) / (kept - 1) : labels.Count;
+
+        for (var i = 0; i < labels.Count; i += step) {
+            var (label, position) = labels[i];
+            var y = plot.Top + plot.Height * position - label.Height * position;
+            context.DrawText(label, new Point(plot.Left - ChartAxis.LabelGap - label.Width, y));
+        }
+    }
+
+    /// <summary>Draws the ends of the time range beneath the plot.</summary>
+    private static void DrawTimeLabels(DrawingContext context, Rect plot, FormattedText? start,
+        FormattedText? end) {
         var footerTop = plot.Bottom + ChartAxis.FooterGap;
         if (start is not null)
             context.DrawText(start, new Point(plot.Left, footerTop));

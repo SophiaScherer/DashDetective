@@ -974,8 +974,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         _networkRow.ChartStatus = ChartStatus.For(_downHistory);
 
         // The only row whose value labels move: both series share this ceiling, so one set describes them.
-        (_networkRow.AxisMaxLabel, _networkRow.AxisMidLabel, _networkRow.AxisMinLabel) =
-            ChartAxis.RateLabels(axis);
+        _networkRow.AxisValueLabels = ChartAxis.RateLabels(axis, ResourceRow.AxisDivisions);
 
         _netErrorsTile.Value = ReadNetworkErrors();
     }

@@ -226,9 +226,7 @@
                                         Points="{Binding SelectedResource.Points}"
                                         Stroke2="{Binding SelectedResource.ValueBrush2}"
                                         Points2="{Binding SelectedResource.Points2}"
-                                        AxisMaxLabel="{Binding SelectedResource.AxisMaxLabel}"
-                                        AxisMidLabel="{Binding SelectedResource.AxisMidLabel}"
-                                        AxisMinLabel="{Binding SelectedResource.AxisMinLabel}"
+                                        AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                         StatusText="{Binding SelectedResource.ChartStatus}"/>
 

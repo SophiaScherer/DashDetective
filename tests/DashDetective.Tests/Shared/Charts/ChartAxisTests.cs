@@ -79,6 +79,50 @@ public class ChartAxisTests {
         Assert.Equal("0", bottom);
     }
 
+    /// <summary>The same rule over more bands, so a chart with room to label every grid line reads in one
+    /// unit taken from its ceiling.</summary>
+    [Fact]
+    public void RateLabels_OverFourBands_LabelsEveryGridLine() {
+        Assert.Equal(new[] { "80 Mbps", "60", "40", "20", "0" }, ChartAxis.RateLabels(80, 4));
+    }
+
+    /// <summary>The percent sign stays on every reading but the zero: it matches the fixed labels the other
+    /// tabs' charts carry, and costs no gutter because the top label is the widest either way.</summary>
+    [Fact]
+    public void PercentLabels_LabelsEveryBandBoundaryTopToBottom() {
+        Assert.Equal(new[] { "100%", "75%", "50%", "25%", "0" }, ChartAxis.PercentLabels(4));
+    }
+
+    /// <summary>One band is the ends alone — what a per-core cell carries, being too short for more.</summary>
+    [Fact]
+    public void PercentLabels_OneBand_IsTheEndsAlone() {
+        Assert.Equal(new[] { "100%", "0" }, ChartAxis.PercentLabels(1));
+    }
+
+    [Fact]
+    public void FitLabelCount_PlotWithRoomForThemAll_KeepsThemAll() {
+        Assert.Equal(5, ChartAxis.FitLabelCount(plotExtent: 200, labelExtent: 12, desired: 5));
+    }
+
+    /// <summary>A sparser set has to land on the same grid lines, so five drops to three rather than four —
+    /// four would sit between the lines it is meant to be reading.</summary>
+    [Fact]
+    public void FitLabelCount_TooTight_DropsToASetThatStillLandsOnGridLines() {
+        Assert.Equal(3, ChartAxis.FitLabelCount(plotExtent: 50, labelExtent: 12, desired: 5));
+    }
+
+    /// <summary>The two ends are the floor: a chart saying nothing about its scale is worse than a crowded
+    /// one, and the ends are what a reading is measured between.</summary>
+    [Fact]
+    public void FitLabelCount_NoRoomAtAll_KeepsTheTwoEnds() {
+        Assert.Equal(2, ChartAxis.FitLabelCount(plotExtent: 8, labelExtent: 12, desired: 5));
+    }
+
+    [Fact]
+    public void FitLabelCount_TwoOrFewer_IsAlreadyTheFloor() {
+        Assert.Equal(2, ChartAxis.FitLabelCount(plotExtent: 8, labelExtent: 12, desired: 2));
+    }
+
     /// <summary>Grid lines land on the half-pixel centre of a device pixel, so a 1px line draws crisp
     /// rather than smeared across two.</summary>
     [Theory]

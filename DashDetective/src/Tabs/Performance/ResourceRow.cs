@@ -112,12 +112,15 @@ public partial class ResourceRow : ObservableObject {
     /// Observable because the window changes with the Settings refresh interval.</summary>
     [ObservableProperty] private string _chartCaption = "";
 
-    /// <summary>The chart's value labels. A percentage resource states a fixed 100 / 50 / 0; the network
-    /// row rewrites them each tick, since its ceiling follows the traffic — which is why these are
-    /// observable rather than fixed identity.</summary>
-    [ObservableProperty] private string _axisMaxLabel = "100%";
-    [ObservableProperty] private string _axisMidLabel = "50%";
-    [ObservableProperty] private string _axisMinLabel = "0";
+    /// <summary>Grid bands on the detail chart. The label set is one longer, so every label lands on a
+    /// line; it has to match the Sparkline's GridRows in the view.</summary>
+    public const int AxisDivisions = 4;
+
+    /// <summary>The chart's value labels, top to bottom. A percentage resource states a fixed 100 / 75 /
+    /// 50 / 25 / 0; the network row rewrites them each tick, since its ceiling follows the traffic — which
+    /// is why this is observable rather than fixed identity.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<string> _axisValueLabels = ChartAxis.PercentLabels(AxisDivisions);
 
     /// <summary>The cold-start line, cleared as soon as this row has a trace to show. Starts set: no row
     /// has a sample before its first tick. The initializer is qualified because this property's own name
