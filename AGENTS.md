@@ -40,11 +40,11 @@ below: it changes how every page is laid out, so read it before touching a view.
 
 **Toolkit — implementation status** (LIVE):
 
-- **Toolkit** — the design document's **"Commands"** tab, shipped in the live app as **Toolkit** (nav
-  label, folder, namespace and type names; "Commands" is a design-doc-only name). The UI was built in
-  phases (plan: `C:\Users\User\.claude\plans\create-the-ui-for-sharded-minsky.md`); execution and the
-  command set are being built in phases now (plan:
-  `C:\Users\User\.claude\plans\develop-a-phased-plan-sunny-crystal.md`). It is the **ninth** tab,
+- **Toolkit** — designed as a **"Commands"** tab and shipped as **Toolkit** (nav label, folder,
+  namespace and type names). "Commands" survives only in older discussion; nothing in the repo uses
+  it, so **always write Toolkit**. The UI was built in
+  phases; execution and the
+  command set were built in phases too. It is the **ninth** tab,
   sitting between Hardware and Settings, which is why the Ctrl+digit tab jumps now run **Ctrl+1 …
   Ctrl+9**.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
@@ -201,8 +201,7 @@ below: it changes how every page is laid out, so read it before touching a view.
 
 **Keyboard shortcuts — implementation status** (LIVE):
 
-- **Keyboard shortcuts** — **fully live**, built in phases (plan:
-  `C:\Users\User\.claude\plans\create-a-phased-plan-crispy-island.md`). A data-driven shortcut layer:
+- **Keyboard shortcuts** — **fully live**, built in phases. A data-driven shortcut layer:
   `src/Shared/Shortcuts` holds the model (`ShortcutCatalog`, `ShortcutId`, `ShortcutScope`, `Shortcut`,
   `ShortcutGroup`, `IShortcutTarget`) and `src/Shell/Shortcuts` the listener (`ShellShortcutHandler`,
   `KeyboardFocus`). **`ShortcutCatalog` is the single source of truth** — the key handler resolves
@@ -239,8 +238,7 @@ below: it changes how every page is laid out, so read it before touching a view.
 
 **Storage — implementation status** (LIVE):
 
-- **Storage** — **fully live**, built in phases (plan:
-  `C:\Users\User\.claude\plans\develop-a-plan-to-radiant-raven.md`). A read-only drives/health view per
+- **Storage** — **fully live**, built in phases. A read-only drives/health view per
   the design comp: a top row of **drive summary cards** (name + health pill, model, usage bar, used/free,
   and live **Read / Write / Temp**) over a bottom row of a **Partitions** table (Vol · Label · File System
   · Capacity · Free) and a **Disk Activity (C:)** card (amber area chart + Active time / Avg response /
@@ -248,8 +246,8 @@ below: it changes how every page is laid out, so read it before touching a view.
   scrolling like Network** (not `ISelfScrollingPage`), reusing `Border Classes="panel"`, the shared
   `Sparkline` (on the `ChartStorage` series key), and the built-in `ProgressBar` for the usage bars.
   Live sources: the drive cards from `PhysicalDiskProvider` + `StorageComposer` + `VolumeProvider`; the
-  Disk Activity chart + Active time / Avg response / **Queue** readouts from the shared `StorageUsageSampler`
-  feed (via `SystemMetricsService`); per-disk **Read/Write** from the page-local
+  Disk Activity chart + Active time / Avg response / **Queue** readouts from the same page-local
+  `IPhysicalDiskThroughputSampler`; per-disk **Read/Write** from the page-local
   `IPhysicalDiskThroughputSampler` (its own 1 Hz timer, deliberately not retimed by Settings); and each NVMe
   card's **Temp** from `DiskTemperatureProvider` (non-admin `IOCTL_STORAGE_QUERY_PROPERTY` health-log read,
   refreshed on a slow ~15 s sub-cadence of the throughput timer). Wired to `IRefreshablePage` /
@@ -359,23 +357,19 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
 
 ## Strict Working Boundaries
 
-You are only permitted to read and modify:
+Every feature is live, so scope comes from **the task**, not from a list in this file. Edit the
+folder(s) the task names and the shell code it needs — nothing else.
 
-1. The current feature folder(s) listed under **Current Scope** above.
-2. The design document (see below).
-3. The default window code (the app's main/root window as originally scaffolded).
-
-You may **read** other parts of the repo for context if needed to keep things consistent
-(e.g. shared styles, naming conventions), but you should not **edit** anything outside the
-three categories above without the user explicitly asking you to expand scope.
+You may **read** anywhere in the repo for context (shared styles, naming, an existing seam), but
+**editing** outside what the task asked for needs the user to say so first.
 
 Do not:
-- Create folders for features not listed under Current Scope.
-- Refactor or "improve" unrelated feature folders while working on the active one.
+- Create a folder for a feature that does not exist. There are no unbuilt features left.
+- Refactor or "improve" an unrelated feature folder while working on the one you were given.
 - Modify project-wide config, build files, or dependencies unless the task specifically requires it and the user has confirmed it.
 
-If a task seems to require touching something outside these boundaries, stop and ask the
-user before proceeding.
+If a task seems to require touching something outside what it named, stop and ask the user
+before proceeding.
 
 Before performing any of the following, stop and ask first:
 - moving files
@@ -386,17 +380,11 @@ Before performing any of the following, stop and ask first:
 - changing MVVM approach
 - altering project structure
 
-## Design Document
-
-There is an attached design document describing UI/UX intent, layout, and behavior for
-each feature. You may read this document as part of feature work on the current
-feature(s).
-
 ## Folder Structure
 
 Source lives under `DashDetective/src/`, split into three areas: shared building blocks,
-the application shell, and one folder per feature ("tab"). Only Dashboard and Settings
-currently exist.
+the application shell, and one folder per feature ("tab"). All nine tabs exist — Dashboard,
+File Explorer, Processes, Performance, Network, Storage, Hardware, Toolkit and Settings.
 
 ```
 /DashDetective
@@ -416,6 +404,8 @@ currently exist.
                                hiding to the tray idles the app rather than merely hiding it. The five
                                sampling pages implement it; Hardware/Toolkit/Settings/File Explorer own
                                no timer and do not)
+      IReorderablePage.cs     (marker: a page whose widget order the user drags and the shell
+                               persists. The page only holds the order; the shell reads and writes it)
       SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
                                a page's timers care about, so the five do not each hand-roll the pair.
                                STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
@@ -437,13 +427,36 @@ currently exist.
                                 appears. Nothing can be asked at startup, and guessing wrong strands the
                                 app — read by MainWindowViewModel.ShowInTray and the Settings toggle.
                                 The FIRST hide additionally shows the tray notice — see /Shell/TrayNotice)
-      GpuMetricsSupport.cs     (whether reading NVIDIA GPU utilization costs a helper process here.
-                                LINUX ONLY: there the figure exists solely through nvidia-smi, which is
-                                why the setting is opt-in at all; Windows takes it from a PDH counter it
-                                already polls, so the toggle has nothing to turn on and the sampler
-                                discards the write. The TrayIntegration shape — one named capability,
-                                read by SettingDescriptions.NvidiaGpuMetricsFor and by
-                                SettingsViewModel.CanUseNvidiaMetrics)
+      AppInfo.cs               (product name + the entry assembly's informational version, so the
+                                Settings footer reports the build it came from rather than a literal)
+      Placeholders.cs          (the strings a surface shows with no real value: NoReading ("—"),
+                                Unknown and the named Unknown* set. DISPLAY wording, NOT sentinels —
+                                a reader still reports null/0 honestly and the consumer picks the
+                                wording, because it differs (Processes wants "Unknown", Network
+                                "PID 1234"))
+      OverlapGuard.cs          (refuses a second poll while one is in flight; three pages had
+                                hand-rolled the same bool-and-finally. LAST-WRITE-LOSES on purpose,
+                                which is right for a timer and wrong for user-driven work — File
+                                Explorer's generation counter and Toolkit's AllowConcurrentExecutions
+                                are different answers, not copies. UI-thread-affine, so not
+                                thread-safe; NvidiaSmiReader locks instead because it is not)
+      PathComparison.cs        (how to tell whether two strings name the same path — Windows folds
+                                case, Linux does not. IDENTITY ONLY: sorting and filtering stay
+                                OrdinalIgnoreCase everywhere, since those are presentation)
+      SystemDrive.cs           (where the OS is installed, resolved once. TWO SHAPES because the
+                                platforms name it differently: Letter for keying a volume record,
+                                Root for anything that opens or measures it)
+      DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
+                                Task Manager). Callers showing related values on one axis pick a
+                                single unit from the shared peak via UnitFor)
+      UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
+      MemorySpeed.cs           (which of Win32_PhysicalMemory's two speeds to show: the CONFIGURED
+                                clock (what Task Manager shows), falling back to the rated one. Two
+                                tabs read the same modules and used to describe a stick two ways)
+      PointerDrag.cs           (the movement threshold before a press counts as a drag, so a click
+                                never nudges anything. Shared by NavigationView + the widget board)
+      RevealFlash.cs           (tints an element when something elsewhere jumps to it. Toggles the
+                                class only; the fade is Border.revealFlash's transition)
       /Charts
         MetricHistory.cs        (THE rolling buffer type: a double[window] plus HOW MUCH OF IT IS REAL, and
                                  the canonical shift (left by one, append at the end) that MetricChannel
@@ -879,8 +892,6 @@ currently exist.
                                  drivetemp one off a SCSI target with the device under block/. FINDING
                                  NOTHING IS THE COMMON CASE — drivetemp is not loaded by default on most
                                  distros; that is correct, not a bug. Stateless: re-walks per call)
-        StorageUsageSampler.cs  (live disk Active time % + read/write/response via PDH PhysicalDisk
-                                 counters; owns a PDH query handle)
         IPhysicalDiskThroughputSampler.cs
                                 (seam + the DiskThroughputSample record + ForCurrentPlatform(). Unlike the
                                  HardwareProviders members this is deliberately STATEFUL — every arm reports
@@ -906,13 +917,14 @@ currently exist.
                                  unit — one try/catch per tick → onFailed + permanent stop; SampleNow for
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
                                  generic MetricChannel<TSample> for snapshot samples + a no-history variant)
-        SystemMetricsService.cs (SINGLE owner of the four SHARED samplers — CPU, Memory, Storage, Network;
+        SystemMetricsService.cs (SINGLE owner of the three SHARED samplers — CPU, Memory, Network;
                                  per-metric 1 Hz channel fans each sample out to subscribers (ref-counted — a
                                  channel runs only while it has one), Pause/Resume for the Live pill,
                                  RefreshAll for Refresh, per-metric fault isolation. Dashboard / Performance /
                                  Processes SUBSCRIBE instead of owning these samplers. Per-GPU and per-disk
-                                 readings are page-local instead (multi-instance; this feed carries only a
-                                 single aggregate), as is the Network tab's own NetworkUsageSampler. Built in
+                                 readings are page-local instead (multi-instance; a shared aggregate feed would
+                                 report a mean across every device under a label naming one of them), as is
+                                 the Network tab's own NetworkUsageSampler. Built in
                                  the App composition root and disposed on shutdown.
                                  THE ALERT WATCHER IS OPT-IN (AlertsEnabled, mirroring the "Resource alerts"
                                  setting and off by default like it): it subscribes to CPU + Memory, so left
@@ -1004,7 +1016,7 @@ currently exist.
                                                          the chassis fields laptops populate more reliably)
                                 SystemStaticInfo.cs     (record for the system-identity result)
       /Toolkit                  ToolkitView.axaml(.cs) + ToolkitViewModel.cs
-                                (the design doc's "Commands" tab. Filter bar (search box + category
+                                (designed as the "Commands" tab. Filter bar (search box + category
                                  chips + count) over a grouped command list, beside a pinned 340px
                                  Execution Log. ISelfScrollingPage (each column scrolls itself) +
                                  IShortcutTarget. Running a row is an async RelayCommand that refuses
@@ -1096,6 +1108,15 @@ currently exist.
                                 ThemeOption.cs, AccentOption.cs, IntervalOption.cs
                                                         (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
+                                GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
+                                                         helper process here. LINUX ONLY: there the figure
+                                                         exists solely through nvidia-smi, which is why the
+                                                         setting is opt-in at all; Windows takes it from a PDH
+                                                         counter it already polls, so the toggle has nothing to
+                                                         turn on and the sampler discards the write. The
+                                                         TrayIntegration shape — one named capability, read by
+                                                         SettingDescriptions.NvidiaGpuMetricsFor and by
+                                                         SettingsViewModel.CanUseNvidiaMetrics)
                                 SettingDescriptions.cs  (the descriptions that name a MECHANISM rather
                                                          than an effect, or a platform that cannot honor
                                                          one, so cannot be shared — "Start with Windows",
@@ -1346,10 +1367,6 @@ currently exist.
                                  IDisposable.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
-                                SystemCacheProvider.cs  (page-local psapi GetPerformanceInfo P/Invoke:
-                                                         SystemCache pages × PageSize = Task Manager's
-                                                         memory "Cached". Soft-fails to null; a thrown
-                                                         exception is logged once, then latches it off)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
@@ -1378,7 +1395,7 @@ currently exist.
                                  cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
                                  card (shared Sparkline, ChartStorage key). Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
-                                 VolumeProvider; Disk Activity + Queue from the shared StorageUsageSampler
+                                 VolumeProvider; Disk Activity + Queue from the page-local throughput sampler
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
                                  from DiskTemperatureProvider (IOCTL health log). IRefreshablePage/
                                  ILiveSamplingPage/IActivatablePage/IDisposable.)
@@ -1749,6 +1766,14 @@ The **Settings persistence** work (settings store + "Launch at startup" + system
 `Microsoft.Win32.Registry` (the HKCU `Run` key) are in-box on `net10.0`, and Avalonia's
 `TrayIcon` ships with the framework. Reuse the in-box JSON + registry for future persisted state.
 
+**The full referenced set, as the csproj actually has it** — the paragraphs above each describe one
+piece of work, so read this for what is present today: Avalonia (`Avalonia`, `.Desktop`,
+`.Themes.Fluent`, `.Fonts.Inter`), `CommunityToolkit.Mvvm`, `System.Management` (WMI),
+**`System.Data.OleDb`** (universal search's file results, through the Windows Search index's
+`Search.CollatorDSO` OLE DB provider) and **`AvaloniaUI.DiagnosticsSupport`** (Debug-only; excluded
+from every other configuration in the csproj). The last two are the ones the paragraphs above do not
+mention. Everything else is in-box.
+
 ## Testing conventions
 
 Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0`, referenced by `DashDetective.sln`).
@@ -1904,9 +1929,8 @@ temperature is the expected outcome, not a defect.
 ## Working Style
 
 - One detail at a time. Prefer small, focused changes over broad sweeps.
-- When a feature folder doesn't exist yet but is in Current Scope, it's fine to create it.
-- Match existing conventions (naming, MVVM patterns, styling) already established in the
-  Dashboard/Settings/default window code rather than introducing new patterns.
+- Match the conventions already in the codebase (naming, MVVM patterns, styling) rather than
+  introducing new ones. Read a neighbouring tab before inventing anything.
 - If you're unsure whether something is in scope, ask rather than assume.
 
 ## Updating This Document
@@ -2031,8 +2055,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   needs the window's `TopLevel`). Export uses the in-box `Avalonia.Platform.Storage` picker — no new
   package.
 
-- **Universal search** — **fully live** (plan:
-  `C:\Users\User\.claude\plans\make-a-plan-to-lexical-salamander.md`). The toolbar box (`Ctrl+F`) searches
+- **Universal search** — **fully live**. The toolbar box (`Ctrl+F`) searches
   six categories at once and navigates to whatever is picked, revealing it in place.
   - **Structure** (`src/Shell/Search/`). `SearchRanker` scores a term against text in four tiers kept
     200 apart (exact / prefix / word-start / anywhere) with a closeness bonus capped below 100, so a
@@ -2069,7 +2092,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
     file or an exited process drops itself rather than promising something that no longer works.
 
-- **Settings** — **fully live** (plan: `C:\Users\User\.claude\plans\you-are-working-in-silly-planet.md`).
+- **Settings** — **fully live**.
   - **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Accent color**
     swatches are data-bound to `SettingsViewModel` and applied at runtime through a single
     `ThemeService` (see *Theming* below). The accent row's **first** swatch is a "Default"
@@ -2106,8 +2129,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     that the app has disclosed, once, that closing the window does not stop it.
     Theme, accent and the navigation choices **persist** through this rather than lasting a session.
 
-- **File Explorer** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\create-a-detailed-plan-jolly-bonbon.md`). A **read-only** three-pane
+- **File Explorer** — **live and functional** (built in phases). A **read-only** three-pane
   browser matching the design comp: a folder **tree** (left, drives-as-roots + lazily-loaded
   subfolders), a **file list** (centre) with a clickable **breadcrumb**, **filter chips**
   (All / Documents / Images / Archives), **sortable column headers**, and a **Show hidden** checkbox,
@@ -2249,8 +2271,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
     **481 ms** of the read, which now completes in **30 ms**. Deliberately **per-read and unshared**:
     nothing to invalidate, nothing to synchronize.
 
-- **Network** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\plan-and-brainstorm-how-iterative-wave.md`). Matches the design comp's
+- **Network** — **live and functional** (built in phases). Matches the design comp's
   Network page: six panels in two rows. The VM is constructed once in `MainWindowViewModel` and follows
   the shared page lifecycle (it samples only while it is the visible tab — see *Lifecycle* below), reuses
   the shared `Sparkline`, and adds **no new NuGet packages** (all
@@ -2308,8 +2329,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
   IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
 
-- **Processes** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\processes-tab-plan.md`). A Task-Manager-style live process view: the
+- **Processes** — **live and functional** (built in phases). A Task-Manager-style live process view: the
   list **split three ways — Apps / Background processes / Windows processes** (per `ProcessClassifier`
   + `ProcessCategory`), per-process **PID / status / CPU % / Memory / Disk / GPU %**, **sortable
   column headers**, a summary strip (**process counts per group**, **total CPU %**, **total
@@ -2354,8 +2374,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   permanent "—" the column was deleted outright: header, data cell, sort key and all. This is **not
   deferred work** — do not re-add the column or build toward it without an explicit task. The table is
   7 columns.
-  **Reworked on branch `performanceTabUpdates` (2026-08)** — nine gaps closed in eight phases (plan:
-  `C:\Users\User\.claude\plans\below-is-a-list-elegant-hamming.md`). What changed, and the decisions
+  **Reworked on branch `performanceTabUpdates` (2026-08)** — nine gaps closed in eight phases. What changed, and the decisions
   behind it that must not be quietly undone:
   - **Columns never drop; the table scrolls.** `ProcessTableLayout` lost its four drop-tier definition
     strings and its `ShowStatus`/`ShowDisk`/`ShowGpu` flags. The header and the rows now share one
@@ -2427,8 +2446,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   (enumerating every process is heavier than a single counter); the summary strip's system-wide
   CPU %/Memory % come from the shared `SystemMetricsService`.
 
-- **Performance** — **live and functional** (built in phases; plan:
-  `C:\Users\User\.claude\plans\develop-a-plan-to-elegant-thimble.md`). A Task-Manager-style resource
+- **Performance** — **live and functional** (built in phases). A Task-Manager-style resource
   drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
   Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
   (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
@@ -2453,8 +2471,10 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   Settings refresh interval) and on Refresh; degrades to "—" if no source is readable. This is
   page-local, like the disk/GPU/per-core samplers — the shared CPU feed carries only the clamped
   utilisation figure, and this reads a *different* counter, so `ProcessorUtilityCpuSampler` /
-  `SystemMetricsService` were untouched. The Memory **Cached** tile is live too: the page-local
-  `SystemCacheProvider` calls the in-box psapi `GetPerformanceInfo` and scales its
+  `SystemMetricsService` were untouched. The Memory **Cached** tile is live too:
+  `WindowsSystemPerformanceProvider` (in `Services/SystemMetrics`, behind `ISystemPerformanceProvider`;
+  it was page-local as `SystemCacheProvider` when first built) calls the in-box psapi
+  `GetPerformanceInfo` and scales its
   `PERFORMANCE_INFORMATION.SystemCache` (pages) by the struct's own `PageSize`, which `MemoryCacheFormatter`
   renders as binary GB — Task Manager's own "Cached" figure (verified against it: 15.3 GB on the tile vs
   15.42 GB summed from the standby + modified page-list counters). **This corrects the old rationale**,
@@ -2480,8 +2500,7 @@ When a new feature becomes active, or an existing one is completed/paused, updat
   yields "—". `DeviceInstance` gained a trailing optional `ulong? VramBytes` and `DeviceInventory.Compose`
   passes it through (both under explicit sign-off; `GpuAdapterProvider` itself was untouched).
 
-  **GPU Temp and Power are live too** (2026-07, plan:
-  `C:\Users\User\.claude\plans\you-re-working-in-the-melodic-star.md`). This **supersedes the old claim that
+  **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
   there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
   no package, no redistributable and **no admin** are needed. Support by vendor:
   - **NVIDIA — temperature and power.** Temperature from NVAPI's `NvAPI_GPU_GetThermalSettings`, power from
@@ -2519,8 +2538,10 @@ When a new feature becomes active, or an existing one is completed/paused, updat
 
 - **Repo-hygiene / portfolio pass — COMPLETED (2026-07-18).** A portfolio `README.md`, a reader-facing
   `docs/ARCHITECTURE.md` (distilled from this appendix), project metadata in the csproj (`Version 0.1.0`,
-  title/authors/copyright, retarget to `net10.0-windows`), analyzer + warning gates (`AnalysisLevel
-  latest`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`) with a root `.editorconfig` encoding the
+  title/authors/copyright, retarget to `net10.0-windows` — since REVERSED to a neutral `net10.0` by the
+  cross-platform port), analyzer + warning gates (`AnalysisLevel latest`, `TreatWarningsAsErrors`,
+  `EnforceCodeStyleInBuild` — since moved to a root `Directory.Build.props` so both projects share them)
+  with a root `.editorconfig` encoding the
   existing style, a `dotnet format --verify-no-changes` step in CI, and the Settings footer wired to a
   real assembly version via `AppInfo` (`src/Shared`) instead of the old fictional string. This did
   **not** change any feature behaviour (the footer text is the sole exception).
