@@ -761,7 +761,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         }
 
         // Set SupportsDetail last (after the label + charts) so the toggle only appears once the grid is ready.
-        _cpuRow.DetailLabel = "Logical processors";
+        _cpuRow.DetailLabel = "Per core";
         _cpuRow.SubCharts = _cpuCores.ConvertAll(c => c.Chart);
         _cpuRow.SupportsDetail = true;
     }
@@ -856,7 +856,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         });
         gpu.Row.SubCharts = gpu.Engines.ConvertAll(e => e.Chart);
         if (!gpu.Row.SupportsDetail) {
-            gpu.Row.DetailLabel = "Individual engines";
+            gpu.Row.DetailLabel = "Per engine";
             gpu.Row.SupportsDetail = true;
         }
     }

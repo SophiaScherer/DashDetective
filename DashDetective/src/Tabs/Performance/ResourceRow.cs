@@ -150,8 +150,9 @@ public partial class ResourceRow : ObservableObject {
     /// gains it once the per-core sampler enumerates its logical processors on the first tick.</summary>
     [ObservableProperty] private bool _supportsDetail;
 
-    /// <summary>The "Detailed" segment's label, e.g. "Logical processors" (CPU) or "Individual engines"
-    /// (GPU). Only meaningful when <see cref="SupportsDetail"/> is true.</summary>
+    /// <summary>The "Detailed" segment's label, e.g. "Per core" (CPU) or "Per engine" (GPU). Pairs with the
+    /// fixed "Overall" beside it, so the two segments read as one scale. Only meaningful when
+    /// <see cref="SupportsDetail"/> is true.</summary>
     [ObservableProperty] private string _detailLabel = "";
 
     /// <summary>The per-subunit mini charts shown in the Detailed view (one per logical processor / engine).
