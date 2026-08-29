@@ -111,6 +111,11 @@ stays in its tab folder.
                                 Task Manager). Callers showing related values on one axis pick a
                                 single unit from the shared peak via UnitFor)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
+      ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
+      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
+                                arms: the 12-hour one must say AM/PM rather than whatever the host
+                                locale designates. Display only — export names, the report's
+                                "Generated" line and the app log stay 24-hour so files stay sortable)
       MemorySpeed.cs           (which of Win32_PhysicalMemory's two speeds to show: the CONFIGURED
                                 clock (what Task Manager shows), falling back to the rated one. Two
                                 tabs read the same modules and used to describe a stick two ways)
@@ -775,8 +780,11 @@ stays in its tab folder.
                                 ToolkitGroup.cs         (immutable category section: upper-cased header
                                                          + the entries that survived the filter)
                                 ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)
-                                ToolkitLogEntry.cs      (record: Time / Command / Output — one console
-                                                         stanza in the Execution Log)
+                                ToolkitLogEntry.cs      (one console stanza in the Execution Log.
+                                                         OBSERVABLE, and it keeps the raw Timestamp beside
+                                                         the formatted Time: the clock-format preference can
+                                                         change while rows are on screen, and a row storing
+                                                         only its pre-formatted string could not be re-stamped)
                                 ToolkitCatalog.cs       (static COPY table only — categories, section
                                                          headers, badge labels. Reads the same on every
                                                          platform, which is why it stayed static when the
@@ -849,8 +857,8 @@ stays in its tab folder.
                                                         (fully live: Appearance + Navigation + Monitoring
                                                          + Export & Data; view code-behind owns the
                                                          export save dialog + clipboard, like MainWindow)
-                                ThemeOption.cs, AccentOption.cs, IntervalOption.cs
-                                                        (selectable item VMs for the Appearance +
+                                ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
+                                IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
                                 GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
                                                          helper process here. LINUX ONLY: there the figure

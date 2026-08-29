@@ -32,6 +32,7 @@ public partial class SettingsViewModel : ViewModelBase {
 
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<AccentOption> AccentOptions { get; }
+    public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
     /// <summary>The shell's navigation bar view-model — the single shared instance, so the Settings
@@ -99,6 +100,11 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var preset in AccentPreset.All)
             AccentOptions.Add(new AccentOption(preset, SelectAccent));
 
+        ClockFormatOptions = new ObservableCollection<ClockFormatOption> {
+            new("24-hour", ClockFormat.TwentyFourHour, SelectClockFormat),
+            new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
+        };
+
         IntervalOptions = new ObservableCollection<IntervalOption> {
             new("0.5s", 0.5, SelectInterval),
             new("1s", 1, SelectInterval),
@@ -115,6 +121,10 @@ public partial class SettingsViewModel : ViewModelBase {
         // Select and apply the persisted refresh interval (falling back to 1 s if it's an unknown value).
         var interval = MatchInterval(settings.RefreshIntervalSeconds);
         SelectInterval(interval);
+
+        // The shell has already applied the clock format from the same settings, so this only reflects it.
+        foreach (var option in ClockFormatOptions)
+            option.IsSelected = option.Value == settings.ClockFormat;
 
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
@@ -135,6 +145,17 @@ public partial class SettingsViewModel : ViewModelBase {
     /// like <see cref="CanUseTray"/>: where the figure needs no helper tool there is nothing to opt into,
     /// and the sampler discards the write anyway.</summary>
     public bool CanUseNvidiaMetrics => GpuMetricsSupport.NeedsHelperTool;
+
+    /// <summary>The currently selected clock format (for capturing into settings). The shell reads this
+    /// and pushes it to the toolbar clock and the Toolkit log.</summary>
+    public ClockFormat ClockFormat {
+        get {
+            foreach (var option in ClockFormatOptions)
+                if (option.IsSelected)
+                    return option.Value;
+            return ClockFormat.TwentyFourHour;
+        }
+    }
 
     /// <summary>The currently selected refresh interval in seconds (for capturing into settings).</summary>
     public double SelectedIntervalSeconds {
@@ -188,6 +209,12 @@ public partial class SettingsViewModel : ViewModelBase {
             _theme.ApplyAccent(preset);
         else
             _theme.ApplyDefaultAppearance();
+        Changed?.Invoke();
+    }
+
+    private void SelectClockFormat(ClockFormatOption option) {
+        foreach (var other in ClockFormatOptions)
+            other.IsSelected = other == option;
         Changed?.Invoke();
     }
 

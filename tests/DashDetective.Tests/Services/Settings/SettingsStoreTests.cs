@@ -1,5 +1,6 @@
 using DashDetective.Services.Settings;
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
 using System;
 using System.IO;
 using Xunit;
@@ -32,6 +33,7 @@ public sealed class SettingsStoreTests : IDisposable {
         var settings = AppSettings.Defaults with {
             Theme = AppTheme.Light,
             AccentName = "Teal",
+            ClockFormat = ClockFormat.TwelveHour,
             RefreshIntervalSeconds = 2,
             LaunchAtStartup = true,
             PerformanceShowAllDevices = true,

@@ -127,6 +127,33 @@
                     </ItemsControl>
                 </Grid>
                 </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ClockFormat}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.ClockFormat.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.ClockFormat.Description}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Classes="segments">
+                        <ItemsControl ItemsSource="{Binding ClockFormatOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:ClockFormatOption">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+                </Border>
             </StackPanel>
         </controls:WidgetPanel>
 

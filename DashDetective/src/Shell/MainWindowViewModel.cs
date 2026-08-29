@@ -50,6 +50,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ToolkitViewModel _toolkit = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
+    private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
 
     // Resource-alert banner state: whether the metrics service reports an active breach, and whether the
     // user dismissed the current one. The banner shows only while active, unignored, and alerts are on.
@@ -246,6 +247,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
+        ApplyClockFormat(settings.ClockFormat);
         _metrics.AlertsEnabled = settings.ResourceAlerts;
         _recents.Load(settings.RecentSearches);
 
@@ -305,6 +307,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AccentName = _theme.CurrentAccent?.Name,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
+        ClockFormat = _settings.ClockFormat,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),
@@ -342,10 +345,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
+        ApplyClockFormat(_settings.ClockFormat);
 
         // The watcher holds the CPU and memory feeds open on its own, so it follows the setting rather
         // than running unconditionally.
         _metrics.AlertsEnabled = _settings.ResourceAlerts;
+    }
+
+    /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
+    /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and
+    /// the clock is re-stamped at once so the change is visible without waiting for the next tick.</summary>
+    private void ApplyClockFormat(ClockFormat format) {
+        _clockFormat = format;
+        _toolkit.ClockFormat = format;
+        UpdateClock();
     }
 
     /// <summary>Mirrors the NVIDIA opt-in onto both pages that own a GPU sampler. Pushed rather than read,
@@ -387,8 +400,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         UpdateAlertBanner();
     }
 
-    private void UpdateClock() =>
-        Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+    private void UpdateClock() => Clock = TimeOfDayFormatter.Format(DateTime.Now, _clockFormat);
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring

@@ -190,6 +190,14 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   (multi-colour) option — a 2×2 four-colour square that restores the authored look (each dashboard
   graph its own colour, highlight blue); the four single-colour swatches recolour the highlight and
   hand the graphs a palette **derived** from that accent, each metric keeping a hue of its own.
+  The **Clock format** segments (24-hour / 12-hour) are a `ClockFormatOption` on the `ThemeOption`
+  pattern. The shell pushes the choice to the two places that show a wall-clock time — the toolbar
+  clock and the Toolkit Execution Log — through `TimeOfDayFormatter` (`src/Shared`), the same way it
+  pushes the NVIDIA opt-in to the GPU pages. **Display only, deliberately:** export file names, the
+  report's `Generated:` line, the exported Toolkit transcript and `Log.cs` all stay 24-hour, so files
+  remain sortable and machine-parseable. `ToolkitLogEntry` keeps its raw `DateTime` alongside the
+  formatted string so rows already on screen re-stamp when the preference changes, and the toolbar
+  clock's fixed width is sized for the wider 12-hour string so switching does not reflow the toolbar.
 - **Monitoring.** The **Refresh interval** segments (0.5 / 1 / 2 / 5 s) are real `IntervalOption`
   selectable-item VMs (the `ThemeOption` pattern); selecting one calls
   `SystemMetricsService.SetInterval`, which retimes **only** the five 1 Hz metric channels — the

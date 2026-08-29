@@ -17,7 +17,7 @@ public sealed class SettingCatalog {
 
     private SettingCatalog() {
         All = [
-            Theme, Accent,
+            Theme, Accent, ClockFormat,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             ExportData,
@@ -35,6 +35,10 @@ public sealed class SettingCatalog {
     public SettingEntry Accent { get; } = new(
         SettingId.Accent, "Appearance", "Accent color", "Applied to charts and highlights",
         Keywords: "accent colour highlight chart swatch");
+
+    public SettingEntry ClockFormat { get; } = new(
+        SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
+        Keywords: "12 hour 24 hour am pm military clock time");
 
     // ----- Navigation -----
 

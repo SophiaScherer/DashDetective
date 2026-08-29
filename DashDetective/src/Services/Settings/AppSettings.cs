@@ -1,4 +1,5 @@
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 
 namespace DashDetective.Services.Settings;
@@ -18,6 +19,11 @@ public sealed record AppSettings {
     /// <summary>The chosen accent's <see cref="AccentPreset.Name"/>, or <c>null</c> for the default
     /// multi-colour look.</summary>
     public string? AccentName { get; init; }
+
+    /// <summary>How on-screen wall-clock times read (the toolbar clock, the Toolkit log). Display only:
+    /// export file names, the report's "Generated" line and the app log stay 24-hour so files remain
+    /// sortable and machine-parseable.</summary>
+    public ClockFormat ClockFormat { get; init; } = ClockFormat.TwentyFourHour;
 
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }

@@ -103,6 +103,22 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// <summary>Whether the log has anything in it. Drives its empty state.</summary>
     [ObservableProperty] private bool _hasLog;
 
+    private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
+
+    /// <summary>How the log stamps its rows. Pushed by the shell from the persisted setting; changing it
+    /// re-stamps the rows already on screen, so the preference applies without clearing the transcript.</summary>
+    public ClockFormat ClockFormat {
+        get => _clockFormat;
+        set {
+            if (value == _clockFormat)
+                return;
+
+            _clockFormat = value;
+            foreach (var entry in Log)
+                entry.Restamp(value);
+        }
+    }
+
     /// <summary>Raised when the focus-filter shortcut fires, so the view can put the caret in the
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
     public event Action? SearchFocusRequested;
@@ -211,13 +227,13 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         // Stamped once, so the stanza keeps the time the command was *started* rather than jumping to
         // the time it finished — which for a 90 s systeminfo would be a minute and a half out.
-        var time = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        var time = DateTime.Now;
 
         // A parameterised row is rejected before anything starts if what was typed is not a host. The
         // rejection is logged rather than shown inline, so the answer is where every other answer is.
         if (entry.Parameter is { } parameter && !ToolkitHostValidator.IsValid(parameter.Value)) {
             Log.Insert(0, new ToolkitLogEntry(
-                time, entry.Command, ToolkitOutputFormatter.InvalidHost(parameter.Value)));
+                time, entry.Command, ToolkitOutputFormatter.InvalidHost(parameter.Value), ClockFormat));
             return;
         }
 
@@ -226,16 +242,16 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         // The "$" line shows the resolved command line, not the row's label: a parameterised label is a
         // placeholder ("ping <host>"), and a row may carry flags it does not spell out.
         var line = action.CommandLine;
-        var pending = new ToolkitLogEntry(time, line, ToolkitOutputFormatter.Running);
+        var pending = new ToolkitLogEntry(time, line, ToolkitOutputFormatter.Running, ClockFormat);
         Log.Insert(0, pending);
 
         var result = await _runner.RunAsync(action);
 
-        // Reference equality, not the record's value equality: if the user cleared the log while the
-        // command was in flight, the placeholder is gone and the result goes with it — they asked for an
-        // empty log, so putting a stanza back would be ignoring them.
+        // Reference equality: if the user cleared the log while the command was in flight, the
+        // placeholder is gone and the result goes with it — they asked for an empty log, so putting a
+        // stanza back would be ignoring them.
         if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
-            Log[0] = new ToolkitLogEntry(time, line, result.Output);
+            Log[0] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
     }
 
     /// <summary>
@@ -399,8 +415,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         sb.AppendLine();
 
+        // Stamped 24-hour from the raw timestamp rather than reusing the row's on-screen string, so an
+        // exported transcript stays sortable whatever the clock-format preference is set to.
         foreach (var entry in Log) {
-            sb.AppendLine($"[{entry.Time}] $ {entry.Command}");
+            sb.AppendLine($"[{entry.Timestamp.ToString("HH:mm:ss", CultureInfo.InvariantCulture)}] $ {entry.Command}");
             sb.AppendLine(entry.Output);
             sb.AppendLine();
         }
