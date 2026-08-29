@@ -62,7 +62,36 @@ public class ChartPaletteTests {
             AssertSameSaturationAndLightness(ChartPalette.Default.Gpu, palette.Gpu);
             AssertSameSaturationAndLightness(ChartPalette.Default.Storage, palette.Storage);
             AssertSameSaturationAndLightness(ChartPalette.Default.NetUp, palette.NetUp);
+            AssertSameSaturationAndLightness(ChartPalette.Default.Threads, palette.Threads);
         }
+    }
+
+    /// <summary>Threads used to be painted GPU's green, which read as a second GPU figure on the
+    /// Processes summary strip. It needs a hue of its own, and enough room around it to stay one.</summary>
+    [Fact]
+    public void Default_Threads_SitsWellClearOfEveryOtherSeries() {
+        var threads = ChartPalette.Default.Threads.ToHsl().H;
+
+        foreach (var series in Enum.GetValues<ChartSeries>()) {
+            if (series is ChartSeries.Threads)
+                continue;
+
+            var other = ChartPalette.Default.For(series).ToHsl().H;
+            var apart = Math.Abs(((threads - other + 540) % 360) - 180);
+            Assert.True(apart > 40, $"Threads is only {apart:F0}° from {series}.");
+        }
+    }
+
+    /// <summary>Every series has to be reachable through <see cref="ChartSeriesColors.For"/>: its
+    /// fallback arm would quietly hand back CPU's colour for one that was left out.</summary>
+    [Fact]
+    public void For_ResolvesEverySeriesToItsOwnColour() {
+        var seen = Enum.GetValues<ChartSeries>()
+            .Where(series => series is not ChartSeries.NetDown) // Deliberately shares CPU's colour.
+            .Select(series => ChartPalette.Default.For(series))
+            .ToList();
+
+        Assert.Equal(seen.Count, seen.Distinct().Count());
     }
 
     /// <summary>A turn that carries a hue past 360° has to wrap rather than land outside the wheel — the
@@ -82,7 +111,7 @@ public class ChartPaletteTests {
 
     private static List<double> Hues(ChartSeriesColors palette) => new() {
         palette.Cpu.ToHsl().H, palette.Memory.ToHsl().H, palette.Gpu.ToHsl().H,
-        palette.Storage.ToHsl().H, palette.NetUp.ToHsl().H,
+        palette.Storage.ToHsl().H, palette.NetUp.ToHsl().H, palette.Threads.ToHsl().H,
     };
 
     /// <summary>Each series' hue distance from CPU's, walking the wheel one way, so the shape of the

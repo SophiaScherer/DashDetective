@@ -341,7 +341,7 @@
             <Border Classes="card">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="THREADS"/>
-                    <TextBlock Classes="sumValue" Foreground="{StaticResource Green}" Text="{Binding ThreadsText}"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartThreads}" Text="{Binding ThreadsText}"/>
                 </StackPanel>
             </Border>
             </layout:UniformFlowPanel>

@@ -101,6 +101,9 @@
     <SolidColorBrush x:Key="ChartStorage" Color="{StaticResource YellowColor}"/>
     <SolidColorBrush x:Key="ChartNetDown" Color="{StaticResource BlueColor}"/>
     <SolidColorBrush x:Key="ChartNetUp" Color="{StaticResource OrangeColor}"/>
+    <!-- Not a graph, but it sits beside the CPU and memory figures on the Processes summary strip, so it
+         re-hues with them. Pink keeps it clear of GPU's green. -->
+    <SolidColorBrush x:Key="ChartThreads" Color="{StaticResource PinkColor}"/>
 
     <!-- ===== Theme-invariant: console surface =====
          The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
