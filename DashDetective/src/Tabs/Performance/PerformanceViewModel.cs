@@ -254,6 +254,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             Series2 = ChartSeries.NetUp,
             LegendLabel1 = "Receive",
             LegendLabel2 = "Send",
+            ValueGlyph = "↓",
+            ValueGlyph2 = "↑",
+            ValueText2 = "0",
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
             Link = NetworkLink(adapterName),
@@ -946,6 +949,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Sampler-failure handler for the Network metric: shows neutral placeholders.</summary>
     private void OnNetworkFailed() {
         _networkRow.ValueText = "—";
+        _networkRow.ValueText2 = "—";
         _netReceiveTile.Value = "—";
         _netSendTile.Value = "—";
     }
@@ -955,6 +959,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         // comparable — the rule DataRateFormatter prescribes for values on a shared axis.
         var (downValue, upValue, unit) = DataRateFormatter.SplitPair(sample.DownMbps, sample.UpMbps);
         _networkRow.ValueText = downValue;
+        _networkRow.ValueText2 = upValue;
         _networkRow.Unit = unit;
         _netReceiveTile.Value = $"{downValue} {unit}";
         _netSendTile.Value = $"{upValue} {unit}";

@@ -54,8 +54,19 @@ public partial class ResourceRow : ObservableObject {
     [ObservableProperty] private string _valueText;
 
     /// <summary>Unit suffix for <see cref="ValueText"/> (e.g. "%", "Mbps"). Fixed for percentage
-    /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate.</summary>
+    /// metrics; the network row re-scales it (kbps / Mbps / Gbps) with the live rate. Shared by both
+    /// headline values, which is what makes the pair directly comparable.</summary>
     [ObservableProperty] private string _unit;
+
+    /// <summary>The second headline value, for a resource whose figure is one of a pair (the adapter row's
+    /// send beside its receive). Shown only when <see cref="HasSecondSeries"/> is true.</summary>
+    [ObservableProperty] private string _valueText2 = "";
+
+    /// <summary>Direction glyphs drawn before each headline value ("↓" / "↑"), matching the arrows on the
+    /// Dashboard's network card. Empty for single-value rows, which draw neither.</summary>
+    public string ValueGlyph { get; init; } = "";
+
+    public string ValueGlyph2 { get; init; } = "";
 
     /// <summary>Which graph this row is, as fixed identity. The colour itself is not stored here: the
     /// view model resolves it from the current <see cref="ChartPalette"/> and re-applies it when the

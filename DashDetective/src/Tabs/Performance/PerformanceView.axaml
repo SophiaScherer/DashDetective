@@ -39,6 +39,12 @@
             <Setter Property="VerticalAlignment" Value="Bottom"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
         </Style>
+        <!-- A row showing a pair (receive over send) stacks two values where one used to sit, so it
+             steps down a size to keep the card the same height as the rest. Declared after .resVal, which
+             is what makes it win: Avalonia ranks equally-close styles by order, not specificity. -->
+        <Style Selector="TextBlock.resVal.pair">
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
 
         <!-- The shared segment sized for the rail: no other tab puts one in a 180px column, so the
              narrower padding and type stay local (a local style outranks the shared Border.seg). -->
@@ -102,12 +108,32 @@
                                             <TextBlock Classes="resName" Text="{Binding Name}"/>
                                             <TextBlock Classes="resSub" Text="{Binding Sub}"/>
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock Classes="resVal" Text="{Binding ValueText}"
-                                                       Foreground="{Binding ValueBrush}"/>
-                                            <TextBlock Classes="resUnit" Text="{Binding Unit}"
-                                                       Foreground="{Binding ValueBrush}"/>
+                                        <!-- One line per series, tinted like the chart it belongs to: an
+                                             adapter's card names the whole adapter, so a receive-only
+                                             figure under it described half its traffic. Both lines share
+                                             the Unit, which is already the larger of the pair's. -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="2"
+                                                        HorizontalAlignment="Right">
+                                                <TextBlock Classes="resUnit" Text="{Binding ValueGlyph}"
+                                                           IsVisible="{Binding HasSecondSeries}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                                <TextBlock Classes="resVal" Text="{Binding ValueText}"
+                                                           Classes.pair="{Binding HasSecondSeries}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                                <TextBlock Classes="resUnit" Text="{Binding Unit}"
+                                                           Foreground="{Binding ValueBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="2"
+                                                        HorizontalAlignment="Right"
+                                                        IsVisible="{Binding HasSecondSeries}">
+                                                <TextBlock Classes="resUnit" Text="{Binding ValueGlyph2}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                                <TextBlock Classes="resVal pair" Text="{Binding ValueText2}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                                <TextBlock Classes="resUnit" Text="{Binding Unit}"
+                                                           Foreground="{Binding ValueBrush2}"/>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
