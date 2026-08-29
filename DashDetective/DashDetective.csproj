@@ -1,12 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <!-- TargetFramework, Nullable and the analyzer gates come from Directory.Build.props. -->
         <OutputType>WinExe</OutputType>
-        <!-- One neutral TFM for every platform: platform differences are decided at runtime by the
-             ForCurrentPlatform() provider seams, never by multi-targeting or #if. The neutral TFM is
-             also what makes the platform-compatibility analyzer (CA1416) a real gate rather than a
-             no-op, which is what AnalysisLevel=latest below engages. -->
-        <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
@@ -16,14 +11,6 @@
         <AssemblyTitle>DashDetective</AssemblyTitle>
         <Authors>Sophia Scherer</Authors>
         <Copyright>© 2026 Sophia Scherer</Copyright>
-
-        <!-- Quality gates. AnalysisLevel=latest turns on the current platform-compatibility (CA14xx)
-             analyzers; EnforceCodeStyleInBuild promotes the .editorconfig code-style rules into the
-             build, and TreatWarningsAsErrors makes any of them (or a stray compiler warning) fail the
-             build rather than slip through. -->
-        <AnalysisLevel>latest</AnalysisLevel>
-        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>

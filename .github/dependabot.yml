@@ -1,0 +1,31 @@
+# Dependency updates. Grouped so a week's worth arrives as one pull request per ecosystem rather
+# than one per package — every update has to pass the same four-leg build, and a dozen separate
+# PRs would run it a dozen times.
+
+version: 2
+updates:
+
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # The four core Avalonia packages are version-locked to each other and must move together.
+      # Listed first because a dependency joins the first group whose patterns match it.
+      avalonia:
+        patterns:
+          - "Avalonia"
+          - "Avalonia.*"
+      nuget:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -1,8 +1,14 @@
 # DashDetective — Architecture
 
 A high-level map of how the app is put together: the layers, the seams between them, and where things
-live. Conventions and rules for changing the code are in [AGENTS.md](../AGENTS.md); build and run
-instructions are in the [README](../README.md).
+live. Start here, then go deeper as needed:
+
+| | |
+| --- | --- |
+| [SOURCE-MAP.md](SOURCE-MAP.md) | Every file under `src/`: what it is for, and the trap it avoids. |
+| [FEATURES.md](FEATURES.md) | What each shipped feature does, and the decisions inside it. |
+| [AGENTS.md](../AGENTS.md) | The rules a change has to satisfy. |
+| [README](../README.md) | Building, running and testing. |
 
 ## What it is
 
@@ -26,6 +32,7 @@ DashDetective/
       Charts/        MetricHistory, ChartScale, ChartAxis, SparklinePoints, …
       Styles/        Palette (colour), Dimensions (layout), SharedStyles, Widgets, Layout
       Shortcuts/     ShortcutCatalog and the shortcut model
+      Completion/    PrefixCompleter, shared by every field that ghosts a suggestion
       (root)         ViewModelBase, marker interfaces, formatters, Placeholders, OverlapGuard
     Services/        shared by more than one tab
       SystemMetrics/ CPU, memory, GPU, storage samplers and providers

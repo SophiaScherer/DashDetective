@@ -13,7 +13,7 @@ namespace DashDetective.Shared.Shortcuts;
 /// <param name="AllowInTextInput">Whether the shortcut still fires while a text box has focus. False
 /// for bare keys, which must reach the text box instead of triggering an app action.</param>
 /// <param name="ShowInHelp">Whether Help lists this entry. False for members of a run that a single
-/// row already covers — Ctrl+2…Ctrl+8 are described by the Ctrl+1 row.</param>
+/// row already covers — Ctrl+2…Ctrl+9 are described by the Ctrl+1 row.</param>
 public sealed record Shortcut(
     ShortcutId Id,
     IReadOnlyList<KeyGesture> Gestures,

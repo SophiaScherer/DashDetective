@@ -1,13 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <!-- Matches the app's neutral TFM, so the suite runs on every platform the app builds for. -->
-        <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
+        <!-- TargetFramework, Nullable and the analyzer gates come from Directory.Build.props, so this
+             project cannot drift from the app's. -->
         <IsPackable>false</IsPackable>
-
-        <!-- Matches the app's gate so CA1416 fails the build here too. Without it the analyzer would only
-             warn in this project, and CI's build step passes no -warnaserror. -->
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!-- Hand-rolled fakes only, no mocking framework (the codebase's zero-dependency ethos). -->
     </PropertyGroup>
 
