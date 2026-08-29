@@ -40,6 +40,14 @@ public static class ChartAxis {
     /// <summary>The bottom footer for time labels of the given height, or 0 when there are none.</summary>
     public static double Footer(double textHeight) => textHeight > 0 ? textHeight + FooterGap : 0;
 
+    /// <summary>The extra left gutter a rotated y-axis title of this height needs, outside the one the value
+    /// labels take, or 0 when the chart carries no title.</summary>
+    public static double TitleGutter(double titleHeight) => titleHeight > 0 ? titleHeight + LabelGap : 0;
+
+    /// <summary>The extra bottom footer an x-axis title of this height needs, under the time labels, or 0
+    /// when the chart carries no title.</summary>
+    public static double TitleFooter(double titleHeight) => titleHeight > 0 ? titleHeight + FooterGap : 0;
+
     /// <summary>The area the grid and the series draw in, once the gutter and footer are taken out. A
     /// reservation too large for the control is given up rather than inverted — a chart squeezed to
     /// nothing still draws something, and never with a negative size.</summary>

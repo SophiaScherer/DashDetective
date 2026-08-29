@@ -29,6 +29,20 @@ public class ChartAxisTests {
         Assert.Equal(11 + ChartAxis.FooterGap, ChartAxis.Footer(11));
     }
 
+    /// <summary>The same reservation rule for the axis titles: a chart that names neither axis — which is
+    /// every chart outside the Performance detail pane — measures exactly as it did before they existed.</summary>
+    [Fact]
+    public void TitleReservations_NoTitle_ReserveNothing() {
+        Assert.Equal(0, ChartAxis.TitleGutter(0));
+        Assert.Equal(0, ChartAxis.TitleFooter(0));
+    }
+
+    [Fact]
+    public void TitleReservations_FitTheRotatedTextPlusItsGap() {
+        Assert.Equal(11 + ChartAxis.LabelGap, ChartAxis.TitleGutter(11));
+        Assert.Equal(11 + ChartAxis.FooterGap, ChartAxis.TitleFooter(11));
+    }
+
     /// <summary>The regression this whole split exists to prevent: an unlabelled chart draws over its whole
     /// self, exactly as it did before the axis furniture was added.</summary>
     [Fact]

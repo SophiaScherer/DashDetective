@@ -108,6 +108,10 @@ public partial class ResourceRow : ObservableObject {
     /// so it never claims a scale the chart isn't drawn on.</summary>
     public string ChartSubject { get; init; } = "% Utilization";
 
+    /// <summary>What the value axis measures, drawn rotated beside its labels. Every resource but the
+    /// adapter is a percentage of itself; the adapter's ceiling is a rate.</summary>
+    public string AxisYTitle { get; init; } = "Utilization (%)";
+
     /// <summary>Caption under the chart header: the subject plus the window the buffer currently covers.
     /// Observable because the window changes with the Settings refresh interval.</summary>
     [ObservableProperty] private string _chartCaption = "";

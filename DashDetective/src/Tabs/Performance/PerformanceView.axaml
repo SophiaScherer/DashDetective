@@ -227,7 +227,9 @@
                                         Stroke2="{Binding SelectedResource.ValueBrush2}"
                                         Points2="{Binding SelectedResource.Points2}"
                                         AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        AxisTimeLabels="{Binding ChartTimeLabels}"
+                                        AxisYTitle="{Binding SelectedResource.AxisYTitle}"
+                                        AxisXTitle="Time"
                                         StatusText="{Binding SelectedResource.ChartStatus}"/>
 
                     <!-- Detailed: one mini chart per logical processor / engine. Uncapped like the

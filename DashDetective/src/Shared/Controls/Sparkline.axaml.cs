@@ -23,8 +23,10 @@ namespace DashDetective.Shared.Controls;
 ///
 /// Fixed-range mode also carries optional axis furniture: value labels down the left — either three fixed
 /// ones (<see cref="AxisMaxLabel"/> / <see cref="AxisMidLabel"/> / <see cref="AxisMinLabel"/>) or a whole
-/// set on <see cref="AxisValueLabels"/>, one per grid line — the ends of the
-/// time range along the bottom (<see cref="AxisStartLabel"/> / <see cref="AxisEndLabel"/>) and a
+/// set on <see cref="AxisValueLabels"/>, one per grid line — the time range along the bottom (its two ends
+/// as <see cref="AxisStartLabel"/> / <see cref="AxisEndLabel"/>, or the whole row on
+/// <see cref="AxisTimeLabels"/>), what each axis measures (<see cref="AxisYTitle"/> /
+/// <see cref="AxisXTitle"/>) and a
 /// <see cref="StatusText"/> line over the plot for a chart with nothing to draw yet. Each reserves
 /// room only when it is set, so an unlabelled chart — every stat-card mini, every per-core cell — measures
 /// and draws exactly as it did before.
@@ -88,6 +90,15 @@ public partial class Sparkline : UserControl {
 
     public static readonly StyledProperty<string?> AxisEndLabelProperty =
         AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisEndLabel));
+
+    public static readonly StyledProperty<IReadOnlyList<string>?> AxisTimeLabelsProperty =
+        AvaloniaProperty.Register<Sparkline, IReadOnlyList<string>?>(nameof(AxisTimeLabels));
+
+    public static readonly StyledProperty<string?> AxisYTitleProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisYTitle));
+
+    public static readonly StyledProperty<string?> AxisXTitleProperty =
+        AvaloniaProperty.Register<Sparkline, string?>(nameof(AxisXTitle));
 
     public static readonly StyledProperty<string?> StatusTextProperty =
         AvaloniaProperty.Register<Sparkline, string?>(nameof(StatusText));
@@ -231,6 +242,27 @@ public partial class Sparkline : UserControl {
         set => SetValue(AxisEndLabelProperty, value);
     }
 
+    /// <summary>The whole time axis at once, oldest first — the form a chart wide enough for more than its
+    /// two ends uses. Set, it replaces <see cref="AxisStartLabel"/>/<see cref="AxisEndLabel"/>; unset, those
+    /// two draw as before. A plot too narrow for the whole set drops back toward its ends.</summary>
+    public IReadOnlyList<string>? AxisTimeLabels {
+        get => GetValue(AxisTimeLabelsProperty);
+        set => SetValue(AxisTimeLabelsProperty, value);
+    }
+
+    /// <summary>What the value axis measures, e.g. "Utilization (%)", drawn rotated beside its labels.
+    /// Empty reserves nothing, which is every chart that does not set it.</summary>
+    public string? AxisYTitle {
+        get => GetValue(AxisYTitleProperty);
+        set => SetValue(AxisYTitleProperty, value);
+    }
+
+    /// <summary>What the horizontal axis measures, e.g. "Time", drawn centred under its labels.</summary>
+    public string? AxisXTitle {
+        get => GetValue(AxisXTitleProperty);
+        set => SetValue(AxisXTitleProperty, value);
+    }
+
     /// <summary>A line drawn over the plot instead of leaving it to explain itself — a chart with nothing
     /// to show yet says so here. Empty draws nothing.</summary>
     public string? StatusText {
@@ -272,7 +304,8 @@ public partial class Sparkline : UserControl {
                 || change.Property == GridColumnsProperty || change.Property == GridBrushProperty
                 || change.Property == AxisMaxLabelProperty || change.Property == AxisMidLabelProperty
                 || change.Property == AxisMinLabelProperty || change.Property == AxisValueLabelsProperty
-                || change.Property == AxisStartLabelProperty
+                || change.Property == AxisStartLabelProperty || change.Property == AxisTimeLabelsProperty
+                || change.Property == AxisYTitleProperty || change.Property == AxisXTitleProperty
                 || change.Property == AxisEndLabelProperty || change.Property == StatusTextProperty
                 || change.Property == AxisBrushProperty))
             InvalidateVisual();
@@ -290,23 +323,29 @@ public partial class Sparkline : UserControl {
         // Axis text is measured before anything is drawn: what it needs decides how much room the plot has.
         var brush = AxisBrush ?? ResolveResource("TextSubtle");
         var values = MeasureValueLabels(brush);
-        var start = Label(AxisStartLabel, brush);
-        var end = Label(AxisEndLabel, brush);
+        var times = MeasureTimeLabels(brush);
+        var yTitle = Label(AxisYTitle, brush);
+        var xTitle = Label(AxisXTitle, brush);
 
         var widest = 0.0;
         foreach (var (label, _) in values)
             widest = Math.Max(widest, TextWidth(label));
+        var deepest = 0.0;
+        foreach (var (label, _) in times)
+            deepest = Math.Max(deepest, TextHeight(label));
 
+        var footer = ChartAxis.Footer(deepest);
         var plot = ChartAxis.PlotRect(w, h,
-            ChartAxis.Gutter(widest),
-            ChartAxis.Footer(Math.Max(TextHeight(start), TextHeight(end))));
+            ChartAxis.TitleGutter(TextHeight(yTitle)) + ChartAxis.Gutter(widest),
+            footer + ChartAxis.TitleFooter(TextHeight(xTitle)));
 
         // The grid and the axis labels sit behind the data and show even before any samples arrive, so an
         // empty chart still says what its scale is.
         if (ShowGrid)
             DrawGrid(context, plot);
         DrawValueLabels(context, plot, values);
-        DrawTimeLabels(context, plot, start, end);
+        DrawTimeLabels(context, plot, times);
+        DrawTitles(context, plot, yTitle, xTitle, footer);
 
         DrawSeries(context, plot);
         DrawStatus(context, plot);
@@ -386,14 +425,71 @@ public partial class Sparkline : UserControl {
         }
     }
 
-    /// <summary>Draws the ends of the time range beneath the plot.</summary>
-    private static void DrawTimeLabels(DrawingContext context, Rect plot, FormattedText? start,
-        FormattedText? end) {
+    /// <summary>The time labels ready to draw, each with where it sits along the axis (0 = oldest, 1 = now).
+    /// Mirrors <see cref="MeasureValueLabels"/>: the list form spaces them evenly, the two fixed properties
+    /// keep the ends they always had.</summary>
+    private List<(FormattedText Label, double Position)> MeasureTimeLabels(IBrush? brush) {
+        var measured = new List<(FormattedText, double)>();
+        var labels = AxisTimeLabels;
+
+        if (labels is not { Count: > 0 }) {
+            Add(AxisStartLabel, 0);
+            Add(AxisEndLabel, 1);
+            return measured;
+        }
+
+        for (var i = 0; i < labels.Count; i++)
+            Add(labels[i], labels.Count > 1 ? (double)i / (labels.Count - 1) : 0);
+        return measured;
+
+        void Add(string? value, double position) {
+            if (Label(value, brush) is { } label)
+                measured.Add((label, position));
+        }
+    }
+
+    /// <summary>Draws the time labels beneath the plot, dropping to a sparser set when they would not all
+    /// fit. The outer two are pulled inside the plot's edges rather than centred on them, so neither is
+    /// clipped.</summary>
+    private static void DrawTimeLabels(DrawingContext context, Rect plot,
+        List<(FormattedText Label, double Position)> labels) {
+        if (labels.Count == 0)
+            return;
+
+        var widest = 0.0;
+        foreach (var (label, _) in labels)
+            widest = Math.Max(widest, label.Width);
+
+        var kept = ChartAxis.FitLabelCount(plot.Width, widest + ChartAxis.LabelGap, labels.Count);
+        var step = kept > 1 ? (labels.Count - 1) / (kept - 1) : labels.Count;
+
         var footerTop = plot.Bottom + ChartAxis.FooterGap;
-        if (start is not null)
-            context.DrawText(start, new Point(plot.Left, footerTop));
-        if (end is not null)
-            context.DrawText(end, new Point(plot.Right - end.Width, footerTop));
+        for (var i = 0; i < labels.Count; i += step) {
+            var (label, position) = labels[i];
+            context.DrawText(label,
+                new Point(plot.Left + plot.Width * position - label.Width * position, footerTop));
+        }
+    }
+
+    /// <summary>Draws what each axis measures: the y title rotated in the band left of its labels, the x
+    /// title centred under the time row. <paramref name="footer"/> is the room the time labels took, which
+    /// is where the x title starts.</summary>
+    private static void DrawTitles(DrawingContext context, Rect plot, FormattedText? yTitle,
+        FormattedText? xTitle, double footer) {
+        if (yTitle is not null) {
+            // Rotated about its own centre so it reads bottom-to-top up the axis it labels.
+            var centre = new Point(yTitle.Height / 2, plot.Top + plot.Height / 2);
+            using (context.PushTransform(
+                       Matrix.CreateTranslation(-centre.X, -centre.Y)
+                       * Matrix.CreateRotation(-Math.PI / 2)
+                       * Matrix.CreateTranslation(centre.X, centre.Y)))
+                context.DrawText(yTitle,
+                    new Point(centre.X - yTitle.Width / 2, centre.Y - yTitle.Height / 2));
+        }
+
+        if (xTitle is not null)
+            context.DrawText(xTitle, new Point(plot.Center.X - xTitle.Width / 2,
+                plot.Bottom + footer + ChartAxis.FooterGap));
     }
 
     /// <summary>Centres <see cref="StatusText"/> over the plot. Drawn last, so it reads over whatever few

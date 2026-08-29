@@ -259,6 +259,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             ValueText2 = "0",
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
+            AxisYTitle = "Throughput",
             Link = NetworkLink(adapterName),
         };
 
@@ -667,9 +668,13 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyChartWindow();
     }
 
-    /// <summary>The oldest end of the chart's time axis, e.g. "−60s". One answer for the page: every
-    /// row's buffer is the same slot count on the same cadence.</summary>
-    [ObservableProperty] private string _chartRangeStart = "";
+    /// <summary>Grid columns on the detail chart divided by the time labels' band count: five bands put a
+    /// label under every second line, so a tick reads against the lattice behind it.</summary>
+    private const int TimeDivisions = 5;
+
+    /// <summary>The chart's time axis, oldest first. One answer for the page: every row's buffer is the
+    /// same slot count on the same cadence.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _chartTimeLabels = Array.Empty<string>();
 
     /// <summary>Rewrites every row's caption, and the shared time axis, for the current window. Called at
     /// construction, whenever the interval changes, and after new rows are built (they inherit the current
@@ -678,7 +683,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         var window = ChartWindow.Describe(WindowSeconds, _service.Interval);
         foreach (var row in Resources)
             row.ChartCaption = $"{row.ChartSubject} over {window}";
-        ChartRangeStart = ChartWindow.StartLabel(WindowSeconds, _service.Interval);
+        ChartTimeLabels = ChartWindow.TickLabels(WindowSeconds, _service.Interval, TimeDivisions);
     }
 
     /// <summary>Re-resolves every row's and sub-chart's tint from the current palette. Called wherever the
