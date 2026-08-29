@@ -135,19 +135,20 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var option in ClockFormatOptions)
             option.IsSelected = option.Value == settings.ClockFormat;
 
-        // The four usage thresholds share one run of choices so they read as the same kind of control;
-        // free space is inverted (alert when it drops BELOW), so its run is small values instead.
-        (string, int)[] usage = [("Off", 0), ("70%", 70), ("80%", 80), ("90%", 90), ("95%", 95)];
-        CpuAlert = new AlertThresholdRow(usage, settings.AlertCpuPercent, RaiseChanged);
-        MemoryAlert = new AlertThresholdRow(usage, settings.AlertMemoryPercent, RaiseChanged);
-        GpuAlert = new AlertThresholdRow(usage, settings.AlertGpuPercent, RaiseChanged);
-        DiskActiveAlert = new AlertThresholdRow(usage, settings.AlertDiskActivePercent, RaiseChanged);
-        LowDiskFreeAlert = new AlertThresholdRow(
-            [("Off", 0), ("5%", 5), ("10%", 10), ("15%", 15), ("20%", 20)],
-            settings.AlertLowDiskFreePercent, RaiseChanged);
+        // A usage threshold under 1% would fire constantly and 100 is a real (if rare) ceiling, so the
+        // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
+        // warns when the number drops BELOW — and stops at 99, since "warn while the disk is 100% free"
+        // is a warning that never stops.
+        CpuAlert = Threshold(settings.AlertCpuEnabled, settings.AlertCpuPercent, 100, "%");
+        MemoryAlert = Threshold(settings.AlertMemoryEnabled, settings.AlertMemoryPercent, 100, "%");
+        GpuAlert = Threshold(settings.AlertGpuEnabled, settings.AlertGpuPercent, 100, "%");
+        DiskActiveAlert = Threshold(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent, 100, "%");
+        LowDiskFreeAlert = Threshold(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent, 99, "%");
+
+        // The wait is not a warning of its own, so it has no switch — only the seconds. Capped at an hour,
+        // past which nothing would ever be reported.
         AlertSustain = new AlertThresholdRow(
-            [("5s", 5), ("10s", 10), ("30s", 30), ("60s", 60)],
-            settings.AlertSustainSeconds, RaiseChanged);
+            isEnabled: true, settings.AlertSustainSeconds, minimum: 1, maximum: 3600, "s", RaiseChanged);
 
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
@@ -168,15 +169,6 @@ public partial class SettingsViewModel : ViewModelBase {
     /// like <see cref="CanUseTray"/>: where the figure needs no helper tool there is nothing to opt into,
     /// and the sampler discards the write anyway.</summary>
     public bool CanUseNvidiaMetrics => GpuMetricsSupport.NeedsHelperTool;
-
-    /// <summary>The alert thresholds, for capturing into settings. Read off the rows rather than
-    /// mirrored into fields, so the segments on screen are the single source of what is persisted.</summary>
-    public int AlertCpuPercent => CpuAlert.Value;
-    public int AlertMemoryPercent => MemoryAlert.Value;
-    public int AlertGpuPercent => GpuAlert.Value;
-    public int AlertDiskActivePercent => DiskActiveAlert.Value;
-    public int AlertLowDiskFreePercent => LowDiskFreeAlert.Value;
-    public int AlertSustainSeconds => AlertSustain.Value;
 
     /// <summary>The currently selected clock format (for capturing into settings). The shell reads this
     /// and pushes it to the toolbar clock and the Toolkit log.</summary>
@@ -244,8 +236,13 @@ public partial class SettingsViewModel : ViewModelBase {
         Changed?.Invoke();
     }
 
+    /// <summary>Builds one percentage row. Every one shares a floor of 1: zero is how the settings layer
+    /// encodes "not watched", and the row's switch says that instead.</summary>
+    private AlertThresholdRow Threshold(bool isEnabled, int percent, int maximum, string suffix) =>
+        new(isEnabled, percent, minimum: 1, maximum, suffix, RaiseChanged);
+
     /// <summary>The alert rows' change callback. Guarded like the other seeded controls, though the rows
-    /// only report real selections anyway.</summary>
+    /// only report real edits anyway.</summary>
     private void RaiseChanged() {
         if (!_initializing)
             Changed?.Invoke();

@@ -214,10 +214,17 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
   **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
   (`src/Services/Startup`, soft-failing).
-- **Alerts.** Six segmented rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space
-  threshold, and how long a breach must last. **"Off" is a segment rather than a second toggle**, so a
-  threshold is one choice and `0` means "not watched" all the way down to `AppSettings`. Every row is
-  disabled on the whole `Border` while the master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
+- **Alerts.** Six rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space threshold, and
+  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`),
+  plus a per-row switch. Runs of preset segments were tried first and pushed the description text into a
+  narrow column that truncated it; a threshold is also a number people want to state rather than pick
+  from a shortlist. **The switch and the number are separate values on purpose**: the service encodes
+  "not watched" as `0`, and a row storing only that would forget its threshold the moment it was switched
+  off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was chosen. The
+  shell folds the pair back into the zero-means-off contract, so the watcher never learns that a page has
+  two controls. "Warn after" has no switch (it is the wait before a warning, not a warning) and reserves
+  the switch column so every number still lines up. Every row is disabled on the whole `Border` while the
+  master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
   (`src/Services/SystemMetrics`) owns the logic, deliberately **outside** `SystemMetricsService`, which stays
   a pure fan-out of the three shared feeds: GPU and disk have no shared feed there because an aggregate
   across devices would report an average under one device's name. The watcher reads them anyway without

@@ -34,6 +34,11 @@ public sealed class SettingsStoreTests : IDisposable {
             Theme = AppTheme.Light,
             AccentName = "Teal",
             ClockFormat = ClockFormat.TwelveHour,
+            AlertCpuEnabled = true,
+            AlertMemoryEnabled = false,
+            AlertGpuEnabled = true,
+            AlertDiskActiveEnabled = true,
+            AlertLowDiskFreeEnabled = false,
             AlertCpuPercent = 80,
             AlertMemoryPercent = 95,
             AlertGpuPercent = 90,
@@ -82,6 +87,9 @@ public sealed class SettingsStoreTests : IDisposable {
         Assert.Equal(90, loaded.AlertMemoryPercent);
         Assert.Equal(10, loaded.AlertLowDiskFreePercent);
         Assert.Equal(10, loaded.AlertSustainSeconds);
+        Assert.True(loaded.AlertCpuEnabled);
+        Assert.False(loaded.AlertGpuEnabled);   // ships off, but with a number already in the box
+        Assert.Equal(90, loaded.AlertGpuPercent);
     }
 
     [Fact]

@@ -316,12 +316,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
-        AlertCpuPercent = _settings.AlertCpuPercent,
-        AlertMemoryPercent = _settings.AlertMemoryPercent,
-        AlertGpuPercent = _settings.AlertGpuPercent,
-        AlertDiskActivePercent = _settings.AlertDiskActivePercent,
-        AlertLowDiskFreePercent = _settings.AlertLowDiskFreePercent,
-        AlertSustainSeconds = _settings.AlertSustainSeconds,
+        AlertCpuEnabled = _settings.CpuAlert.IsEnabled,
+        AlertMemoryEnabled = _settings.MemoryAlert.IsEnabled,
+        AlertGpuEnabled = _settings.GpuAlert.IsEnabled,
+        AlertDiskActiveEnabled = _settings.DiskActiveAlert.IsEnabled,
+        AlertLowDiskFreeEnabled = _settings.LowDiskFreeAlert.IsEnabled,
+        AlertCpuPercent = _settings.CpuAlert.Value,
+        AlertMemoryPercent = _settings.MemoryAlert.Value,
+        AlertGpuPercent = _settings.GpuAlert.Value,
+        AlertDiskActivePercent = _settings.DiskActiveAlert.Value,
+        AlertLowDiskFreePercent = _settings.LowDiskFreeAlert.Value,
+        AlertSustainSeconds = _settings.AlertSustain.Value,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
@@ -360,16 +365,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// The watcher holds the CPU and memory feeds open on its own, which is why it follows the setting
     /// rather than running unconditionally.</summary>
     private void ApplyAlertSettings(AppSettings settings) {
+        // Folded into the watcher's zero-means-off contract here: the service has no reason to know that a
+        // threshold and a switch are two controls on a page, and this keeps a disabled row's number.
         _alerts.Options = new ResourceAlertOptions {
-            CpuPercent = settings.AlertCpuPercent,
-            MemoryPercent = settings.AlertMemoryPercent,
-            GpuPercent = settings.AlertGpuPercent,
-            DiskActivePercent = settings.AlertDiskActivePercent,
-            LowDiskFreePercent = settings.AlertLowDiskFreePercent,
+            CpuPercent = Watched(settings.AlertCpuEnabled, settings.AlertCpuPercent),
+            MemoryPercent = Watched(settings.AlertMemoryEnabled, settings.AlertMemoryPercent),
+            GpuPercent = Watched(settings.AlertGpuEnabled, settings.AlertGpuPercent),
+            DiskActivePercent = Watched(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent),
+            LowDiskFreePercent = Watched(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent),
             SustainSeconds = settings.AlertSustainSeconds,
         };
         _alerts.Enabled = settings.ResourceAlerts;
     }
+
+    /// <summary>A threshold as the watcher wants it: the number when the resource is watched, else zero.</summary>
+    private static int Watched(bool enabled, int percent) => enabled ? percent : 0;
 
     /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
     /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and
@@ -415,7 +425,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AlertMetric.DiskSpace =>
             $"Low disk space — {alert.DeviceName} is {alert.Value:F0}% free, at or below the {alert.Threshold}% warning level.",
         _ =>
-            $"High resource usage — {alert.DeviceName} has stayed at or above {alert.Threshold}% for {_settings.AlertSustainSeconds} seconds.",
+            $"High resource usage — {alert.DeviceName} has stayed at or above {alert.Threshold}% for {_settings.AlertSustain.Value} seconds.",
     };
 
     /// <summary>The banner shows only while a breach is active, the "Resource alerts" setting is on, and

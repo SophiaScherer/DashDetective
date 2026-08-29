@@ -907,6 +907,22 @@ stays in its tab folder.
                                 ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
                                 IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
+                                NumericField.axaml(.cs) (a typed whole number with its unit beside it —
+                                                         "90 %", "10 s". Digits only, filtered on a
+                                                         TUNNELLED TextInput so a paste cannot smuggle a
+                                                         letter past it. Takes the value AS IT IS TYPED,
+                                                         not on focus loss: clicking anything that does
+                                                         not take focus leaves the box focused, so a
+                                                         commit-on-blur field silently lost the number.
+                                                         Only the ceiling is enforced mid-edit — raising a
+                                                         too-small number to the floor rewrites the box
+                                                         under the caret — and the box is reconciled to
+                                                         the stored value when the edit ends)
+                                AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
+                                                         switched-off row remembers its number. The
+                                                         settings layer encodes "not watched" as 0, which
+                                                         alone would forget it, so GPU could not ship
+                                                         "off, defaulted to 90")
                                 GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
                                                          helper process here. LINUX ONLY: there the figure
                                                          exists solely through nvidia-smi, which is why the

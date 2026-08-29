@@ -48,14 +48,21 @@ public sealed record AppSettings {
     /// are only watched while this is on.</summary>
     public bool ResourceAlerts { get; init; }
 
-    /// <summary>Per-metric alert thresholds as percentages, where <b>0 means the metric is not watched</b>.
-    /// Defaults match <c>ResourceAlertOptions.Defaults</c>: CPU and memory at 90 (what the app shipped
-    /// with), low-disk-space at 10, and GPU / disk activity off, since sustained saturation of either is
-    /// what legitimate heavy work looks like.</summary>
+    /// <summary>Whether each resource is watched. Separate from the threshold beside it so a switched-off
+    /// row still remembers its number: GPU and disk activity ship off — sustained saturation of either is
+    /// what legitimate heavy work looks like — but with a sensible figure already in the box.</summary>
+    public bool AlertCpuEnabled { get; init; } = true;
+    public bool AlertMemoryEnabled { get; init; } = true;
+    public bool AlertGpuEnabled { get; init; }
+    public bool AlertDiskActiveEnabled { get; init; }
+    public bool AlertLowDiskFreeEnabled { get; init; } = true;
+
+    /// <summary>Per-metric alert thresholds as percentages, kept whether or not the metric is watched.
+    /// The four usage figures are an upper bound; low-disk-space is a lower one.</summary>
     public int AlertCpuPercent { get; init; } = 90;
     public int AlertMemoryPercent { get; init; } = 90;
-    public int AlertGpuPercent { get; init; }
-    public int AlertDiskActivePercent { get; init; }
+    public int AlertGpuPercent { get; init; } = 90;
+    public int AlertDiskActivePercent { get; init; } = 90;
     public int AlertLowDiskFreePercent { get; init; } = 10;
 
     /// <summary>How long a usage metric must stay over its threshold before it counts. Seconds rather

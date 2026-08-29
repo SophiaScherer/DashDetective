@@ -302,8 +302,13 @@
         <!-- ===== Alerts ===== -->
         <!-- Its own card rather than six more Monitoring rows, and every row is gated on the master
              "Resource alerts" toggle above. Disabled on the whole Border, not just the control: a dimmed
-             segmented run reads as "not in effect", where a live one beside a dead toggle would not.
-             "Off" is a segment rather than a per-row toggle, so a threshold is one choice, not two. -->
+             control reads as "not in effect", where a live one beside a dead toggle would not.
+
+             A typed number rather than a run of preset segments: five or six presets per row pushed the
+             description into a narrow column, and a threshold is a number people want to state. The
+             per-row switch is what turns a resource off, so the number survives being switched off and
+             the field never has to carry a magic "Off" member. "Warn after" has no switch — it is the
+             wait before a warning, not a warning. -->
         <controls:WidgetPanel WidgetId="settings.alerts" Title="{Binding Catalog.AlertCpu.Section}"
                               Subtitle="Watched only while Resource alerts is on">
             <StackPanel Spacing="16">
@@ -311,28 +316,18 @@
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertCpu}"
                         IsEnabled="{Binding ResourceAlerts}">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertCpu.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertCpu.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding CpuAlert.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding CpuAlert.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding CpuAlert.Minimum}"
+                                                   Maximum="{Binding CpuAlert.Maximum}"
+                                                   Suffix="{Binding CpuAlert.Suffix}" IsEnabled="{Binding CpuAlert.IsEnabled}"/>
+                            <ToggleButton Classes="toggle" IsChecked="{Binding CpuAlert.IsEnabled}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -340,28 +335,18 @@
                         IsEnabled="{Binding ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertMemory.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertMemory.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding MemoryAlert.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding MemoryAlert.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding MemoryAlert.Minimum}"
+                                                   Maximum="{Binding MemoryAlert.Maximum}"
+                                                   Suffix="{Binding MemoryAlert.Suffix}" IsEnabled="{Binding MemoryAlert.IsEnabled}"/>
+                            <ToggleButton Classes="toggle" IsChecked="{Binding MemoryAlert.IsEnabled}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -369,28 +354,18 @@
                         IsEnabled="{Binding ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertGpu.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertGpu.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding GpuAlert.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding GpuAlert.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding GpuAlert.Minimum}"
+                                                   Maximum="{Binding GpuAlert.Maximum}"
+                                                   Suffix="{Binding GpuAlert.Suffix}" IsEnabled="{Binding GpuAlert.IsEnabled}"/>
+                            <ToggleButton Classes="toggle" IsChecked="{Binding GpuAlert.IsEnabled}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -398,28 +373,18 @@
                         IsEnabled="{Binding ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertDiskActivity.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertDiskActivity.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding DiskActiveAlert.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding DiskActiveAlert.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding DiskActiveAlert.Minimum}"
+                                                   Maximum="{Binding DiskActiveAlert.Maximum}"
+                                                   Suffix="{Binding DiskActiveAlert.Suffix}" IsEnabled="{Binding DiskActiveAlert.IsEnabled}"/>
+                            <ToggleButton Classes="toggle" IsChecked="{Binding DiskActiveAlert.IsEnabled}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -427,28 +392,18 @@
                         IsEnabled="{Binding ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertLowDiskFree.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertLowDiskFree.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding LowDiskFreeAlert.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding LowDiskFreeAlert.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding LowDiskFreeAlert.Minimum}"
+                                                   Maximum="{Binding LowDiskFreeAlert.Maximum}"
+                                                   Suffix="{Binding LowDiskFreeAlert.Suffix}" IsEnabled="{Binding LowDiskFreeAlert.IsEnabled}"/>
+                            <ToggleButton Classes="toggle" IsChecked="{Binding LowDiskFreeAlert.IsEnabled}"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -456,28 +411,20 @@
                         IsEnabled="{Binding ResourceAlerts}"
                         BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
                     <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
                             <TextBlock Classes="settingName" Text="{Binding Catalog.AlertSustain.Name}"/>
                             <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertSustain.Description}"/>
                         </StackPanel>
-                        <Border Grid.Column="1" Classes="segments">
-                            <ItemsControl ItemsSource="{Binding AlertSustain.Options}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
-                                        <Button Classes="bare" Command="{Binding SelectCommand}">
-                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                                <TextBlock Text="{Binding Label}"/>
-                                            </Border>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Border>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center">
+                            <settings:NumericField Value="{Binding AlertSustain.Value, Mode=TwoWay}"
+                                                   Minimum="{Binding AlertSustain.Minimum}"
+                                                   Maximum="{Binding AlertSustain.Maximum}"
+                                                   Suffix="{Binding AlertSustain.Suffix}"/>
+                            <!-- Holds the switch column open on the one row that has no switch, so every
+                                 number in the card still lines up. -->
+                            <Border Width="40"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </StackPanel>
