@@ -4,7 +4,26 @@
 > Always read this file in full before making any changes. If instructions here conflict with
 > something you infer from the codebase, this file wins.
 
-This file holds the **rules** — what a change has to satisfy. The detail lives beside it:
+This file holds the **rules** — what a change has to satisfy. It is deliberately short, and the
+detail it used to carry now lives in three files beside it.
+
+## Before you change anything
+
+Reading this file is **not sufficient**. It is step one of three, and steps two and three are not
+optional background:
+
+1. **Read this file in full.** It is the rules, and it is ~650 lines.
+2. **Open [docs/SOURCE-MAP.md](docs/SOURCE-MAP.md) at the section for every folder you will edit.**
+   It is one section per folder, so this is a targeted read, not a full one. Many entries record a
+   bug that was already fixed once — the reason a value is read one way and not the obvious other
+   way. **The code will not tell you.** `LinuxDiskTemperatureProvider` matching a hwmon by name
+   rather than index, `/proc/diskstats` listing `sda` and `sda1` alike, `/proc/mounts` naming one
+   device many times: each of those reads as an over-complication until you know what it prevents.
+3. **Open [docs/FEATURES.md](docs/FEATURES.md) at the entry for the feature you are touching.** It
+   holds the decisions inside it that must not be undone — the Toolkit's four safety invariants, for
+   instance, are there and nowhere else.
+
+Skipping 2 or 3 is how a fixed bug comes back.
 
 | | |
 | --- | --- |
@@ -112,8 +131,32 @@ tests/DashDetective.Tests/   mirrors src/ path for path
 ```
 
 **[docs/SOURCE-MAP.md](docs/SOURCE-MAP.md) is the file-by-file map** — what each file is for and,
-where it matters, the trap it exists to avoid. Consult it before adding a file or changing one you
-have not read; several entries record a bug that was fixed once already.
+where it matters, the trap it exists to avoid. Jump straight to the folder you are working in:
+
+- Shared: [root](docs/SOURCE-MAP.md#srcshared) ·
+  [Charts](docs/SOURCE-MAP.md#srcsharedcharts) ·
+  [Controls](docs/SOURCE-MAP.md#srcsharedcontrols) ·
+  [Layout](docs/SOURCE-MAP.md#srcsharedlayout) ·
+  [Styles](docs/SOURCE-MAP.md#srcsharedstyles)
+- Services: [SystemMetrics](docs/SOURCE-MAP.md#srcservicessystemmetrics) ·
+  [Platform](docs/SOURCE-MAP.md#srcservicesplatform) ·
+  [Theming](docs/SOURCE-MAP.md#srcservicestheming) ·
+  [Settings](docs/SOURCE-MAP.md#srcservicessettings) ·
+  [Network](docs/SOURCE-MAP.md#srcservicesnetwork) ·
+  [Startup](docs/SOURCE-MAP.md#srcservicesstartup) ·
+  [Diagnostics](docs/SOURCE-MAP.md#srcservicesdiagnostics)
+- Shell: [root](docs/SOURCE-MAP.md#srcshell) ·
+  [Navigation](docs/SOURCE-MAP.md#srcshellnavigation) ·
+  [TrayNotice](docs/SOURCE-MAP.md#srcshelltraynotice)
+- Tabs: [Dashboard](docs/SOURCE-MAP.md#srctabsdashboard) ·
+  [FileExplorer](docs/SOURCE-MAP.md#srctabsfileexplorer) ·
+  [Processes](docs/SOURCE-MAP.md#srctabsprocesses) ·
+  [Performance](docs/SOURCE-MAP.md#srctabsperformance) ·
+  [Network](docs/SOURCE-MAP.md#srctabsnetwork) ·
+  [Storage](docs/SOURCE-MAP.md#srctabsstorage) ·
+  [Hardware](docs/SOURCE-MAP.md#srctabshardware) ·
+  [Toolkit](docs/SOURCE-MAP.md#srctabstoolkit) ·
+  [Settings](docs/SOURCE-MAP.md#srctabssettings)
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
 until a second feature needs them.
