@@ -12,23 +12,26 @@ public enum ChartSeries {
     Storage,
     NetDown,
     NetUp,
+    Threads,
 }
 
 /// <summary>
-/// The six per-graph series colours, in the order <c>ThemeService</c> writes them to the
+/// The seven per-graph series colours, in the order <c>ThemeService</c> writes them to the
 /// <c>ChartCpu</c> / <c>ChartMemory</c> / <c>ChartGpu</c> / <c>ChartStorage</c> / <c>ChartNetDown</c> /
-/// <c>ChartNetUp</c> resource keys.
+/// <c>ChartNetUp</c> / <c>ChartThreads</c> resource keys.
 /// </summary>
 public sealed record ChartSeriesColors(
-    Color Cpu, Color Memory, Color Gpu, Color Storage, Color NetDown, Color NetUp) {
+    Color Cpu, Color Memory, Color Gpu, Color Storage, Color NetDown, Color NetUp, Color Threads) {
 
-    /// <summary>This palette's colour for one series.</summary>
+    /// <summary>This palette's colour for one series. Every member is listed explicitly: the fallback
+    /// arm would silently paint a newly added series as CPU rather than fail to compile.</summary>
     public Color For(ChartSeries series) => series switch {
         ChartSeries.Memory => Memory,
         ChartSeries.Gpu => Gpu,
         ChartSeries.Storage => Storage,
         ChartSeries.NetDown => NetDown,
         ChartSeries.NetUp => NetUp,
+        ChartSeries.Threads => Threads,
         _ => Cpu,
     };
 }
@@ -55,7 +58,10 @@ public static class ChartPalette {
         Gpu: Color.Parse("#6ccb5f"),
         Storage: Color.Parse("#ffcf4d"),
         NetDown: Color.Parse("#4cc2ff"),
-        NetUp: Color.Parse("#ff8a5c"));
+        NetUp: Color.Parse("#ff8a5c"),
+        // Pink sits in the wheel's one wide gap, between purple and orange, so a thread count reads as
+        // its own thing rather than as a second GPU or memory figure.
+        Threads: Color.Parse("#ff7ac6"));
 
     /// <summary>The palette for <paramref name="accent"/>: the accent itself for CPU and net-down, and
     /// every other series' default hue turned by the accent's offset from the default blue.</summary>
@@ -67,7 +73,8 @@ public static class ChartPalette {
             Gpu: Rotate(Default.Gpu, turn),
             Storage: Rotate(Default.Storage, turn),
             NetDown: accent,
-            NetUp: Rotate(Default.NetUp, turn));
+            NetUp: Rotate(Default.NetUp, turn),
+            Threads: Rotate(Default.Threads, turn));
     }
 
     /// <summary>Turns <paramref name="color"/>'s hue by <paramref name="degrees"/>, keeping its

@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Theming;
 
 namespace DashDetective.Tabs.Network;
 
@@ -11,10 +12,10 @@ namespace DashDetective.Tabs.Network;
 /// State colours are fixed (not themed), matching the comp and the app's other status indicators.
 /// </summary>
 public partial class ConnectionRow : ObservableObject {
-    private static readonly IBrush EstablishedBrush = new SolidColorBrush(Color.Parse("#6ccb5f"));
-    private static readonly IBrush ListeningBrush = new SolidColorBrush(Color.Parse("#4cc2ff"));
-    private static readonly IBrush TimeWaitBrush = new SolidColorBrush(Color.Parse("#ffcf4d"));
-    private static readonly IBrush OtherBrush = new SolidColorBrush(Color.Parse("#9aa0a6"));
+    private static readonly IBrush EstablishedBrush = SemanticBrushes.StatusGood;
+    private static readonly IBrush ListeningBrush = SemanticBrushes.StatusInfo;
+    private static readonly IBrush TimeWaitBrush = SemanticBrushes.StatusWarn;
+    private static readonly IBrush OtherBrush = SemanticBrushes.StatusIdle;
 
     public ConnectionRow(ConnectionInfo info) {
         Key = info.Key;

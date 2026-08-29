@@ -18,7 +18,7 @@
         <!-- The elevation shield. Fixed rather than themed, like the kind badges and the status dots:
              "this raises a UAC prompt" must read the same under every accent. Tab-local: no other
              feature raises a UAC prompt. -->
-        <SolidColorBrush x:Key="ShieldAmber" Color="#ffcf4d"/>
+        <SolidColorBrush x:Key="ShieldAmber" Color="{StaticResource YellowColor}"/>
     </UserControl.Resources>
 
     <UserControl.Styles>

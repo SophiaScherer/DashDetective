@@ -51,7 +51,7 @@
     </Style>
     <Style Selector="controls|WidgetPanel.dragging /template/ Border">
         <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        <Setter Property="BoxShadow" Value="0 10 28 0 #55000000"/>
+        <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
     </Style>
 
     <!-- The header is the drag handle, so say so on hover. -->

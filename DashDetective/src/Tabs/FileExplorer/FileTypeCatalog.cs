@@ -1,12 +1,13 @@
 using Avalonia.Media;
+using DashDetective.Services.Theming;
 
 namespace DashDetective.Tabs.FileExplorer;
 
 /// <summary>
 /// Maps filesystem entries to the themed vector glyph + fixed colour used to draw them in the
 /// tree, file list and details pane. Icons are drawn as stroked <see cref="Geometry"/> outlines
-/// (no shell HICON→bitmap conversion). The per-type colours are semantic and fixed (like the
-/// Palette's legend brushes), authored to match the design comp.
+/// (no shell HICON→bitmap conversion). The per-type colours are the palette's semantic, fixed
+/// brushes (see <see cref="SemanticBrushes"/>), so they never drift from the rest of the app.
 /// </summary>
 public static class FileTypeCatalog {
     /// <summary>Folder outline with a raised left tab, authored in a 16x16 space.</summary>
@@ -17,16 +18,16 @@ public static class FileTypeCatalog {
     public static readonly Geometry DocGlyph = Geometry.Parse(
         "M4,1.5 H9 L12.5,5 V14.5 H4 Z M9,1.5 V5 H12.5");
 
-    /// <summary>Amber, matching the design comp's folder colour (#e8b64c).</summary>
-    public static readonly IBrush FolderBrush = Brush("#e8b64c");
+    /// <summary>Amber. The palette's yellow, which the comp's folder colour was a near-duplicate of.</summary>
+    public static readonly IBrush FolderBrush = SemanticBrushes.Yellow;
 
-    // Semantic file-type colours from the comp (fixed, not theme-swapped).
-    private static readonly IBrush Blue = Brush("#4cc2ff");
-    private static readonly IBrush Green = Brush("#6ccb5f");
-    private static readonly IBrush Purple = Brush("#c58fff");
-    private static readonly IBrush Yellow = Brush("#ffcf4d");
-    private static readonly IBrush Red = Brush("#ff6b6b");
-    private static readonly IBrush Neutral = Brush("#9aa0a6");
+    // Semantic file-type colours (fixed, not theme-swapped), from the shared palette.
+    private static readonly IBrush Blue = SemanticBrushes.Blue;
+    private static readonly IBrush Green = SemanticBrushes.Green;
+    private static readonly IBrush Purple = SemanticBrushes.Purple;
+    private static readonly IBrush Yellow = SemanticBrushes.Yellow;
+    private static readonly IBrush Red = SemanticBrushes.Red;
+    private static readonly IBrush Neutral = SemanticBrushes.Neutral;
 
     /// <summary>The glyph + colour to draw an entry with.</summary>
     public static (Geometry Glyph, IBrush Brush) ForEntry(bool isDirectory, string extension) =>
@@ -55,8 +56,6 @@ public static class FileTypeCatalog {
             => FileCategory.Document,
         _ => FileCategory.Other,
     };
-
-    private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
 }
 
 /// <summary>Coarse file grouping behind the All / Documents / Images / Archives filter.</summary>

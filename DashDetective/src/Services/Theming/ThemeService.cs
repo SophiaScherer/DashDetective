@@ -120,6 +120,7 @@ public sealed class ThemeService {
             res["ChartStorage"] = new SolidColorBrush(series.Storage);
             res["ChartNetDown"] = new SolidColorBrush(series.NetDown);
             res["ChartNetUp"] = new SolidColorBrush(series.NetUp);
+            res["ChartThreads"] = new SolidColorBrush(series.Threads);
         }
 
         // Raised even with no Application (headless tests): the palette itself has still changed.

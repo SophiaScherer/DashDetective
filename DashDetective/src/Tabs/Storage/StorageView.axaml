@@ -245,7 +245,7 @@
                                 <Border Background="{DynamicResource CardBackground}"
                                         BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
                                         CornerRadius="8" Padding="6" MinWidth="200"
-                                        BoxShadow="0 8 24 0 #22000000">
+                                        BoxShadow="{StaticResource ShadowPopup}">
                                     <ItemsControl ItemsSource="{Binding Drives}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:DriveCard">

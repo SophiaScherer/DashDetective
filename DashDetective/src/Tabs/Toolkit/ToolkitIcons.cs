@@ -1,12 +1,14 @@
 using Avalonia.Media;
+using DashDetective.Services.Theming;
 
 namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
 /// Feature-local glyphs and fixed badge colours for the Toolkit rows, one set per
 /// <see cref="ToolkitEntryKind"/>. Same conventions as <c>HardwareIcons</c>: 18×18 stroked
-/// geometries, and **fixed** legend-style tints (not the theme-swapped accent) so a kind reads the
-/// same in light and dark — a foreground colour plus a 14%-opacity tile/pill background.
+/// geometries, and **fixed** legend-style tints from <see cref="SemanticBrushes"/> (not the
+/// theme-swapped accent) so a kind reads the same in light and dark — a foreground colour plus the
+/// palette's soft tile/pill background.
 ///
 /// Only <see cref="ToolkitEntry"/>'s presentation getters and the view reach this, and they do so
 /// lazily: <c>Geometry.Parse</c> needs a render backend, so nothing the tests touch may load it.
@@ -39,18 +41,18 @@ public static class ToolkitIcons {
         "M12,10.5 V14 A0.5,0.5 0 0 1 11.5,14.5 H4 A0.5,0.5 0 0 1 3.5,14 V6.5 " +
         "A0.5,0.5 0 0 1 4,6 H7.5");
 
-    // ----- Fixed per-kind colours (foreground + 14%-tint background, as #AARRGGBB) -----
+    // ----- Fixed per-kind colours (foreground + tinted background), from the shared palette -----
 
-    private static readonly IBrush Blue = Brush.Parse("#4cc2ff");
-    private static readonly IBrush BlueBg = Brush.Parse("#244cc2ff");
-    private static readonly IBrush Purple = Brush.Parse("#c58fff");
-    private static readonly IBrush PurpleBg = Brush.Parse("#24c58fff");
-    private static readonly IBrush Green = Brush.Parse("#6ccb5f");
-    private static readonly IBrush GreenBg = Brush.Parse("#246ccb5f");
-    private static readonly IBrush Yellow = Brush.Parse("#ffcf4d");
-    private static readonly IBrush YellowBg = Brush.Parse("#24ffcf4d");
-    private static readonly IBrush Orange = Brush.Parse("#ff8a5c");
-    private static readonly IBrush OrangeBg = Brush.Parse("#24ff8a5c");
+    private static readonly IBrush Blue = SemanticBrushes.Blue;
+    private static readonly IBrush BlueBg = SemanticBrushes.BlueSoft;
+    private static readonly IBrush Purple = SemanticBrushes.Purple;
+    private static readonly IBrush PurpleBg = SemanticBrushes.PurpleSoft;
+    private static readonly IBrush Green = SemanticBrushes.Green;
+    private static readonly IBrush GreenBg = SemanticBrushes.GreenSoft;
+    private static readonly IBrush Yellow = SemanticBrushes.Yellow;
+    private static readonly IBrush YellowBg = SemanticBrushes.YellowSoft;
+    private static readonly IBrush Orange = SemanticBrushes.Orange;
+    private static readonly IBrush OrangeBg = SemanticBrushes.OrangeSoft;
 
     /// <summary>The row glyph for a kind.</summary>
     public static Geometry GlyphFor(ToolkitEntryKind kind) => kind switch {

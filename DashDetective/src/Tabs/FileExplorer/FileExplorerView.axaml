@@ -235,7 +235,7 @@
                            IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
                         <Border Background="{DynamicResource CardBackground}"
                                 BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                CornerRadius="8" Padding="12" BoxShadow="0 8 24 0 #22000000">
+                                CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
                             <StackPanel Spacing="10">
                                 <!-- Reveals OS hidden/system entries in list + tree. -->
                                 <CheckBox Classes="optionCheck" Content="Show hidden"

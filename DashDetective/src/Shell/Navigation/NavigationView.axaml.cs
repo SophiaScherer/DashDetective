@@ -145,7 +145,7 @@ public partial class NavigationView : UserControl {
             CornerRadius = new CornerRadius(7),
             Padding = new Thickness(9, 6),
             IsHitTestVisible = false,
-            BoxShadow = BoxShadows.Parse("0 6 16 0 #55000000"),
+            BoxShadow = ShadowRes("ShadowDrag"),
             Child = new StackPanel {
                 Orientation = Orientation.Horizontal, Spacing = 8,
                 Children = { _dragChipIcon, _dragChipLabel },
@@ -177,6 +177,13 @@ public partial class NavigationView : UserControl {
         this.TryGetResource(key, ActualThemeVariant, out var res) && res is IBrush brush
             ? brush
             : new SolidColorBrush(fallback);
+
+    // No literal fallback, unlike BrushRes: a shadow is decorative, so a missing key drops the shadow
+    // rather than reintroducing a hex the palette is supposed to own.
+    private BoxShadows ShadowRes(string key) =>
+        this.TryGetResource(key, ActualThemeVariant, out var res) && res is BoxShadows shadow
+            ? shadow
+            : default;
 
     // Nearest window edge to the pointer — every edge is a valid dock target, so snap to the closest.
     private static NavOrientation NearestEdge(Point p, Size size) {

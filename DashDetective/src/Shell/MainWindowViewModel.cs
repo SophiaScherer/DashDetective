@@ -32,8 +32,8 @@ using System.Text;
 namespace DashDetective.Shell;
 
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
-    private static readonly IBrush LiveDot = new SolidColorBrush(Color.Parse("#6ccb5f"));
-    private static readonly IBrush PausedDot = new SolidColorBrush(Color.Parse("#9aa0a6"));
+    private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
+    private static readonly IBrush PausedDot = SemanticBrushes.StatusIdle;
 
     private const string AlertMessage = "High resource usage — CPU or memory has stayed above 90%.";
 
@@ -65,7 +65,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private bool _trayNoticeShown;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage))]
+    [NotifyPropertyChangedFor(nameof(CurrentPageSelfScrolls), nameof(ScrollingPage), nameof(SelfScrollingPage),
+                              nameof(RefreshToolTip))]
     private ViewModelBase _currentPage;
 
     /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
@@ -79,7 +80,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LiveLabel), nameof(LiveDotBrush))]
+    [NotifyPropertyChangedFor(nameof(LiveLabel), nameof(LiveDotBrush), nameof(RefreshToolTip))]
     private bool _isLive = true;
 
     /// <summary>The navigation bar: owns the nav items and selection; the shell hosts the page it
@@ -104,6 +105,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     public string LiveLabel => IsLive ? "Live" : "Paused";
     public IBrush LiveDotBrush => IsLive ? LiveDot : PausedDot;
+
+    /// <summary>What the toolbar's Refresh button promises on the current page — see
+    /// <see cref="RefreshHint"/> for why it is worded rather than disabled.</summary>
+    public string RefreshToolTip => RefreshHint.For(CurrentPage, IsLive);
 
     /// <summary>Whether the app should hide to the tray (rather than exit) when the window is closed.
     /// Gated on <see cref="TrayIntegration.HidesOnClose"/>, so a desktop with no tray closes normally

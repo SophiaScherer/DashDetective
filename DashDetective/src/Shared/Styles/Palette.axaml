@@ -1,44 +1,109 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!--
-      Central colour palette for DashDetective.
+      Central colour palette for DashDetective. Every colour in the app is defined here, once.
 
       Three groups of keys:
-      • Theme-invariant (below): series colours and the accent set. Same in Light and Dark.
-        The accent keys are overwritten at runtime by ThemeService, so views must reference
-        them with {DynamicResource ...}.
-      • Theme-variant (ThemeDictionaries): surfaces, lines and the text ramp. These flip with
-        the app's ThemeVariant (Light/Dark), so views must reference them with {DynamicResource}.
-      Fixed series colours may stay {StaticResource}; everything else must be {DynamicResource}.
+      • Series — the per-graph colours. Overwritten at runtime by ThemeService when an accent is
+        chosen, so views must reference them with {DynamicResource ...}.
+      • Semantic — the fixed hues, their status aliases and their tints. These deliberately do NOT
+        follow the accent: a "Running" process should not turn orange because the accent did.
+        {StaticResource} is correct for them. Code that needs them as brushes reads the C# mirror,
+        Services/Theming/SemanticBrushes.cs.
+      • Surface (ThemeDictionaries) — surfaces, lines and the text ramp. These flip with the app's
+        ThemeVariant (Light/Dark), so views must reference them with {DynamicResource}.
+
+      Each hue is declared once as a <Color> primitive and every brush derives from it, so a colour has
+      a single definition however many tints hang off it.
     -->
 
+    <!-- ===== Colour primitives =====
+         The authored hues. Nothing outside this file should spell a hex literal. -->
+    <Color x:Key="BlueColor">#4cc2ff</Color>
+    <Color x:Key="PurpleColor">#c58fff</Color>
+    <Color x:Key="GreenColor">#6ccb5f</Color>
+    <Color x:Key="YellowColor">#ffcf4d</Color>
+    <Color x:Key="OrangeColor">#ff8a5c</Color>
+    <Color x:Key="RedColor">#ff6b6b</Color>
+    <Color x:Key="PinkColor">#ff7ac6</Color>
+    <Color x:Key="NeutralColor">#9aa0a6</Color>
+    <!-- Black, for the shadow and scrim tints below. Fixed in both themes: a dimmed window reads as
+         dimmed either way. -->
+    <Color x:Key="ShadeColor">#000000</Color>
+
     <!-- ===== Theme-invariant: fixed accent-legend colours =====
-         The four accent choices, plus yellow. Used by the "Default" swatch's 2x2 legend and as
-         the default per-graph chart colours below. Fixed, so a running accent swap never changes them. -->
-    <SolidColorBrush x:Key="Blue" Color="#4cc2ff"/>
-    <SolidColorBrush x:Key="Purple" Color="#c58fff"/>
-    <SolidColorBrush x:Key="Green" Color="#6ccb5f"/>
-    <SolidColorBrush x:Key="Yellow" Color="#ffcf4d"/>
-    <SolidColorBrush x:Key="Orange" Color="#ff8a5c"/>
+         Used by the "Default" swatch's 2x2 legend and as the default per-graph chart colours below.
+         Fixed, so a running accent swap never changes them. -->
+    <SolidColorBrush x:Key="Blue" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="Purple" Color="{StaticResource PurpleColor}"/>
+    <SolidColorBrush x:Key="Green" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="Yellow" Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="Orange" Color="{StaticResource OrangeColor}"/>
+    <SolidColorBrush x:Key="Red" Color="{StaticResource RedColor}"/>
+    <SolidColorBrush x:Key="Pink" Color="{StaticResource PinkColor}"/>
+    <SolidColorBrush x:Key="Neutral" Color="{StaticResource NeutralColor}"/>
+
+    <!-- ===== Semantic: status =====
+         What a dot, badge or health figure means, named by meaning rather than by hue. Aliases of the
+         fixed colours above, so a status never drifts from the legend it is read against. -->
+    <SolidColorBrush x:Key="StatusGood" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="StatusWarn" Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="StatusBad" Color="{StaticResource RedColor}"/>
+    <SolidColorBrush x:Key="StatusInfo" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="StatusIdle" Color="{StaticResource NeutralColor}"/>
+
+    <!-- ===== Semantic: soft fills =====
+         The tint behind an icon tile or badge. One alpha for all of them — the two that had drifted
+         apart, 14% and 16%, are now both 16% — so tinted surfaces read as one family across tabs. -->
+    <SolidColorBrush x:Key="BlueSoft" Color="{StaticResource BlueColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="PurpleSoft" Color="{StaticResource PurpleColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="GreenSoft" Color="{StaticResource GreenColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="YellowSoft" Color="{StaticResource YellowColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="OrangeSoft" Color="{StaticResource OrangeColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="RedSoft" Color="{StaticResource RedColor}" Opacity="0.16"/>
+    <SolidColorBrush x:Key="PinkSoft" Color="{StaticResource PinkColor}" Opacity="0.16"/>
+
+    <!-- Outlines for those fills, and the hover step above each. Only the destructive (red) and the
+         alert (yellow) surfaces are interactive today, so only they carry the full ladder. -->
+    <SolidColorBrush x:Key="RedSoftHover" Color="{StaticResource RedColor}" Opacity="0.24"/>
+    <SolidColorBrush x:Key="RedLine" Color="{StaticResource RedColor}" Opacity="0.30"/>
+    <SolidColorBrush x:Key="RedLineHover" Color="{StaticResource RedColor}" Opacity="0.40"/>
+    <SolidColorBrush x:Key="YellowLine" Color="{StaticResource YellowColor}" Opacity="0.30"/>
+
+    <!-- ===== Semantic: elevation =====
+         Three roles, replacing five ad-hoc alphas. A popup sits just off the surface; a dragged item
+         and a modal sit well above it. Fixed in both themes, like the scrim. -->
+    <BoxShadows x:Key="ShadowPopup">0 8 24 0 #22000000</BoxShadows>
+    <BoxShadows x:Key="ShadowDrag">0 8 24 0 #55000000</BoxShadows>
+    <BoxShadows x:Key="ShadowModal">0 12 40 0 #55000000</BoxShadows>
+
+    <!-- The full-window dim behind a modal. Black at 55% in BOTH themes. A non-null Background is also
+         what makes a modal modal — it swallows pointer input bound for the window behind it. -->
+    <SolidColorBrush x:Key="ScrimBackground" Color="{StaticResource ShadeColor}" Opacity="0.55"/>
 
     <!-- ===== Theme-invariant: accent set (swapped at runtime by ThemeService) ===== -->
-    <SolidColorBrush x:Key="Accent" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource BlueColor}"/>
     <SolidColorBrush x:Key="AccentHover" Color="#66d0ff"/>
     <SolidColorBrush x:Key="OnAccent" Color="#06263a"/>
-    <SolidColorBrush x:Key="AccentSoft" Color="#4cc2ff" Opacity="0.12"/>
+    <!-- 12%, not the 16% of the soft fills above: this one sits behind body text, where a stronger
+         fill costs contrast. -->
+    <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource BlueColor}" Opacity="0.12"/>
     <!-- Colours (not brushes) for the brand-logo gradient stops. -->
     <Color x:Key="AccentColor">#4cc2ff</Color>
     <Color x:Key="AccentDeep">#2a7fd4</Color>
 
     <!-- ===== Theme-invariant: chart series (swapped at runtime by ThemeService) =====
          Each dashboard graph binds to one of these. In the "Default" look they hold the distinct
-         colours below; when a single accent is chosen, ThemeService sets them all to that accent. -->
-    <SolidColorBrush x:Key="ChartCpu" Color="#4cc2ff"/>
-    <SolidColorBrush x:Key="ChartMemory" Color="#c58fff"/>
-    <SolidColorBrush x:Key="ChartGpu" Color="#6ccb5f"/>
-    <SolidColorBrush x:Key="ChartStorage" Color="#ffcf4d"/>
-    <SolidColorBrush x:Key="ChartNetDown" Color="#4cc2ff"/>
-    <SolidColorBrush x:Key="ChartNetUp" Color="#ff8a5c"/>
+         colours below; when a single accent is chosen, ThemeService re-hues them around it. -->
+    <SolidColorBrush x:Key="ChartCpu" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartMemory" Color="{StaticResource PurpleColor}"/>
+    <SolidColorBrush x:Key="ChartGpu" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="ChartStorage" Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="ChartNetDown" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartNetUp" Color="{StaticResource OrangeColor}"/>
+    <!-- Not a graph, but it sits beside the CPU and memory figures on the Processes summary strip, so it
+         re-hues with them. Pink keeps it clear of GPU's green. -->
+    <SolidColorBrush x:Key="ChartThreads" Color="{StaticResource PinkColor}"/>
 
     <!-- ===== Theme-invariant: console surface =====
          The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
@@ -50,8 +115,8 @@
     <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
     <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
     <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
-    <SolidColorBrush x:Key="ConsoleGreen" Color="#6ccb5f"/>
-    <SolidColorBrush x:Key="ConsoleBlue" Color="#4cc2ff"/>
+    <SolidColorBrush x:Key="ConsoleGreen" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="ConsoleBlue" Color="{StaticResource BlueColor}"/>
 
     <ResourceDictionary.ThemeDictionaries>
 
