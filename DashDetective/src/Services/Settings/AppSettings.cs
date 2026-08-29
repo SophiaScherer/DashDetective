@@ -8,7 +8,9 @@ namespace DashDetective.Services.Settings;
 /// The persisted user preferences, written to <c>settings.json</c> by <see cref="SettingsStore"/>.
 /// An immutable snapshot: the composition root applies it on load and captures a fresh one to save
 /// whenever a control changes. Every property has a default so a file missing fields (an older
-/// schema, a hand-edit) still deserializes; <see cref="SchemaVersion"/> guards future migrations.
+/// schema, a hand-edit) still deserializes — though the defaults survive that only because
+/// <see cref="SettingsStore"/> merges a loaded file over <see cref="Defaults"/>; see the note there
+/// before assuming an initializer here is enough. <see cref="SchemaVersion"/> guards future migrations.
 /// </summary>
 public sealed record AppSettings {
     /// <summary>Bumped when the shape changes incompatibly; a mismatch falls back to <see cref="Defaults"/>.</summary>
@@ -42,8 +44,23 @@ public sealed record AppSettings {
     /// not stop it.</summary>
     public bool TrayNoticeShown { get; init; }
 
-    /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
+    /// <summary>The master switch for the in-app resource-alert banner. The per-metric thresholds below
+    /// are only watched while this is on.</summary>
     public bool ResourceAlerts { get; init; }
+
+    /// <summary>Per-metric alert thresholds as percentages, where <b>0 means the metric is not watched</b>.
+    /// Defaults match <c>ResourceAlertOptions.Defaults</c>: CPU and memory at 90 (what the app shipped
+    /// with), low-disk-space at 10, and GPU / disk activity off, since sustained saturation of either is
+    /// what legitimate heavy work looks like.</summary>
+    public int AlertCpuPercent { get; init; } = 90;
+    public int AlertMemoryPercent { get; init; } = 90;
+    public int AlertGpuPercent { get; init; }
+    public int AlertDiskActivePercent { get; init; }
+    public int AlertLowDiskFreePercent { get; init; } = 10;
+
+    /// <summary>How long a usage metric must stay over its threshold before it counts. Seconds rather
+    /// than samples, so the wait means the same thing at every refresh interval.</summary>
+    public int AlertSustainSeconds { get; init; } = 10;
 
     /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default: it is
     /// the only metric in the app that costs a process launch, and the card reads "—" without it. No

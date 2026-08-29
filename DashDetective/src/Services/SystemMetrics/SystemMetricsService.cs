@@ -13,14 +13,13 @@ namespace DashDetective.Services.SystemMetrics;
 /// under a label naming one of them. Subscriptions are ref-counted
 /// (a channel runs only while it has subscribers); <see cref="Pause"/>/<see cref="Resume"/> back the Live
 /// pill, <see cref="RefreshAll"/> backs Refresh, and per-metric fault isolation is kept.
+///
+/// Pure fan-out: resource alerts are <see cref="ResourceAlertWatcher"/>'s job, and it subscribes here like
+/// any page. Keeping the thresholds out of this class is what lets the watcher read GPU and disk — which
+/// have no shared feed here, by the rule above — without this class growing an aggregate of either.
 /// </summary>
 public sealed class SystemMetricsService : IDisposable {
     private static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds(1);
-
-    /// <summary>Utilisation level (%) at or above which a metric counts as breaching, and the number of
-    /// consecutive breaching samples that raises a resource alert (10 s at the default 1 Hz cadence).</summary>
-    private const double AlertThresholdPercent = 90;
-    private const int AlertConsecutiveSamples = 10;
 
     private readonly Func<string> _adapterName;
     private readonly IDisposable? _cpuDisposable;
@@ -29,14 +28,6 @@ public sealed class SystemMetricsService : IDisposable {
     private readonly MetricFeed<MemorySample> _memory;
     private readonly MetricFeed<NetworkSample> _network;
     private readonly MetricFeed[] _feeds;
-
-    // Internal resource-alert watcher: consecutive-breach streaks per metric and the combined state.
-    // Its subscriptions are what would keep the CPU and memory feeds alive with no page on screen, so
-    // they are attached only while the user has resource alerts switched on (see AlertsEnabled).
-    private readonly MetricSubscriptions _alertWatchers;
-    private int _cpuBreachStreak;
-    private int _memoryBreachStreak;
-    private bool _alertActive;
 
     public SystemMetricsService()
         : this(CreateSystemSamplers()) { }
@@ -58,12 +49,6 @@ public sealed class SystemMetricsService : IDisposable {
         _memory = new MetricFeed<MemorySample>(DefaultInterval, samplers.Memory, timerFactory);
         _network = new MetricFeed<NetworkSample>(DefaultInterval, samplers.Network, timerFactory);
         _feeds = new MetricFeed[] { _cpu, _memory, _network };
-
-        // Watch CPU + memory for a sustained breach. Built detached: the setting is off by default, and
-        // subscribing would hold both channels open however little else is running.
-        _alertWatchers = new MetricSubscriptions(
-            () => _cpu.Subscribe(OnCpuAlertSample, static () => { }),
-            () => _memory.Subscribe(OnMemoryAlertSample, static () => { }));
     }
 
     // Builds the three shared real samplers, each wrapped in a Sample() delegate; the CPU instance is also
@@ -82,36 +67,6 @@ public sealed class SystemMetricsService : IDisposable {
 
     // Carries the real sampler bundle plus the native-handle owner that needs disposing.
     private readonly record struct SystemSamplers(MetricSamplers Bundle, IDisposable CpuDisposable);
-
-    /// <summary>Raised when the resource-alert state flips: <c>true</c> once CPU or memory has stayed at or
-    /// above the threshold for <see cref="AlertConsecutiveSamples"/> samples, <c>false</c> when both recover.
-    /// The shell surfaces this as an inline banner (gated by the user's "Resource alerts" setting).</summary>
-    public event Action<bool>? AlertActiveChanged;
-
-    /// <summary>Whether a resource alert is currently active.</summary>
-    public bool AlertActive => _alertActive;
-
-    /// <summary>Whether the resource-alert watcher is running — mirrors the user's "Resource alerts"
-    /// setting, and is off by default like it. The watcher subscribes to the CPU and memory feeds, so
-    /// leaving it on holds both open even with every page deactivated. Switching it off clears any
-    /// active alert, so a banner cannot outlive the setting that raised it.</summary>
-    public bool AlertsEnabled {
-        get => _alertWatchers.IsAttached;
-        set {
-            if (value == _alertWatchers.IsAttached)
-                return;
-
-            if (value) {
-                _alertWatchers.Attach();
-                return;
-            }
-
-            _alertWatchers.Detach();
-            _cpuBreachStreak = 0;
-            _memoryBreachStreak = 0;
-            EvaluateAlert();
-        }
-    }
 
     /// <summary>Friendly name of the sampled network adapter, for the throughput caption.</summary>
     public string NetworkAdapterName => _adapterName();
@@ -152,28 +107,6 @@ public sealed class SystemMetricsService : IDisposable {
         IntervalChanged?.Invoke(interval);
     }
 
-    /// <summary>Updates the CPU breach streak and re-evaluates the alert state.</summary>
-    private void OnCpuAlertSample(double cpuPercent) {
-        _cpuBreachStreak = cpuPercent >= AlertThresholdPercent ? _cpuBreachStreak + 1 : 0;
-        EvaluateAlert();
-    }
-
-    /// <summary>Updates the memory breach streak and re-evaluates the alert state.</summary>
-    private void OnMemoryAlertSample(MemorySample sample) {
-        _memoryBreachStreak = sample.LoadPercent >= AlertThresholdPercent ? _memoryBreachStreak + 1 : 0;
-        EvaluateAlert();
-    }
-
-    /// <summary>An alert is active while either metric's streak has reached the consecutive-sample count;
-    /// raises <see cref="AlertActiveChanged"/> only on a transition.</summary>
-    private void EvaluateAlert() {
-        var active = _cpuBreachStreak >= AlertConsecutiveSamples || _memoryBreachStreak >= AlertConsecutiveSamples;
-        if (active == _alertActive)
-            return;
-        _alertActive = active;
-        AlertActiveChanged?.Invoke(active);
-    }
-
     /// <summary>Pauses all metric sampling (shell Live pill off). Refresh still works while paused.</summary>
     public void Pause() {
         foreach (var feed in _feeds)
@@ -195,7 +128,6 @@ public sealed class SystemMetricsService : IDisposable {
 
     /// <summary>Stops all channels and disposes the sampler that owns a native query handle (CPU).</summary>
     public void Dispose() {
-        _alertWatchers.Dispose();
         foreach (var feed in _feeds)
             feed.Dispose();
         _cpuDisposable?.Dispose();

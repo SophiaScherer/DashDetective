@@ -35,6 +35,15 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
+    // ----- Alerts: one row per watched resource, plus how long a breach must last -----
+
+    public AlertThresholdRow CpuAlert { get; }
+    public AlertThresholdRow MemoryAlert { get; }
+    public AlertThresholdRow GpuAlert { get; }
+    public AlertThresholdRow DiskActiveAlert { get; }
+    public AlertThresholdRow LowDiskFreeAlert { get; }
+    public AlertThresholdRow AlertSustain { get; }
+
     /// <summary>The shell's navigation bar view-model — the single shared instance, so the Settings
     /// Navigation controls and the on-bar controls stay in sync.</summary>
     public NavigationViewModel Nav { get; }
@@ -126,6 +135,20 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var option in ClockFormatOptions)
             option.IsSelected = option.Value == settings.ClockFormat;
 
+        // The four usage thresholds share one run of choices so they read as the same kind of control;
+        // free space is inverted (alert when it drops BELOW), so its run is small values instead.
+        (string, int)[] usage = [("Off", 0), ("70%", 70), ("80%", 80), ("90%", 90), ("95%", 95)];
+        CpuAlert = new AlertThresholdRow(usage, settings.AlertCpuPercent, RaiseChanged);
+        MemoryAlert = new AlertThresholdRow(usage, settings.AlertMemoryPercent, RaiseChanged);
+        GpuAlert = new AlertThresholdRow(usage, settings.AlertGpuPercent, RaiseChanged);
+        DiskActiveAlert = new AlertThresholdRow(usage, settings.AlertDiskActivePercent, RaiseChanged);
+        LowDiskFreeAlert = new AlertThresholdRow(
+            [("Off", 0), ("5%", 5), ("10%", 10), ("15%", 15), ("20%", 20)],
+            settings.AlertLowDiskFreePercent, RaiseChanged);
+        AlertSustain = new AlertThresholdRow(
+            [("5s", 5), ("10s", 10), ("30s", 30), ("60s", 60)],
+            settings.AlertSustainSeconds, RaiseChanged);
+
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
         // registry state, which is the ground truth if it was changed outside the app.
@@ -145,6 +168,15 @@ public partial class SettingsViewModel : ViewModelBase {
     /// like <see cref="CanUseTray"/>: where the figure needs no helper tool there is nothing to opt into,
     /// and the sampler discards the write anyway.</summary>
     public bool CanUseNvidiaMetrics => GpuMetricsSupport.NeedsHelperTool;
+
+    /// <summary>The alert thresholds, for capturing into settings. Read off the rows rather than
+    /// mirrored into fields, so the segments on screen are the single source of what is persisted.</summary>
+    public int AlertCpuPercent => CpuAlert.Value;
+    public int AlertMemoryPercent => MemoryAlert.Value;
+    public int AlertGpuPercent => GpuAlert.Value;
+    public int AlertDiskActivePercent => DiskActiveAlert.Value;
+    public int AlertLowDiskFreePercent => LowDiskFreeAlert.Value;
+    public int AlertSustainSeconds => AlertSustain.Value;
 
     /// <summary>The currently selected clock format (for capturing into settings). The shell reads this
     /// and pushes it to the toolbar clock and the Toolkit log.</summary>
@@ -210,6 +242,13 @@ public partial class SettingsViewModel : ViewModelBase {
         else
             _theme.ApplyDefaultAppearance();
         Changed?.Invoke();
+    }
+
+    /// <summary>The alert rows' change callback. Guarded like the other seeded controls, though the rows
+    /// only report real selections anyway.</summary>
+    private void RaiseChanged() {
+        if (!_initializing)
+            Changed?.Invoke();
     }
 
     private void SelectClockFormat(ClockFormatOption option) {

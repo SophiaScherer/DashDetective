@@ -211,12 +211,24 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   coarse timers stay coarse (Dashboard uptime 30 s; Network adapters 5 s / connections 2.5 s /
   ping 2 s are NOT retimed). The three toggles are real templated `ToggleButton`s (shared
   `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
-  alerts** (merged from the comp's two notification toggles — no OS toast is in scope, so both meant
-  the same in-app banner), **Show in system tray**, **Launch at startup**. The alert watcher lives in
-  `SystemMetricsService` (raises `AlertActiveChanged` after CPU or memory stays ≥ 90 % for 10
-  consecutive samples); the shell shows an inline warning banner below the toolbar (auto-clears on
-  recovery, `×` to dismiss the current breach, gated by the setting). **Launch at startup** writes the
-  HKCU `…\Run` value via `IStartupRegistration` (`src/Services/Startup`, soft-failing).
+  alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
+  **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
+  (`src/Services/Startup`, soft-failing).
+- **Alerts.** Six segmented rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space
+  threshold, and how long a breach must last. **"Off" is a segment rather than a second toggle**, so a
+  threshold is one choice and `0` means "not watched" all the way down to `AppSettings`. Every row is
+  disabled on the whole `Border` while the master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
+  (`src/Services/SystemMetrics`) owns the logic, deliberately **outside** `SystemMetricsService`, which stays
+  a pure fan-out of the three shared feeds: GPU and disk have no shared feed there because an aggregate
+  across devices would report an average under one device's name. The watcher reads them anyway without
+  breaking that rule — it owns its own samplers (their contracts require it) and takes the **worst device,
+  named in the banner**. Three decisions worth keeping: the sustain window is **seconds converted against
+  the live interval**, not a sample count (the old fixed 10 samples silently meant 5 s at the 0.5 s cadence
+  and 50 s at the 5 s one); **GPU and disk activity default off**, because sustained saturation of either is
+  what games, renders and large copies look like; and free space **skips unlettered volumes**, because
+  Recovery/EFI partitions sit near-full by design and alerting on them is a banner that never clears. The
+  shell shows the inline warning below the toolbar, with copy built from the breach (`×` dismisses the
+  current one; a different resource taking over clears the dismissal).
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.

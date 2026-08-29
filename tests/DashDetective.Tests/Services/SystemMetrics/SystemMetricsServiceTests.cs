@@ -8,8 +8,8 @@ using Xunit;
 namespace DashDetective.Tests.Services.SystemMetrics;
 
 /// <summary>Covers <see cref="SystemMetricsService"/> through the injected sampler bundle + fake timer
-/// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe, per-metric fault isolation, and
-/// the sustained-breach alert watcher — including that the watcher costs nothing until it is enabled.</summary>
+/// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe and per-metric fault isolation. The
+/// resource-alert behaviour this class used to own now lives in <c>ResourceAlertWatcherTests</c>.</summary>
 public class SystemMetricsServiceTests {
     // Feeds are constructed in this order, so the captured timers line up by index.
     private const int Cpu = 0, Memory = 1, Network = 2;
@@ -61,53 +61,22 @@ public class SystemMetricsServiceTests {
     }
 
     [Fact]
-    public void AlertsEnabled_StartsCpuAndMemory_AndStopsThemAgainWhenCleared() {
-        var (service, timers) = Create(new FakeSamplers());
-
-        service.AlertsEnabled = true;
-        Assert.True(timers[Cpu].IsRunning);
-        Assert.True(timers[Memory].IsRunning);
-        Assert.False(timers[Network].IsRunning);   // the watcher wants neither
-
-        service.AlertsEnabled = false;
-        Assert.False(timers[Cpu].IsRunning);
-        Assert.False(timers[Memory].IsRunning);
-    }
-
-    [Fact]
-    public void AlertsEnabled_ClearedDuringABreach_ClearsTheAlert() {
-        var fakes = new FakeSamplers { Cpu = 95 };
-        var (service, _) = Create(fakes);
-        service.AlertsEnabled = true;
-        var transitions = new List<bool>();
-        service.AlertActiveChanged += active => transitions.Add(active);
-
-        for (var i = 0; i < 10; i++)
-            service.RefreshAll();
-        Assert.True(service.AlertActive);
-
-        // A banner must not outlive the setting that raised it.
-        service.AlertsEnabled = false;
-        Assert.False(service.AlertActive);
-        Assert.Equal(new[] { true, false }, transitions);
-    }
-
-    [Fact]
     public void PauseThenResume_StopsAllThenRestartsOnlySubscribed() {
         var (service, timers) = Create(new FakeSamplers());
-        service.AlertsEnabled = true;                                // CPU + Memory now have a subscriber
+        service.SubscribeCpu(_ => { }, () => { });
+        service.SubscribeMemory(_ => { }, () => { });
         var token = service.SubscribeNetwork(_ => { }, () => { });   // Network now has a subscriber
 
         service.Pause();
         Assert.All(timers, t => Assert.False(t.IsRunning));
 
         service.Resume();
-        Assert.True(timers[Cpu].IsRunning);       // alert subscriber
-        Assert.True(timers[Memory].IsRunning);    // alert subscriber
-        Assert.True(timers[Network].IsRunning);   // our subscriber
+        Assert.True(timers[Cpu].IsRunning);
+        Assert.True(timers[Memory].IsRunning);
+        Assert.True(timers[Network].IsRunning);
 
-        // With its only subscriber gone, Network stays stopped across a Pause/Resume while the
-        // alert-subscribed feeds come back.
+        // With its only subscriber gone, Network stays stopped across a Pause/Resume while the two that
+        // still have one come back.
         token.Dispose();
         service.Pause();
         service.Resume();
@@ -158,21 +127,4 @@ public class SystemMetricsServiceTests {
         Assert.True(timers[Cpu].IsRunning);       // ...and stays running
     }
 
-    [Fact]
-    public void Alert_RaisesTrueAfterSustainedCpuBreach_ThenFalseOnRecovery() {
-        var fakes = new FakeSamplers();   // cpu starts at 50, below the threshold
-        var (service, _) = Create(fakes);
-        service.AlertsEnabled = true;
-        var transitions = new List<bool>();
-        service.AlertActiveChanged += active => transitions.Add(active);
-
-        fakes.Cpu = 95;
-        for (var i = 0; i < 10; i++)
-            service.RefreshAll();
-        Assert.Equal(new[] { true }, transitions);   // fires once, on the 10th consecutive breach
-
-        fakes.Cpu = 50;
-        service.RefreshAll();
-        Assert.Equal(new[] { true, false }, transitions);   // and once more on recovery
-    }
 }

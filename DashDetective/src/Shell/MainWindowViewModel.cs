@@ -35,9 +35,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
     private static readonly IBrush PausedDot = SemanticBrushes.StatusIdle;
 
-    private const string AlertMessage = "High resource usage — CPU or memory has stayed above 90%.";
-
     private readonly SystemMetricsService _metrics;
+    private readonly ResourceAlertWatcher _alerts;
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard;
@@ -52,9 +51,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly DispatcherTimer _clockTimer;
     private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
 
-    // Resource-alert banner state: whether the metrics service reports an active breach, and whether the
-    // user dismissed the current one. The banner shows only while active, unignored, and alerts are on.
-    private bool _alertActive;
+    // Resource-alert banner state: the breach the watcher currently reports, and whether the user
+    // dismissed it. The banner shows only while there is one, unignored, and alerts are on.
+    private ResourceAlert? _alert;
     private bool _alertDismissed;
 
     // Whether the window is on screen. Hidden to the tray it is not, and no page should be sampling —
@@ -76,8 +75,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Whether the resource-alert banner is currently shown in the shell.</summary>
     [ObservableProperty] private bool _alertBannerVisible;
 
-    /// <summary>The resource-alert banner message.</summary>
-    [ObservableProperty] private string _alertText = AlertMessage;
+    /// <summary>The resource-alert banner message, naming the resource and device that breached.</summary>
+    [ObservableProperty] private string _alertText = "";
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
     [ObservableProperty]
@@ -133,6 +132,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // sample (Dashboard, Performance, Processes); the rest are self-contained.
         _metrics = metrics;
         _store = store;
+        _alerts = new ResourceAlertWatcher(metrics);
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
         _performance = new PerformanceViewModel(metrics, _theme);
@@ -158,7 +158,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _processes.PreferencesChanged += Persist;
         foreach (var page in ReorderablePages)
             page.WidgetOrderChanged += Persist;
-        _metrics.AlertActiveChanged += OnAlertActiveChanged;
+        _alerts.AlertChanged += OnAlertChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
         Nav.Initialize(new[] {
@@ -248,7 +248,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
         ApplyClockFormat(settings.ClockFormat);
-        _metrics.AlertsEnabled = settings.ResourceAlerts;
+        ApplyAlertSettings(settings);
         _recents.Load(settings.RecentSearches);
 
         _processes.ColumnOrder = ProcessColumnOrder.Decode(settings.ProcessColumns);
@@ -316,6 +316,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
+        AlertCpuPercent = _settings.AlertCpuPercent,
+        AlertMemoryPercent = _settings.AlertMemoryPercent,
+        AlertGpuPercent = _settings.AlertGpuPercent,
+        AlertDiskActivePercent = _settings.AlertDiskActivePercent,
+        AlertLowDiskFreePercent = _settings.AlertLowDiskFreePercent,
+        AlertSustainSeconds = _settings.AlertSustainSeconds,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
@@ -346,10 +352,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
         ApplyClockFormat(_settings.ClockFormat);
+        ApplyAlertSettings(CaptureCurrent());
+    }
 
-        // The watcher holds the CPU and memory feeds open on its own, so it follows the setting rather
-        // than running unconditionally.
-        _metrics.AlertsEnabled = _settings.ResourceAlerts;
+    /// <summary>Pushes the alert thresholds and the master switch onto the watcher. Thresholds first: the
+    /// setter clears every streak, so applying them after enabling would discard the first samples.
+    /// The watcher holds the CPU and memory feeds open on its own, which is why it follows the setting
+    /// rather than running unconditionally.</summary>
+    private void ApplyAlertSettings(AppSettings settings) {
+        _alerts.Options = new ResourceAlertOptions {
+            CpuPercent = settings.AlertCpuPercent,
+            MemoryPercent = settings.AlertMemoryPercent,
+            GpuPercent = settings.AlertGpuPercent,
+            DiskActivePercent = settings.AlertDiskActivePercent,
+            LowDiskFreePercent = settings.AlertLowDiskFreePercent,
+            SustainSeconds = settings.AlertSustainSeconds,
+        };
+        _alerts.Enabled = settings.ResourceAlerts;
     }
 
     /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
@@ -379,19 +398,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             Persist();
     }
 
-    /// <summary>The metrics service flipped the resource-alert state. Recovery clears any dismissal so a
-    /// later breach shows again; then re-evaluate the banner.</summary>
-    private void OnAlertActiveChanged(bool active) {
-        _alertActive = active;
-        if (!active)
-            _alertDismissed = false;
+    /// <summary>The watcher changed what it reports. A different resource clears any dismissal too, not
+    /// just recovery — the user dismissed the message they were shown, not every message to come.</summary>
+    private void OnAlertChanged(ResourceAlert? alert) {
+        _alert = alert;
+        _alertDismissed = false;
+        if (alert is { } breach)
+            AlertText = DescribeAlert(breach);
         UpdateAlertBanner();
     }
+
+    /// <summary>The banner copy. Names the device, because "a GPU is busy" on a two-GPU machine is not
+    /// something anyone can act on, and reports the threshold that was actually crossed rather than a
+    /// literal, so the text cannot drift from the setting.</summary>
+    private string DescribeAlert(ResourceAlert alert) => alert.Metric switch {
+        AlertMetric.DiskSpace =>
+            $"Low disk space — {alert.DeviceName} is {alert.Value:F0}% free, at or below the {alert.Threshold}% warning level.",
+        _ =>
+            $"High resource usage — {alert.DeviceName} has stayed at or above {alert.Threshold}% for {_settings.AlertSustainSeconds} seconds.",
+    };
 
     /// <summary>The banner shows only while a breach is active, the "Resource alerts" setting is on, and
     /// the user hasn't dismissed the current breach.</summary>
     private void UpdateAlertBanner() =>
-        AlertBannerVisible = _alertActive && _settings.ResourceAlerts && !_alertDismissed;
+        AlertBannerVisible = _alert is not null && _settings.ResourceAlerts && !_alertDismissed;
 
     /// <summary>Dismisses the current alert banner (until usage recovers and breaches again).</summary>
     [RelayCommand]
@@ -412,6 +442,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             _metrics.Resume();
         else
             _metrics.Pause();
+        _alerts.SetLive(IsLive);
         foreach (var item in Nav.NavItems)
             (item.Page as ILiveSamplingPage)?.SetLive(IsLive);
     }
@@ -670,7 +701,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     public void Dispose() {
         _clockTimer.Stop();
         Search.Dispose();
-        _metrics.AlertActiveChanged -= OnAlertActiveChanged;
+        _alerts.AlertChanged -= OnAlertChanged;
+        _alerts.Dispose();
         foreach (var item in Nav.NavItems)
             (item.Page as IDisposable)?.Dispose();
         _metrics.Dispose();

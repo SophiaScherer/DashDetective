@@ -231,6 +231,12 @@ stays in its tab folder.
       /Settings
         AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
         SettingsStore.cs        (load-on-start soft-fail to defaults; debounced atomic save to
+                                (Load MERGES the file over AppSettings.Defaults key by key — LOAD-BEARING,
+                                 not belt-and-braces. Deserializing directly discards every non-default
+                                 initializer the file omits: the source generator treats a record's init
+                                 properties as constructor parameters, builds the object from one args
+                                 array, and fills absent slots with default(T). That silently loaded
+                                 ShowInTray as false, and every alert threshold as 0 — which is OFF)
                                  %AppData%/DashDetective/settings.json; Flush on shutdown. Pure
                                  persistence — knows no view-models; the composition root applies/observes)
         SettingsJsonContext.cs  (System.Text.Json source-gen context for AppSettings; string enums)
@@ -659,6 +665,21 @@ stays in its tab folder.
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
                                  generic MetricChannel<TSample> for snapshot samples + a no-history variant)
         SystemMetricsService.cs (SINGLE owner of the three SHARED samplers — CPU, Memory, Network;
+        ResourceAlert.cs        (AlertMetric + the breach being reported: resource, DEVICE NAME, reading,
+                                 threshold. Named because "a GPU is busy" on a two-GPU machine is not
+                                 actionable)
+        ResourceAlertOptions.cs (the user's thresholds. ZERO MEANS OFF, which collapses "enabled" into the
+                                 value — one control per row, one check in the watcher. GPU and disk
+                                 activity default off: sustained saturation of either is what legitimate
+                                 heavy work looks like)
+        ResourceAlertWatcher.cs (watches CPU/memory (shared feeds) plus GPU, disk activity and free space
+                                 against those thresholds. Owns its OWN GPU + disk samplers, which their
+                                 contracts require, and never aggregates — it takes the WORST device and
+                                 names it, so the no-shared-aggregate rule above still holds. Sustain is
+                                 SECONDS converted against the live interval, not a sample count, which
+                                 used to mean 5 s at the 0.5 s cadence and 50 s at the 5 s one. Free space
+                                 skips UNLETTERED volumes: Recovery/EFI sit near-full by design, so
+                                 watching them is a banner that never goes away)
                                  per-metric 1 Hz channel fans each sample out to subscribers (ref-counted — a
                                  channel runs only while it has one), Pause/Resume for the Live pill,
                                  RefreshAll for Refresh, per-metric fault isolation. Dashboard / Performance /

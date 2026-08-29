@@ -299,6 +299,190 @@
             </StackPanel>
         </controls:WidgetPanel>
 
+        <!-- ===== Alerts ===== -->
+        <!-- Its own card rather than six more Monitoring rows, and every row is gated on the master
+             "Resource alerts" toggle above. Disabled on the whole Border, not just the control: a dimmed
+             segmented run reads as "not in effect", where a live one beside a dead toggle would not.
+             "Off" is a segment rather than a per-row toggle, so a threshold is one choice, not two. -->
+        <controls:WidgetPanel WidgetId="settings.alerts" Title="{Binding Catalog.AlertCpu.Section}"
+                              Subtitle="Watched only while Resource alerts is on">
+            <StackPanel Spacing="16">
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertCpu}"
+                        IsEnabled="{Binding ResourceAlerts}">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertCpu.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertCpu.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding CpuAlert.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertMemory}"
+                        IsEnabled="{Binding ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertMemory.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertMemory.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding MemoryAlert.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertGpu}"
+                        IsEnabled="{Binding ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertGpu.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertGpu.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding GpuAlert.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertDiskActivity}"
+                        IsEnabled="{Binding ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertDiskActivity.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertDiskActivity.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding DiskActiveAlert.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertLowDiskFree}"
+                        IsEnabled="{Binding ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertLowDiskFree.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertLowDiskFree.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding LowDiskFreeAlert.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AlertSustain}"
+                        IsEnabled="{Binding ResourceAlerts}"
+                        BorderBrush="{DynamicResource RowLine}" BorderThickness="0,1,0,0" Padding="0,9,0,0">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Classes="settingName" Text="{Binding Catalog.AlertSustain.Name}"/>
+                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AlertSustain.Description}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="segments">
+                            <ItemsControl ItemsSource="{Binding AlertSustain.Options}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="settings:AlertThresholdOption">
+                                        <Button Classes="bare" Command="{Binding SelectCommand}">
+                                            <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </controls:WidgetPanel>
+
         <!-- ===== Export & Data ===== -->
         <controls:WidgetPanel WidgetId="settings.export" Title="{Binding Catalog.ExportData.Section}">
             <StackPanel Spacing="14">
