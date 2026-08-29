@@ -198,6 +198,7 @@ Per-platform behaviour is resolved at runtime behind an interface, one place per
 | --- | --- | --- |
 | `IFileSystemRoots` | Drive letters | `/`, `$HOME`, removable mounts from `/proc/mounts` |
 | `IStartupRegistration` | HKCU `Run` value | XDG `.desktop` in `~/.config/autostart` |
+| `IUserPictureProvider` | `AccountPicture\Users\{SID}` index, then `%PUBLIC%\AccountPictures` | `~/.face`, `~/.face.icon`, AccountsService icon |
 | `IShellInterop` / `IProcessInterop` | Shell type names, Properties sheet | Reveal the containing folder |
 | `IToolkitCatalog` | Windows command set | Linux command set |
 | `IProcFileSystem` | — | `/proc` and `/sys` reads |

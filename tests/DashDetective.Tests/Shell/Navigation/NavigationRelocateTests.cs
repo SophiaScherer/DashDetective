@@ -1,3 +1,4 @@
+using DashDetective.Services.Identity;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tests.Fakes;
 using Xunit;
@@ -10,7 +11,7 @@ namespace DashDetective.Tests.Shell.Navigation;
 public class NavigationRelocateTests {
     private static (NavigationViewModel Bar, FakeUiTimer Relocate) Bar() {
         var relocate = new FakeUiTimer();
-        return (new NavigationViewModel(new FakeUiTimer(), relocate), relocate);
+        return (new NavigationViewModel(new FakeUiTimer(), relocate, new UnsupportedUserPictureProvider()), relocate);
     }
 
     [Fact]

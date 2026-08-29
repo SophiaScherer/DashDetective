@@ -21,6 +21,7 @@ stays in its tab folder.
 - [`src/Shared/Controls`](#srcsharedcontrols)
 - [`src/Services/Settings`](#srcservicessettings)
 - [`src/Services/Startup`](#srcservicesstartup)
+- [`src/Services/Identity`](#srcservicesidentity)
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
 - [`src/Services/Platform`](#srcservicesplatform)
@@ -252,6 +253,31 @@ stays in its tab folder.
         DesktopEntry.cs         (the .desktop body as pure statics. Exec is QUOTED and its four reserved
                                  characters escaped: unquoted, a path under /home/My User/ parses as two
                                  arguments and launches the wrong thing)
+```
+
+## `src/Services/Identity`
+
+```
+      /Identity
+        CurrentUserProvider.cs  (the interactive user's login name, initials badge and real privilege
+                                 level, read once. Every source degrades independently — a denied token
+                                 read reports the neutral "User" rather than guessing "Standard User",
+                                 which would be a near-miss)
+        IUserPictureProvider.cs (the seam + ForCurrentPlatform(); see Provider seams below. Returns the
+                                 file's ENCODED bytes, not a decoded image, so it holds no UI type and is
+                                 testable without a render backend)
+        WindowsUserPictureProvider.cs
+                                (the account picture: the AccountPicture\Users\{SID} registry index
+                                 first, since that is what Windows itself maintains, then the tiles in
+                                 %PUBLIC%\AccountPictures\{SID} for a stale or missing index. Tries 448
+                                 downward, NOT the 1080 Windows also stores — the avatar is 32px. Holds
+                                 UnsupportedUserPictureProvider too. Reads only; nothing here writes)
+        LinuxUserPictureProvider.cs
+                                (~/.face, then ~/.face.icon, then the AccountsService icon cached per user
+                                 name. HOME FIRST because AccountsService holds a display-manager copy
+                                 that can be older than what the user last set)
+        UserPictureFile.cs      (the read both arms share: an 8 MB cap and one soft-fail, so a picture
+                                 found through the registry and one at ~/.face obey identical rules)
 ```
 
 ## `src/Services/Diagnostics`

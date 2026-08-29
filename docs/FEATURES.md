@@ -66,6 +66,13 @@ point drives the **same shared** `NavigationViewModel`:
   otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 
+The footer avatar shows the **device's own account picture** when the OS has one, read through the
+`IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
+on Windows, `~/.face` / AccountsService on Linux. The reader returns encoded bytes rather than a decoded
+image, so it holds no UI type; `NavigationViewModel` decodes once and falls back to the accent-gradient
+**initials badge** whenever there is no picture, the read is denied, or the file will not decode. The
+gradient stays the backdrop either way, so it still re-tints with the accent.
+
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
 label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
 alignment / rounding) are **computed properties on the VM — no value converters**. The rail
