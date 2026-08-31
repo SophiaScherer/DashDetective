@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Tabs.Settings.NumericField">
+
+    <!-- The number sits in the shared Border.field with a chrome-less TextBox.flat inside it, and the
+         unit sits OUTSIDE the box to its right: the box holds what is editable, the suffix labels it.
+         Right-aligned and fixed width so a column of these lines up whatever the digits. -->
+    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Border Classes="field" Width="56">
+            <TextBox Name="Entry" Classes="flat" TextAlignment="Right"
+                     VerticalAlignment="Stretch" MaxLength="5"/>
+        </Border>
+        <TextBlock Name="SuffixLabel" FontSize="12" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextSubtle}"/>
+    </StackPanel>
+</UserControl>

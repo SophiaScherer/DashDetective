@@ -3,14 +3,17 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Identity;
 using DashDetective.Services.Threading;
 using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 
 namespace DashDetective.Shell.Navigation;
 
@@ -104,12 +107,14 @@ public partial class NavigationViewModel : ViewModelBase {
     [NotifyPropertyChangedFor(nameof(ShowChevron))]
     private bool _isDragging;
 
-    public NavigationViewModel() : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter()) { }
+    public NavigationViewModel()
+        : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter(),
+               IUserPictureProvider.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: takes the puck's hide timer and the re-dock fade timer explicitly. A real
-    /// <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is pumping, so headless tests inject
-    /// fakes and tick them by hand.</summary>
-    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate) {
+    /// <summary>Test seam: takes the puck's hide timer, the re-dock fade timer and the account-picture
+    /// reader explicitly. A real <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is
+    /// pumping, so headless tests inject fakes and tick them by hand.</summary>
+    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate, IUserPictureProvider picture) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -130,6 +135,23 @@ public partial class NavigationViewModel : ViewModelBase {
         UserName = user.DisplayName;
         UserInitials = user.Initials;
         UserRole = user.Role;
+        UserPicture = Decode(picture.Read());
+    }
+
+    /// <summary>Decodes the account picture's bytes for the footer avatar. Soft-failing like the reader
+    /// that produced them: a file that is not really an image, or a host with no imaging backend (the
+    /// headless test runs), yields no picture and the initials badge stays.</summary>
+    private static Bitmap? Decode(byte[]? bytes) {
+        if (bytes is null)
+            return null;
+
+        try {
+            using var stream = new MemoryStream(bytes);
+            return new Bitmap(stream);
+        } catch (Exception e) {
+            Log.Warn("Could not decode the account picture", e);
+            return null;
+        }
     }
 
     // ----- Footer identity (the interactive Windows user; read once at construction) -----
@@ -139,8 +161,17 @@ public partial class NavigationViewModel : ViewModelBase {
     [NotifyPropertyChangedFor(nameof(UserTooltip))]
     private string _userName = "";
 
-    /// <summary>Up to two letters shown in the footer avatar badge.</summary>
+    /// <summary>Up to two letters shown in the footer avatar badge, when there is no account picture.</summary>
     [ObservableProperty] private string _userInitials = "";
+
+    /// <summary>The operating system's account picture for this user, or <c>null</c> when there is none
+    /// (no picture set, a denied read, or a platform with no such store).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUserPicture))]
+    private Bitmap? _userPicture;
+
+    /// <summary>Whether to show the account picture instead of the initials badge.</summary>
+    public bool HasUserPicture => UserPicture is not null;
 
     /// <summary>The account's privilege level ("Administrator" / "Standard User").</summary>
     [ObservableProperty]

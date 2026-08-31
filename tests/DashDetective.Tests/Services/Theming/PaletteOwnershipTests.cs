@@ -19,12 +19,16 @@ namespace DashDetective.Tests.Services.Theming;
 /// {StaticResource}.
 /// </summary>
 public class PaletteOwnershipTests {
-    /// <summary>Palette.axaml, plus the C# mirrors that deliberately restate it.</summary>
+    /// <summary>Palette.axaml, plus the C# mirrors that deliberately restate it, plus the HTML export.</summary>
     private static readonly string[] Allowed = [
         "src/Shared/Styles/Palette.axaml",
         "src/Services/Theming/ChartPalette.cs",
         "src/Services/Theming/SemanticBrushes.cs",
         "src/Services/Theming/AccentPreset.cs",
+        // The HTML report is a standalone document rendered by a browser, not app UI. It has no access
+        // to the palette at all, and it must not: an exported file that only looked right inside
+        // DashDetective would be the bug. Its colours are the document's, not the theme's.
+        "src/Services/Diagnostics/ReportFormatters.cs",
     ];
 
     /// <summary>Six- and eight-digit hex, the only forms the app has ever used. Deliberately not

@@ -19,8 +19,10 @@ stays in its tab folder.
 - [`src/Shared/Styles`](#srcsharedstyles)
 - [`src/Shared/Layout`](#srcsharedlayout)
 - [`src/Shared/Controls`](#srcsharedcontrols)
+- [`src/Shared/Shortcuts`](#srcsharedshortcuts)
 - [`src/Services/Settings`](#srcservicessettings)
 - [`src/Services/Startup`](#srcservicesstartup)
+- [`src/Services/Identity`](#srcservicesidentity)
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
 - [`src/Services/Platform`](#srcservicesplatform)
@@ -111,6 +113,17 @@ stays in its tab folder.
                                 Task Manager). Callers showing related values on one axis pick a
                                 single unit from the shared peak via UnitFor)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
+      ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
+      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
+      FileSave.cs              (the ONE save-file flow: offer the formats, take a destination from the
+                                native dialog, write what the chosen extension asked for. Replaced three
+                                near-identical copies — toolbar Export, the two Settings buttons, the
+                                Toolkit log — which is what made adding a format a three-place edit.
+                                Content is rendered only after a destination is picked, and only in the
+                                one format chosen)
+                                arms: the 12-hour one must say AM/PM rather than whatever the host
+                                locale designates. Display only — export names, the report's
+                                "Generated" line and the app log stay 24-hour so files stay sortable)
       MemorySpeed.cs           (which of Win32_PhysicalMemory's two speeds to show: the CONFIGURED
                                 clock (what Task Manager shows), falling back to the rated one. Two
                                 tabs read the same modules and used to describe a stick two ways)
@@ -219,12 +232,50 @@ stays in its tab folder.
                                         Its Mono and Flush variants back the Network tab's IP config)
 ```
 
+## `src/Shared/Shortcuts`
+
+```
+      /Shortcuts
+        ShortcutId.cs           (every keyboard action. NavigateTab1..9 MUST STAY CONTIGUOUS —
+                                 HandleGlobal maps them to nav positions by subtracting NavigateTab1)
+        ShortcutScope.cs        (Global, Search, or the tab that owns the shortcut)
+        Shortcut.cs             (one entry: gestures, Help copy, scope, whether it survives a focused
+                                 text box, whether Help lists it)
+        ShortcutGroup.cs        (one headed block of shortcuts, as Help renders them)
+        IShortcutTarget.cs      (a page opts in with Scope + HandleShortcut, so no per-page shell wiring)
+        ShortcutCatalog.cs      (the SHIPPED DEFAULTS, one static table, plus the pure table-taking
+                                 TryResolve/GroupForHelp. Invariant: neither an action nor a gesture
+                                 bound twice WITHIN one scope — one id may serve several scopes, which is
+                                 how "/" focuses both the Processes and Toolkit filters)
+        ShortcutBindings.cs     (the bindings ACTUALLY IN FORCE: those defaults with the user's rebinds
+                                 applied. Resolution and Help grouping live here because both have to see
+                                 what the user chose; the catalog's helpers do the work, so neither
+                                 exists twice. A rebind replaces ALL of a shortcut's default gestures, so
+                                 rebinding Refresh leaves neither F5 nor Ctrl+R firing it. A clash is
+                                 refused only WITHIN one scope — Alt+Up is legally both Processes sort
+                                 and File Explorer up, since only one tab is ever current)
+        GestureFormatter.cs     (a KeyGesture as Help spells it. Only REBOUND entries use it — a default
+                                 keeps its hand-written copy, which says things a formatter cannot
+                                 ("Ctrl+1 … Ctrl+9" covers nine bindings in one row). Also owns
+                                 IsModifierKey: a binding of "Ctrl" alone would fire on touch)
+        ShortcutOverrideCodec.cs
+                                (the rebinds as one opaque string for AppSettings, the WidgetOrders
+                                 shape. Ids, keys and modifiers BY NAME, so inserting an enum member
+                                 cannot silently rebind someone's keyboard; an unreadable entry is
+                                 skipped, leaving that shortcut on its default)
+```
 ## `src/Services/Settings`
 
 ```
       /Settings
         AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
         SettingsStore.cs        (load-on-start soft-fail to defaults; debounced atomic save to
+                                (Load MERGES the file over AppSettings.Defaults key by key — LOAD-BEARING,
+                                 not belt-and-braces. Deserializing directly discards every non-default
+                                 initializer the file omits: the source generator treats a record's init
+                                 properties as constructor parameters, builds the object from one args
+                                 array, and fills absent slots with default(T). That silently loaded
+                                 ShowInTray as false, and every alert threshold as 0 — which is OFF)
                                  %AppData%/DashDetective/settings.json; Flush on shutdown. Pure
                                  persistence — knows no view-models; the composition root applies/observes)
         SettingsJsonContext.cs  (System.Text.Json source-gen context for AppSettings; string enums)
@@ -249,6 +300,31 @@ stays in its tab folder.
                                  arguments and launches the wrong thing)
 ```
 
+## `src/Services/Identity`
+
+```
+      /Identity
+        CurrentUserProvider.cs  (the interactive user's login name, initials badge and real privilege
+                                 level, read once. Every source degrades independently — a denied token
+                                 read reports the neutral "User" rather than guessing "Standard User",
+                                 which would be a near-miss)
+        IUserPictureProvider.cs (the seam + ForCurrentPlatform(); see Provider seams below. Returns the
+                                 file's ENCODED bytes, not a decoded image, so it holds no UI type and is
+                                 testable without a render backend)
+        WindowsUserPictureProvider.cs
+                                (the account picture: the AccountPicture\Users\{SID} registry index
+                                 first, since that is what Windows itself maintains, then the tiles in
+                                 %PUBLIC%\AccountPictures\{SID} for a stale or missing index. Tries 448
+                                 downward, NOT the 1080 Windows also stores — the avatar is 32px. Holds
+                                 UnsupportedUserPictureProvider too. Reads only; nothing here writes)
+        LinuxUserPictureProvider.cs
+                                (~/.face, then ~/.face.icon, then the AccountsService icon cached per user
+                                 name. HOME FIRST because AccountsService holds a display-manager copy
+                                 that can be older than what the user last set)
+        UserPictureFile.cs      (the read both arms share: an 8 MB cap and one soft-fail, so a picture
+                                 found through the registry and one at ~/.face obey identical rules)
+```
+
 ## `src/Services/Diagnostics`
 
 ```
@@ -258,6 +334,22 @@ stays in its tab folder.
                                  MetricChannel catch blocks route through Log.Warn, and Program.cs hooks
                                  AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException →
                                  Log.Error. No logging packages)
+        DiagnosticsReport.cs    (the report as DATA — sections of key/value rows — rather than as text.
+                                 It used to be built by string concatenation split across the shell and
+                                 the Dashboard, which is why there was only ever one format)
+        DiagnosticsFormat.cs    (the export formats + what each saves as, and the one place a report is
+                                 rendered into one. FromFileName reads the format off the CHOSEN NAME:
+                                 Avalonia does not report which picker filter was used, and a typed
+                                 extension should beat a selected one)
+        ReportFormatters.cs     (text / Markdown / HTML / CSV renderers. The TEXT one is pinned byte for
+                                 byte by a test — a saved report and a new one still have to diff
+                                 cleanly. Each escapes what its own syntax reserves, which is not
+                                 hypothetical: every DNS list holds a comma and a machine name is
+                                 user-controlled text. EXEMPT from the palette-ownership rule, since an
+                                 exported page is a browser document with no access to the theme)
+        DiagnosticsJsonContext.cs
+                                (source-gen context for the JSON export, like SettingsJsonContext — it
+                                 is what keeps the trimming/AOT gate clean)
 ```
 
 ## `src/Services/Theming`
@@ -628,6 +720,21 @@ stays in its tab folder.
                                  paused Refresh. Non-generic MetricChannel for plain-double metrics,
                                  generic MetricChannel<TSample> for snapshot samples + a no-history variant)
         SystemMetricsService.cs (SINGLE owner of the three SHARED samplers — CPU, Memory, Network;
+        ResourceAlert.cs        (AlertMetric + the breach being reported: resource, DEVICE NAME, reading,
+                                 threshold. Named because "a GPU is busy" on a two-GPU machine is not
+                                 actionable)
+        ResourceAlertOptions.cs (the user's thresholds. ZERO MEANS OFF, which collapses "enabled" into the
+                                 value — one control per row, one check in the watcher. GPU and disk
+                                 activity default off: sustained saturation of either is what legitimate
+                                 heavy work looks like)
+        ResourceAlertWatcher.cs (watches CPU/memory (shared feeds) plus GPU, disk activity and free space
+                                 against those thresholds. Owns its OWN GPU + disk samplers, which their
+                                 contracts require, and never aggregates — it takes the WORST device and
+                                 names it, so the no-shared-aggregate rule above still holds. Sustain is
+                                 SECONDS converted against the live interval, not a sample count, which
+                                 used to mean 5 s at the 0.5 s cadence and 50 s at the 5 s one. Free space
+                                 skips UNLETTERED volumes: Recovery/EFI sit near-full by design, so
+                                 watching them is a banner that never goes away)
                                  per-metric 1 Hz channel fans each sample out to subscribers (ref-counted — a
                                  channel runs only while it has one), Pause/Resume for the Live pill,
                                  RefreshAll for Refresh, per-metric fault isolation. Dashboard / Performance /
@@ -775,8 +882,11 @@ stays in its tab folder.
                                 ToolkitGroup.cs         (immutable category section: upper-cased header
                                                          + the entries that survived the filter)
                                 ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)
-                                ToolkitLogEntry.cs      (record: Time / Command / Output — one console
-                                                         stanza in the Execution Log)
+                                ToolkitLogEntry.cs      (one console stanza in the Execution Log.
+                                                         OBSERVABLE, and it keeps the raw Timestamp beside
+                                                         the formatted Time: the clock-format preference can
+                                                         change while rows are on screen, and a row storing
+                                                         only its pre-formatted string could not be re-stamped)
                                 ToolkitCatalog.cs       (static COPY table only — categories, section
                                                          headers, badge labels. Reads the same on every
                                                          platform, which is why it stayed static when the
@@ -849,9 +959,35 @@ stays in its tab folder.
                                                         (fully live: Appearance + Navigation + Monitoring
                                                          + Export & Data; view code-behind owns the
                                                          export save dialog + clipboard, like MainWindow)
-                                ThemeOption.cs, AccentOption.cs, IntervalOption.cs
-                                                        (selectable item VMs for the Appearance +
+                                ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
+                                IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
+                                NumericField.axaml(.cs) (a typed whole number with its unit beside it —
+                                ShortcutCaptureBox.axaml(.cs)
+                                                        (arms, then captures the next key press as a
+                                                         binding. The SHELL SEES THE KEY FIRST — its
+                                                         listener tunnels from the window — so it raises
+                                                         CapturingChanged for the view model to hold, and
+                                                         the shell stands down on it. Modifier-only
+                                                         presses are ignored; Esc abandons)
+                                ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
+                                                         whether it is custom, and the note explaining a
+                                                         refused capture where it happened)
+                                                         "90 %", "10 s". Digits only, filtered on a
+                                                         TUNNELLED TextInput so a paste cannot smuggle a
+                                                         letter past it. Takes the value AS IT IS TYPED,
+                                                         not on focus loss: clicking anything that does
+                                                         not take focus leaves the box focused, so a
+                                                         commit-on-blur field silently lost the number.
+                                                         Only the ceiling is enforced mid-edit — raising a
+                                                         too-small number to the floor rewrites the box
+                                                         under the caret — and the box is reconciled to
+                                                         the stored value when the edit ends)
+                                AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
+                                                         switched-off row remembers its number. The
+                                                         settings layer encodes "not watched" as 0, which
+                                                         alone would forget it, so GPU could not ship
+                                                         "off, defaulted to 90")
                                 GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
                                                          helper process here. LINUX ONLY: there the figure
                                                          exists solely through nvidia-smi, which is why the

@@ -1,5 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
@@ -291,42 +292,31 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>
-    /// Builds a plain-text diagnostics report from the current on-screen values (no re-sampling),
-    /// for the shell's Export action. Mirrors the "Save Report as .txt" convention of tools like
-    /// msinfo32 and CPU-Z.
+    /// The Dashboard's contribution to the system report, from the current on-screen values (no
+    /// re-sampling). Returns sections rather than text so every export format renders the same content;
+    /// the shell composes these with the other tabs' rows and hands the whole thing to a formatter.
     /// </summary>
-    public string BuildDiagnosticsReport() {
-        var sb = new StringBuilder();
-        sb.AppendLine("DashDetective — System Report");
-        sb.AppendLine($"Generated: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}");
-        sb.AppendLine();
-
-        sb.AppendLine("System");
-        AppendReportRow(sb, "OS", OsText);
-        AppendReportRow(sb, "Device", DeviceText);
-        AppendReportRow(sb, "Motherboard", MotherboardText);
-        AppendReportRow(sb, "BIOS", BiosText);
-        AppendReportRow(sb, "Build", BuildText);
-        AppendReportRow(sb, "Uptime", UptimeText);
-        sb.AppendLine();
-
-        sb.AppendLine("Live metrics");
-        AppendReportRow(sb, "CPU", $"{CpuValueText}%  ({CpuModelText})");
-        AppendReportRow(sb, "Memory", $"{MemoryUtilizationText}  ({MemoryModelText})");
-        // The only live metric that can have no reading at all, so the "%" has to be conditional — "—%"
-        // would read as a measured zero.
-        AppendReportRow(sb, "GPU", GpuValueText == Placeholders.NoReading
-            ? $"{Placeholders.NoReading}  ({GpuModelText})"
-            : $"{GpuValueText}%  ({GpuModelText})");
-        AppendReportRow(sb, "Storage", $"{StorageValueText}% active  ({StorageSubText})");
-        AppendReportRow(sb, "Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})");
-
-        return sb.ToString();
-    }
-
-    /// <summary>Appends a left-aligned "key: value" line for the diagnostics report.</summary>
-    private static void AppendReportRow(StringBuilder sb, string key, string value) =>
-        sb.AppendLine($"  {(key + ":").PadRight(14)}{value}");
+    public IReadOnlyList<ReportSection> GetReportSections() => [
+        new ReportSection("System", [
+            new ReportRow("OS", OsText),
+            new ReportRow("Device", DeviceText),
+            new ReportRow("Motherboard", MotherboardText),
+            new ReportRow("BIOS", BiosText),
+            new ReportRow("Build", BuildText),
+            new ReportRow("Uptime", UptimeText),
+        ]),
+        new ReportSection("Live metrics", [
+            new ReportRow("CPU", $"{CpuValueText}%  ({CpuModelText})"),
+            new ReportRow("Memory", $"{MemoryUtilizationText}  ({MemoryModelText})"),
+            // The only live metric that can have no reading at all, so the "%" has to be conditional —
+            // "—%" would read as a measured zero.
+            new ReportRow("GPU", GpuValueText == Placeholders.NoReading
+                ? $"{Placeholders.NoReading}  ({GpuModelText})"
+                : $"{GpuValueText}%  ({GpuModelText})"),
+            new ReportRow("Storage", $"{StorageValueText}% active  ({StorageSubText})"),
+            new ReportRow("Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})"),
+        ]),
+    ];
 
     /// <summary>
     /// Renders the rolling 60-second metric histories as CSV for the Settings "Export CSV" action.

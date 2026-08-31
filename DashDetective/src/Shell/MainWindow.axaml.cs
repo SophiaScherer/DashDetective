@@ -1,17 +1,21 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
+using DashDetective.Services.Diagnostics;
+using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
 using DashDetective.Shell.TrayNotice;
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Threading.Tasks;
 
 namespace DashDetective.Shell;
 
 public partial class MainWindow : Window {
+    /// <summary>Stand-in bindings for the window's brief life before its DataContext is set. Nothing can
+    /// press a key in that window, so this only exists to keep the delegate total.</summary>
+    private static readonly ShortcutBindings Defaults = new();
+
     // Set by the tray "Exit" so a subsequent close actually exits instead of hiding to tray.
     private bool _exitRequested;
 
@@ -29,6 +33,7 @@ public partial class MainWindow : Window {
         DataContextChanged += OnDataContextChanged;
         _shortcuts = new ShellShortcutHandler(
             this,
+            () => (DataContext as MainWindowViewModel)?.Shortcuts ?? Defaults,
             () => (DataContext as MainWindowViewModel)?.ActiveScope ?? ShortcutScope.Global,
             id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
         Closed += (_, _) => _shortcuts.Dispose();
@@ -113,34 +118,17 @@ public partial class MainWindow : Window {
     /// out rather than hidden in the signature. <see cref="ExportReportAsync"/> never throws.</summary>
     private void OnExportRequested() => _ = ExportReportAsync();
 
-    /// <summary>
-    /// Exports the current system snapshot as a plain-text report. Owns the file-save dialog here
-    /// (rather than in the view model) because the picker needs the window's <see cref="TopLevel"/>.
-    /// </summary>
-    private async Task ExportReportAsync() {
+    /// <summary>Exports the current system snapshot, in whichever format the chosen filename asks for.
+    /// The dialog itself is <see cref="FileSave"/>, shared with the Settings export buttons.</summary>
+    private Task ExportReportAsync() {
         if (DataContext is not MainWindowViewModel vm)
-            return;
+            return Task.CompletedTask;
 
-        var storage = StorageProvider;
-        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions {
-            Title = "Export system report",
-            SuggestedFileName = $"DashDetective-report-{DateTime.Now:yyyyMMdd-HHmmss}",
-            DefaultExtension = "txt",
-            FileTypeChoices = new[] {
-                new FilePickerFileType("Text report") { Patterns = new[] { "*.txt" } },
-            },
-        });
-
-        if (file is null)
-            return; // user cancelled
-
-        try {
-            await using var stream = await file.OpenWriteAsync();
-            await using var writer = new StreamWriter(stream);
-            await writer.WriteAsync(vm.BuildReport());
-        } catch (Exception) {
-            // Disk full, permission denied, drive removed mid-write, etc. Swallow so a failed
-            // export can't take the app down; the file simply isn't written.
-        }
+        return FileSave.SaveAsync(
+            this,
+            title: "Export system report",
+            suggestedName: $"DashDetective-report-{DateTime.Now:yyyyMMdd-HHmmss}",
+            formats: DiagnosticsFormats.Offered,
+            content: vm.BuildReport);
     }
 }

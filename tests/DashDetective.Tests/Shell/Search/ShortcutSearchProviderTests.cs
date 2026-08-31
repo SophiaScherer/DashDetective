@@ -14,7 +14,7 @@ namespace DashDetective.Tests.Shell.Search;
 /// binding in Help instead of firing the action blind.</summary>
 public class ShortcutSearchProviderTests {
     private static Task<IReadOnlyList<SearchResult>> Query(string term, System.Action? openHelp = null) =>
-        new ShortcutSearchProvider(openHelp ?? (() => { }))
+        new ShortcutSearchProvider(new ShortcutBindings(), openHelp ?? (() => { }))
             .QueryAsync(new SearchQuery(term), CancellationToken.None);
 
     [Fact]

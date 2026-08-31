@@ -17,9 +17,11 @@ public sealed class SettingCatalog {
 
     private SettingCatalog() {
         All = [
-            Theme, Accent,
+            Theme, Accent, ClockFormat,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
+            AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
+            Shortcuts,
             ExportData,
         ];
     }
@@ -35,6 +37,10 @@ public sealed class SettingCatalog {
     public SettingEntry Accent { get; } = new(
         SettingId.Accent, "Appearance", "Accent color", "Applied to charts and highlights",
         Keywords: "accent colour highlight chart swatch");
+
+    public SettingEntry ClockFormat { get; } = new(
+        SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
+        Keywords: "12 hour 24 hour am pm military clock time");
 
     // ----- Navigation -----
 
@@ -55,7 +61,7 @@ public sealed class SettingCatalog {
 
     public SettingEntry ResourceAlerts { get; } = new(
         SettingId.ResourceAlerts, "Monitoring", "Resource alerts",
-        "Show a banner when CPU or RAM exceeds 90%",
+        "Show a banner when a resource crosses its threshold",
         Keywords: "notification warning banner threshold high usage");
 
     // Off by default because it is the one metric in the app that costs a process launch to read. The
@@ -77,6 +83,48 @@ public sealed class SettingCatalog {
     public SettingEntry LaunchAtStartup { get; } = new(
         SettingId.LaunchAtStartup, "Monitoring", "Launch at startup", SettingDescriptions.LaunchAtStartup,
         Keywords: "boot autostart auto start login run on startup");
+
+    // ----- Alerts -----
+
+    // One entry per watched resource rather than one for the card: a threshold is the thing people come
+    // looking for ("cpu alert 90"), and each has to be revealable on its own.
+    public SettingEntry AlertCpu { get; } = new(
+        SettingId.AlertCpu, "Alerts", "CPU usage", "Warn when processor use stays this high",
+        Keywords: "cpu processor alert threshold percent high usage warning");
+
+    public SettingEntry AlertMemory { get; } = new(
+        SettingId.AlertMemory, "Alerts", "Memory usage", "Warn when RAM use stays this high",
+        Keywords: "memory ram alert threshold percent high usage warning");
+
+    // Off by default, and the copy says why: sustained saturation is what legitimate heavy work looks
+    // like on both of these, so watching them by default would mostly report the machine doing its job.
+    public SettingEntry AlertGpu { get; } = new(
+        SettingId.AlertGpu, "Alerts", "GPU usage",
+        "Warn when any graphics adapter stays this busy. Off by default — games and renders live here",
+        Keywords: "gpu graphics adapter alert threshold percent high usage warning");
+
+    public SettingEntry AlertDiskActivity { get; } = new(
+        SettingId.AlertDiskActivity, "Alerts", "Disk activity",
+        "Warn when any drive stays this busy. Off by default — large copies and updates live here",
+        Keywords: "disk drive activity busy alert threshold percent warning io");
+
+    public SettingEntry AlertLowDiskFree { get; } = new(
+        SettingId.AlertLowDiskFree, "Alerts", "Low disk space",
+        "Warn when any drive drops below this much free space",
+        Keywords: "disk space free full storage low alert threshold warning capacity");
+
+    public SettingEntry AlertSustain { get; } = new(
+        SettingId.AlertSustain, "Alerts", "Warn after",
+        "How long usage must stay over a threshold before it counts",
+        Keywords: "sustain duration delay how long seconds alert threshold debounce");
+
+    // ----- Keyboard -----
+
+    // One entry for the whole card, like ExportData below: search should land someone on the list, and
+    // an entry per binding would bury every other setting under thirty near-identical rows.
+    public SettingEntry Shortcuts { get; } = new(
+        SettingId.Shortcuts, "Keyboard", "Keyboard shortcuts", "Change the keys any action is bound to",
+        Keywords: "keyboard shortcut hotkey key binding keybinding rebind remap customize reset");
 
     // ----- Export & Data -----
 

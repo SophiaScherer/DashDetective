@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Tabs.Settings.ShortcutCaptureBox">
+
+    <UserControl.Styles>
+        <!-- Armed, the box is an accent-outlined prompt rather than a value: it is asking for input, not
+             showing one. -->
+        <Style Selector="Border#Box.capturing">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+        <Style Selector="Border#Box.capturing TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Name="Trigger" Classes="bare" Focusable="True">
+            <Border Name="Box" Classes="field" MinWidth="132" Padding="10,0">
+                <TextBlock Name="Label" FontSize="12" VerticalAlignment="Center"
+                           HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            </Border>
+        </Button>
+
+        <!-- Only offered once there is something to undo, so an untouched row carries no extra chrome. -->
+        <Button Name="Reset" Classes="toolIcon" IsVisible="False" ToolTip.Tip="Restore the default">
+            <Path Width="14" Height="14" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                  StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                  Data="M3,7 A4,4 0 1 1 4.2,9.9 M3,4 V7 H6"/>
+        </Button>
+    </StackPanel>
+</UserControl>

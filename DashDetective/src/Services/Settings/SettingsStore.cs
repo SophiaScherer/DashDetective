@@ -3,6 +3,7 @@ using DashDetective.Services.Diagnostics;
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace DashDetective.Services.Settings;
 
@@ -44,7 +45,7 @@ public sealed class SettingsStore : IDisposable {
 
         try {
             var json = File.ReadAllText(_path);
-            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.AppSettings);
+            var settings = Merge(json);
 
             // A null (empty/whitespace file) or a schema we don't understand → start clean.
             if (settings is null || settings.SchemaVersion != CurrentSchemaVersion) {
@@ -57,6 +58,36 @@ public sealed class SettingsStore : IDisposable {
             Log.Warn("Failed to read settings.json; using defaults", e);
             return AppSettings.Defaults;
         }
+    }
+
+    /// <summary>
+    /// Deserializes a file over <see cref="AppSettings.Defaults"/>, key by key, rather than on its own.
+    ///
+    /// <b>This is load-bearing, not belt-and-braces.</b> Deserializing the file directly discards every
+    /// non-default initializer on <c>AppSettings</c> for any property the file omits: the source generator
+    /// treats a record's <c>init</c> properties as constructor parameters (generated code cannot assign an
+    /// <c>init</c> property after construction, so it must use one object initializer), builds the whole
+    /// object from a single args array, and fills the absent slots with <c>default(T)</c>. A file written
+    /// before a property existed therefore loaded <c>ShowInTray</c> as false and every alert threshold as
+    /// 0 — and 0 is how a threshold is switched off.
+    ///
+    /// Merging as JSON rather than mapping fields keeps that fix general: a property added later inherits
+    /// its default from here with no further work. <c>JsonNode</c> is a document API, not reflection-based
+    /// serialization, so this stays clean under the trimming/AOT gate.
+    /// </summary>
+    private static AppSettings? Merge(string json) {
+        if (JsonNode.Parse(json) is not JsonObject file)
+            return null;   // not an object (empty or hand-mangled) — the caller falls back to defaults
+
+        var merged = JsonSerializer.SerializeToNode(AppSettings.Defaults, SettingsJsonContext.Default.AppSettings)
+            as JsonObject;
+        if (merged is null)
+            return null;
+
+        foreach (var (key, value) in file)
+            merged[key] = value?.DeepClone();
+
+        return merged.Deserialize(SettingsJsonContext.Default.AppSettings);
     }
 
     /// <summary>Queues <paramref name="settings"/> to be written after a short debounce, coalescing a

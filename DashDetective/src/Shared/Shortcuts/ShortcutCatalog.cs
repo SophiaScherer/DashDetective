@@ -5,11 +5,15 @@ using System.Collections.Generic;
 namespace DashDetective.Shared.Shortcuts;
 
 /// <summary>
-/// The single source of truth for every keyboard shortcut: gestures, focus guards and Help copy. The
-/// shell resolves keys through <see cref="TryResolve"/> and the Help modal renders <see cref="All"/>,
-/// so a live binding can never go undocumented (or a documented one go dead). Held as a static table
-/// like <c>HelpContent</c> and <c>HardwareCatalog</c>, and free of any control types, so it is
-/// testable without a render backend.
+/// The <b>shipped default</b> for every keyboard shortcut: gestures, focus guards and Help copy. What is
+/// actually in force is <see cref="ShortcutBindings"/> — these defaults with the user's rebinds applied —
+/// and that is what the shell resolves through and Help renders, so a live binding can never go
+/// undocumented (or a documented one go dead).
+///
+/// The resolution and grouping helpers here take the table as an argument so the bindings can run the
+/// user's choices through this same code rather than through a second copy of it. Held as a static table
+/// like <c>HelpContent</c> and <c>HardwareCatalog</c>, and free of any control types, so it is testable
+/// without a render backend.
 /// </summary>
 public static class ShortcutCatalog {
     /// <summary>Every shortcut, in the order Help lists them.</summary>
@@ -141,18 +145,22 @@ public static class ShortcutCatalog {
             "/", "Focus the command filter", ShortcutScope.Toolkit, AllowInTextInput: false),
     ];
 
-    /// <summary>The listed shortcuts, grouped by where they apply, as the Help modal renders them.
-    /// Generated from <see cref="All"/> rather than hand-maintained, so documentation cannot drift away
-    /// from what the keys actually do.</summary>
-    public static IReadOnlyList<ShortcutGroup> HelpGroups { get; } = BuildHelpGroups();
+    /// <summary>The default bindings grouped as the Help modal renders them. Generated from
+    /// <see cref="All"/> rather than hand-maintained, so documentation cannot drift away from what the
+    /// keys actually do. <b>The shell renders <c>ShortcutBindings.HelpGroups</c> instead</b>, which is
+    /// this same grouping over the user's chosen bindings; this one is the shipped baseline.</summary>
+    public static IReadOnlyList<ShortcutGroup> HelpGroups { get; } = GroupForHelp(All);
 
-    private static IReadOnlyList<ShortcutGroup> BuildHelpGroups() {
+    /// <summary>Groups any binding table for Help. Takes the table rather than reading <see cref="All"/>
+    /// so <c>ShortcutBindings</c> can group the effective bindings through the same code, instead of
+    /// growing a second copy of this that could drift.</summary>
+    public static IReadOnlyList<ShortcutGroup> GroupForHelp(IReadOnlyList<Shortcut> shortcuts) {
         var groups = new List<ShortcutGroup>();
 
         // The scopes are declared general-first, which is also the order to read them in.
         foreach (var scope in Enum.GetValues<ShortcutScope>()) {
             var rows = new List<Shortcut>();
-            foreach (var shortcut in All)
+            foreach (var shortcut in shortcuts)
                 if (shortcut.Scope == scope && shortcut.ShowInHelp)
                     rows.Add(shortcut);
 
@@ -191,16 +199,23 @@ public static class ShortcutCatalog {
     /// text box, so typing "/" into a search field never fires an app action.
     /// </summary>
     public static bool TryResolve(
+        Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) =>
+        TryResolve(All, key, modifiers, textInputFocused, scope, out id);
+
+    /// <summary>The same resolution over any binding table, so <c>ShortcutBindings</c> can run the user's
+    /// chosen bindings through this code rather than through a second copy of it.</summary>
+    public static bool TryResolve(IReadOnlyList<Shortcut> shortcuts,
         Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {
-        if (scope != ShortcutScope.Global && TryMatch(key, modifiers, textInputFocused, scope, out id))
+        if (scope != ShortcutScope.Global &&
+            TryMatch(shortcuts, key, modifiers, textInputFocused, scope, out id))
             return true;
 
-        return TryMatch(key, modifiers, textInputFocused, ShortcutScope.Global, out id);
+        return TryMatch(shortcuts, key, modifiers, textInputFocused, ShortcutScope.Global, out id);
     }
 
-    private static bool TryMatch(
+    private static bool TryMatch(IReadOnlyList<Shortcut> shortcuts,
         Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {
-        foreach (var shortcut in All) {
+        foreach (var shortcut in shortcuts) {
             if (shortcut.Scope != scope)
                 continue;
             if (textInputFocused && !shortcut.AllowInTextInput)

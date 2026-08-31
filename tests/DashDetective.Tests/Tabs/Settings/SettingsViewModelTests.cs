@@ -4,6 +4,7 @@ using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Settings;
 using DashDetective.Tests.Fakes;
@@ -22,7 +23,7 @@ public class SettingsViewModelTests {
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         return new SettingsViewModel(
             new ThemeService(), new NavigationViewModel(), metrics, AppSettings.Defaults, startup,
-            () => "", () => "");
+            new ShortcutBindings(), _ => "", () => "");
     }
 
     [Fact]

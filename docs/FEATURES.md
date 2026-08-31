@@ -66,6 +66,13 @@ point drives the **same shared** `NavigationViewModel`:
   otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 
+The footer avatar shows the **device's own account picture** when the OS has one, read through the
+`IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
+on Windows, `~/.face` / AccountsService on Linux. The reader returns encoded bytes rather than a decoded
+image, so it holds no UI type; `NavigationViewModel` decodes once and falls back to the accent-gradient
+**initials badge** whenever there is no picture, the read is denied, or the file will not decode. The
+gradient stays the backdrop either way, so it still re-tints with the accent.
+
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
 label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
 alignment / rounding) are **computed properties on the VM — no value converters**. The rail
@@ -152,7 +159,7 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   merges and caps what comes back, and discards an answer whose term the user has already typed past.
   A provider that throws costs its own category and nothing else.
 - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
-  `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Toolkit (over
+  `ShortcutBindings.HelpGroups`, so a result already knows its scope and the keys currently bound), Toolkit (over
   `ToolkitViewModel.AllEntries`, ranking the command text above its description), Processes (over the
   Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
   row), and Files.
@@ -190,27 +197,64 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   (multi-colour) option — a 2×2 four-colour square that restores the authored look (each dashboard
   graph its own colour, highlight blue); the four single-colour swatches recolour the highlight and
   hand the graphs a palette **derived** from that accent, each metric keeping a hue of its own.
+  The **Clock format** segments (24-hour / 12-hour) are a `ClockFormatOption` on the `ThemeOption`
+  pattern. The shell pushes the choice to the two places that show a wall-clock time — the toolbar
+  clock and the Toolkit Execution Log — through `TimeOfDayFormatter` (`src/Shared`), the same way it
+  pushes the NVIDIA opt-in to the GPU pages. **Display only, deliberately:** export file names, the
+  report's `Generated:` line, the exported Toolkit transcript and `Log.cs` all stay 24-hour, so files
+  remain sortable and machine-parseable. `ToolkitLogEntry` keeps its raw `DateTime` alongside the
+  formatted string so rows already on screen re-stamp when the preference changes, and the toolbar
+  clock's fixed width is sized for the wider 12-hour string so switching does not reflow the toolbar.
 - **Monitoring.** The **Refresh interval** segments (0.5 / 1 / 2 / 5 s) are real `IntervalOption`
   selectable-item VMs (the `ThemeOption` pattern); selecting one calls
   `SystemMetricsService.SetInterval`, which retimes **only** the five 1 Hz metric channels — the
   coarse timers stay coarse (Dashboard uptime 30 s; Network adapters 5 s / connections 2.5 s /
   ping 2 s are NOT retimed). The three toggles are real templated `ToggleButton`s (shared
   `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
-  alerts** (merged from the comp's two notification toggles — no OS toast is in scope, so both meant
-  the same in-app banner), **Show in system tray**, **Launch at startup**. The alert watcher lives in
-  `SystemMetricsService` (raises `AlertActiveChanged` after CPU or memory stays ≥ 90 % for 10
-  consecutive samples); the shell shows an inline warning banner below the toolbar (auto-clears on
-  recovery, `×` to dismiss the current breach, gated by the setting). **Launch at startup** writes the
-  HKCU `…\Run` value via `IStartupRegistration` (`src/Services/Startup`, soft-failing).
+  alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
+  **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
+  (`src/Services/Startup`, soft-failing).
+- **Keyboard.** The rebinding list for every shortcut, rendered from the live bindings. Written up
+  under *Keyboard shortcuts* below, since the behaviour is the shortcut layer's rather than this
+  page's.
+- **Alerts.** Six rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space threshold, and
+  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`),
+  plus a per-row switch. Runs of preset segments were tried first and pushed the description text into a
+  narrow column that truncated it; a threshold is also a number people want to state rather than pick
+  from a shortlist. **The switch and the number are separate values on purpose**: the service encodes
+  "not watched" as `0`, and a row storing only that would forget its threshold the moment it was switched
+  off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was chosen. The
+  shell folds the pair back into the zero-means-off contract, so the watcher never learns that a page has
+  two controls. "Warn after" has no switch (it is the wait before a warning, not a warning) and reserves
+  the switch column so every number still lines up. Every row is disabled on the whole `Border` while the
+  master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
+  (`src/Services/SystemMetrics`) owns the logic, deliberately **outside** `SystemMetricsService`, which stays
+  a pure fan-out of the three shared feeds: GPU and disk have no shared feed there because an aggregate
+  across devices would report an average under one device's name. The watcher reads them anyway without
+  breaking that rule — it owns its own samplers (their contracts require it) and takes the **worst device,
+  named in the banner**. Three decisions worth keeping: the sustain window is **seconds converted against
+  the live interval**, not a sample count (the old fixed 10 samples silently meant 5 s at the 0.5 s cadence
+  and 50 s at the 5 s one); **GPU and disk activity default off**, because sustained saturation of either is
+  what games, renders and large copies look like; and free space **skips unlettered volumes**, because
+  Recovery/EFI partitions sit near-full by design and alerting on them is a banner that never clears. The
+  shell shows the inline warning below the toolbar, with copy built from the breach (`×` dismisses the
+  current one; a different resource taking over clears the dismissal).
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.
-- **Export & Data.** Handlers in `SettingsView.axaml.cs` (own the save dialog + clipboard, needing
-  the `TopLevel`, like `MainWindow`): **Copy diagnostics** → clipboard; **Export report (.txt)** →
-  the same plain-text report as the toolbar Export (no PDF library); **Export CSV** → the rolling
-  60-sample metric histories (`DashboardViewModel.BuildMetricsCsv`). `MainWindowViewModel.BuildReport`
-  now appends a Hardware summary and the primary network config (via small read-only accessors —
-  `HardwareViewModel.GetReportRows`, `NetworkViewModel.GetPrimaryConfigRows`).
+- **Export & Data.** **Copy diagnostics** → clipboard (as text); **Export report** → the system
+  snapshot as **text, JSON, Markdown, HTML or CSV**, picked in the native dialog's own type list; **Export
+  CSV** → the rolling 60-sample metric histories, a different artifact from the report and so still its
+  own button. The report is a `DiagnosticsReport` — sections of key/value rows — built by
+  `MainWindowViewModel.BuildReportModel` from `DashboardViewModel.GetReportSections` plus the read-only
+  accessors on Hardware, Network and Storage; each format is a renderer over that one model. Three
+  decisions worth keeping: the **text format is pinned byte for byte by a test**, so an existing saved
+  report and a new one still diff cleanly; the format comes from the **chosen filename**, not the picked
+  filter, because Avalonia does not report the latter and a typed extension should win; and the HTML is
+  **self-contained and exempt from the palette-ownership rule**, since a page opened in a browser has no
+  access to the app's theme and must not look right only inside DashDetective. One `FileSave` helper owns
+  the dialog for all of it, replacing three near-identical copies (toolbar Export, the two Settings
+  buttons, the Toolkit log export).
 - **Persistence.** All of the above (plus Appearance and Navigation) persist to
   `%AppData%/DashDetective/settings.json` via `SettingsStore` (`src/Services/Settings`; System.Text.Json
   source-gen, load-on-start with full soft-fail to defaults, debounced atomic save, `schemaVersion`).
@@ -219,6 +263,11 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
   that the app has disclosed, once, that closing the window does not stop it.
   Theme, accent and the navigation choices **persist** through this rather than lasting a session.
+  **`Load` merges the file over `AppSettings.Defaults` key by key, and that merge is what makes the
+  "soft-fail to defaults" above true for a property the file predates.** The source generator treats
+  a record's `init` properties as constructor parameters and fills absent slots with `default(T)`, so
+  deserializing directly discarded every non-default initializer — `ShowInTray` loaded as false for
+  months, and every alert threshold would have loaded as `0`, which is how one is switched off.
 
 ## File Explorer
 
@@ -797,8 +846,11 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **Keyboard shortcuts** — **fully live**, built in phases. A data-driven shortcut layer:
   `src/Shared/Shortcuts` holds the model (`ShortcutCatalog`, `ShortcutId`, `ShortcutScope`, `Shortcut`,
   `ShortcutGroup`, `IShortcutTarget`) and `src/Shell/Shortcuts` the listener (`ShellShortcutHandler`,
-  `KeyboardFocus`). **`ShortcutCatalog` is the single source of truth** — the key handler resolves
-  against it and the Help modal renders from it, so bindings and documentation cannot drift. Dispatch is
+  `KeyboardFocus`). **`ShortcutCatalog` is the shipped default table, and `ShortcutBindings` is what is
+  actually in force** — the defaults with the user's rebinds applied. One `ShortcutBindings` instance is
+  shared by the key handler, Help, universal search and the Settings page, so all four describe and act
+  on the same thing and cannot drift. Resolution and Help grouping live on the instance; the catalog
+  keeps the pure table-taking helpers, so there is no second copy of either. Dispatch is
   a priority chain on `MainWindowViewModel.HandleShortcut` (open modal → current page via
   `IShortcutTarget` → global), and a handler reports whether it acted so an inapplicable key falls
   through. Resolution is **scope-aware**: a gesture may mean different things on different tabs
@@ -809,6 +861,20 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   tab reuses the existing action rather than minting a near-duplicate id per tab. The catalog invariant
   is therefore "neither an action **nor** a gesture bound twice **within one scope**", which is what
   `ShortcutCatalogTests` pins.
+- **Every shortcut is rebindable**, from the Keyboard card on the Settings page. A row arms a
+  `ShortcutCaptureBox`, which swallows the next press and offers it to the view model; the rebind
+  **replaces all of a shortcut's default gestures**, so rebinding Refresh leaves neither F5 nor Ctrl+R
+  firing it. Rebinds persist as one opaque string (`ShortcutOverrideCodec`, ids and keys **by name** so
+  reordering an enum cannot silently rebind a keyboard), and a per-row reset and a card-level
+  "Restore default shortcuts" put them back.
+- **The shell must stand down while a capture is armed.** Its listener is a tunnelling handler on the
+  window, so it sees the press *before* the capture box does — without this, arming a box and pressing
+  Ctrl+1 would navigate away instead of capturing. `SettingsViewModel.IsCapturingShortcut` is what
+  `HandleShortcut` checks first, returning false so the key continues down to the box.
+- **A clash is refused, not silently accepted**, and only **within one scope**. Cross-scope duplicates
+  stay legal because they already are (`Alt+↑` on Processes and File Explorer), since only one tab is
+  ever current. The capture box reports the conflict inline, naming the action that already holds the
+  gesture.
 - **The digit jumps run `Ctrl+1 … Ctrl+9`** (nine tabs). `ShortcutId.NavigateTab1..9` must stay
   contiguous — `MainWindowViewModel.HandleGlobal` maps them to nav positions by subtracting
   `NavigateTab1`, and its range guard names the last one, so a tenth tab means touching the enum, the

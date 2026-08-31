@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Search;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
@@ -35,9 +36,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
     private static readonly IBrush PausedDot = SemanticBrushes.StatusIdle;
 
-    private const string AlertMessage = "High resource usage — CPU or memory has stayed above 90%.";
-
     private readonly SystemMetricsService _metrics;
+    private readonly ResourceAlertWatcher _alerts;
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
     private readonly DashboardViewModel _dashboard;
@@ -50,10 +50,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ToolkitViewModel _toolkit = new();
     private readonly SettingsViewModel _settings;
     private readonly DispatcherTimer _clockTimer;
+    private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
 
-    // Resource-alert banner state: whether the metrics service reports an active breach, and whether the
-    // user dismissed the current one. The banner shows only while active, unignored, and alerts are on.
-    private bool _alertActive;
+    // Resource-alert banner state: the breach the watcher currently reports, and whether the user
+    // dismissed it. The banner shows only while there is one, unignored, and alerts are on.
+    private ResourceAlert? _alert;
     private bool _alertDismissed;
 
     // Whether the window is on screen. Hidden to the tray it is not, and no page should be sampling —
@@ -69,14 +70,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                               nameof(RefreshToolTip))]
     private ViewModelBase _currentPage;
 
-    /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
+    /// <summary>Live wall clock shown at the right of the toolbar, in the chosen clock format.</summary>
     [ObservableProperty] private string _clock = "";
 
     /// <summary>Whether the resource-alert banner is currently shown in the shell.</summary>
     [ObservableProperty] private bool _alertBannerVisible;
 
-    /// <summary>The resource-alert banner message.</summary>
-    [ObservableProperty] private string _alertText = AlertMessage;
+    /// <summary>The resource-alert banner message, naming the resource and device that breached.</summary>
+    [ObservableProperty] private string _alertText = "";
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
     [ObservableProperty]
@@ -87,9 +88,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
     public NavigationViewModel Nav { get; } = new();
 
+    /// <summary>The live keyboard bindings: the catalog's defaults with the user's rebinds applied. One
+    /// instance, shared by the key handler, Help, universal search and the Settings page, so all four
+    /// describe and act on the same thing.</summary>
+    public ShortcutBindings Shortcuts { get; } = new();
+
     /// <summary>The Help modal. Owned here rather than by the nav bar because the overlay covers the
     /// whole window, navigation bar included.</summary>
-    public HelpViewModel Help { get; } = new();
+    public HelpViewModel Help { get; }
 
     /// <summary>The toolbar's universal search. Built here because this is the one class that already
     /// holds every page instance, so a result's "go there and reveal it" callback is a closure over the
@@ -132,6 +138,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // sample (Dashboard, Performance, Processes); the rest are self-contained.
         _metrics = metrics;
         _store = store;
+        _alerts = new ResourceAlertWatcher(metrics);
+        Help = new HelpViewModel(Shortcuts);
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
         _performance = new PerformanceViewModel(metrics, _theme);
@@ -144,7 +152,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // Build the Settings page with the shared theming seam + nav, the metrics service (refresh
         // interval), the loaded settings (toggle/interval seed) and the report/CSV builders.
         _settings = new SettingsViewModel(_theme, Nav, metrics, settings,
-                                          IStartupRegistration.ForCurrentPlatform(),
+                                          IStartupRegistration.ForCurrentPlatform(), Shortcuts,
                                           BuildReport, BuildMetricsCsv);
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
@@ -157,7 +165,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _processes.PreferencesChanged += Persist;
         foreach (var page in ReorderablePages)
             page.WidgetOrderChanged += Persist;
-        _metrics.AlertActiveChanged += OnAlertActiveChanged;
+        _alerts.AlertChanged += OnAlertChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
         Nav.Initialize(new[] {
@@ -192,7 +200,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Search = new UniversalSearchViewModel([
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
-            new ShortcutSearchProvider(Help.Open, Icons.Help),
+            new ShortcutSearchProvider(Shortcuts, Help.Open, Icons.Help),
             new ToolkitSearchProvider(() => _toolkit.AllEntries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
@@ -226,6 +234,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     private void ApplySettings(AppSettings settings) {
+        Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
+
         _theme.ApplyTheme(settings.Theme);
         var accent = FindAccent(settings.AccentName);
         if (accent is { } preset)
@@ -246,7 +256,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
-        _metrics.AlertsEnabled = settings.ResourceAlerts;
+        ApplyClockFormat(settings.ClockFormat);
+        ApplyAlertSettings(settings);
         _recents.Load(settings.RecentSearches);
 
         _processes.ColumnOrder = ProcessColumnOrder.Decode(settings.ProcessColumns);
@@ -305,6 +316,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AccentName = _theme.CurrentAccent?.Name,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
+        ClockFormat = _settings.ClockFormat,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),
@@ -313,6 +325,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
+        AlertCpuEnabled = _settings.CpuAlert.IsEnabled,
+        AlertMemoryEnabled = _settings.MemoryAlert.IsEnabled,
+        AlertGpuEnabled = _settings.GpuAlert.IsEnabled,
+        AlertDiskActiveEnabled = _settings.DiskActiveAlert.IsEnabled,
+        AlertLowDiskFreeEnabled = _settings.LowDiskFreeAlert.IsEnabled,
+        AlertCpuPercent = _settings.CpuAlert.Value,
+        AlertMemoryPercent = _settings.MemoryAlert.Value,
+        AlertGpuPercent = _settings.GpuAlert.Value,
+        AlertDiskActivePercent = _settings.DiskActiveAlert.Value,
+        AlertLowDiskFreePercent = _settings.LowDiskFreeAlert.Value,
+        AlertSustainSeconds = _settings.AlertSustain.Value,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
         PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
@@ -330,6 +353,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ProcessesSort = _processes.RememberSort
             ? ProcessSortState.Encode(_processes.SortKey, _processes.SortAscending)
             : "",
+        ShortcutOverrides = ShortcutOverrideCodec.Encode(Shortcuts.Overrides),
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
@@ -342,10 +366,38 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
+        ApplyClockFormat(_settings.ClockFormat);
+        ApplyAlertSettings(CaptureCurrent());
+    }
 
-        // The watcher holds the CPU and memory feeds open on its own, so it follows the setting rather
-        // than running unconditionally.
-        _metrics.AlertsEnabled = _settings.ResourceAlerts;
+    /// <summary>Pushes the alert thresholds and the master switch onto the watcher. Thresholds first: the
+    /// setter clears every streak, so applying them after enabling would discard the first samples.
+    /// The watcher holds the CPU and memory feeds open on its own, which is why it follows the setting
+    /// rather than running unconditionally.</summary>
+    private void ApplyAlertSettings(AppSettings settings) {
+        // Folded into the watcher's zero-means-off contract here: the service has no reason to know that a
+        // threshold and a switch are two controls on a page, and this keeps a disabled row's number.
+        _alerts.Options = new ResourceAlertOptions {
+            CpuPercent = Watched(settings.AlertCpuEnabled, settings.AlertCpuPercent),
+            MemoryPercent = Watched(settings.AlertMemoryEnabled, settings.AlertMemoryPercent),
+            GpuPercent = Watched(settings.AlertGpuEnabled, settings.AlertGpuPercent),
+            DiskActivePercent = Watched(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent),
+            LowDiskFreePercent = Watched(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent),
+            SustainSeconds = settings.AlertSustainSeconds,
+        };
+        _alerts.Enabled = settings.ResourceAlerts;
+    }
+
+    /// <summary>A threshold as the watcher wants it: the number when the resource is watched, else zero.</summary>
+    private static int Watched(bool enabled, int percent) => enabled ? percent : 0;
+
+    /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
+    /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and
+    /// the clock is re-stamped at once so the change is visible without waiting for the next tick.</summary>
+    private void ApplyClockFormat(ClockFormat format) {
+        _clockFormat = format;
+        _toolkit.ClockFormat = format;
+        UpdateClock();
     }
 
     /// <summary>Mirrors the NVIDIA opt-in onto both pages that own a GPU sampler. Pushed rather than read,
@@ -366,19 +418,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             Persist();
     }
 
-    /// <summary>The metrics service flipped the resource-alert state. Recovery clears any dismissal so a
-    /// later breach shows again; then re-evaluate the banner.</summary>
-    private void OnAlertActiveChanged(bool active) {
-        _alertActive = active;
-        if (!active)
-            _alertDismissed = false;
+    /// <summary>The watcher changed what it reports. A different resource clears any dismissal too, not
+    /// just recovery — the user dismissed the message they were shown, not every message to come.</summary>
+    private void OnAlertChanged(ResourceAlert? alert) {
+        _alert = alert;
+        _alertDismissed = false;
+        if (alert is { } breach)
+            AlertText = DescribeAlert(breach);
         UpdateAlertBanner();
     }
+
+    /// <summary>The banner copy. Names the device, because "a GPU is busy" on a two-GPU machine is not
+    /// something anyone can act on, and reports the threshold that was actually crossed rather than a
+    /// literal, so the text cannot drift from the setting.</summary>
+    private string DescribeAlert(ResourceAlert alert) => alert.Metric switch {
+        AlertMetric.DiskSpace =>
+            $"Low disk space — {alert.DeviceName} is {alert.Value:F0}% free, at or below the {alert.Threshold}% warning level.",
+        _ =>
+            $"High resource usage — {alert.DeviceName} has stayed at or above {alert.Threshold}% for {_settings.AlertSustain.Value} seconds.",
+    };
 
     /// <summary>The banner shows only while a breach is active, the "Resource alerts" setting is on, and
     /// the user hasn't dismissed the current breach.</summary>
     private void UpdateAlertBanner() =>
-        AlertBannerVisible = _alertActive && _settings.ResourceAlerts && !_alertDismissed;
+        AlertBannerVisible = _alert is not null && _settings.ResourceAlerts && !_alertDismissed;
 
     /// <summary>Dismisses the current alert banner (until usage recovers and breaches again).</summary>
     [RelayCommand]
@@ -387,8 +450,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         UpdateAlertBanner();
     }
 
-    private void UpdateClock() =>
-        Clock = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+    private void UpdateClock() => Clock = TimeOfDayFormatter.Format(DateTime.Now, _clockFormat);
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
@@ -400,6 +462,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             _metrics.Resume();
         else
             _metrics.Pause();
+        _alerts.SetLive(IsLive);
         foreach (var item in Nav.NavItems)
             (item.Page as ILiveSamplingPage)?.SetLive(IsLive);
     }
@@ -426,6 +489,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
 
     public bool HandleShortcut(ShortcutId id) {
+        // A capture box on the Settings page is waiting for a key press. This listener tunnels from the
+        // window, so it sees the press first; claiming it here would run the shortcut being rebound
+        // instead of letting it be captured. Returning false leaves the key to continue down to the box.
+        if (_settings.IsCapturingShortcut)
+            return false;
+
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
         // allowed to act on the page hidden behind the scrim.
         if (Help.IsOpen) {
@@ -543,31 +612,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// network configuration follow so the report is an honest full-system snapshot. Called from the
     /// window / Settings code-behind, which own the save dialog + clipboard (they need the TopLevel).
     /// </summary>
-    public string BuildReport() {
-        var sb = new StringBuilder();
-        sb.Append(_dashboard.BuildDiagnosticsReport());
-        sb.AppendLine();
+    public DiagnosticsReport BuildReportModel() {
+        var sections = new List<ReportSection>(_dashboard.GetReportSections());
+        sections.Add(Section("Hardware", _hardware.GetReportRows()));
+        sections.Add(Section("Network configuration", _network.GetPrimaryConfigRows()));
+        sections.Add(Section("Storage", _storage.GetReportRows()));
 
-        sb.AppendLine("Hardware");
-        foreach (var (key, value) in _hardware.GetReportRows())
-            AppendReportRow(sb, key, value);
-        sb.AppendLine();
-
-        sb.AppendLine("Network configuration");
-        foreach (var (key, value) in _network.GetPrimaryConfigRows())
-            AppendReportRow(sb, key, value);
-        sb.AppendLine();
-
-        sb.AppendLine("Storage");
-        foreach (var (key, value) in _storage.GetReportRows())
-            AppendReportRow(sb, key, value);
-
-        return sb.ToString();
+        return new DiagnosticsReport("DashDetective — System Report", DateTime.Now, sections);
     }
 
-    /// <summary>Appends a left-aligned "key: value" line, matching the Dashboard report's layout.</summary>
-    private static void AppendReportRow(StringBuilder sb, string key, string value) =>
-        sb.AppendLine($"  {(key + ":").PadRight(14)}{value}");
+    /// <summary>Wraps a page's key/value rows as a report section, so the pages keep supplying plain
+    /// tuples and know nothing about the report model.</summary>
+    private static ReportSection Section(string title, IReadOnlyList<(string Key, string Value)> rows) {
+        var mapped = new List<ReportRow>(rows.Count);
+        foreach (var (key, value) in rows)
+            mapped.Add(new ReportRow(key, value));
+        return new ReportSection(title, mapped);
+    }
+
+    /// <summary>The system report rendered in one format, for the Export actions.</summary>
+    public string BuildReport(DiagnosticsFormat format) =>
+        DiagnosticsFormats.Render(BuildReportModel(), format);
 
     /// <summary>Builds the rolling-history metrics CSV for the Settings "Export CSV" action.</summary>
     public string BuildMetricsCsv() => _dashboard.BuildMetricsCsv();
@@ -658,7 +723,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     public void Dispose() {
         _clockTimer.Stop();
         Search.Dispose();
-        _metrics.AlertActiveChanged -= OnAlertActiveChanged;
+        _alerts.AlertChanged -= OnAlertChanged;
+        _alerts.Dispose();
         foreach (var item in Nav.NavItems)
             (item.Page as IDisposable)?.Dispose();
         _metrics.Dispose();

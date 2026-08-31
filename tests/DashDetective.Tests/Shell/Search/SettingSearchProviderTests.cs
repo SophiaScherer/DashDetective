@@ -37,7 +37,7 @@ public class SettingSearchProviderTests {
 
     [Fact]
     public async Task QueryAsync_FindsASettingByItsDescription() {
-        Assert.Equal("Resource alerts", (await Best("exceeds 90%")).Title);
+        Assert.Equal("Resource alerts", (await Best("crosses its threshold")).Title);
     }
 
     [Fact]

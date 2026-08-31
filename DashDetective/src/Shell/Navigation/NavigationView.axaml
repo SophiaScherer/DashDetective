@@ -371,8 +371,13 @@
                     BorderBrush="{DynamicResource Hairline}">
                 <DockPanel LastChildFill="True" VerticalAlignment="Center">
 
+                    <!-- The device's account picture when the OS has one, else the initials badge. The
+                         accent gradient stays the backdrop either way, so it still re-tints with the
+                         accent when there is no picture (and shows through a transparent one).
+                         ClipToBounds crops the photo to the circle. -->
                     <Border DockPanel.Dock="{Binding FooterAvatarDock}" Width="32" Height="32"
-                            CornerRadius="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            CornerRadius="16" ClipToBounds="True"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
                             ToolTip.Tip="{Binding UserTooltip}">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -380,8 +385,13 @@
                                 <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
                             </LinearGradientBrush>
                         </Border.Background>
-                        <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Panel>
+                            <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
+                                       IsVisible="{Binding !HasUserPicture}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image Source="{Binding UserPicture}" Stretch="UniformToFill"
+                                   IsVisible="{Binding HasUserPicture}"/>
+                        </Panel>
                     </Border>
 
                     <Button Classes="navCtl" DockPanel.Dock="{Binding ControlsDock}"

@@ -1,4 +1,5 @@
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
 
 namespace DashDetective.Services.Settings;
@@ -7,7 +8,9 @@ namespace DashDetective.Services.Settings;
 /// The persisted user preferences, written to <c>settings.json</c> by <see cref="SettingsStore"/>.
 /// An immutable snapshot: the composition root applies it on load and captures a fresh one to save
 /// whenever a control changes. Every property has a default so a file missing fields (an older
-/// schema, a hand-edit) still deserializes; <see cref="SchemaVersion"/> guards future migrations.
+/// schema, a hand-edit) still deserializes — though the defaults survive that only because
+/// <see cref="SettingsStore"/> merges a loaded file over <see cref="Defaults"/>; see the note there
+/// before assuming an initializer here is enough. <see cref="SchemaVersion"/> guards future migrations.
 /// </summary>
 public sealed record AppSettings {
     /// <summary>Bumped when the shape changes incompatibly; a mismatch falls back to <see cref="Defaults"/>.</summary>
@@ -18,6 +21,11 @@ public sealed record AppSettings {
     /// <summary>The chosen accent's <see cref="AccentPreset.Name"/>, or <c>null</c> for the default
     /// multi-colour look.</summary>
     public string? AccentName { get; init; }
+
+    /// <summary>How on-screen wall-clock times read (the toolbar clock, the Toolkit log). Display only:
+    /// export file names, the report's "Generated" line and the app log stay 24-hour so files remain
+    /// sortable and machine-parseable.</summary>
+    public ClockFormat ClockFormat { get; init; } = ClockFormat.TwentyFourHour;
 
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
@@ -36,8 +44,30 @@ public sealed record AppSettings {
     /// not stop it.</summary>
     public bool TrayNoticeShown { get; init; }
 
-    /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
+    /// <summary>The master switch for the in-app resource-alert banner. The per-metric thresholds below
+    /// are only watched while this is on.</summary>
     public bool ResourceAlerts { get; init; }
+
+    /// <summary>Whether each resource is watched. Separate from the threshold beside it so a switched-off
+    /// row still remembers its number: GPU and disk activity ship off — sustained saturation of either is
+    /// what legitimate heavy work looks like — but with a sensible figure already in the box.</summary>
+    public bool AlertCpuEnabled { get; init; } = true;
+    public bool AlertMemoryEnabled { get; init; } = true;
+    public bool AlertGpuEnabled { get; init; }
+    public bool AlertDiskActiveEnabled { get; init; }
+    public bool AlertLowDiskFreeEnabled { get; init; } = true;
+
+    /// <summary>Per-metric alert thresholds as percentages, kept whether or not the metric is watched.
+    /// The four usage figures are an upper bound; low-disk-space is a lower one.</summary>
+    public int AlertCpuPercent { get; init; } = 90;
+    public int AlertMemoryPercent { get; init; } = 90;
+    public int AlertGpuPercent { get; init; } = 90;
+    public int AlertDiskActivePercent { get; init; } = 90;
+    public int AlertLowDiskFreePercent { get; init; } = 10;
+
+    /// <summary>How long a usage metric must stay over its threshold before it counts. Seconds rather
+    /// than samples, so the wait means the same thing at every refresh interval.</summary>
+    public int AlertSustainSeconds { get; init; } = 10;
 
     /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default: it is
     /// the only metric in the app that costs a process launch, and the card reads "—" without it. No
@@ -97,6 +127,11 @@ public sealed record AppSettings {
     /// <summary>The Processes sort column and direction, encoded by <c>ProcessSortState</c>. Written
     /// only while <see cref="ProcessesRememberSort"/> is on. Opaque here, like the four above.</summary>
     public string ProcessesSort { get; init; } = "";
+
+    /// <summary>The keyboard shortcuts the user has rebound, encoded by <c>ShortcutOverrideCodec</c>.
+    /// Opaque here for the same reason as the ones above. Empty means every shortcut is on the binding
+    /// it shipped with.</summary>
+    public string ShortcutOverrides { get; init; } = "";
 
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>

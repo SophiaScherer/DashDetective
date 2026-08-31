@@ -17,13 +17,15 @@ namespace DashDetective.Shell.Search.Providers;
 /// binding, and firing it blind from a search box would be a surprising way to trigger an action.
 /// </summary>
 public sealed class ShortcutSearchProvider : ISearchProvider {
+    private readonly ShortcutBindings _shortcuts;
     private readonly Action _openHelp;
     private readonly Geometry? _icon;
 
     /// <summary>The row glyph is passed in rather than read from the nav <c>Icons</c> table: a
     /// <c>Geometry</c> can only be built with a render backend attached, so reaching for one here would
     /// make this class untestable headlessly.</summary>
-    public ShortcutSearchProvider(Action openHelp, Geometry? icon = null) {
+    public ShortcutSearchProvider(ShortcutBindings shortcuts, Action openHelp, Geometry? icon = null) {
+        _shortcuts = shortcuts;
         _openHelp = openHelp;
         _icon = icon;
     }
@@ -37,7 +39,7 @@ public sealed class ShortcutSearchProvider : ISearchProvider {
         var term = query.Term;
         var results = new List<SearchResult>();
 
-        foreach (var group in ShortcutCatalog.HelpGroups)
+        foreach (var group in _shortcuts.HelpGroups)
             foreach (var shortcut in group.Shortcuts) {
                 var score = SearchRanker.ScoreBest(term, shortcut.Description, shortcut.Keys);
                 if (score == SearchRanker.NoMatch)

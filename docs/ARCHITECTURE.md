@@ -144,7 +144,15 @@ Both soft-fail. Samplers a second tab needs live in `src/Services`; the rest sta
 
 `SystemMetricsService` owns the shared feeds and hands them out as ref-counted subscriptions, so two
 tabs watching CPU cause one poll. `MetricChannel` wraps a sampler with its failure state, which is what
-turns a throw into the on-screen placeholder.
+turns a throw into the on-screen placeholder. It is **pure fan-out**: GPU and disk have no shared feed
+there, because an aggregate across several devices would report an average under a label naming one of
+them.
+
+`ResourceAlertWatcher` lives outside it for that reason. It subscribes to the shared CPU and memory
+feeds like any page, but owns its own GPU and disk samplers — which their contracts require, both being
+stateful — and never aggregates: it takes the **worst device and names it** in the banner. Its sustain
+window is seconds converted against the live interval, not a sample count, so the wait means the same
+thing at every refresh cadence.
 
 On Linux every reader goes through **`IProcFileSystem`** (`src/Services/Platform/Linux`) rather than
 `System.IO`, and each pseudo-file has one parser named after it (`ProcStatParser`,
@@ -177,18 +185,47 @@ or older file falls back to defaults rather than preventing launch. Collection-s
 as one encoded string, because the record's value equality — which the save round-trip relies on —
 compares collections by reference.
 
+**`Load` merges the file over `AppSettings.Defaults` key by key, and that is what makes the sentence
+above true.** The source generator treats a record's `init` properties as constructor parameters and
+fills the slots a file omits with `default(T)`, so deserializing directly discards every non-default
+initializer for a property the file predates. Merging as JSON keeps the fix general: a property added
+later inherits its default with no further work.
+
 `MainWindowViewModel` is the only place settings are applied and captured: `ApplySettings` pushes each
 value into the seam that owns it, `CaptureCurrent` reads them back.
 
+## Diagnostics export
+
+The system report is **data, not text**: `DiagnosticsReport` (`src/Services/Diagnostics`) is sections of
+key/value rows, composed by `MainWindowViewModel.BuildReportModel` from the Dashboard's own sections
+plus read-only row accessors on Hardware, Network and Storage. Each format — text, JSON, Markdown, HTML,
+CSV — is a renderer over that one model, so the pages keep supplying plain tuples and know nothing about
+export. It was string concatenation split across the shell and the Dashboard before, which is why there
+was only ever one format.
+
+`DiagnosticsFormats` is the single table of what each format is called and saves as, and the one place a
+renderer is chosen. `FileSave` (`src/Shared`) owns the save dialog for every export, and reads the format
+back off the **chosen filename** rather than the picked filter, which Avalonia does not report. The text
+renderer is pinned byte for byte by a test: a saved report and a new one have to diff cleanly.
+
 ## Keyboard shortcuts
 
-`ShortcutCatalog` (`src/Shared/Shortcuts`) is the single source of truth: one static table of gesture,
-scope, whether it survives a focused text box, and the Help copy. The key handler resolves against it
-and the Help modal renders from it, so a live binding cannot go undocumented.
+`ShortcutCatalog` (`src/Shared/Shortcuts`) is the shipped default table: gesture, scope, whether it
+survives a focused text box, and the Help copy. `ShortcutBindings` is what is actually in force — those
+defaults with the user's rebinds applied. One instance is shared by the key handler, the Help modal,
+universal search and the Settings Keyboard card, so a live binding cannot go undocumented and all four
+describe the same thing. Resolution and Help grouping live on the instance; the catalog keeps the pure
+table-taking helpers, so neither exists twice.
+
+A rebind replaces **all** of a shortcut's default gestures, and is refused when the gesture is already
+taken **within the same scope** — cross-scope duplicates stay legal, since only one tab is ever current.
+Overrides persist as one encoded string, ids and keys by name.
 
 `ShellShortcutHandler` (`src/Shell/Shortcuts`) attaches one tunneling `KeyDown` handler to the window.
-Dispatch is a priority chain on `MainWindowViewModel.HandleShortcut` — an open modal, then the search
-dropdown, then the current page's scope, then global — so it is testable without a UI.
+Dispatch is a priority chain on `MainWindowViewModel.HandleShortcut` — a capture in progress, then an
+open modal, then the search dropdown, then the current page's scope, then global — so it is testable
+without a UI. **The capture check has to come first**: the handler tunnels from the window and so sees
+a press before the Settings capture box does, and would otherwise run the shortcut being rebound.
 
 ## Cross-platform seams
 
@@ -198,6 +235,7 @@ Per-platform behaviour is resolved at runtime behind an interface, one place per
 | --- | --- | --- |
 | `IFileSystemRoots` | Drive letters | `/`, `$HOME`, removable mounts from `/proc/mounts` |
 | `IStartupRegistration` | HKCU `Run` value | XDG `.desktop` in `~/.config/autostart` |
+| `IUserPictureProvider` | `AccountPicture\Users\{SID}` index, then `%PUBLIC%\AccountPictures` | `~/.face`, `~/.face.icon`, AccountsService icon |
 | `IShellInterop` / `IProcessInterop` | Shell type names, Properties sheet | Reveal the containing folder |
 | `IToolkitCatalog` | Windows command set | Linux command set |
 | `IProcFileSystem` | — | `/proc` and `/sys` reads |

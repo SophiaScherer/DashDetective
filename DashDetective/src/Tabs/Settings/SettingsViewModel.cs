@@ -1,12 +1,16 @@
+using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Navigation;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace DashDetective.Tabs.Settings;
@@ -23,7 +27,7 @@ public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
     private readonly SystemMetricsService _metrics;
     private readonly IStartupRegistration _startup;
-    private readonly Func<string> _buildReport;
+    private readonly Func<DiagnosticsFormat, string> _buildReport;
     private readonly Func<string> _buildMetricsCsv;
 
     // Guards the constructor's initial application of persisted values from raising Changed or writing
@@ -32,11 +36,36 @@ public partial class SettingsViewModel : ViewModelBase {
 
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<AccentOption> AccentOptions { get; }
+    public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
+
+    // ----- Alerts: one row per watched resource, plus how long a breach must last -----
+
+    public AlertThresholdRow CpuAlert { get; }
+    public AlertThresholdRow MemoryAlert { get; }
+    public AlertThresholdRow GpuAlert { get; }
+    public AlertThresholdRow DiskActiveAlert { get; }
+    public AlertThresholdRow LowDiskFreeAlert { get; }
+    public AlertThresholdRow AlertSustain { get; }
 
     /// <summary>The shell's navigation bar view-model — the single shared instance, so the Settings
     /// Navigation controls and the on-bar controls stay in sync.</summary>
     public NavigationViewModel Nav { get; }
+
+    /// <summary>The live keyboard bindings — the same instance the shell resolves key presses through, so
+    /// this page edits what is actually in force rather than a copy of it.</summary>
+    public ShortcutBindings Shortcuts { get; }
+
+    /// <summary>The Keyboard card's rows, grouped by scope exactly as Help lists them.</summary>
+    public ObservableCollection<ShortcutRowGroup> ShortcutGroups { get; } = [];
+
+    /// <summary>Whether anything has been rebound, which offers "Restore defaults".</summary>
+    public bool HasCustomShortcuts => Shortcuts.HasOverrides;
+
+    /// <summary>Whether a capture box is waiting for a key press. <b>The shell reads this and stands
+    /// down while it is set</b>: its listener tunnels from the window, so it sees the key first and would
+    /// otherwise run the shortcut being rebound instead of letting it be captured.</summary>
+    public bool IsCapturingShortcut { get; private set; }
 
     /// <summary>Raised after any persisted setting changes (theme, accent, interval, or a toggle), so the
     /// composition root can capture and save the current state.</summary>
@@ -61,7 +90,8 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Keep running in the tray when the window is closed instead of exiting.</summary>
     [ObservableProperty] private bool _showInTray;
 
-    /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
+    /// <summary>The master switch for the resource-alert banner. The per-metric thresholds on the Alerts
+    /// card are only watched while this is on.</summary>
     [ObservableProperty] private bool _resourceAlerts;
 
     /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default — the
@@ -77,11 +107,14 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <c>InternalsVisibleTo</c>).</summary>
     internal SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
                                AppSettings settings, IStartupRegistration startup,
-                               Func<string> buildReport, Func<string> buildMetricsCsv) {
+                               ShortcutBindings shortcuts,
+                               Func<DiagnosticsFormat, string> buildReport,
+                               Func<string> buildMetricsCsv) {
         _theme = theme;
         _metrics = metrics;
         _startup = startup;
         Nav = nav;
+        Shortcuts = shortcuts;
         _buildReport = buildReport;
         _buildMetricsCsv = buildMetricsCsv;
         _initializing = true;
@@ -98,6 +131,11 @@ public partial class SettingsViewModel : ViewModelBase {
         };
         foreach (var preset in AccentPreset.All)
             AccentOptions.Add(new AccentOption(preset, SelectAccent));
+
+        ClockFormatOptions = new ObservableCollection<ClockFormatOption> {
+            new("24-hour", ClockFormat.TwentyFourHour, SelectClockFormat),
+            new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
+        };
 
         IntervalOptions = new ObservableCollection<IntervalOption> {
             new("0.5s", 0.5, SelectInterval),
@@ -116,6 +154,25 @@ public partial class SettingsViewModel : ViewModelBase {
         var interval = MatchInterval(settings.RefreshIntervalSeconds);
         SelectInterval(interval);
 
+        // The shell has already applied the clock format from the same settings, so this only reflects it.
+        foreach (var option in ClockFormatOptions)
+            option.IsSelected = option.Value == settings.ClockFormat;
+
+        // A usage threshold under 1% would fire constantly and 100 is a real (if rare) ceiling, so the
+        // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
+        // warns when the number drops BELOW — and stops at 99, since "warn while the disk is 100% free"
+        // is a warning that never stops.
+        CpuAlert = Threshold(settings.AlertCpuEnabled, settings.AlertCpuPercent, 100, "%");
+        MemoryAlert = Threshold(settings.AlertMemoryEnabled, settings.AlertMemoryPercent, 100, "%");
+        GpuAlert = Threshold(settings.AlertGpuEnabled, settings.AlertGpuPercent, 100, "%");
+        DiskActiveAlert = Threshold(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent, 100, "%");
+        LowDiskFreeAlert = Threshold(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent, 99, "%");
+
+        // The wait is not a warning of its own, so it has no switch — only the seconds. Capped at an hour,
+        // past which nothing would ever be reported.
+        AlertSustain = new AlertThresholdRow(
+            isEnabled: true, settings.AlertSustainSeconds, minimum: 1, maximum: 3600, "s", RaiseChanged);
+
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
         // registry state, which is the ground truth if it was changed outside the app.
@@ -124,7 +181,100 @@ public partial class SettingsViewModel : ViewModelBase {
         _resourceAlerts = settings.ResourceAlerts;
         _nvidiaGpuMetrics = settings.NvidiaGpuMetrics;
 
+        // The shell has already loaded any persisted overrides, so this only reflects them. Rebuilt on
+        // Changed so a reset — or a rebind from anywhere else — reaches the rows.
+        RebuildShortcutRows();
+        Shortcuts.Changed += RebuildShortcutRows;
+
         _initializing = false;
+    }
+
+    // ----- Keyboard -----
+
+    /// <summary>Rebuilds the rows from the live bindings, reusing the existing row objects where the
+    /// grouping has not changed so a rebind does not blink the whole card away and back.</summary>
+    private void RebuildShortcutRows() {
+        var groups = Shortcuts.HelpGroups;
+
+        if (ShortcutGroups.Count == groups.Count) {
+            for (var i = 0; i < groups.Count; i++)
+                UpdateRows(ShortcutGroups[i].Rows, groups[i].Shortcuts);
+        } else {
+            ShortcutGroups.Clear();
+            foreach (var group in groups) {
+                var rows = new List<ShortcutRow>(group.Shortcuts.Count);
+                foreach (var shortcut in group.Shortcuts)
+                    rows.Add(new ShortcutRow(shortcut.Id, shortcut.Description));
+                ShortcutGroups.Add(new ShortcutRowGroup(group.Title, rows));
+                UpdateRows(rows, group.Shortcuts);
+            }
+        }
+
+        OnPropertyChanged(nameof(HasCustomShortcuts));
+    }
+
+    private void UpdateRows(IReadOnlyList<ShortcutRow> rows, IReadOnlyList<Shortcut> shortcuts) {
+        for (var i = 0; i < rows.Count && i < shortcuts.Count; i++) {
+            rows[i].Keys = shortcuts[i].Keys;
+            rows[i].IsCustom = Shortcuts.IsCustom(shortcuts[i].Id);
+        }
+    }
+
+    /// <summary>Tracks whether a capture box is armed, for the shell to read.</summary>
+    public void SetCapturing(bool capturing) => IsCapturingShortcut = capturing;
+
+    /// <summary>
+    /// Applies a captured gesture. A clash inside the same scope is refused and explained on the row —
+    /// cross-scope duplicates stay legal, because they already are: Alt+↑ sorts on Processes and climbs a
+    /// folder on File Explorer, and only one tab is ever current.
+    /// </summary>
+    public void Rebind(ShortcutRow row, KeyGesture gesture) {
+        ClearNotes();
+
+        if (Shortcuts.TryRebind(row.Id, gesture, out var conflict)) {
+            Changed?.Invoke();
+            return;
+        }
+
+        row.Note = $"{GestureFormatter.Describe(gesture)} is already {DescribeAction(conflict)}.";
+    }
+
+    /// <summary>Puts one shortcut back on its shipped binding.</summary>
+    public void ResetShortcut(ShortcutRow row) {
+        ClearNotes();
+        if (!row.IsCustom)
+            return;
+
+        Shortcuts.ResetToDefault(row.Id);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Puts every shortcut back on its shipped binding.</summary>
+    [RelayCommand]
+    private void ResetAllShortcuts() {
+        ClearNotes();
+        if (!Shortcuts.HasOverrides)
+            return;
+
+        Shortcuts.ResetAll();
+        Changed?.Invoke();
+    }
+
+    /// <summary>What the conflicting shortcut does, so the refusal names an action rather than an id.</summary>
+    private string DescribeAction(ShortcutId id) {
+        foreach (var shortcut in Shortcuts.All)
+            if (shortcut.Id == id)
+                return shortcut.Description.Length > 0 ? $"\"{shortcut.Description}\"" : "in use";
+
+        return "in use";
+    }
+
+    /// <summary>Only the newest attempt is explained; leaving older notes up would read as several
+    /// things being wrong at once.</summary>
+    private void ClearNotes() {
+        foreach (var group in ShortcutGroups)
+            foreach (var row in group.Rows)
+                row.Note = "";
     }
 
     /// <summary>Whether the "Show in system tray" setting can be operated. Bound to the whole row, not
@@ -136,6 +286,17 @@ public partial class SettingsViewModel : ViewModelBase {
     /// and the sampler discards the write anyway.</summary>
     public bool CanUseNvidiaMetrics => GpuMetricsSupport.NeedsHelperTool;
 
+    /// <summary>The currently selected clock format (for capturing into settings). The shell reads this
+    /// and pushes it to the toolbar clock and the Toolkit log.</summary>
+    public ClockFormat ClockFormat {
+        get {
+            foreach (var option in ClockFormatOptions)
+                if (option.IsSelected)
+                    return option.Value;
+            return ClockFormat.TwentyFourHour;
+        }
+    }
+
     /// <summary>The currently selected refresh interval in seconds (for capturing into settings).</summary>
     public double SelectedIntervalSeconds {
         get {
@@ -146,8 +307,8 @@ public partial class SettingsViewModel : ViewModelBase {
         }
     }
 
-    /// <summary>Builds the plain-text system report (for Copy diagnostics / Export report).</summary>
-    public string BuildReport() => _buildReport();
+    /// <summary>Builds the system report in one format (for Copy diagnostics / Export report).</summary>
+    public string BuildReport(DiagnosticsFormat format) => _buildReport(format);
 
     /// <summary>Builds the rolling-history metrics CSV (for Export CSV).</summary>
     public string BuildMetricsCsv() => _buildMetricsCsv();
@@ -188,6 +349,24 @@ public partial class SettingsViewModel : ViewModelBase {
             _theme.ApplyAccent(preset);
         else
             _theme.ApplyDefaultAppearance();
+        Changed?.Invoke();
+    }
+
+    /// <summary>Builds one percentage row. Every one shares a floor of 1: zero is how the settings layer
+    /// encodes "not watched", and the row's switch says that instead.</summary>
+    private AlertThresholdRow Threshold(bool isEnabled, int percent, int maximum, string suffix) =>
+        new(isEnabled, percent, minimum: 1, maximum, suffix, RaiseChanged);
+
+    /// <summary>The alert rows' change callback. Guarded like the other seeded controls, though the rows
+    /// only report real edits anyway.</summary>
+    private void RaiseChanged() {
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    private void SelectClockFormat(ClockFormatOption option) {
+        foreach (var other in ClockFormatOptions)
+            other.IsSelected = other == option;
         Changed?.Invoke();
     }
 

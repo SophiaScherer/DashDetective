@@ -135,8 +135,13 @@ public class DashboardGpuCardTests {
             () => new FakeGpuUsageSampler().Silent(Nvidia), Adapter(Nvidia, "NVIDIA nvidia (10de:2504)"));
 
         Assert.Equal("—", viewModel.GpuValueText);
-        Assert.Contains("GPU:", viewModel.BuildDiagnosticsReport());
-        Assert.DoesNotContain("GPU:          0%", viewModel.BuildDiagnosticsReport());
+
+        var gpu = viewModel.GetReportSections()
+            .Single(section => section.Title == "Live metrics")
+            .Rows.Single(row => row.Key == "GPU");
+
+        Assert.StartsWith("—", gpu.Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("0%", gpu.Value, StringComparison.Ordinal);
     }
 
     /// <summary>The inventory keeps only adapters the sampler also reports, so an enumerated adapter the

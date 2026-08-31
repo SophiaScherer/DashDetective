@@ -1,6 +1,10 @@
+using Avalonia.Input;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
@@ -32,6 +36,18 @@ public sealed class SettingsStoreTests : IDisposable {
         var settings = AppSettings.Defaults with {
             Theme = AppTheme.Light,
             AccentName = "Teal",
+            ClockFormat = ClockFormat.TwelveHour,
+            AlertCpuEnabled = true,
+            AlertMemoryEnabled = false,
+            AlertGpuEnabled = true,
+            AlertDiskActiveEnabled = true,
+            AlertLowDiskFreeEnabled = false,
+            AlertCpuPercent = 80,
+            AlertMemoryPercent = 95,
+            AlertGpuPercent = 90,
+            AlertDiskActivePercent = 70,
+            AlertLowDiskFreePercent = 5,
+            AlertSustainSeconds = 30,
             RefreshIntervalSeconds = 2,
             LaunchAtStartup = true,
             PerformanceShowAllDevices = true,
@@ -45,6 +61,11 @@ public sealed class SettingsStoreTests : IDisposable {
             ProcessColumns = "Name\u001FCpu\u001FPid",
             ProcessesRememberCollapsed = true,
             ProcessesRememberSort = true,
+            // Built by the real encoder rather than hand-written, so the round trip proves the string the
+            // app actually stores survives JSON — separators and all.
+            ShortcutOverrides = ShortcutOverrideCodec.Encode(new Dictionary<ShortcutId, KeyGesture> {
+                [ShortcutId.Export] = new(Key.G, KeyModifiers.Control),
+            }),
             ProcessesCollapsedSections = "Background\u001FWindows",
             ProcessesSort = "Cpu\u001FDesc",
         };
@@ -56,6 +77,27 @@ public sealed class SettingsStoreTests : IDisposable {
 
         var loaded = new SettingsStore(_path).Load();
         Assert.Equal(settings, loaded);
+    }
+
+    /// <summary>A settings file written before the alert thresholds existed must come back carrying their
+    /// defaults, not zeros — zero is how a metric is switched OFF, so a silent zero would disable the CPU
+    /// and memory alerts of every existing install.</summary>
+    [Fact]
+    public void Load_FileFromBeforeTheAlertThresholds_KeepsTheirDefaults() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "Theme": "Dark", "ResourceAlerts": true }
+            """);
+
+        var loaded = new SettingsStore(_path).Load();
+
+        Assert.True(loaded.ShowInTray);   // the pre-existing non-default initializer, same rule
+        Assert.Equal(90, loaded.AlertCpuPercent);
+        Assert.Equal(90, loaded.AlertMemoryPercent);
+        Assert.Equal(10, loaded.AlertLowDiskFreePercent);
+        Assert.Equal(10, loaded.AlertSustainSeconds);
+        Assert.True(loaded.AlertCpuEnabled);
+        Assert.False(loaded.AlertGpuEnabled);   // ships off, but with a number already in the box
+        Assert.Equal(90, loaded.AlertGpuPercent);
     }
 
     [Fact]
