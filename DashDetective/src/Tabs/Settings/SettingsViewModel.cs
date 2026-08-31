@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
@@ -23,7 +24,7 @@ public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
     private readonly SystemMetricsService _metrics;
     private readonly IStartupRegistration _startup;
-    private readonly Func<string> _buildReport;
+    private readonly Func<DiagnosticsFormat, string> _buildReport;
     private readonly Func<string> _buildMetricsCsv;
 
     // Guards the constructor's initial application of persisted values from raising Changed or writing
@@ -87,7 +88,8 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <c>InternalsVisibleTo</c>).</summary>
     internal SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
                                AppSettings settings, IStartupRegistration startup,
-                               Func<string> buildReport, Func<string> buildMetricsCsv) {
+                               Func<DiagnosticsFormat, string> buildReport,
+                               Func<string> buildMetricsCsv) {
         _theme = theme;
         _metrics = metrics;
         _startup = startup;
@@ -191,8 +193,8 @@ public partial class SettingsViewModel : ViewModelBase {
         }
     }
 
-    /// <summary>Builds the plain-text system report (for Copy diagnostics / Export report).</summary>
-    public string BuildReport() => _buildReport();
+    /// <summary>Builds the system report in one format (for Copy diagnostics / Export report).</summary>
+    public string BuildReport(DiagnosticsFormat format) => _buildReport(format);
 
     /// <summary>Builds the rolling-history metrics CSV (for Export CSV).</summary>
     public string BuildMetricsCsv() => _buildMetricsCsv();

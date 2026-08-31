@@ -22,7 +22,7 @@ public class SettingsViewModelTests {
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         return new SettingsViewModel(
             new ThemeService(), new NavigationViewModel(), metrics, AppSettings.Defaults, startup,
-            () => "", () => "");
+            _ => "", () => "");
     }
 
     [Fact]

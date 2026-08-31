@@ -239,12 +239,19 @@ six categories at once and navigates to whatever is picked, revealing it in plac
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.
-- **Export & Data.** Handlers in `SettingsView.axaml.cs` (own the save dialog + clipboard, needing
-  the `TopLevel`, like `MainWindow`): **Copy diagnostics** → clipboard; **Export report (.txt)** →
-  the same plain-text report as the toolbar Export (no PDF library); **Export CSV** → the rolling
-  60-sample metric histories (`DashboardViewModel.BuildMetricsCsv`). `MainWindowViewModel.BuildReport`
-  now appends a Hardware summary and the primary network config (via small read-only accessors —
-  `HardwareViewModel.GetReportRows`, `NetworkViewModel.GetPrimaryConfigRows`).
+- **Export & Data.** **Copy diagnostics** → clipboard (as text); **Export report** → the system
+  snapshot as **text, JSON, Markdown, HTML or CSV**, picked in the native dialog's own type list; **Export
+  CSV** → the rolling 60-sample metric histories, a different artifact from the report and so still its
+  own button. The report is a `DiagnosticsReport` — sections of key/value rows — built by
+  `MainWindowViewModel.BuildReportModel` from `DashboardViewModel.GetReportSections` plus the read-only
+  accessors on Hardware, Network and Storage; each format is a renderer over that one model. Three
+  decisions worth keeping: the **text format is pinned byte for byte by a test**, so an existing saved
+  report and a new one still diff cleanly; the format comes from the **chosen filename**, not the picked
+  filter, because Avalonia does not report the latter and a typed extension should win; and the HTML is
+  **self-contained and exempt from the palette-ownership rule**, since a page opened in a browser has no
+  access to the app's theme and must not look right only inside DashDetective. One `FileSave` helper owns
+  the dialog for all of it, replacing three near-identical copies (toolbar Export, the two Settings
+  buttons, the Toolkit log export).
 - **Persistence.** All of the above (plus Appearance and Navigation) persist to
   `%AppData%/DashDetective/settings.json` via `SettingsStore` (`src/Services/Settings`; System.Text.Json
   source-gen, load-on-start with full soft-fail to defaults, debounced atomic save, `schemaVersion`).

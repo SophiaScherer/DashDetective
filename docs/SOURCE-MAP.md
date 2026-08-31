@@ -114,6 +114,12 @@ stays in its tab folder.
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
       TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
+      FileSave.cs              (the ONE save-file flow: offer the formats, take a destination from the
+                                native dialog, write what the chosen extension asked for. Replaced three
+                                near-identical copies — toolbar Export, the two Settings buttons, the
+                                Toolkit log — which is what made adding a format a three-place edit.
+                                Content is rendered only after a destination is picked, and only in the
+                                one format chosen)
                                 arms: the 12-hour one must say AM/PM rather than whatever the host
                                 locale designates. Display only — export names, the report's
                                 "Generated" line and the app log stay 24-hour so files stay sortable)
@@ -295,6 +301,22 @@ stays in its tab folder.
                                  MetricChannel catch blocks route through Log.Warn, and Program.cs hooks
                                  AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException →
                                  Log.Error. No logging packages)
+        DiagnosticsReport.cs    (the report as DATA — sections of key/value rows — rather than as text.
+                                 It used to be built by string concatenation split across the shell and
+                                 the Dashboard, which is why there was only ever one format)
+        DiagnosticsFormat.cs    (the export formats + what each saves as, and the one place a report is
+                                 rendered into one. FromFileName reads the format off the CHOSEN NAME:
+                                 Avalonia does not report which picker filter was used, and a typed
+                                 extension should beat a selected one)
+        ReportFormatters.cs     (text / Markdown / HTML / CSV renderers. The TEXT one is pinned byte for
+                                 byte by a test — a saved report and a new one still have to diff
+                                 cleanly. Each escapes what its own syntax reserves, which is not
+                                 hypothetical: every DNS list holds a comma and a machine name is
+                                 user-controlled text. EXEMPT from the palette-ownership rule, since an
+                                 exported page is a browser document with no access to the theme)
+        DiagnosticsJsonContext.cs
+                                (source-gen context for the JSON export, like SettingsJsonContext — it
+                                 is what keeps the trimming/AOT gate clean)
 ```
 
 ## `src/Services/Theming`

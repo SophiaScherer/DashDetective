@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Search;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
@@ -596,31 +597,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// network configuration follow so the report is an honest full-system snapshot. Called from the
     /// window / Settings code-behind, which own the save dialog + clipboard (they need the TopLevel).
     /// </summary>
-    public string BuildReport() {
-        var sb = new StringBuilder();
-        sb.Append(_dashboard.BuildDiagnosticsReport());
-        sb.AppendLine();
+    public DiagnosticsReport BuildReportModel() {
+        var sections = new List<ReportSection>(_dashboard.GetReportSections());
+        sections.Add(Section("Hardware", _hardware.GetReportRows()));
+        sections.Add(Section("Network configuration", _network.GetPrimaryConfigRows()));
+        sections.Add(Section("Storage", _storage.GetReportRows()));
 
-        sb.AppendLine("Hardware");
-        foreach (var (key, value) in _hardware.GetReportRows())
-            AppendReportRow(sb, key, value);
-        sb.AppendLine();
-
-        sb.AppendLine("Network configuration");
-        foreach (var (key, value) in _network.GetPrimaryConfigRows())
-            AppendReportRow(sb, key, value);
-        sb.AppendLine();
-
-        sb.AppendLine("Storage");
-        foreach (var (key, value) in _storage.GetReportRows())
-            AppendReportRow(sb, key, value);
-
-        return sb.ToString();
+        return new DiagnosticsReport("DashDetective — System Report", DateTime.Now, sections);
     }
 
-    /// <summary>Appends a left-aligned "key: value" line, matching the Dashboard report's layout.</summary>
-    private static void AppendReportRow(StringBuilder sb, string key, string value) =>
-        sb.AppendLine($"  {(key + ":").PadRight(14)}{value}");
+    /// <summary>Wraps a page's key/value rows as a report section, so the pages keep supplying plain
+    /// tuples and know nothing about the report model.</summary>
+    private static ReportSection Section(string title, IReadOnlyList<(string Key, string Value)> rows) {
+        var mapped = new List<ReportRow>(rows.Count);
+        foreach (var (key, value) in rows)
+            mapped.Add(new ReportRow(key, value));
+        return new ReportSection(title, mapped);
+    }
+
+    /// <summary>The system report rendered in one format, for the Export actions.</summary>
+    public string BuildReport(DiagnosticsFormat format) =>
+        DiagnosticsFormats.Render(BuildReportModel(), format);
 
     /// <summary>Builds the rolling-history metrics CSV for the Settings "Export CSV" action.</summary>
     public string BuildMetricsCsv() => _dashboard.BuildMetricsCsv();
