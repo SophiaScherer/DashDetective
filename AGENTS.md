@@ -48,11 +48,19 @@ new task explicitly assigns, and do not modify a live feature without an explici
 
 The nine tabs — Dashboard, File Explorer, Processes, Performance, Network, Storage, Hardware,
 **Toolkit** and Settings — plus the shell **Navigation bar**, **universal search**, **keyboard
-shortcuts** (rebindable, with the Settings Keyboard card), the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
+shortcuts**, the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
 passes (repo-hygiene / portfolio; de-duplication / composition). **Read
 [docs/FEATURES.md](docs/FEATURES.md) before touching any of them** — it holds the write-up for each,
 including the decisions inside it that must not be undone. The **widget system** entry changes how
 every page is laid out, so read that one before touching a view.
+
+A **customization pass** is also complete, and it reached five features rather than one folder:
+**rebindable keyboard shortcuts** (the Settings Keyboard card, `ShortcutBindings` over the catalog's
+defaults), **per-metric resource alerts** (`ResourceAlertWatcher`, now including GPU, disk activity and
+low disk space), **multi-format diagnostics export** (text / JSON / Markdown / HTML / CSV over a
+structured `DiagnosticsReport`), a **12/24-hour clock format**, and the **device account picture** in
+the nav footer (`IUserPictureProvider`). Each has an entry in
+[docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
@@ -629,6 +637,28 @@ code-behind do not — the provider that failed has already logged it with more 
 `DiskTemperatureRange`). They stay separate from each other on purpose: a drive at 130 °C is a bad
 reading, a GPU at 130 °C is a hot one.
 
+### Settings
+
+- **Adding a property to `AppSettings` is not enough to give it a default.** `SettingsStore.Load`
+  deserializes a file *over* `AppSettings.Defaults`, key by key, and that merge is what preserves
+  initializers — **load-bearing, not belt-and-braces.** The JSON source generator treats a record's
+  `init` properties as constructor parameters (generated code cannot assign an `init` property after
+  construction, so it must use one object initializer), builds the object from a single args array, and
+  fills absent slots with `default(T)`. Deserializing directly therefore discarded every non-default
+  initializer for any property a file omitted: `ShowInTray` loaded as `false` for months, and every
+  alert threshold would have loaded as `0`. Do not "simplify" `Load` back to a plain `Deserialize`.
+- **Collection-shaped state is one opaque encoded string with its own codec**, because the record's
+  value equality — which the save round-trip relies on — compares collections by reference. Codecs store
+  **names, never ordinals**: inserting an enum member must not silently re-point saved state at a
+  different one. An unreadable entry is skipped, not fatal.
+- **A setting that can be switched off encodes "off" in the value where that is unambiguous.** An alert
+  threshold of `0` means "not watched", which keeps one control per row and one check in the watcher.
+  Where the *number* has to survive being switched off, the switch is a separate persisted flag — that
+  is why the alert rows store both, so GPU can ship off with 90 already in the box.
+- **`SettingId` and `SettingCatalog` are a bijection**, pinned by a test: a new id without an entry
+  fails the build. The page's labels bind to the catalog rather than holding literals, so the copy on
+  screen is by construction the copy universal search matches against.
+
 ### Platform readers
 
 - **Never substitute a near-miss.** Where a platform has no source for a value, return `null` and let
@@ -672,6 +702,11 @@ temperature is the expected outcome, not a defect.
   exists to stop. Add a token when the second site asks for it, not before.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
+- **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions
+  are the three C# mirrors beside it and **`ReportFormatters.cs`** — an exported HTML report is a
+  browser document with no access to the theme, and one that only looked right inside DashDetective
+  would be the bug. That is the bar for a future exemption: rendered outside the app, not merely
+  inconvenient to tokenise.
 
 ### Testing
 

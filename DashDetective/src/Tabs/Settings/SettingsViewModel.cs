@@ -90,7 +90,8 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Keep running in the tray when the window is closed instead of exiting.</summary>
     [ObservableProperty] private bool _showInTray;
 
-    /// <summary>Show the in-app banner when CPU or memory stays above the alert threshold.</summary>
+    /// <summary>The master switch for the resource-alert banner. The per-metric thresholds on the Alerts
+    /// card are only watched while this is on.</summary>
     [ObservableProperty] private bool _resourceAlerts;
 
     /// <summary>Read NVIDIA GPU utilization on Linux by running <c>nvidia-smi</c>. Off by default — the

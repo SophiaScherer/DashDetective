@@ -214,6 +214,9 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
   **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
   (`src/Services/Startup`, soft-failing).
+- **Keyboard.** The rebinding list for every shortcut, rendered from the live bindings. Written up
+  under *Keyboard shortcuts* below, since the behaviour is the shortcut layer's rather than this
+  page's.
 - **Alerts.** Six rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space threshold, and
   how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`),
   plus a per-row switch. Runs of preset segments were tried first and pushed the description text into a
@@ -260,6 +263,11 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
   that the app has disclosed, once, that closing the window does not stop it.
   Theme, accent and the navigation choices **persist** through this rather than lasting a session.
+  **`Load` merges the file over `AppSettings.Defaults` key by key, and that merge is what makes the
+  "soft-fail to defaults" above true for a property the file predates.** The source generator treats
+  a record's `init` properties as constructor parameters and fills absent slots with `default(T)`, so
+  deserializing directly discarded every non-default initializer — `ShowInTray` loaded as false for
+  months, and every alert threshold would have loaded as `0`, which is how one is switched off.
 
 ## File Explorer
 

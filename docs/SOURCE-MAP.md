@@ -19,6 +19,7 @@ stays in its tab folder.
 - [`src/Shared/Styles`](#srcsharedstyles)
 - [`src/Shared/Layout`](#srcsharedlayout)
 - [`src/Shared/Controls`](#srcsharedcontrols)
+- [`src/Shared/Shortcuts`](#srcsharedshortcuts)
 - [`src/Services/Settings`](#srcservicessettings)
 - [`src/Services/Startup`](#srcservicesstartup)
 - [`src/Services/Identity`](#srcservicesidentity)
@@ -231,6 +232,38 @@ stays in its tab folder.
                                         Its Mono and Flush variants back the Network tab's IP config)
 ```
 
+## `src/Shared/Shortcuts`
+
+```
+      /Shortcuts
+        ShortcutId.cs           (every keyboard action. NavigateTab1..9 MUST STAY CONTIGUOUS —
+                                 HandleGlobal maps them to nav positions by subtracting NavigateTab1)
+        ShortcutScope.cs        (Global, Search, or the tab that owns the shortcut)
+        Shortcut.cs             (one entry: gestures, Help copy, scope, whether it survives a focused
+                                 text box, whether Help lists it)
+        ShortcutGroup.cs        (one headed block of shortcuts, as Help renders them)
+        IShortcutTarget.cs      (a page opts in with Scope + HandleShortcut, so no per-page shell wiring)
+        ShortcutCatalog.cs      (the SHIPPED DEFAULTS, one static table, plus the pure table-taking
+                                 TryResolve/GroupForHelp. Invariant: neither an action nor a gesture
+                                 bound twice WITHIN one scope — one id may serve several scopes, which is
+                                 how "/" focuses both the Processes and Toolkit filters)
+        ShortcutBindings.cs     (the bindings ACTUALLY IN FORCE: those defaults with the user's rebinds
+                                 applied. Resolution and Help grouping live here because both have to see
+                                 what the user chose; the catalog's helpers do the work, so neither
+                                 exists twice. A rebind replaces ALL of a shortcut's default gestures, so
+                                 rebinding Refresh leaves neither F5 nor Ctrl+R firing it. A clash is
+                                 refused only WITHIN one scope — Alt+Up is legally both Processes sort
+                                 and File Explorer up, since only one tab is ever current)
+        GestureFormatter.cs     (a KeyGesture as Help spells it. Only REBOUND entries use it — a default
+                                 keeps its hand-written copy, which says things a formatter cannot
+                                 ("Ctrl+1 … Ctrl+9" covers nine bindings in one row). Also owns
+                                 IsModifierKey: a binding of "Ctrl" alone would fire on touch)
+        ShortcutOverrideCodec.cs
+                                (the rebinds as one opaque string for AppSettings, the WidgetOrders
+                                 shape. Ids, keys and modifiers BY NAME, so inserting an enum member
+                                 cannot silently rebind someone's keyboard; an unreadable entry is
+                                 skipped, leaving that shortcut on its default)
+```
 ## `src/Services/Settings`
 
 ```

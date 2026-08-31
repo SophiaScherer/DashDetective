@@ -70,7 +70,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                               nameof(RefreshToolTip))]
     private ViewModelBase _currentPage;
 
-    /// <summary>Live wall clock shown at the right of the toolbar (24-hour HH:mm:ss).</summary>
+    /// <summary>Live wall clock shown at the right of the toolbar, in the chosen clock format.</summary>
     [ObservableProperty] private string _clock = "";
 
     /// <summary>Whether the resource-alert banner is currently shown in the shell.</summary>

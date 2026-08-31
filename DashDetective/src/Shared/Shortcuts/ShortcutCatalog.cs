@@ -5,11 +5,15 @@ using System.Collections.Generic;
 namespace DashDetective.Shared.Shortcuts;
 
 /// <summary>
-/// The single source of truth for every keyboard shortcut: gestures, focus guards and Help copy. The
-/// shell resolves keys through <see cref="TryResolve"/> and the Help modal renders <see cref="All"/>,
-/// so a live binding can never go undocumented (or a documented one go dead). Held as a static table
-/// like <c>HelpContent</c> and <c>HardwareCatalog</c>, and free of any control types, so it is
-/// testable without a render backend.
+/// The <b>shipped default</b> for every keyboard shortcut: gestures, focus guards and Help copy. What is
+/// actually in force is <see cref="ShortcutBindings"/> — these defaults with the user's rebinds applied —
+/// and that is what the shell resolves through and Help renders, so a live binding can never go
+/// undocumented (or a documented one go dead).
+///
+/// The resolution and grouping helpers here take the table as an argument so the bindings can run the
+/// user's choices through this same code rather than through a second copy of it. Held as a static table
+/// like <c>HelpContent</c> and <c>HardwareCatalog</c>, and free of any control types, so it is testable
+/// without a render backend.
 /// </summary>
 public static class ShortcutCatalog {
     /// <summary>Every shortcut, in the order Help lists them.</summary>
