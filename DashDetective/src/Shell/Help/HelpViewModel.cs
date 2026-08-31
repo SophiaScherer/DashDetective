@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
+using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Shell.Help;
@@ -29,6 +30,10 @@ public partial class HelpViewModel : ViewModelBase {
         ];
         SyncTabs();
     }
+
+    /// <summary>Raised with a topic's key when something asks Help to point at it. The overlay listens
+    /// and flashes that row.</summary>
+    public event Action<string>? RevealRequested;
 
     /// <summary>Whether the modal is showing. Drives the overlay's visibility.</summary>
     [ObservableProperty] private bool _isOpen;
@@ -77,6 +82,13 @@ public partial class HelpViewModel : ViewModelBase {
     /// <summary>Hides the modal (the ×, the Esc key, and a click on the scrim all land here).</summary>
     [RelayCommand]
     public void Close() => IsOpen = false;
+
+    /// <summary>Switches to the topic's own tab and asks the overlay to scroll it into view. The tab
+    /// moves off Overview so the reader lands on one section rather than the whole scroll.</summary>
+    public void Reveal(HelpTab tab, string topicKey) {
+        SelectedTab = tab;
+        RevealRequested?.Invoke(topicKey);
+    }
 
     private void SelectTab(HelpTabOption option) => SelectedTab = option.Value;
 

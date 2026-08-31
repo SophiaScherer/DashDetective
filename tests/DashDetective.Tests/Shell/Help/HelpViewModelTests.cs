@@ -102,4 +102,16 @@ public class HelpViewModelTests {
         vm.Open();
         Assert.Equal(HelpTab.Overview, vm.SelectedTab);
     }
+
+    [Fact]
+    public void Reveal_SwitchesToTheTopicsTabAndAnnouncesIt() {
+        var vm = new HelpViewModel(new ShortcutBindings());
+        string? revealed = null;
+        vm.RevealRequested += key => revealed = key;
+
+        vm.Reveal(HelpTab.Tips, "tip.search");
+
+        Assert.Equal(HelpTab.Tips, vm.SelectedTab);
+        Assert.Equal("tip.search", revealed);
+    }
 }

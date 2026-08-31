@@ -201,6 +201,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
             new ShortcutSearchProvider(Shortcuts, Help.Open, Icons.Help),
+            new HelpSearchProvider(RevealHelp, Icons.Help),
             new ToolkitSearchProvider(() => _toolkit.AllEntries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
@@ -682,6 +683,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void RevealSetting(SettingId id) {
         NavigateToPage(_settings);
         _settings.Reveal(id);
+    }
+
+    /// <summary>Opens Help on a topic's own tab with that topic scrolled into view and flashed.</summary>
+    private void RevealHelp(HelpTab tab, string topicKey) {
+        Help.Open();
+        Help.Reveal(tab, topicKey);
     }
 
     /// <summary>Opens the Toolkit with the given command scrolled into view and flashed.</summary>
