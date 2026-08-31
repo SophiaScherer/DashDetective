@@ -21,5 +21,6 @@ public enum SettingId {
     NvidiaGpuMetrics,
     ShowInTray,
     LaunchAtStartup,
+    Shortcuts,
     ExportData,
 }

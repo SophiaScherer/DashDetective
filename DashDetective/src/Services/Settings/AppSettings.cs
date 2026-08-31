@@ -128,6 +128,11 @@ public sealed record AppSettings {
     /// only while <see cref="ProcessesRememberSort"/> is on. Opaque here, like the four above.</summary>
     public string ProcessesSort { get; init; } = "";
 
+    /// <summary>The keyboard shortcuts the user has rebound, encoded by <c>ShortcutOverrideCodec</c>.
+    /// Opaque here for the same reason as the ones above. Empty means every shortcut is on the binding
+    /// it shipped with.</summary>
+    public string ShortcutOverrides { get; init; } = "";
+
     /// <summary>The first-run baseline, also the soft-fail fallback for a missing/corrupt file. Encodes
     /// the same on/off states the static mock showed, so a fresh install looks unchanged.</summary>
     public static AppSettings Defaults { get; } = new();

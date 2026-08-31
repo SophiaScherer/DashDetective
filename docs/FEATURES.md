@@ -159,7 +159,7 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   merges and caps what comes back, and discards an answer whose term the user has already typed past.
   A provider that throws costs its own category and nothing else.
 - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
-  `ShortcutCatalog.HelpGroups`, so a result already knows its scope and keys), Toolkit (over
+  `ShortcutBindings.HelpGroups`, so a result already knows its scope and the keys currently bound), Toolkit (over
   `ToolkitViewModel.AllEntries`, ranking the command text above its description), Processes (over the
   Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
   row), and Files.
@@ -838,8 +838,11 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **Keyboard shortcuts** — **fully live**, built in phases. A data-driven shortcut layer:
   `src/Shared/Shortcuts` holds the model (`ShortcutCatalog`, `ShortcutId`, `ShortcutScope`, `Shortcut`,
   `ShortcutGroup`, `IShortcutTarget`) and `src/Shell/Shortcuts` the listener (`ShellShortcutHandler`,
-  `KeyboardFocus`). **`ShortcutCatalog` is the single source of truth** — the key handler resolves
-  against it and the Help modal renders from it, so bindings and documentation cannot drift. Dispatch is
+  `KeyboardFocus`). **`ShortcutCatalog` is the shipped default table, and `ShortcutBindings` is what is
+  actually in force** — the defaults with the user's rebinds applied. One `ShortcutBindings` instance is
+  shared by the key handler, Help, universal search and the Settings page, so all four describe and act
+  on the same thing and cannot drift. Resolution and Help grouping live on the instance; the catalog
+  keeps the pure table-taking helpers, so there is no second copy of either. Dispatch is
   a priority chain on `MainWindowViewModel.HandleShortcut` (open modal → current page via
   `IShortcutTarget` → global), and a handler reports whether it acted so an inapplicable key falls
   through. Resolution is **scope-aware**: a gesture may mean different things on different tabs
@@ -850,6 +853,20 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   tab reuses the existing action rather than minting a near-duplicate id per tab. The catalog invariant
   is therefore "neither an action **nor** a gesture bound twice **within one scope**", which is what
   `ShortcutCatalogTests` pins.
+- **Every shortcut is rebindable**, from the Keyboard card on the Settings page. A row arms a
+  `ShortcutCaptureBox`, which swallows the next press and offers it to the view model; the rebind
+  **replaces all of a shortcut's default gestures**, so rebinding Refresh leaves neither F5 nor Ctrl+R
+  firing it. Rebinds persist as one opaque string (`ShortcutOverrideCodec`, ids and keys **by name** so
+  reordering an enum cannot silently rebind a keyboard), and a per-row reset and a card-level
+  "Restore default shortcuts" put them back.
+- **The shell must stand down while a capture is armed.** Its listener is a tunnelling handler on the
+  window, so it sees the press *before* the capture box does — without this, arming a box and pressing
+  Ctrl+1 would navigate away instead of capturing. `SettingsViewModel.IsCapturingShortcut` is what
+  `HandleShortcut` checks first, returning false so the key continues down to the box.
+- **A clash is refused, not silently accepted**, and only **within one scope**. Cross-scope duplicates
+  stay legal because they already are (`Alt+↑` on Processes and File Explorer), since only one tab is
+  ever current. The capture box reports the conflict inline, naming the action that already holds the
+  gesture.
 - **The digit jumps run `Ctrl+1 … Ctrl+9`** (nine tabs). `ShortcutId.NavigateTab1..9` must stay
   contiguous — `MainWindowViewModel.HandleGlobal` maps them to nav positions by subtracting
   `NavigateTab1`, and its range guard names the last one, so a tenth tab means touching the enum, the

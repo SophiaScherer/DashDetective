@@ -48,7 +48,7 @@ new task explicitly assigns, and do not modify a live feature without an explici
 
 The nine tabs — Dashboard, File Explorer, Processes, Performance, Network, Storage, Hardware,
 **Toolkit** and Settings — plus the shell **Navigation bar**, **universal search**, **keyboard
-shortcuts**, the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
+shortcuts** (rebindable, with the Settings Keyboard card), the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
 passes (repo-hygiene / portfolio; de-duplication / composition). **Read
 [docs/FEATURES.md](docs/FEATURES.md) before touching any of them** — it holds the write-up for each,
 including the decisions inside it that must not be undone. The **widget system** entry changes how

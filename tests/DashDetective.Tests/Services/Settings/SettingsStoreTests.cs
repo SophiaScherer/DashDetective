@@ -1,7 +1,10 @@
+using Avalonia.Input;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Xunit;
 
@@ -58,6 +61,11 @@ public sealed class SettingsStoreTests : IDisposable {
             ProcessColumns = "Name\u001FCpu\u001FPid",
             ProcessesRememberCollapsed = true,
             ProcessesRememberSort = true,
+            // Built by the real encoder rather than hand-written, so the round trip proves the string the
+            // app actually stores survives JSON — separators and all.
+            ShortcutOverrides = ShortcutOverrideCodec.Encode(new Dictionary<ShortcutId, KeyGesture> {
+                [ShortcutId.Export] = new(Key.G, KeyModifiers.Control),
+            }),
             ProcessesCollapsedSections = "Background\u001FWindows",
             ProcessesSort = "Cpu\u001FDesc",
         };

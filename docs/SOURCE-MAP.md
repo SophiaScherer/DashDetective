@@ -930,6 +930,16 @@ stays in its tab folder.
                                 IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
                                 NumericField.axaml(.cs) (a typed whole number with its unit beside it —
+                                ShortcutCaptureBox.axaml(.cs)
+                                                        (arms, then captures the next key press as a
+                                                         binding. The SHELL SEES THE KEY FIRST — its
+                                                         listener tunnels from the window — so it raises
+                                                         CapturingChanged for the view model to hold, and
+                                                         the shell stands down on it. Modifier-only
+                                                         presses are ignored; Esc abandons)
+                                ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
+                                                         whether it is custom, and the note explaining a
+                                                         refused capture where it happened)
                                                          "90 %", "10 s". Digits only, filtered on a
                                                          TUNNELLED TextInput so a paste cannot smuggle a
                                                          letter past it. Takes the value AS IT IS TYPED,

@@ -88,9 +88,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
     public NavigationViewModel Nav { get; } = new();
 
+    /// <summary>The live keyboard bindings: the catalog's defaults with the user's rebinds applied. One
+    /// instance, shared by the key handler, Help, universal search and the Settings page, so all four
+    /// describe and act on the same thing.</summary>
+    public ShortcutBindings Shortcuts { get; } = new();
+
     /// <summary>The Help modal. Owned here rather than by the nav bar because the overlay covers the
     /// whole window, navigation bar included.</summary>
-    public HelpViewModel Help { get; } = new();
+    public HelpViewModel Help { get; }
 
     /// <summary>The toolbar's universal search. Built here because this is the one class that already
     /// holds every page instance, so a result's "go there and reveal it" callback is a closure over the
@@ -134,6 +139,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _metrics = metrics;
         _store = store;
         _alerts = new ResourceAlertWatcher(metrics);
+        Help = new HelpViewModel(Shortcuts);
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
         _performance = new PerformanceViewModel(metrics, _theme);
@@ -146,7 +152,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // Build the Settings page with the shared theming seam + nav, the metrics service (refresh
         // interval), the loaded settings (toggle/interval seed) and the report/CSV builders.
         _settings = new SettingsViewModel(_theme, Nav, metrics, settings,
-                                          IStartupRegistration.ForCurrentPlatform(),
+                                          IStartupRegistration.ForCurrentPlatform(), Shortcuts,
                                           BuildReport, BuildMetricsCsv);
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
@@ -194,7 +200,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Search = new UniversalSearchViewModel([
             new PageSearchProvider(Nav.NavItems, Nav.Navigate),
             new SettingSearchProvider(RevealSetting, Icons.Settings),
-            new ShortcutSearchProvider(Help.Open, Icons.Help),
+            new ShortcutSearchProvider(Shortcuts, Help.Open, Icons.Help),
             new ToolkitSearchProvider(() => _toolkit.AllEntries, RevealToolkit, Icons.Toolkit),
             new ProcessSearchProvider(() => _processes.Snapshot, RevealProcess, Icons.Processes),
             new FileSearchProvider(
@@ -228,6 +234,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     private void ApplySettings(AppSettings settings) {
+        Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
+
         _theme.ApplyTheme(settings.Theme);
         var accent = FindAccent(settings.AccentName);
         if (accent is { } preset)
@@ -345,6 +353,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ProcessesSort = _processes.RememberSort
             ? ProcessSortState.Encode(_processes.SortKey, _processes.SortAscending)
             : "",
+        ShortcutOverrides = ShortcutOverrideCodec.Encode(Shortcuts.Overrides),
     };
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
@@ -480,6 +489,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
 
     public bool HandleShortcut(ShortcutId id) {
+        // A capture box on the Settings page is waiting for a key press. This listener tunnels from the
+        // window, so it sees the press first; claiming it here would run the shortcut being rebound
+        // instead of letting it be captured. Returning false leaves the key to continue down to the box.
+        if (_settings.IsCapturingShortcut)
+            return false;
+
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
         // allowed to act on the page hidden behind the scrim.
         if (Help.IsOpen) {

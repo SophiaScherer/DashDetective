@@ -12,6 +12,10 @@ using System.Threading.Tasks;
 namespace DashDetective.Shell;
 
 public partial class MainWindow : Window {
+    /// <summary>Stand-in bindings for the window's brief life before its DataContext is set. Nothing can
+    /// press a key in that window, so this only exists to keep the delegate total.</summary>
+    private static readonly ShortcutBindings Defaults = new();
+
     // Set by the tray "Exit" so a subsequent close actually exits instead of hiding to tray.
     private bool _exitRequested;
 
@@ -29,6 +33,7 @@ public partial class MainWindow : Window {
         DataContextChanged += OnDataContextChanged;
         _shortcuts = new ShellShortcutHandler(
             this,
+            () => (DataContext as MainWindowViewModel)?.Shortcuts ?? Defaults,
             () => (DataContext as MainWindowViewModel)?.ActiveScope ?? ShortcutScope.Global,
             id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
         Closed += (_, _) => _shortcuts.Dispose();

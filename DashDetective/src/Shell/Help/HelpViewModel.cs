@@ -13,6 +13,15 @@ namespace DashDetective.Shell.Help;
 /// nothing here is persisted.
 /// </summary>
 public partial class HelpViewModel : ViewModelBase {
+    private readonly ShortcutBindings _shortcuts;
+
+    /// <summary>Takes the live bindings rather than reading the catalog, so the modal lists the keys the
+    /// user actually chose. Re-announces its groups when they change, since the modal may be open.</summary>
+    public HelpViewModel(ShortcutBindings shortcuts) {
+        _shortcuts = shortcuts;
+        _shortcuts.Changed += () => OnPropertyChanged(nameof(ShortcutGroups));
+    }
+
     /// <summary>Whether the modal is showing. Drives the overlay's visibility.</summary>
     [ObservableProperty] private bool _isOpen;
 
@@ -22,9 +31,9 @@ public partial class HelpViewModel : ViewModelBase {
     /// <summary>The orientation tips, in display order.</summary>
     public IReadOnlyList<string> Tips => HelpContent.Tips;
 
-    /// <summary>The keyboard shortcuts, grouped by where they apply. Read straight from the catalog the
-    /// key handler uses, so this page always describes the bindings that are actually live.</summary>
-    public IReadOnlyList<ShortcutGroup> ShortcutGroups => ShortcutCatalog.HelpGroups;
+    /// <summary>The keyboard shortcuts, grouped by where they apply. Read straight from the bindings the
+    /// key handler uses, so this page always describes what the keys actually do — rebinds included.</summary>
+    public IReadOnlyList<ShortcutGroup> ShortcutGroups => _shortcuts.HelpGroups;
 
     /// <summary>Product name and version for the modal's subheading, read from the running assembly
     /// rather than hard-coded (same source as the Settings footer).</summary>

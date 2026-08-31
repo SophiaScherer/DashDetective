@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -50,6 +51,23 @@ public partial class SettingsView : UserControl {
         this.GetVisualDescendants()
             .OfType<Border>()
             .FirstOrDefault(border => border.Tag is SettingId tag && tag == id);
+
+    /// <summary>A capture box armed or stood down. Held on the view model because the shell's key
+    /// listener tunnels from the window and would otherwise run the shortcut being rebound.</summary>
+    private void OnShortcutCapturingChanged(object? sender, bool capturing) =>
+        (DataContext as SettingsViewModel)?.SetCapturing(capturing);
+
+    /// <summary>A capture box produced a gesture. The row it belongs to is the box's own DataContext —
+    /// the template has no other way to say which shortcut was being rebound.</summary>
+    private void OnShortcutCaptured(object? sender, KeyGesture gesture) {
+        if (DataContext is SettingsViewModel vm && (sender as Control)?.DataContext is ShortcutRow row)
+            vm.Rebind(row, gesture);
+    }
+
+    private void OnShortcutResetRequested(object? sender, EventArgs e) {
+        if (DataContext is SettingsViewModel vm && (sender as Control)?.DataContext is ShortcutRow row)
+            vm.ResetShortcut(row);
+    }
 
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>
     private async void OnCopyDiagnosticsClick(object? sender, RoutedEventArgs e) {

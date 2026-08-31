@@ -15,15 +15,20 @@ namespace DashDetective.Shell.Shortcuts;
 /// </summary>
 public sealed class ShellShortcutHandler : IDisposable {
     private readonly TopLevel _host;
+    private readonly Func<ShortcutBindings> _bindings;
     private readonly Func<ShortcutScope> _activeScope;
     private readonly Func<ShortcutId, bool> _dispatch;
 
-    /// <summary>Starts listening on <paramref name="host"/>. <paramref name="activeScope"/> is asked
-    /// which tab's bindings are live at press time, and <paramref name="dispatch"/> runs the resolved
-    /// action, returning whether it did anything.</summary>
+    /// <summary>Starts listening on <paramref name="host"/>. <paramref name="bindings"/> is asked for the
+    /// live bindings at press time — a delegate rather than an instance, matching the other two, because
+    /// the window is constructed before its <c>DataContext</c> exists. <paramref name="activeScope"/> is
+    /// asked which tab's bindings apply, and <paramref name="dispatch"/> runs the resolved action,
+    /// returning whether it did anything.</summary>
     public ShellShortcutHandler(
-        TopLevel host, Func<ShortcutScope> activeScope, Func<ShortcutId, bool> dispatch) {
+        TopLevel host, Func<ShortcutBindings> bindings, Func<ShortcutScope> activeScope,
+        Func<ShortcutId, bool> dispatch) {
         _host = host;
+        _bindings = bindings;
         _activeScope = activeScope;
         _dispatch = dispatch;
         _host.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -33,7 +38,7 @@ public sealed class ShellShortcutHandler : IDisposable {
 
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         var textInputFocused = KeyboardFocus.IsTextInputFocused(_host);
-        if (!ShortcutCatalog.TryResolve(e.Key, e.KeyModifiers, textInputFocused, _activeScope(), out var id))
+        if (!_bindings().TryResolve(e.Key, e.KeyModifiers, textInputFocused, _activeScope(), out var id))
             return;
 
         // Consume only what actually ran. A shortcut that doesn't apply right now (End Task with

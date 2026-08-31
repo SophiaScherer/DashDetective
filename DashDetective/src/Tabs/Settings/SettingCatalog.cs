@@ -21,6 +21,7 @@ public sealed class SettingCatalog {
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
+            Shortcuts,
             ExportData,
         ];
     }
@@ -116,6 +117,14 @@ public sealed class SettingCatalog {
         SettingId.AlertSustain, "Alerts", "Warn after",
         "How long usage must stay over a threshold before it counts",
         Keywords: "sustain duration delay how long seconds alert threshold debounce");
+
+    // ----- Keyboard -----
+
+    // One entry for the whole card, like ExportData below: search should land someone on the list, and
+    // an entry per binding would bury every other setting under thirty near-identical rows.
+    public SettingEntry Shortcuts { get; } = new(
+        SettingId.Shortcuts, "Keyboard", "Keyboard shortcuts", "Change the keys any action is bound to",
+        Keywords: "keyboard shortcut hotkey key binding keybinding rebind remap customize reset");
 
     // ----- Export & Data -----
 

@@ -430,6 +430,69 @@
             </StackPanel>
         </controls:WidgetPanel>
 
+        <!-- ===== Keyboard ===== -->
+        <!-- Rendered from the LIVE bindings, grouped exactly as Help groups them, so this list and the
+             Help modal can never describe different keys. A row arms its capture box, the box swallows the
+             next press, and the view model accepts or refuses it — a clash inside the same scope is
+             refused and explained on the row itself. -->
+        <controls:WidgetPanel WidgetId="settings.keyboard" Title="{Binding Catalog.Shortcuts.Section}"
+                              Subtitle="{Binding Catalog.Shortcuts.Description}">
+            <StackPanel Spacing="18">
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Shortcuts}">
+                    <StackPanel Spacing="18">
+                        <ItemsControl ItemsSource="{Binding ShortcutGroups}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="18"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:ShortcutRowGroup">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextSubtle}"/>
+                                        <ItemsControl ItemsSource="{Binding Rows}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="6"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="settings:ShortcutRow">
+                                                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                                        <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                                                            <TextBlock Classes="settingName"
+                                                                       Text="{Binding Description}"/>
+                                                            <TextBlock Classes="settingDesc" Text="{Binding Note}"
+                                                                       IsVisible="{Binding HasNote}"
+                                                                       Foreground="{DynamicResource StatusWarn}"/>
+                                                        </StackPanel>
+                                                        <settings:ShortcutCaptureBox
+                                                            Grid.Column="1"
+                                                            Keys="{Binding Keys}"
+                                                            IsCustom="{Binding IsCustom}"
+                                                            CapturingChanged="OnShortcutCapturingChanged"
+                                                            GestureCaptured="OnShortcutCaptured"
+                                                            ResetRequested="OnShortcutResetRequested"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Classes="action" Content="Restore default shortcuts"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding HasCustomShortcuts}"
+                                Command="{Binding ResetAllShortcutsCommand}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </controls:WidgetPanel>
+
         <!-- ===== Export & Data ===== -->
         <controls:WidgetPanel WidgetId="settings.export" Title="{Binding Catalog.ExportData.Section}">
             <StackPanel Spacing="14">
