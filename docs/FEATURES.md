@@ -20,6 +20,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Performance](#performance)
 - [Toolkit](#toolkit)
 - [Keyboard shortcuts](#keyboard-shortcuts)
+- [Help](#help)
 - [Storage](#storage)
 - [Page lifecycle](#page-lifecycle)
 - [Widget system](#widget-system)
@@ -152,7 +153,7 @@ package.
 ## Universal search
 
 **Fully live**. The toolbar box (`Ctrl+F`) searches
-six categories at once and navigates to whatever is picked, revealing it in place.
+seven categories at once and navigates to whatever is picked, revealing it in place.
 - **Structure** (`src/Shell/Search/`). `SearchRanker` scores a term against text in four tiers kept
   200 apart (exact / prefix / word-start / anywhere) with a closeness bonus capped below 100, so a
   tier can never be crossed. `SearchAggregator` fans one query out to independent `ISearchProvider`s,
@@ -160,9 +161,10 @@ six categories at once and navigates to whatever is picked, revealing it in plac
   A provider that throws costs its own category and nothing else.
 - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over
   `ShortcutBindings.HelpGroups`, so a result already knows its scope and the keys currently bound), Toolkit (over
-  `ToolkitViewModel.AllEntries`, ranking the command text above its description), Processes (over the
-  Processes tab's existing snapshot — no extra enumeration — folding a multi-process app into one
-  row), and Files.
+  `ToolkitViewModel.AllEntries`, ranking the command text above its description), Help (over
+  `HelpContent`'s page tour and tips, so the prose that explains a feature is findable and not just the
+  key that fires it), Processes (over the Processes tab's existing snapshot — no extra enumeration —
+  folding a multi-process app into one row), and Files.
 - **Jumping.** There is **no routing layer**. Each provider takes a "go there" callback built in
   `MainWindowViewModel` (the one class already holding every page), which navigates and then calls a
   small public `Reveal(...)` on the page. Settings rows carry their `SettingId` as their `Tag`, so
@@ -891,9 +893,32 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   because only the focused control knows whether there is a suggestion to accept, and Tab must go on
   moving focus everywhere else.
 - **Superseded by universal search:** `Ctrl+F` is now the global search gesture on every tab, and `/`
-  is the tab-local one — it focuses the Processes filter and the File Explorer address bar. Both `/`
-  bindings are `AllowInTextInput: false`, which also fixed a bug where the key was consumed before
+  is the tab-local one — it focuses the Processes filter, the Toolkit command filter and the File
+  Explorer address bar. All three `/` bindings are `AllowInTextInput: false`, which also fixed a bug where the key was consumed before
   reaching the box it had just focused, so a `/` could never be typed into it.
+
+## Help
+
+- **Help** — **fully live**. A modal overlay (`F1` / `Ctrl+/` / the nav bar's button), **not a page**:
+  no `NavItem`, no `ViewLocator` entry, so it can sit above every surface including the nav bar and
+  needs no slot in the `Ctrl+1 … Ctrl+9` numbering.
+- **Two kinds of content, one of them generated.** The keyboard table is built from
+  `ShortcutBindings.HelpGroups` — the same object the key handler resolves against — so it lists the
+  keys currently bound, rebinds included, and cannot describe a binding that is not live. Everything
+  else is curated copy in `HelpContent`, a static table with no UI dependency, pinned by
+  `HelpContentTests` for trimming, punctuation, and key uniqueness.
+- **Tabs: Overview · Getting started · Tips · Shortcuts.** Overview is a **filter, not a section** — it
+  turns every section's visibility flag on, so each section is written once and there is no all-in-one
+  view that can drift from the parts. `Open()` resets to Overview: asking for Help is asking for
+  everything it knows, not for wherever the last visit left off. The strip reuses the shared
+  `segments`/`seg` styles rather than a `TabControl`, of which the app has none.
+- **Searchable, and it lands on the sentence.** `HelpSearchProvider` scores the tour and the tips, and
+  a picked result opens Help on that topic's own tab and flashes the row — the same seam Settings uses,
+  finding the row by the key in its `Tag` rather than a name-to-control switch. Untitled tips are
+  scored against the body alone: handing `ScoreBest` a null title would spend a field penalty on it and
+  rank every tip below the tour. The shortcut table is deliberately **not** indexed here, since
+  `ShortcutSearchProvider` already covers it and a binding listed twice under two tags only crowds the
+  dropdown.
 
 ## Storage
 
