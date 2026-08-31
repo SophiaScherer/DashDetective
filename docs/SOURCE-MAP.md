@@ -807,6 +807,35 @@ stays in its tab folder.
                                      it holds no state but which button was pressed)
 ```
 
+## `src/Shell/Help`
+
+```
+      /Help
+        HelpOverlay.axaml(.cs)      (the Help modal — a full-window scrim with a centred card, embedded
+        HelpViewModel.cs             directly by MainWindow rather than routed through the ViewLocator,
+                                     so it sits above every surface including the nav bar. NOT a page:
+                                     no NavItem, no ViewLocator entry. The scrim's non-null Background
+                                     is what makes it modal — it swallows pointer input bound for the
+                                     window behind it. Esc is NOT handled in the code-behind: the
+                                     shell's shortcut chain owns the key app-wide. The VM takes
+                                     ShortcutBindings, not the catalog, so the table lists the keys the
+                                     user actually chose, and re-announces its groups on a rebind)
+        HelpContent.cs              (the CURATED copy — the description, the page tour, the tips. A
+                                     static table like HardwareCatalog, so it is testable with no UI.
+                                     The shortcut table is NOT here: it is generated from
+                                     ShortcutBindings, so it cannot drift from what the keys do. The
+                                     tour restates the nav labels rather than reading NavItem, whose
+                                     Geometry icon needs a render backend the tests do not have)
+        HelpTopic.cs                (one entry of copy: Key + optional Title + Body. Key is both the
+                                     search identity and the Tag the reveal flash finds)
+        HelpTab.cs                  (enum: Overview / GettingStarted / Tips / Shortcuts. Overview is a
+                                     FILTER, not a section — it turns every ShowX flag on, so each
+                                     section's markup exists once and no all-in-one view can drift)
+        HelpTabOption.cs            (selectable item VM for the segmented tab strip, like ThemeOption)
+        (searching this copy is HelpSearchProvider in Shell/Search/Providers; its results carry a
+         topic's tab + key, and MainWindowViewModel.RevealHelp opens the modal and reveals the row)
+```
+
 ## `src/Shell/Navigation`
 
 ```

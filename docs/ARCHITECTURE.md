@@ -65,7 +65,8 @@ hover-revealed chevron puck, a right-click dock menu, dragging the brand area to
 Settings → Appearance.
 
 **Universal search** (`src/Shell/Search`) fans out across providers — pages, settings, processes,
-files — with no routing layer; each page exposes a `Reveal()` seam for jumping to a result. It sits in
+files, Help's own copy — with no routing layer; each target exposes a `Reveal()` seam for jumping to a
+result. It sits in
 the toolbar as an icon until asked for, by the icon itself or Ctrl+F, and puts itself away again when
 it loses focus with nothing typed. That state is deliberately not persisted.
 
