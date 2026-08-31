@@ -40,6 +40,7 @@ public class HelpViewModelTests {
         var vm = new HelpViewModel(new ShortcutBindings());
         Assert.Equal(HelpContent.Description, vm.Description);
         Assert.Same(HelpContent.Tips, vm.Tips);
+        Assert.Same(HelpContent.GettingStarted, vm.GettingStarted);
     }
 
     [Fact]

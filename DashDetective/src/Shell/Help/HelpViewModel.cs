@@ -25,11 +25,14 @@ public partial class HelpViewModel : ViewModelBase {
     /// <summary>Whether the modal is showing. Drives the overlay's visibility.</summary>
     [ObservableProperty] private bool _isOpen;
 
-    /// <summary>The one-paragraph app description shown above the tips.</summary>
+    /// <summary>The one-paragraph app description shown above the tour.</summary>
     public string Description => HelpContent.Description;
 
+    /// <summary>The page-by-page tour, in navigation order.</summary>
+    public IReadOnlyList<HelpTopic> GettingStarted => HelpContent.GettingStarted;
+
     /// <summary>The orientation tips, in display order.</summary>
-    public IReadOnlyList<string> Tips => HelpContent.Tips;
+    public IReadOnlyList<HelpTopic> Tips => HelpContent.Tips;
 
     /// <summary>The keyboard shortcuts, grouped by where they apply. Read straight from the bindings the
     /// key handler uses, so this page always describes what the keys actually do — rebinds included.</summary>

@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:help="using:DashDetective.Shell.Help"
              xmlns:sc="using:DashDetective.Shared.Shortcuts"
-             xmlns:sys="using:System"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
@@ -71,8 +70,34 @@
                               VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="22,20,22,24" Spacing="20">
 
-                        <TextBlock Text="{Binding Description}" FontSize="13" LineHeight="21"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}"/>
+                        <!-- What the app is, then a line per page in navigation order. -->
+                        <StackPanel Spacing="18">
+                            <TextBlock Text="{Binding Description}" FontSize="13" LineHeight="21"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}"/>
+
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="helpSection" Text="GETTING STARTED"/>
+                                <ItemsControl ItemsSource="{Binding GettingStarted}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Spacing="11"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="help:HelpTopic">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextStrong}"/>
+                                                <TextBlock Text="{Binding Body}" FontSize="12.5"
+                                                           LineHeight="19" TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextSecondary}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
 
                         <StackPanel Spacing="10">
                             <TextBlock Classes="helpSection" Text="TIPS"/>
@@ -83,11 +108,11 @@
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="sys:String">
+                                    <DataTemplate x:DataType="help:HelpTopic">
                                         <Grid ColumnDefinitions="Auto,*">
                                             <TextBlock Grid.Column="0" Text="•" FontSize="12.5"
                                                        Foreground="{DynamicResource Accent}"/>
-                                            <TextBlock Grid.Column="1" Margin="9,0,0,0" Text="{Binding}"
+                                            <TextBlock Grid.Column="1" Margin="9,0,0,0" Text="{Binding Body}"
                                                        FontSize="12.5" LineHeight="19" TextWrapping="Wrap"
                                                        Foreground="{DynamicResource TextSecondary}"/>
                                         </Grid>

@@ -500,7 +500,7 @@
                      than on any one button. -->
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ExportData}">
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Classes="action primary" Content="Export report (.txt)" Click="OnExportReportClick"/>
+                        <Button Classes="action primary" Content="Export report" Click="OnExportReportClick"/>
                         <Button Classes="action" Content="Export CSV" Click="OnExportCsvClick"/>
                         <Button Classes="action" Content="Copy diagnostics" Click="OnCopyDiagnosticsClick"/>
                     </StackPanel>
