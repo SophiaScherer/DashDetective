@@ -290,6 +290,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             yield return _storage;
             yield return _hardware;
             yield return _processes;
+            yield return _performance;
         }
     }
 

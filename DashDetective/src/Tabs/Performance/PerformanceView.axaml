@@ -94,7 +94,12 @@
                 <ItemsControl ItemsSource="{Binding Resources}" Margin="0,0,2,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Spacing="8"/>
+                            <!-- One column: a flow panel rather than a StackPanel because it is the
+                                 panel that knows how to reorder. Only the grip drags, so a press
+                                 anywhere else on the row still selects the device. -->
+                            <layout:UniformFlowPanel MaxColumns="1" RowSpacing="8"
+                                                     DragGrip="Marked"
+                                                     Order="{Binding ResourceOrder.Order, Mode=TwoWay}"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -103,8 +108,16 @@
                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                 <Border Classes="card selectable" Classes.selected="{Binding IsSelected}"
                                         ToolTip.Tip="{Binding NoteTip}">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                        <!-- The drag handle, and the only part of the row that is
+                                             one. The mark and the hit target are the BORDER: a bare
+                                             stroked Path is hit-testable only along its two 1.6px
+                                             lines, which is not something a pointer can find. -->
+                                        <Border Grid.Column="0" Background="Transparent" Width="14"
+                                                layout:Reorder.IsGrip="True">
+                                            <Path Classes="dragGrip" Data="M0,0 L0,15 M5,0 L5,15"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                             <TextBlock Classes="resName" Text="{Binding Name}"/>
                                             <TextBlock Classes="resSub" Text="{Binding Sub}"/>
                                         </StackPanel>
@@ -112,7 +125,7 @@
                                              adapter's card names the whole adapter, so a receive-only
                                              figure under it described half its traffic. Both lines share
                                              the Unit, which is already the larger of the pair's. -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="2"
                                                         HorizontalAlignment="Right">
                                                 <TextBlock Classes="resUnit" Text="{Binding ValueGlyph}"
@@ -271,7 +284,9 @@
             <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"/>
+                        <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"
+                                                 DragGrip="Item"
+                                                 Order="{Binding SelectedResource.StatOrder.Order, Mode=TwoWay}"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>

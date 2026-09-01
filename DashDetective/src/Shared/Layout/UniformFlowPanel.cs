@@ -18,6 +18,10 @@ public enum ReorderGrip {
 
     /// <summary>Anywhere on the item, minus any control inside it that takes clicks of its own.</summary>
     Item,
+
+    /// <summary>Only from an element marked <see cref="Reorder.IsGripProperty"/>. For an item that is
+    /// itself a control, so a press anywhere else belongs to that control.</summary>
+    Marked,
 }
 
 /// <summary>
@@ -140,19 +144,25 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
     /// a press on a button in a card is aimed at the button.</summary>
     public bool TryGetHandle(Visual source, out ReorderHandle handle) {
         handle = default;
-        if (DragGrip != ReorderGrip.Item)
+        if (DragGrip == ReorderGrip.None)
             return false;
 
+        Control? marked = null;
         foreach (var node in source.GetSelfAndVisualAncestors()) {
             if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this)) {
-                if (!_visible.Contains(candidate))
+                if (!_visible.Contains(candidate) || (DragGrip == ReorderGrip.Marked && marked is null))
                     return false;
-                handle = new ReorderHandle(candidate, Lifted(candidate), candidate);
+
+                handle = new ReorderHandle(candidate, Lifted(candidate), marked ?? candidate);
                 return true;
             }
 
-            // Below the item root, so this is a control the press belongs to rather than the card.
-            if (node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
+            if (node is Control element && Reorder.GetIsGrip(element))
+                marked = element;
+
+            // Below the item root, so this is a control the press belongs to rather than the card. A
+            // marked grip has already said which part is draggable, so it needs no such rule.
+            if (DragGrip == ReorderGrip.Item && node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
                 return false;
         }
 

@@ -11,7 +11,17 @@ public sealed class Reorder {
     public static readonly AttachedProperty<string?> IdProperty =
         AvaloniaProperty.RegisterAttached<Reorder, Control, string?>("Id");
 
+    /// <summary>Marks the one element inside an item that a drag may be started from. For an item
+    /// that is itself a control — the Performance rail's rows are buttons — a grip is the only way to
+    /// tell a drag from a click.</summary>
+    public static readonly AttachedProperty<bool> IsGripProperty =
+        AvaloniaProperty.RegisterAttached<Reorder, Control, bool>("IsGrip");
+
     public static string? GetId(Control control) => control.GetValue(IdProperty);
+
+    public static bool GetIsGrip(Control control) => control.GetValue(IsGripProperty);
+
+    public static void SetIsGrip(Control control, bool value) => control.SetValue(IsGripProperty, value);
 
     public static void SetId(Control control, string? value) => control.SetValue(IdProperty, value);
 

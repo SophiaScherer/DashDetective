@@ -34,7 +34,30 @@ namespace DashDetective.Tabs.Performance;
 /// hosting it in the bounded, non-scrolling container (it manages its own panes, like File Explorer).
 /// </summary>
 public partial class PerformanceViewModel : ViewModelBase,
-        IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IDisposable {
+        IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IReorderablePage,
+        IDisposable {
+    /// <summary>The order of the device rail, bound two-way to it.</summary>
+    public SavedOrder ResourceOrder { get; } = new("performance.resources");
+
+    // One stat-tile order per kind of device rather than per device: the tiles are the same for every
+    // CPU or every GPU, and a key naming an adapter goes stale the moment the hardware changes.
+    private readonly Dictionary<ChartSeries, SavedOrder> _statOrders = new();
+
+    public IEnumerable<SavedOrder> SavedOrders {
+        get {
+            yield return ResourceOrder;
+            foreach (var order in _statOrders.Values)
+                yield return order;
+        }
+    }
+
+    /// <summary>The stat-tile order every resource of this kind shares.</summary>
+    private SavedOrder StatOrderFor(ChartSeries series) {
+        if (!_statOrders.TryGetValue(series, out var order))
+            _statOrders[series] = order = new SavedOrder($"performance.stats.{series}".ToLowerInvariant());
+        return order;
+    }
+
     /// <summary>Width of every rolling metric history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
 
@@ -231,14 +254,18 @@ public partial class PerformanceViewModel : ViewModelBase,
                                   new[] {
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
-                                  }, Select) { Link = HardwareLink() };
+                                  }, Select) {
+            Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
+        };
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
                                      _memoryHistory.Points(100),
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
                                          _memCachedTile, _memCommittedTile,
-                                     }, Select) { Link = HardwareLink() };
+                                     }, Select) {
+            Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Memory),
+        };
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
         // read once at construction (it rarely changes).
@@ -251,6 +278,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
+            StatOrder = StatOrderFor(ChartSeries.NetDown),
             Series2 = ChartSeries.NetUp,
             LegendLabel1 = "Receive",
             LegendLabel2 = "Send",
@@ -575,7 +603,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select) {
-                Link = StorageLink(disk.DiskNumber),
+                Link = StorageLink(disk.DiskNumber), StatOrder = StatOrderFor(ChartSeries.Storage),
             };
             var resource = new DiskResource {
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
@@ -619,7 +647,10 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       new[] {
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
                                           tempTile, powerTile,
-                                      }, Select) { IsDetailed = _gpuDetailed, Link = HardwareLink() };
+                                      }, Select) {
+                IsDetailed = _gpuDetailed, Link = HardwareLink(),
+                StatOrder = StatOrderFor(ChartSeries.Gpu),
+            };
             var resource = new GpuResource {
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,

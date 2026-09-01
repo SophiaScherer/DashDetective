@@ -225,7 +225,8 @@ stays in its tab folder.
                                  order, and the mapping from a drop index — which counts only what is on
                                  screen — into an order that holds every child. No Avalonia types, so it
                                  tests without a layout pass)
-        Reorder.cs              (how a panel names a child: an id attached in markup, else the
+        Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
+                                 start from, plus how a panel names a child: an id attached in markup, else the
                                  control's own, else its item view model's where the children are
                                  generated. The attached one is for a tile written out by hand, which
                                  is the only kind that cannot name itself)
@@ -1336,7 +1337,12 @@ stays in its tab folder.
                                  Fills the viewport via ISelfScrollingPage, like File Explorer. All five
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
                                  SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IActivatablePage/
-                                 IDisposable.)
+                                 IDisposable. Both strips reorder: the rail only by the GRIP on each row,
+                                 since the rows are buttons and a press anywhere else selects the device,
+                                 and the stat tiles by the tile. The tile order is saved PER DEVICE KIND
+                                 — performance.stats.cpu and so on — because the tiles are the same for
+                                 every CPU, and a key naming one adapter goes stale when the hardware
+                                 does. The chart panel between them does not move.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the

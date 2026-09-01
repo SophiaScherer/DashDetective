@@ -87,7 +87,6 @@ public sealed class ReorderDrag {
         _grabX = Fraction(_press.X - handle.Item.Bounds.X, _size.Width);
         _grabY = Fraction(_press.Y - handle.Item.Bounds.Y, _size.Height);
         _pending = true;
-        e.Pointer.Capture(_host.Surface);
     }
 
     // A fraction, not a pixel offset: an item grabbed near its right edge would otherwise end up
@@ -107,7 +106,12 @@ public sealed class ReorderDrag {
             if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
                 return;
 
+            // Capture here rather than on the press. A grip can sit inside a button — the
+            // Performance rail's rows ARE buttons — and a button captures the pointer on its own
+            // press, which would take this one straight back off us. Taking it on the first move
+            // past the threshold instead cancels that click, which is what a drag should do.
             _dragging = true;
+            e.Pointer.Capture(_host.Surface);
             _host.BeginPreview();
             _lifted?.Classes.Add("dragging");
             _item.ZIndex = 10;
@@ -135,25 +139,29 @@ public sealed class ReorderDrag {
     }
 
     private void OnReleased(object? sender, PointerReleasedEventArgs e) {
-        // Only a press this drag claimed may release the capture. Releasing unconditionally strips the
+        // Only a drag that took the capture may release it. Releasing unconditionally strips the
         // capture a button took on its own press, and it then never sees the release that clicks it.
-        if (!_pending)
+        if (!_dragging) {
+            _pending = false;
             return;
+        }
 
-        if (_dragging)
-            _host.CommitPreview();
-
+        _host.CommitPreview();
         e.Pointer.Capture(null);
+
+        // This release ends a drag, not a click, so it must not also press whatever is under it.
+        e.Handled = true;
         End();
     }
 
     private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
-        if (_pending)
+        if (_dragging)
             End();
+        _pending = false;
     }
 
     private void OnExited(object? sender, PointerEventArgs e) {
-        if (!_pending)
+        if (!_dragging)
             ShowGripCursor(null);
     }
 
