@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DashDetective.Shared.Controls;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
@@ -13,7 +14,11 @@ namespace DashDetective.Tabs.Hardware;
 /// <see cref="ObservableCollection{T}"/> so a card whose rows vary at runtime (Storage Devices —
 /// one row per detected drive) can rebuild them.
 /// </summary>
-public sealed partial class HardwareCard : ObservableObject {
+public sealed partial class HardwareCard : ObservableObject, IWidgetIdentity {
+    /// <summary>What a saved order names this card by. Not the title: a machine with two adapters has
+    /// two cards called Graphics.</summary>
+    public string WidgetId { get; }
+
     public string Title { get; }
 
     [ObservableProperty]
@@ -25,8 +30,9 @@ public sealed partial class HardwareCard : ObservableObject {
     public ObservableCollection<HardwareSpec> Rows { get; }
 
     public HardwareCard(
-        string title, string subtitle, Geometry icon, IBrush iconColor, IBrush iconBackground,
-        IEnumerable<HardwareSpec> rows) {
+        string widgetId, string title, string subtitle, Geometry icon, IBrush iconColor,
+        IBrush iconBackground, IEnumerable<HardwareSpec> rows) {
+        WidgetId = widgetId;
         Title = title;
         _subtitle = subtitle;
         Icon = icon;

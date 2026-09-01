@@ -17,7 +17,9 @@
     <ItemsControl ItemsSource="{Binding Cards}">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-                <layout:UniformFlowPanel MinItemWidth="360" ColumnSpacing="16" RowSpacing="16"/>
+                <layout:UniformFlowPanel MinItemWidth="360" ColumnSpacing="16" RowSpacing="16"
+                                         Reorder="Item"
+                                         Order="{Binding CardOrder.Order, Mode=TwoWay}"/>
             </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>

@@ -1261,7 +1261,10 @@ stays in its tab folder.
                                                          — not self-scrolling. VM builds the six fixed
                                                          HardwareCard models, populates them from
                                                          HardwareInfoProvider in the ctor, and implements
-                                                         IRefreshablePage; Sensors card left as "—")
+                                                         IRefreshablePage; Sensors card left as "—".
+                                                         Every card drags to reorder — the grid is a
+                                                         UniformFlowPanel with Reorder="Item", saved under
+                                                         the "hardware" key)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the
@@ -1280,7 +1283,10 @@ stays in its tab folder.
                                 HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
                                                          each with .Unknown; fields default to "—")
                                 HardwareCard.cs         (observable: fixed title/icon/colours, observable
-                                                         Subtitle + ObservableCollection<HardwareSpec> Rows)
+                                                         Subtitle + ObservableCollection<HardwareSpec> Rows.
+                                                         Carries a WidgetId a saved order names it by — the
+                                                         title cannot, since a two-adapter machine has two
+                                                         cards called Graphics)
                                 HardwareSpec.cs         (observable: fixed Key, observable Value → "—")
                                 HardwareIcons.cs        (feature-local card glyph geometries + fixed
                                                          per-card icon colours)

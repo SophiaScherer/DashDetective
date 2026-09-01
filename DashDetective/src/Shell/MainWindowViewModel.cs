@@ -288,6 +288,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             yield return _dashboard;
             yield return _network;
             yield return _storage;
+            yield return _hardware;
         }
     }
 

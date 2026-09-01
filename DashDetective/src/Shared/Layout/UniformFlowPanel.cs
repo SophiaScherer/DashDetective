@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
@@ -146,7 +147,7 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
             if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this)) {
                 if (!_visible.Contains(candidate))
                     return false;
-                handle = new ReorderHandle(candidate, candidate, candidate);
+                handle = new ReorderHandle(candidate, Lifted(candidate), candidate);
                 return true;
             }
 
@@ -157,6 +158,11 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
 
         return false;
     }
+
+    // A generated item is a ContentPresenter wrapped around the card, and the picked-up look belongs
+    // on the card itself — a class on the presenter matches no style.
+    private static Control Lifted(Control item) =>
+        item is ContentPresenter { Child: Control card } ? card : item;
 
     public int DropIndexAt(Point pointer) =>
         WidgetBoardLayout.DropIndex(
