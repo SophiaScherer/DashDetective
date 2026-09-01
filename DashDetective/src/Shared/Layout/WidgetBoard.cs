@@ -1,13 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using DashDetective.Shared.Controls;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace DashDetective.Shared.Layout;
 
@@ -20,9 +18,9 @@ namespace DashDetective.Shared.Layout;
 /// clamps a stretched child to MaxWidth and then centres it, leaving a dead margin down each side.
 /// <c>MinWidth</c> stays the child's own, so there is one source of truth.
 ///
-/// The drag itself is <see cref="ReorderDrag"/>'s; this supplies the layout it works over.
+/// The drag itself is <see cref="ReorderablePanel"/>'s; this supplies the layout it works over.
 /// </summary>
-public class WidgetBoard : Panel, IReorderablePanel {
+public class WidgetBoard : ReorderablePanel {
     /// <summary>This child's share of its row. Row-local, so a drag changes what it buys.</summary>
     public static readonly AttachedProperty<double> WeightProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, double>("Weight", 1.0);
@@ -46,31 +44,15 @@ public class WidgetBoard : Panel, IReorderablePanel {
     public static readonly StyledProperty<double> RowSpacingProperty =
         AvaloniaProperty.Register<WidgetBoard, double>(nameof(RowSpacing));
 
-    /// <summary>The widget ids in display order, two-way so a drag reports its result back to the page
-    /// that persists it. Ids the board does not have are ignored; ones it has that are missing keep
-    /// their declared position.</summary>
-    public static readonly StyledProperty<IReadOnlyList<string>?> OrderProperty =
-        AvaloniaProperty.Register<WidgetBoard, IReadOnlyList<string>?>(
-            nameof(Order), defaultBindingMode: BindingMode.TwoWay);
-
-    private readonly List<Control> _visible = new();
     private WidgetSlot[] _slots = Array.Empty<WidgetSlot>();
     private double[] _slotWidths = Array.Empty<double>();
-    private List<int> _rowEnds = new();
     private double[] _rowHeights = Array.Empty<double>();
-    private Rect2[] _slotRects = Array.Empty<Rect2>();
-
-    private readonly ChildOrder _childOrder = new();
-    private readonly ReorderDrag _drag;
-    private bool _applyingOrder;
 
     static WidgetBoard() {
         AffectsParentMeasure<WidgetBoard>(
             WeightProperty, MaxSlotWidthProperty, BreakBeforeProperty, StretchProperty);
         AffectsMeasure<WidgetBoard>(ColumnSpacingProperty, RowSpacingProperty);
     }
-
-    public WidgetBoard() => _drag = new ReorderDrag(this);
 
     /// <summary>Horizontal gap between widgets sharing a row.</summary>
     public double ColumnSpacing {
@@ -83,19 +65,6 @@ public class WidgetBoard : Panel, IReorderablePanel {
         get => GetValue(RowSpacingProperty);
         set => SetValue(RowSpacingProperty, value);
     }
-
-    public IReadOnlyList<string>? Order {
-        get => GetValue(OrderProperty);
-        set => SetValue(OrderProperty, value);
-    }
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
-        base.OnPropertyChanged(change);
-        if (change.Property == OrderProperty && !_applyingOrder && ApplySavedOrder())
-            InvalidateMeasure();
-    }
-
-    private bool ApplySavedOrder() => _childOrder.ApplySaved(Order, DeclaredIds());
 
     public static double GetWeight(Control control) => control.GetValue(WeightProperty);
 
@@ -115,60 +84,19 @@ public class WidgetBoard : Panel, IReorderablePanel {
 
     public static void SetStretch(Control control, bool value) => control.SetValue(StretchProperty, value);
 
-    /// <summary>Raised with the new widget-id order once a drag commits.</summary>
-    public event Action<IReadOnlyList<string>>? OrderChanged;
-
-    // ----- Drag to reorder: the board's half of it. The pointer is ReorderDrag's. -----
-
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
-        base.OnAttachedToVisualTree(e);
-        _drag.Attach();
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
-        _drag.Detach();
-        base.OnDetachedFromVisualTree(e);
-    }
-
-    Panel IReorderablePanel.Surface => this;
-
-    IReadOnlyList<Control> IReorderablePanel.Items => _visible;
-
     /// <summary>A press may drag from a header only, and must miss every control in it — Storage keeps
     /// a drive picker up there, which a drag would otherwise swallow.</summary>
-    public bool TryGetHandle(Visual source, out ReorderHandle handle) {
+    public override bool TryGetHandle(Visual source, out ReorderHandle handle) {
         handle = default;
         if (!HitHeader(source, out var panel, out var header))
             return false;
 
         var child = BoardChildOf(panel);
-        if (child is null || !_visible.Contains(child))
+        if (child is null || !IsShown(child))
             return false;
 
         handle = new ReorderHandle(child, panel, header);
         return true;
-    }
-
-    public int SlotAt(Point point) =>
-        WidgetBoardLayout.SlotAt(
-            _slotRects.AsSpan(0, _visible.Count),
-            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
-            point.X, point.Y);
-
-    public void BeginPreview() => _childOrder.BeginPreview();
-
-    public bool PreviewMove(Control item, int target) =>
-        _childOrder.Move(Children.IndexOf(item), target, IsChildVisible);
-
-    public void CommitPreview() {
-        var ids = _childOrder.Commit(DeclaredIds());
-        if (ids.Count == 0)
-            return;
-
-        _applyingOrder = true;
-        Order = ids;
-        _applyingOrder = false;
-        OrderChanged?.Invoke(ids);
     }
 
     private static bool HitHeader(Visual source, out WidgetPanel panel, out Panel header) {
@@ -200,22 +128,21 @@ public class WidgetBoard : Panel, IReorderablePanel {
 
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();
-        if (_visible.Count == 0) {
-            _rowEnds = new List<int>();
+        RowEnds.Clear();
+        if (Visible.Count == 0)
             return default;
-        }
 
         BuildSlots();
-        _rowEnds = WidgetBoardLayout.PackRows(_slots.AsSpan(0, _visible.Count),
-                                              availableSize.Width, ColumnSpacing);
-        EnsureRowCapacity(_rowEnds.Count);
+        RowEnds.AddRange(WidgetBoardLayout.PackRows(_slots.AsSpan(0, Visible.Count),
+                                                    availableSize.Width, ColumnSpacing));
+        EnsureRowCapacity(RowEnds.Count);
 
         var totalHeight = 0.0;
         var totalWidth = 0.0;
         var start = 0;
 
-        for (var r = 0; r < _rowEnds.Count; r++) {
-            var end = _rowEnds[r];
+        for (var r = 0; r < RowEnds.Count; r++) {
+            var end = RowEnds[r];
             var count = end - start;
             var row = _slots.AsSpan(start, count);
             var rowWidths = _slotWidths.AsSpan(start, count);
@@ -229,12 +156,12 @@ public class WidgetBoard : Panel, IReorderablePanel {
             var rowHeight = 0.0;
             var rowWidth = 0.0;
             for (var i = 0; i < count; i++) {
-                var child = _visible[start + i];
+                var child = Visible[start + i];
 
                 // The dragged widget keeps the width it was picked up at, so its content cannot
                 // re-wrap under the cursor while the rows behind it re-pack.
-                var measureWidth = ReferenceEquals(child, _drag.Dragged)
-                    ? _drag.DragSize.Width
+                var measureWidth = ReferenceEquals(child, Drag.Dragged)
+                    ? Drag.DragSize.Width
                     : rowWidths[i];
                 child.Measure(new Size(measureWidth, double.PositiveInfinity));
                 rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
@@ -247,12 +174,12 @@ public class WidgetBoard : Panel, IReorderablePanel {
             start = end;
         }
 
-        totalHeight += RowSpacing * (_rowEnds.Count - 1);
+        totalHeight += RowSpacing * (RowEnds.Count - 1);
         return new Size(double.IsFinite(availableSize.Width) ? availableSize.Width : totalWidth, totalHeight);
     }
 
     protected override Size ArrangeOverride(Size finalSize) {
-        if (_visible.Count == 0 || _rowEnds.Count == 0)
+        if (Visible.Count == 0 || RowEnds.Count == 0)
             return finalSize;
 
         // Re-split against the arranged width; the row MEMBERSHIP stays as measured, so the heights
@@ -260,8 +187,8 @@ public class WidgetBoard : Panel, IReorderablePanel {
         var y = 0.0;
         var start = 0;
 
-        for (var r = 0; r < _rowEnds.Count; r++) {
-            var end = _rowEnds[r];
+        for (var r = 0; r < RowEnds.Count; r++) {
+            var end = RowEnds[r];
             var count = end - start;
             var row = _slots.AsSpan(start, count);
             var rowWidths = _slotWidths.AsSpan(start, count);
@@ -269,21 +196,10 @@ public class WidgetBoard : Panel, IReorderablePanel {
 
             var x = 0.0;
             for (var i = 0; i < count; i++) {
+                // A dragged widget keeps its place in Children so nothing is reparented and no
+                // binding is torn down; only the box it is arranged at follows the pointer.
                 var index = start + i;
-                var box = new Rect(x, y, rowWidths[i], _rowHeights[r]);
-                _slotRects[index] = new Rect2(box.X, box.Y, box.Width, box.Height);
-
-                // Follows the pointer, keeping its place in Children so nothing is reparented and no
-                // binding is torn down. Anchored to the pointer rather than offset from its slot: the
-                // previewed slot jumps a whole column the moment a reorder commits, which threw the
-                // widget out from under the cursor. The slot keeps its real size, and is what the drop
-                // hint outlines.
-                if (ReferenceEquals(_visible[index], _drag.Dragged)) {
-                    _drag.ShowHint(box);
-                    box = _drag.DragBox();
-                }
-
-                _visible[index].Arrange(box);
+                Visible[index].Arrange(Placed(index, new Rect(x, y, rowWidths[i], _rowHeights[r])));
                 x += rowWidths[i] + ColumnSpacing;
             }
 
@@ -294,35 +210,14 @@ public class WidgetBoard : Panel, IReorderablePanel {
         return finalSize;
     }
 
-    /// <summary>Collapsed children are skipped, so a hidden widget takes no slot.</summary>
-    private void CollectVisible() {
-        if (_childOrder.Sync(Children.Count))
-            ApplySavedOrder();
-
-        _visible.Clear();
-        foreach (var index in _childOrder.Shown(_drag.IsDragging))
-            if (index < Children.Count && Children[index].IsVisible)
-                _visible.Add(Children[index]);
-    }
-
-    private bool IsChildVisible(int index) => index < Children.Count && Children[index].IsVisible;
-
-    private List<string> DeclaredIds() {
-        var ids = new List<string>(Children.Count);
-        foreach (var child in Children)
-            ids.Add(Reorder.IdOf(child));
-        return ids;
-    }
-
     private void BuildSlots() {
-        if (_slots.Length < _visible.Count) {
-            _slots = new WidgetSlot[_visible.Count];
-            _slotWidths = new double[_visible.Count];
-            _slotRects = new Rect2[_visible.Count];
+        if (_slots.Length < Visible.Count) {
+            _slots = new WidgetSlot[Visible.Count];
+            _slotWidths = new double[Visible.Count];
         }
 
-        for (var i = 0; i < _visible.Count; i++) {
-            var child = _visible[i];
+        for (var i = 0; i < Visible.Count; i++) {
+            var child = Visible[i];
             _slots[i] = new WidgetSlot(
                 Math.Max(0, GetWeight(child)),
                 child.MinWidth,

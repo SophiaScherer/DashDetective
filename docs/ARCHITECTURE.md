@@ -114,7 +114,8 @@ layout pass.
 
 **Dragging to reorder is `ReorderDrag`** (`src/Shared/Layout`), not the board's: it owns the pointer,
 the threshold, the drag cursor, the previewed order and the drop hint, and drives any panel that
-implements `IReorderablePanel`. `WidgetBoard` is one such panel; `UniformFlowPanel` is the other, which
+implements `IReorderablePanel` — in practice by deriving from `ReorderablePanel`, which holds the half
+of that seam every panel answers the same way. `WidgetBoard` is one such panel; `UniformFlowPanel` is the other, which
 is what lets a data-bound strip of cards reorder — Hardware's components, Storage's drives, Processes'
 summary tiles, Performance's device rail and stat tiles. A panel reorders a private index list
 (`ChildOrder`), never `Children`. Identity comes from `Reorder.IdOf`: an id attached in markup, the

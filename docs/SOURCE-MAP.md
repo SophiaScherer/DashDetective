@@ -196,8 +196,8 @@ stays in its tab folder.
 ```
       /Layout
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
-                                 so surplus buys a column, and drags by the header to reorder. Owns the
-                                 layout half of the drag only — the pointer half is ReorderDrag's)
+                                 so surplus buys a column, and drags by the header to reorder. A
+                                 ReorderablePanel, so all it owns is the packing and the header rule)
         ReorderDrag.cs          (drag-to-reorder for any panel that can say where its children are:
                                  pointer, threshold, cursor, previewed order and drop hint. The drag
                                  cursor is set HERE, not in Widgets.axaml: a style cannot tell whether a
@@ -205,6 +205,12 @@ stays in its tab folder.
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed)
+        ReorderablePanel.cs     (the half of reordering both panels share: the saved order and its
+                                 re-entrancy guard, the previewed order, the children on screen and
+                                 where their slots were arranged. A base class rather than a helper
+                                 each panel forwards to — the forwarding would have been most of what
+                                 they shared, and Order would have had to become an attached property
+                                 to live anywhere else. Layout vocabulary stays with the panels)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
                                  handle is, and the previewed order. Reorder is always a permutation of
                                  the panel's own index list — a panel that reordered Children instead
