@@ -210,8 +210,8 @@ public static class WidgetBoardLayout {
     }
 
     /// <summary>Where a widget dragged to (<paramref name="x"/>, <paramref name="y"/>) would be
-    /// inserted: the row whose band holds the pointer, then the first slot whose midpoint is right of
-    /// it.</summary>
+    /// inserted: the row whose band holds the point, then the first slot whose midpoint is past it.
+    /// Which midpoint depends on how the row runs — see below.</summary>
     public static int DropIndex(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
         if (slots.Length == 0)
             return 0;
@@ -230,6 +230,15 @@ public static class WidgetBoardLayout {
         // start tracks the row before the one chosen when the loop ran to the end, so recompute it.
         start = row == 0 ? 0 : rowEnds[row - 1];
         var rowEnd = rowEnds[row];
+
+        // A row holding one slot is an entry in a list, not a column in a grid: the flow runs DOWN the
+        // panel, so it is the horizontal centre line that says before or after. Asking about x there
+        // decides nothing — the slot spans the full width, so a grip near its left edge reads as "left
+        // of the middle" wherever it is dragged, and nothing could ever be dropped below the last row.
+        if (rowEnd - start == 1) {
+            var only = slots[start];
+            return y < only.Top + only.Height / 2 + Epsilon ? start : rowEnd;
+        }
 
         for (var i = start; i < rowEnd; i++)
             if (x < slots[i].Left + slots[i].Width / 2)

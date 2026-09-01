@@ -211,7 +211,11 @@ stays in its tab folder.
                                  would re-enter its layout and, under an ItemsControl, fight the
                                  generator)
         WidgetBoardLayout.cs    (its arithmetic + DropIndex + DragRect — no Avalonia types, so it tests
-                                 without layout)
+                                 without layout. DropIndex picks a row by y, then decides within it on
+                                 the midpoint of whichever axis that row RUNS ALONG: x for a row of
+                                 several slots, y for a row of one. A single-slot row is a list entry,
+                                 and asking about x there decides nothing — the slot spans the full
+                                 width, so nothing could be dropped below the last row)
         DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's
                                  OverlayLayer. Shared by the nav bar's drag-to-dock and the board's
                                  drag-to-reorder; the board cannot host it as a child, which would

@@ -295,6 +295,39 @@ public class WidgetBoardLayoutTests {
         Assert.Equal(6, WidgetBoardLayout.DropIndex(Grid(), GridRows, 900, 5000));
     }
 
+    // A one-column strip: three 200x60 slots stacked with a 16px gutter, the shape of the
+    // Performance device rail.
+    private static Rect2[] Column() => new[] {
+        new Rect2(0, 0, 200, 60), new Rect2(0, 76, 200, 60), new Rect2(0, 152, 200, 60),
+    };
+
+    private static readonly int[] ColumnRows = { 1, 2, 3 };
+
+    /// <summary>A row of one slot runs down the panel, so the horizontal centre line decides. Testing x
+    /// instead decides nothing — every slot spans the full width — and nothing could be dropped below
+    /// the last row.</summary>
+    [Theory]
+    [InlineData(10, 0)]      // over the first slot's top half
+    [InlineData(50, 1)]      // past its middle, so after it
+    [InlineData(90, 1)]      // over the second slot's top half
+    [InlineData(140, 2)]     // past its middle
+    [InlineData(200, 3)]     // past the last slot's middle: after everything
+    [InlineData(5000, 3)]    // below the strip entirely
+    public void DropIndex_InAColumn_PicksTheSlotTheDragHasPassed(double y, int expected) {
+        Assert.Equal(expected, WidgetBoardLayout.DropIndex(Column(), ColumnRows, 100, y));
+    }
+
+    /// <summary>And it says the same wherever along the row the drag is held, which is what stops the
+    /// grip's own position from deciding the answer.</summary>
+    [Theory]
+    [InlineData(5)]
+    [InlineData(100)]
+    [InlineData(195)]
+    public void DropIndex_InAColumn_IgnoresX(double x) {
+        Assert.Equal(3, WidgetBoardLayout.DropIndex(Column(), ColumnRows, x, 200));
+        Assert.Equal(0, WidgetBoardLayout.DropIndex(Column(), ColumnRows, x, 10));
+    }
+
     [Fact]
     public void DropIndex_Empty_IsZero() {
         Assert.Equal(0, WidgetBoardLayout.DropIndex(Array.Empty<Rect2>(), Array.Empty<int>(), 10, 10));
