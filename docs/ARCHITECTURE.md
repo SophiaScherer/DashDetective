@@ -112,6 +112,14 @@ another column rather than a wider widget. Widgets are dragged by their headers 
 re-packs live. The arithmetic is `WidgetBoardLayout`, free of Avalonia types and unit-tested without a
 layout pass.
 
+**Dragging to reorder is `ReorderDrag`** (`src/Shared/Layout`), not the board's: it owns the pointer,
+the threshold, the drag cursor, the previewed order and the drop hint, and drives any panel that
+implements `IReorderablePanel`. `WidgetBoard` is one such panel; `UniformFlowPanel` is the other, which
+is what lets a data-bound strip of cards reorder — Hardware's components, Storage's drives, Processes'
+summary tiles, Performance's device rail and stat tiles. A panel reorders a private index list
+(`ChildOrder`), never `Children`. Identity comes from `Reorder.IdOf`: an id attached in markup, the
+control's own, or its item view model's.
+
 The order is persisted per page by `WidgetOrders`, keyed by widget id rather than index. Resolving a
 saved order against what a page declares now drops ids it no longer has and keeps a newly added widget
 at its declared position, so a later release does not drop a new widget at the bottom of a layout the

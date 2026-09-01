@@ -102,7 +102,9 @@
                 <ItemsPanelTemplate>
                     <!-- Wraps below 280px per card, where the used/free split and the
                          read/write/temp row stop fitting on their lines. -->
-                    <layout:UniformFlowPanel MinItemWidth="280" ColumnSpacing="16" RowSpacing="16"/>
+                    <layout:UniformFlowPanel MinItemWidth="280" ColumnSpacing="16" RowSpacing="16"
+                                             DragGrip="Item"
+                                             Order="{Binding DriveOrder.Order, Mode=TwoWay}"/>
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>

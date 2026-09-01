@@ -1375,7 +1375,9 @@ stays in its tab folder.
 ```
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
                                 (LIVE — read-only drives/health view: a top row of DriveCard summary
-                                 cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
+                                 cards (reorderable within their strip, saved under "storage.drives";
+                                 the strip itself is one pinned board row, so a card never leaves it)
+                                 over a Partitions table (PartitionRow item VMs) + a Disk Activity
                                  card (shared Sparkline, ChartStorage key). Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
                                  VolumeProvider; Disk Activity + Queue from the page-local throughput sampler

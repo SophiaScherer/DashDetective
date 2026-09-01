@@ -37,7 +37,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
     public SavedOrder Widgets { get; } = new("storage");
 
-    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
+    /// <summary>The order of the drive cards inside the strip. Its own order because the strip is one
+    /// pinned board row: the cards reorder among themselves, never out of it.</summary>
+    public SavedOrder DriveOrder { get; } = new("storage.drives");
+
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets, DriveOrder];
 
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
     // (≈ every 15 s at the default cadence) rather than every tick.
