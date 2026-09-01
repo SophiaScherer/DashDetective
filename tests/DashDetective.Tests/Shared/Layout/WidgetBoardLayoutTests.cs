@@ -300,6 +300,31 @@ public class WidgetBoardLayoutTests {
         Assert.Equal(0, WidgetBoardLayout.DropIndex(Array.Empty<Rect2>(), Array.Empty<int>(), 10, 10));
     }
 
+    [Theory]
+    [InlineData(0.5, 0.5, 350, 250)]   // grabbed dead centre
+    [InlineData(0, 0, 500, 300)]       // grabbed at the top-left corner
+    [InlineData(1, 1, 200, 200)]       // grabbed at the bottom-right corner
+    public void DragRect_KeepsTheGripUnderThePointer(double grabX, double grabY,
+                                                     double expectedLeft, double expectedTop) {
+        var rect = WidgetBoardLayout.DragRect(300, 100, 500, 300, grabX, grabY);
+
+        Assert.Equal(expectedLeft, rect.Left, 6);
+        Assert.Equal(expectedTop, rect.Top, 6);
+        Assert.Equal(300, rect.Width);
+        Assert.Equal(100, rect.Height);
+    }
+
+    /// <summary>The grip is a fraction, so a widget picked up by its right edge stays under the
+    /// pointer even once the slot it came from is a different size.</summary>
+    [Fact]
+    public void DragRect_ScalesTheGripWithTheWidth() {
+        var wide = WidgetBoardLayout.DragRect(760, 100, 500, 300, 0.9, 0.5);
+        var narrow = WidgetBoardLayout.DragRect(340, 100, 500, 300, 0.9, 0.5);
+
+        Assert.Equal(500 - 0.9 * 760, wide.Left, 6);
+        Assert.Equal(500 - 0.9 * 340, narrow.Left, 6);
+    }
+
     /// <summary>Whether the row has more content width than its caps can between them absorb, which
     /// is the point at which the caps give way rather than banking the rest as whitespace.</summary>
     private static bool ExceedsEveryCap(ReadOnlySpan<WidgetSlot> row, double width) {

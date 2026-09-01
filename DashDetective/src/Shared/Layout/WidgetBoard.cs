@@ -72,6 +72,16 @@ public class WidgetBoard : Panel {
     private WidgetPanel? _draggedPanel;
     private bool _applyingOrder;
 
+    // Where in the widget it was picked up, as fractions of its size, and the size it had then. Both
+    // are what keep the grip under the cursor when the slots beneath it re-pack.
+    private double _grabX;
+    private double _grabY;
+    private Size _dragSize;
+    private DragDropHint? _hint;
+    private Panel? _handleUnderPointer;
+
+    private static readonly Cursor DragCursor = new(StandardCursorType.Hand);
+
     static WidgetBoard() {
         AffectsParentMeasure<WidgetBoard>(
             WeightProperty, MaxSlotWidthProperty, BreakBeforeProperty, StretchProperty);
@@ -169,7 +179,7 @@ public class WidgetBoard : Panel {
     private void OnPreviewPressed(object? sender, PointerPressedEventArgs e) {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
-        if (e.Source is not Visual source || !HitHeader(source, out var panel))
+        if (e.Source is not Visual source || !HitHeader(source, out var panel, out _))
             return;
 
         var child = BoardChildOf(panel);
@@ -179,13 +189,23 @@ public class WidgetBoard : Panel {
         _dragged = child;
         _draggedPanel = panel;
         _pressPoint = e.GetPosition(this);
+        _dragSize = child.Bounds.Size;
+        _grabX = Fraction(_pressPoint.X - child.Bounds.X, _dragSize.Width);
+        _grabY = Fraction(_pressPoint.Y - child.Bounds.Y, _dragSize.Height);
         _dragPending = true;
         e.Pointer.Capture(this);
     }
 
+    // A fraction, not a pixel offset: a widget grabbed near its right edge would otherwise end up
+    // beside the cursor rather than under it once its slot changed size.
+    private static double Fraction(double offset, double extent) =>
+        extent > 0 ? Math.Clamp(offset / extent, 0, 1) : 0;
+
     private void OnPointerMove(object? sender, PointerEventArgs e) {
-        if (!_dragPending || _dragged is null)
+        if (!_dragPending || _dragged is null) {
+            ShowHandleCursor(e.Source as Visual);
             return;
+        }
 
         _pointer = e.GetPosition(this);
         if (!_dragging) {
@@ -197,12 +217,39 @@ public class WidgetBoard : Panel {
             _preview.AddRange(_order);
             _draggedPanel?.Classes.Add("dragging");
             _dragged.ZIndex = 10;
+            _hint = new DragDropHint(this, this.Radius("RadiusPanel", 4));
+            _hint.Attach();
         }
 
         // Re-pack under the order being tried, so the others shift as the drag moves.
         if (MovePreviewTo(DropTarget()))
             InvalidateMeasure();
         InvalidateArrange();
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e) {
+        base.OnPointerExited(e);
+        if (!_dragPending)
+            ShowHandleCursor(null);
+    }
+
+    /// <summary>Points the cursor at the drag handle under it, from the same predicate that starts a
+    /// drag. Driving both from one place is what stops a header advertising a drag it cannot do: a
+    /// panel outside a board, or a control sitting inside a header, offers none.</summary>
+    private void ShowHandleCursor(Visual? source) {
+        Panel? handle = null;
+        if (source is not null && HitHeader(source, out var panel, out var header)
+            && BoardChildOf(panel) is { } child && _visible.Contains(child))
+            handle = header;
+
+        if (ReferenceEquals(handle, _handleUnderPointer))
+            return;
+
+        if (_handleUnderPointer is not null)
+            _handleUnderPointer.Cursor = null;
+        if (handle is not null)
+            handle.Cursor = DragCursor;
+        _handleUnderPointer = handle;
     }
 
     private void OnPointerUp(object? sender, PointerReleasedEventArgs e) {
@@ -265,19 +312,19 @@ public class WidgetBoard : Panel {
 
     /// <summary>The press must hit a header and miss every control in it — Storage keeps a drive
     /// picker up there, which a drag would otherwise swallow.</summary>
-    private static bool HitHeader(Visual source, out WidgetPanel panel) {
+    private static bool HitHeader(Visual source, out WidgetPanel panel, out Panel header) {
         panel = null!;
-        var header = false;
+        header = null!;
         foreach (var node in source.GetSelfAndVisualAncestors()) {
             switch (node) {
                 case Button or ToggleButton or TextBox or ComboBox or ScrollBar:
                     return false;
-                case Panel { Name: "PART_Header" }:
-                    header = true;
+                case Panel { Name: "PART_Header" } hit:
+                    header = hit;
                     break;
                 case WidgetPanel found:
                     panel = found;
-                    return header;
+                    return header is not null;
             }
         }
         return false;
@@ -285,6 +332,8 @@ public class WidgetBoard : Panel {
 
     // Reached from release and from lost capture alike, so the lifted state can never stick.
     private void EndDrag() {
+        _hint?.Hide();
+        _hint = null;
         _draggedPanel?.Classes.Remove("dragging");
         if (_dragged is not null)
             _dragged.ZIndex = 0;
@@ -348,7 +397,13 @@ public class WidgetBoard : Panel {
             var rowWidth = 0.0;
             for (var i = 0; i < count; i++) {
                 var child = _visible[start + i];
-                child.Measure(new Size(rowWidths[i], double.PositiveInfinity));
+
+                // The dragged widget keeps the width it was picked up at, so its content cannot
+                // re-wrap under the cursor while the rows behind it re-pack.
+                var measureWidth = _dragging && ReferenceEquals(child, _dragged)
+                    ? _dragSize.Width
+                    : rowWidths[i];
+                child.Measure(new Size(measureWidth, double.PositiveInfinity));
                 rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
                 rowWidth += double.IsFinite(rowWidths[i]) ? rowWidths[i] : child.DesiredSize.Width;
             }
@@ -385,11 +440,17 @@ public class WidgetBoard : Panel {
                 var box = new Rect(x, y, rowWidths[i], _rowHeights[r]);
                 _slotRects[index] = new Rect2(box.X, box.Y, box.Width, box.Height);
 
-                // Follows the pointer from its previewed slot, keeping its place in Children so
-                // nothing is reparented and no binding is torn down.
-                if (_dragging && ReferenceEquals(_visible[index], _dragged))
-                    box = box.WithX(box.X + _pointer.X - _pressPoint.X)
-                             .WithY(box.Y + _pointer.Y - _pressPoint.Y);
+                // Follows the pointer, keeping its place in Children so nothing is reparented and
+                // no binding is torn down. Anchored to the pointer rather than offset from its slot:
+                // the previewed slot jumps a whole column the moment a reorder commits, which threw
+                // the widget out from under the cursor. The slot keeps its real size, and is what the
+                // drop hint outlines.
+                if (_dragging && ReferenceEquals(_visible[index], _dragged)) {
+                    _hint?.ShowFrom(this, box);
+                    var drag = WidgetBoardLayout.DragRect(_dragSize.Width, _dragSize.Height,
+                                                          _pointer.X, _pointer.Y, _grabX, _grabY);
+                    box = new Rect(drag.Left, drag.Top, drag.Width, drag.Height);
+                }
 
                 _visible[index].Arrange(box);
                 x += rowWidths[i] + ColumnSpacing;

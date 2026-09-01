@@ -131,6 +131,9 @@ stays in its tab folder.
                                 never nudges anything. Shared by NavigationView + the widget board)
       RevealFlash.cs           (tints an element when something elsewhere jumps to it. Toggles the
                                 class only; the fade is Border.revealFlash's transition)
+      ThemeResources.cs        (brush/shadow/radius lookups for visuals built in code. Asks with the
+                                element's ActualThemeVariant: FindResource returns null for every
+                                palette brush, all of which live in a theme dictionary)
 ```
 
 ## `src/Shared/Charts`
@@ -189,8 +192,18 @@ stays in its tab folder.
 ```
       /Layout
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
-                                 so surplus buys a column, and drags by the header to reorder)
-        WidgetBoardLayout.cs    (its arithmetic + DropIndex — no Avalonia types, so it tests without layout)
+                                 so surplus buys a column, and drags by the header to reorder. The drag
+                                 cursor is set HERE, not in Widgets.axaml: a style cannot tell whether a
+                                 panel is in a board, and one that could not advertised a drag on three
+                                 tabs that have none. A dragged widget is anchored to the pointer and
+                                 frozen at its pickup size — offsetting it from its previewed slot threw
+                                 it a whole column sideways the moment a reorder committed)
+        WidgetBoardLayout.cs    (its arithmetic + DropIndex + DragRect — no Avalonia types, so it tests
+                                 without layout)
+        DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's
+                                 OverlayLayer. Shared by the nav bar's drag-to-dock and the board's
+                                 drag-to-reorder; the board cannot host it as a child, which would
+                                 re-enter its own layout)
         WidgetOrders.cs         (per-page order codec; the resolver that survives a widget being added,
                                  removed or renamed now lives in OrderResolver.cs, which this delegates
                                  to — the Processes columns want the same semantics)

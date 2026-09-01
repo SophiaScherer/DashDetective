@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using DashDetective.Shared;
+using DashDetective.Shared.Layout;
 using System;
 
 namespace DashDetective.Shell.Navigation;
@@ -29,7 +30,7 @@ public partial class NavigationView : UserControl {
     private Point _pressPoint;                   // press location, in overlay coordinates
     private NavOrientation _targetEdge;          // edge the drop would dock to
     private OverlayLayer? _overlay;              // window-level layer the highlight is drawn into
-    private Border? _dropHint;                   // the target-edge highlight
+    private DragDropHint? _dropHint;             // the target-edge highlight, shared with the boards' drag
     private Border? _dragChip;                   // the cursor-following chip (icon + destination hint)
     private Path? _dragChipIcon;                 // panel glyph inside the chip, reflecting the target edge
     private TextBlock? _dragChipLabel;           // "Dock left/top/…" text inside the chip
@@ -68,7 +69,8 @@ public partial class NavigationView : UserControl {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
 
-        _overlay = OverlayLayer.GetOverlayLayer(this);
+        _dropHint = new DragDropHint(this);
+        _overlay = _dropHint.Attach();
         if (_overlay is null)
             return;
 
@@ -113,18 +115,7 @@ public partial class NavigationView : UserControl {
         if (_viewModel is not null)
             _viewModel.IsDragging = true;
 
-        var accent = BrushRes("Accent", Colors.DodgerBlue) is ISolidColorBrush accentBrush
-            ? accentBrush.Color
-            : Colors.DodgerBlue;
-
-        _dropHint = new Border {
-            Background = new SolidColorBrush(accent, 0.18),
-            BorderBrush = new SolidColorBrush(accent),
-            BorderThickness = new Thickness(2),
-            CornerRadius = new CornerRadius(4),
-            IsHitTestVisible = false,
-        };
-        _overlay?.Children.Add(_dropHint);
+        var accent = this.BrushColor("Accent", Colors.DodgerBlue);
 
         // A floating chip that follows the cursor: a panel glyph (pointing at the target edge) plus a
         // short destination hint, mirroring how JetBrains shows what is being docked and where.
@@ -136,16 +127,16 @@ public partial class NavigationView : UserControl {
         };
         _dragChipLabel = new TextBlock {
             FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
-            Foreground = BrushRes("TextStrong", Colors.White),
+            Foreground = this.Brush("TextStrong", Colors.White),
         };
         _dragChip = new Border {
-            Background = BrushRes("SidebarBackground", Color.FromRgb(0x1b, 0x1b, 0x1b)),
+            Background = this.Brush("SidebarBackground", Color.FromRgb(0x1b, 0x1b, 0x1b)),
             BorderBrush = new SolidColorBrush(accent),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(7),
             Padding = new Thickness(9, 6),
             IsHitTestVisible = false,
-            BoxShadow = ShadowRes("ShadowDrag"),
+            BoxShadow = this.Shadow("ShadowDrag"),
             Child = new StackPanel {
                 Orientation = Orientation.Horizontal, Spacing = 8,
                 Children = { _dragChipIcon, _dragChipLabel },
@@ -159,10 +150,9 @@ public partial class NavigationView : UserControl {
         if (_viewModel is not null)
             _viewModel.IsDragging = false;
 
-        if (_overlay is not null) {
-            if (_dropHint is not null) _overlay.Children.Remove(_dropHint);
-            if (_dragChip is not null) _overlay.Children.Remove(_dragChip);
-        }
+        if (_overlay is not null && _dragChip is not null)
+            _overlay.Children.Remove(_dragChip);
+        _dropHint?.Hide();
 
         _dropHint = null;
         _dragChip = null;
@@ -172,18 +162,6 @@ public partial class NavigationView : UserControl {
         _dragging = false;
         _dragPending = false;
     }
-
-    private IBrush BrushRes(string key, Color fallback) =>
-        this.TryGetResource(key, ActualThemeVariant, out var res) && res is IBrush brush
-            ? brush
-            : new SolidColorBrush(fallback);
-
-    // No literal fallback, unlike BrushRes: a shadow is decorative, so a missing key drops the shadow
-    // rather than reintroducing a hex the palette is supposed to own.
-    private BoxShadows ShadowRes(string key) =>
-        this.TryGetResource(key, ActualThemeVariant, out var res) && res is BoxShadows shadow
-            ? shadow
-            : default;
 
     // Nearest window edge to the pointer — every edge is a valid dock target, so snap to the closest.
     private static NavOrientation NearestEdge(Point p, Size size) {
@@ -223,10 +201,7 @@ public partial class NavigationView : UserControl {
                 left = 0; top = size.Height - horizontal; width = size.Width; height = horizontal; break;
         }
 
-        Canvas.SetLeft(_dropHint, left);
-        Canvas.SetTop(_dropHint, top);
-        _dropHint.Width = width;
-        _dropHint.Height = height;
+        _dropHint.Show(new Rect(left, top, width, height));
     }
 
     // Point the chip's glyph at the target edge, update its hint, and centre it on the cursor (it is

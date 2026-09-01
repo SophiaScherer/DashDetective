@@ -238,6 +238,15 @@ public static class WidgetBoardLayout {
         return rowEnd;
     }
 
+    /// <summary>Where a dragged widget is drawn: at the size it was picked up at, under the pointer at
+    /// the same relative grip. Anchoring to the pointer rather than to the slot is what stops a re-pack
+    /// mid-drag from pulling the widget out from under the cursor.</summary>
+    /// <param name="grabX">Where along the widget's width it was grabbed, as a fraction.</param>
+    /// <param name="grabY">Where down the widget's height it was grabbed, as a fraction.</param>
+    public static Rect2 DragRect(double width, double height, double pointerX, double pointerY,
+                                 double grabX, double grabY) =>
+        new(pointerX - grabX * width, pointerY - grabY * height, width, height);
+
     private static double Cap(WidgetSlot slot) =>
         slot.Stretch ? double.PositiveInfinity : Math.Max(slot.MinWidth, slot.MaxWidth);
 }
