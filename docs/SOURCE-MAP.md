@@ -225,10 +225,12 @@ stays in its tab folder.
                                  order, and the mapping from a drop index — which counts only what is on
                                  screen — into an order that holds every child. No Avalonia types, so it
                                  tests without a layout pass)
-        WidgetIds.cs            (how a panel names a child: the control's own id, or its item view
-                                 model's where the children are generated)
+        Reorder.cs              (how a panel names a child: an id attached in markup, else the
+                                 control's own, else its item view model's where the children are
+                                 generated. The attached one is for a tile written out by hand, which
+                                 is the only kind that cannot name itself)
         UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
-                                 With Reorder set it also drags to reorder, through the same ReorderDrag
+                                 With DragGrip set it also drags to reorder, through the same ReorderDrag
                                  a board uses — its children are usually generated, so the order is
                                  re-applied every time the generator rebuilds them)
         FlowLayout, GridColumns, TableColumns, WeightedRowLayout
@@ -1380,7 +1382,9 @@ stays in its tab folder.
 
 ```
       /Processes                (the tab itself is described under Feature notes; only its seams and the
-                                 column model are mapped here)
+                                 column model are mapped here. The four summary tiles above the table
+                                 drag to reorder, saved under "processes.summary"; the table below them
+                                 does not move, and its own column drag is unrelated)
                                 ProcessColumnId.cs      (enum: the seven columns, declaration order =
                                                          the order the table ships in)
                                 ProcessColumns.cs       (one table of per-column minimum width + weight,

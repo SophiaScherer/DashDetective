@@ -18,7 +18,7 @@
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
                 <layout:UniformFlowPanel MinItemWidth="360" ColumnSpacing="16" RowSpacing="16"
-                                         Reorder="Item"
+                                         DragGrip="Item"
                                          Order="{Binding CardOrder.Order, Mode=TwoWay}"/>
             </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>

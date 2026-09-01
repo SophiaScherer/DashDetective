@@ -27,7 +27,12 @@ namespace DashDetective.Tabs.Processes;
 /// flicker. Sorting, filtering and expand/collapse all re-project the snapshot already in hand rather
 /// than re-enumerating, so they feel instant between polls.
 /// </summary>
-public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IShortcutTarget, IDisposable {
+public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, ISelfScrollingPage, IShortcutTarget, IReorderablePage, IDisposable {
+    /// <summary>The order of the summary tiles above the table, bound two-way to their strip.</summary>
+    public SavedOrder Summary { get; } = new("processes.summary");
+
+    public IEnumerable<SavedOrder> SavedOrders => [Summary];
+
     /// <summary>Poll cadence. Enumerating every process (with per-process window/responding probes) is
     /// heavier than a single counter, so it polls slower than the Dashboard's 1 Hz samplers — close to
     /// Task Manager's own refresh.</summary>

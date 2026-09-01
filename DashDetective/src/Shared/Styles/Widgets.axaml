@@ -56,7 +56,7 @@
 
     <!-- The same, for a plain surface dragged out of a strip: those are cards rather than widgets,
          so they have no template to reach into. -->
-    <Style Selector="Border.panel.dragging">
+    <Style Selector="Border.panel.dragging, Border.card.dragging">
         <Setter Property="Opacity" Value="0.92"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
         <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>

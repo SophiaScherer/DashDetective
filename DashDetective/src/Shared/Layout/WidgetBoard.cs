@@ -310,7 +310,7 @@ public class WidgetBoard : Panel, IReorderablePanel {
     private List<string> DeclaredIds() {
         var ids = new List<string>(Children.Count);
         foreach (var child in Children)
-            ids.Add(WidgetIds.Of(child));
+            ids.Add(Reorder.IdOf(child));
         return ids;
     }
 

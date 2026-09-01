@@ -314,8 +314,10 @@
         <!-- ===== Summary strip: the action buttons keep their natural width on the right and the
              four cards flow in whatever space is left, wrapping rather than being squeezed. -->
         <Panel Grid.Row="0">
-            <layout:UniformFlowPanel MinItemWidth="130" ColumnSpacing="12" RowSpacing="12">
-            <Border Classes="card">
+            <layout:UniformFlowPanel MinItemWidth="130" ColumnSpacing="12" RowSpacing="12"
+                                     DragGrip="Item"
+                                     Order="{Binding Summary.Order, Mode=TwoWay}">
+            <Border Classes="card" layout:Reorder.Id="processes.count">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="PROCESSES"/>
                     <TextBlock Classes="sumValue" Text="{Binding TotalProcessesText}"/>
@@ -324,21 +326,21 @@
                                Text="{Binding ProcessBreakdownText}"/>
                 </StackPanel>
             </Border>
-            <Border Classes="card">
+            <Border Classes="card" layout:Reorder.Id="processes.cpu">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="CPU"/>
                     <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
                                Text="{Binding CpuUsageText}"/>
                 </StackPanel>
             </Border>
-            <Border Classes="card">
+            <Border Classes="card" layout:Reorder.Id="processes.memory">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="MEMORY"/>
                     <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
                                Text="{Binding MemoryUsageText}"/>
                 </StackPanel>
             </Border>
-            <Border Classes="card">
+            <Border Classes="card" layout:Reorder.Id="processes.threads">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="THREADS"/>
                     <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartThreads}" Text="{Binding ThreadsText}"/>

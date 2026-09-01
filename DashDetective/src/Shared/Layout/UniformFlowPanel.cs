@@ -29,7 +29,7 @@ public enum ReorderGrip {
 /// sites drop the negative-margin-on-panel idiom — that cancellation assumes a fixed column count
 /// and stops working once the count varies.
 ///
-/// With <see cref="Reorder"/> set it also drags to reorder, through the same
+/// With <see cref="DragGrip"/> set it also drags to reorder, through the same
 /// <see cref="ReorderDrag"/> a <see cref="WidgetBoard"/> uses. Unlike a board, its children are
 /// usually generated from a collection, so the ids come off the item view models and the order is
 /// re-applied whenever the generator rebuilds them.
@@ -51,8 +51,8 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
 
     /// <summary>What may start a drag here. Read once, when the panel enters the tree — set it in
     /// markup, not from a binding that changes later.</summary>
-    public static readonly StyledProperty<ReorderGrip> ReorderProperty =
-        AvaloniaProperty.Register<UniformFlowPanel, ReorderGrip>(nameof(Reorder));
+    public static readonly StyledProperty<ReorderGrip> DragGripProperty =
+        AvaloniaProperty.Register<UniformFlowPanel, ReorderGrip>(nameof(DragGrip));
 
     /// <summary>The item ids in display order, two-way so a drag reports its result back to the page
     /// that persists it. Ids the panel does not have are ignored; ones it has that are missing keep
@@ -99,9 +99,9 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
         set => SetValue(RowSpacingProperty, value);
     }
 
-    public ReorderGrip Reorder {
-        get => GetValue(ReorderProperty);
-        set => SetValue(ReorderProperty, value);
+    public ReorderGrip DragGrip {
+        get => GetValue(DragGripProperty);
+        set => SetValue(DragGripProperty, value);
     }
 
     public IReadOnlyList<string>? Order {
@@ -122,12 +122,12 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
         base.OnAttachedToVisualTree(e);
-        if (Reorder != ReorderGrip.None)
+        if (DragGrip != ReorderGrip.None)
             _drag.Attach();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
-        if (Reorder != ReorderGrip.None)
+        if (DragGrip != ReorderGrip.None)
             _drag.Detach();
         base.OnDetachedFromVisualTree(e);
     }
@@ -140,7 +140,7 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
     /// a press on a button in a card is aimed at the button.</summary>
     public bool TryGetHandle(Visual source, out ReorderHandle handle) {
         handle = default;
-        if (Reorder != ReorderGrip.Item)
+        if (DragGrip != ReorderGrip.Item)
             return false;
 
         foreach (var node in source.GetSelfAndVisualAncestors()) {
@@ -296,7 +296,7 @@ public class UniformFlowPanel : Panel, IReorderablePanel {
     private List<string> DeclaredIds() {
         var ids = new List<string>(Children.Count);
         foreach (var child in Children)
-            ids.Add(WidgetIds.Of(child));
+            ids.Add(Reorder.IdOf(child));
         return ids;
     }
 }
