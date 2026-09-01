@@ -1033,6 +1033,10 @@ load-bearing:
    generator. `ChildOrder` owns that list for both panels.
 5. **A drop index counts what is on screen; an order holds every child.** The two agree until a widget
    is collapsed, and then disagree silently — `ChildOrder.Move` maps between them.
+6. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
+   which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
+   was grabbed, and could not express dragging straight down at all: x never changes, so the item
+   landed one slot short — in two columns, the slot up and to the right.
 
 A page persists one `SavedOrder` per strip (`IReorderablePage.SavedOrders`), which is what lets
 Performance keep a rail order and a separate tile order per device kind. The drop hint is the nav

@@ -209,42 +209,37 @@ public static class WidgetBoardLayout {
         widths[count - 1] += leftover;
     }
 
-    /// <summary>Where a widget dragged to (<paramref name="x"/>, <paramref name="y"/>) would be
-    /// inserted: the row whose band holds the point, then the first slot whose midpoint is past it.
-    /// Which midpoint depends on how the row runs — see below.</summary>
-    public static int DropIndex(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
+    /// <summary>
+    /// The slot a drag held at (<paramref name="x"/>, <paramref name="y"/>) would take: the row whose
+    /// band holds the point, then the slot in that row it sits over.
+    ///
+    /// A drag TAKES the slot it covers; it is not inserted into the gap beside one. The gap reading
+    /// cannot express the most ordinary gesture there is — dragging straight down never changes x, so
+    /// asking which side of a slot's middle the drag is on can never move it into the row below, and
+    /// it landed one slot short every time, which in two columns is the slot up and to the right.
+    /// </summary>
+    public static int SlotAt(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
         if (slots.Length == 0)
             return 0;
 
         var row = rowEnds.Length - 1;
-        var start = 0;
-        for (var r = 0; r < rowEnds.Length; r++) {
-            var end = rowEnds[r];
-            if (y < slots[end - 1].Bottom) {
+        for (var r = 0; r < rowEnds.Length; r++)
+            if (y < slots[rowEnds[r] - 1].Bottom) {
                 row = r;
                 break;
             }
-            start = end;
-        }
 
-        // start tracks the row before the one chosen when the loop ran to the end, so recompute it.
-        start = row == 0 ? 0 : rowEnds[row - 1];
+        var start = row == 0 ? 0 : rowEnds[row - 1];
         var rowEnd = rowEnds[row];
 
-        // A row holding one slot is an entry in a list, not a column in a grid: the flow runs DOWN the
-        // panel, so it is the horizontal centre line that says before or after. Asking about x there
-        // decides nothing — the slot spans the full width, so a grip near its left edge reads as "left
-        // of the middle" wherever it is dragged, and nothing could ever be dropped below the last row.
-        if (rowEnd - start == 1) {
-            var only = slots[start];
-            return y < only.Top + only.Height / 2 + Epsilon ? start : rowEnd;
-        }
-
+        // The last slot the drag has reached the start of. A gutter belongs to the slot before it, and
+        // anything short of the row's first slot belongs to that one.
+        var target = start;
         for (var i = start; i < rowEnd; i++)
-            if (x < slots[i].Left + slots[i].Width / 2)
-                return i;
+            if (x + Epsilon >= slots[i].Left)
+                target = i;
 
-        return rowEnd;
+        return target;
     }
 
     /// <summary>Where a dragged widget is drawn: at the size it was picked up at, under the pointer at

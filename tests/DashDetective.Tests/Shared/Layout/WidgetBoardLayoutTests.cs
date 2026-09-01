@@ -265,7 +265,7 @@ public class WidgetBoardLayoutTests {
         }
     }
 
-    // ===== Drop index =====
+    // ===== The slot a drag is over =====
 
     // Two rows of three 300px slots, 100px tall.
     private static Rect2[] Grid() => new[] {
@@ -275,24 +275,41 @@ public class WidgetBoardLayoutTests {
 
     private static readonly int[] GridRows = { 3, 6 };
 
+    /// <summary>A drag takes the slot it covers. Measured from the box it occupies rather than from the
+    /// pointer inside it, so where in the item it was grabbed cannot change the answer.</summary>
     [Theory]
-    [InlineData(10, 50, 0)]      // left of the first slot's midpoint
-    [InlineData(200, 50, 1)]     // past it, so it lands after the first
-    [InlineData(800, 50, 3)]     // past every midpoint on row one
-    [InlineData(10, 150, 3)]     // start of row two
-    [InlineData(800, 150, 6)]    // end of row two
-    public void DropIndex_PicksTheSlotThePointerHasPassed(double x, double y, int expected) {
-        Assert.Equal(expected, WidgetBoardLayout.DropIndex(Grid(), GridRows, x, y));
+    [InlineData(150, 50, 0)]      // over the first slot
+    [InlineData(10, 50, 0)]       // and still over it near its leading edge
+    [InlineData(466, 50, 1)]      // over the second
+    [InlineData(800, 50, 2)]      // over the third
+    [InlineData(150, 166, 3)]     // straight below the first: the second row's first slot
+    [InlineData(800, 150, 5)]     // the second row's last
+    public void SlotAt_TakesTheSlotTheDragCovers(double x, double y, int expected) {
+        Assert.Equal(expected, WidgetBoardLayout.SlotAt(Grid(), GridRows, x, y));
+    }
+
+    /// <summary>Straight down is the gesture the old gap reading could not express: x never changes, so
+    /// which side of a slot's middle the drag sat on could never move it into the row below.</summary>
+    [Fact]
+    public void SlotAt_StraightDown_TakesTheSlotBelow() {
+        var grid = Grid();
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(grid, GridRows, 150, 50));
+        Assert.Equal(3, WidgetBoardLayout.SlotAt(grid, GridRows, 150, 166));
     }
 
     [Fact]
-    public void DropIndex_AboveTheBoard_ClampsToTheFirstRow() {
-        Assert.Equal(0, WidgetBoardLayout.DropIndex(Grid(), GridRows, 10, -400));
+    public void SlotAt_InAGutter_KeepsTheSlotBeforeIt() {
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(Grid(), GridRows, 308, 50));
     }
 
     [Fact]
-    public void DropIndex_BelowTheBoard_ClampsToTheLastRow() {
-        Assert.Equal(6, WidgetBoardLayout.DropIndex(Grid(), GridRows, 900, 5000));
+    public void SlotAt_AboveTheBoard_ClampsToTheFirstRow() {
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(Grid(), GridRows, 10, -400));
+    }
+
+    [Fact]
+    public void SlotAt_BelowTheBoard_ClampsToTheLastRow() {
+        Assert.Equal(5, WidgetBoardLayout.SlotAt(Grid(), GridRows, 900, 5000));
     }
 
     // A one-column strip: three 200x60 slots stacked with a 16px gutter, the shape of the
@@ -303,18 +320,17 @@ public class WidgetBoardLayoutTests {
 
     private static readonly int[] ColumnRows = { 1, 2, 3 };
 
-    /// <summary>A row of one slot runs down the panel, so the horizontal centre line decides. Testing x
-    /// instead decides nothing — every slot spans the full width — and nothing could be dropped below
-    /// the last row.</summary>
+    /// <summary>A one-column strip is rows all the way down, so y alone decides — including below the
+    /// last slot, which is how anything is ever dropped at the bottom of the rail.</summary>
     [Theory]
-    [InlineData(10, 0)]      // over the first slot's top half
-    [InlineData(50, 1)]      // past its middle, so after it
-    [InlineData(90, 1)]      // over the second slot's top half
-    [InlineData(140, 2)]     // past its middle
-    [InlineData(200, 3)]     // past the last slot's middle: after everything
-    [InlineData(5000, 3)]    // below the strip entirely
-    public void DropIndex_InAColumn_PicksTheSlotTheDragHasPassed(double y, int expected) {
-        Assert.Equal(expected, WidgetBoardLayout.DropIndex(Column(), ColumnRows, 100, y));
+    [InlineData(10, 0)]
+    [InlineData(50, 0)]
+    [InlineData(90, 1)]
+    [InlineData(160, 2)]
+    [InlineData(200, 2)]
+    [InlineData(5000, 2)]    // below the strip entirely
+    public void SlotAt_InAColumn_TakesTheSlotTheDragCovers(double y, int expected) {
+        Assert.Equal(expected, WidgetBoardLayout.SlotAt(Column(), ColumnRows, 100, y));
     }
 
     /// <summary>And it says the same wherever along the row the drag is held, which is what stops the
@@ -323,14 +339,14 @@ public class WidgetBoardLayoutTests {
     [InlineData(5)]
     [InlineData(100)]
     [InlineData(195)]
-    public void DropIndex_InAColumn_IgnoresX(double x) {
-        Assert.Equal(3, WidgetBoardLayout.DropIndex(Column(), ColumnRows, x, 200));
-        Assert.Equal(0, WidgetBoardLayout.DropIndex(Column(), ColumnRows, x, 10));
+    public void SlotAt_InAColumn_IgnoresX(double x) {
+        Assert.Equal(2, WidgetBoardLayout.SlotAt(Column(), ColumnRows, x, 200));
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(Column(), ColumnRows, x, 10));
     }
 
     [Fact]
-    public void DropIndex_Empty_IsZero() {
-        Assert.Equal(0, WidgetBoardLayout.DropIndex(Array.Empty<Rect2>(), Array.Empty<int>(), 10, 10));
+    public void SlotAt_Empty_IsZero() {
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(Array.Empty<Rect2>(), Array.Empty<int>(), 10, 10));
     }
 
     [Theory]

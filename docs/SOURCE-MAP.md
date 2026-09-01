@@ -210,12 +210,13 @@ stays in its tab folder.
                                  the panel's own index list — a panel that reordered Children instead
                                  would re-enter its layout and, under an ItemsControl, fight the
                                  generator)
-        WidgetBoardLayout.cs    (its arithmetic + DropIndex + DragRect — no Avalonia types, so it tests
-                                 without layout. DropIndex picks a row by y, then decides within it on
-                                 the midpoint of whichever axis that row RUNS ALONG: x for a row of
-                                 several slots, y for a row of one. A single-slot row is a list entry,
-                                 and asking about x there decides nothing — the slot spans the full
-                                 width, so nothing could be dropped below the last row)
+        WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
+                                 without layout. SlotAt is what a drag TAKES, not a gap it is inserted
+                                 into: the row whose band holds the point, then the slot in that row it
+                                 sits over. The gap reading could not express dragging straight down —
+                                 x never changes, so which side of a slot's middle the drag sat on could
+                                 not move it into the row below, and it landed one slot short, which in
+                                 two columns is the slot up and to the right)
         DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's
                                  OverlayLayer. Shared by the nav bar's drag-to-dock and the board's
                                  drag-to-reorder; the board cannot host it as a child, which would

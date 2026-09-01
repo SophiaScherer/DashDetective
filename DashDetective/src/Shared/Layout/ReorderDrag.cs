@@ -125,18 +125,15 @@ public sealed class ReorderDrag {
         _host.Surface.InvalidateArrange();
     }
 
-    /// <summary>Where the dragged item belongs once it is out of the way: the drop index counts it
-    /// where it still sits, so anything past that lands one place earlier.</summary>
-    private int DropTarget() {
-        var items = _host.Items;
-        var current = -1;
-        for (var i = 0; i < items.Count; i++)
-            if (ReferenceEquals(items[i], _item))
-                current = i;
+    /// <summary>Where the dragged item belongs: the slot it is covering, which is where it already
+    /// looks like it will land.</summary>
+    private int DropTarget() =>
+        Math.Clamp(_host.SlotAt(Centre(DragBox())), 0, Math.Max(0, _host.Items.Count - 1));
 
-        var drop = _host.DropIndexAt(_pointer);
-        return Math.Clamp(drop > current ? drop - 1 : drop, 0, Math.Max(0, items.Count - 1));
-    }
+    // The middle of the item as drawn, not the pointer inside it. The pointer can be anywhere in the
+    // item — half a card's width from its middle — so a card grabbed by its right edge and dragged
+    // straight down used to reach the next column's half of the row before it looked anywhere near it.
+    private static Point Centre(Rect box) => new(box.X + box.Width / 2, box.Y + box.Height / 2);
 
     private void OnReleased(object? sender, PointerReleasedEventArgs e) {
         // Only a drag that took the capture may release it. Releasing unconditionally strips the

@@ -149,11 +149,11 @@ public class WidgetBoard : Panel, IReorderablePanel {
         return true;
     }
 
-    public int DropIndexAt(Point pointer) =>
-        WidgetBoardLayout.DropIndex(
+    public int SlotAt(Point point) =>
+        WidgetBoardLayout.SlotAt(
             _slotRects.AsSpan(0, _visible.Count),
             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
-            pointer.X, pointer.Y);
+            point.X, point.Y);
 
     public void BeginPreview() => _childOrder.BeginPreview();
 

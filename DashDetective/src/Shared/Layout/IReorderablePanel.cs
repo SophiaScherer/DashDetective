@@ -34,9 +34,9 @@ public interface IReorderablePanel {
     /// <summary>What this press may drag, if anything.</summary>
     bool TryGetHandle(Visual source, out ReorderHandle handle);
 
-    /// <summary>Where the pointer says the dragged item belongs, as an index into
-    /// <see cref="Items"/> with the item still in its old place.</summary>
-    int DropIndexAt(Point pointer);
+    /// <summary>The slot the drag is over, as an index into <see cref="Items"/>. The dragged item
+    /// takes that slot; it is not inserted beside it.</summary>
+    int SlotAt(Point point);
 
     /// <summary>Starts previewing a reorder: the shown order becomes the one being tried.</summary>
     void BeginPreview();
