@@ -28,6 +28,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace DashDetective.Shell;
@@ -163,8 +164,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
         _processes.PreferencesChanged += Persist;
-        foreach (var page in ReorderablePages)
-            page.WidgetOrderChanged += Persist;
+        foreach (var order in SavedOrders)
+            order.Changed += Persist;
         _alerts.AlertChanged += OnAlertChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
@@ -276,9 +277,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         }
 
         var orders = WidgetOrders.Decode(settings.WidgetOrders);
-        foreach (var page in ReorderablePages)
-            if (orders.TryGetValue(page.PageKey, out var order))
-                page.WidgetOrder = order;
+        foreach (var saved in SavedOrders)
+            if (orders.TryGetValue(saved.Key, out var order))
+                saved.Order = order;
     }
 
     /// <summary>The pages whose widget order is persisted.</summary>
@@ -290,12 +291,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         }
     }
 
-    /// <summary>Every page's widget order, keyed by page, for the settings snapshot.</summary>
+    /// <summary>Every saved order in the app. A page can hold more than one, so this is what the
+    /// shell subscribes to, restores and encodes — never the page itself.</summary>
+    private IEnumerable<SavedOrder> SavedOrders => ReorderablePages.SelectMany(page => page.SavedOrders);
+
+    /// <summary>Every widget order, keyed by what it saves under, for the settings snapshot.</summary>
     private string EncodeWidgetOrders() {
         var orders = new Dictionary<string, IReadOnlyList<string>>();
-        foreach (var page in ReorderablePages)
-            if (page.WidgetOrder.Count > 0)
-                orders[page.PageKey] = page.WidgetOrder;
+        foreach (var saved in SavedOrders)
+            if (saved.Order.Count > 0)
+                orders[saved.Key] = saved.Order;
 
         return WidgetOrders.Encode(orders);
     }

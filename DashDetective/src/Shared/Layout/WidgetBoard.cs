@@ -3,9 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.VisualTree;
-using DashDetective.Shared;
 using DashDetective.Shared.Controls;
 using System;
 using System.Collections.Generic;
@@ -21,8 +19,10 @@ namespace DashDetective.Shared.Layout;
 /// The cap is attached here rather than being the child's own <c>MaxWidth</c>: Avalonia's arrange
 /// clamps a stretched child to MaxWidth and then centres it, leaving a dead margin down each side.
 /// <c>MinWidth</c> stays the child's own, so there is one source of truth.
+///
+/// The drag itself is <see cref="ReorderDrag"/>'s; this supplies the layout it works over.
 /// </summary>
-public class WidgetBoard : Panel {
+public class WidgetBoard : Panel, IReorderablePanel {
     /// <summary>This child's share of its row. Row-local, so a drag changes what it buys.</summary>
     public static readonly AttachedProperty<double> WeightProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, double>("Weight", 1.0);
@@ -64,29 +64,16 @@ public class WidgetBoard : Panel {
     // never mutates Children: that is re-entrant mid-layout and would detach a live Sparkline.
     private readonly List<int> _order = new();
     private readonly List<int> _preview = new();
-    private bool _dragPending;
-    private bool _dragging;
-    private Point _pressPoint;
-    private Point _pointer;
-    private Control? _dragged;
-    private WidgetPanel? _draggedPanel;
+    private readonly ReorderDrag _drag;
     private bool _applyingOrder;
-
-    // Where in the widget it was picked up, as fractions of its size, and the size it had then. Both
-    // are what keep the grip under the cursor when the slots beneath it re-pack.
-    private double _grabX;
-    private double _grabY;
-    private Size _dragSize;
-    private DragDropHint? _hint;
-    private Panel? _handleUnderPointer;
-
-    private static readonly Cursor DragCursor = new(StandardCursorType.Hand);
 
     static WidgetBoard() {
         AffectsParentMeasure<WidgetBoard>(
             WeightProperty, MaxSlotWidthProperty, BreakBeforeProperty, StretchProperty);
         AffectsMeasure<WidgetBoard>(ColumnSpacingProperty, RowSpacingProperty);
     }
+
+    public WidgetBoard() => _drag = new ReorderDrag(this);
 
     /// <summary>Horizontal gap between widgets sharing a row.</summary>
     public double ColumnSpacing {
@@ -158,160 +145,89 @@ public class WidgetBoard : Panel {
     /// <summary>Raised with the new widget-id order once a drag commits.</summary>
     public event Action<IReadOnlyList<string>>? OrderChanged;
 
-    // ----- Drag to reorder -----
+    // ----- Drag to reorder: the board's half of it. The pointer is ReorderDrag's. -----
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
         base.OnAttachedToVisualTree(e);
-        AddHandler(PointerPressedEvent, OnPreviewPressed, RoutingStrategies.Tunnel);
-        AddHandler(PointerMovedEvent, OnPointerMove, RoutingStrategies.Tunnel);
-        AddHandler(PointerReleasedEvent, OnPointerUp, RoutingStrategies.Tunnel);
-        AddHandler(PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Tunnel);
+        _drag.Attach();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
-        RemoveHandler(PointerPressedEvent, OnPreviewPressed);
-        RemoveHandler(PointerMovedEvent, OnPointerMove);
-        RemoveHandler(PointerReleasedEvent, OnPointerUp);
-        RemoveHandler(PointerCaptureLostEvent, OnCaptureLost);
+        _drag.Detach();
         base.OnDetachedFromVisualTree(e);
     }
 
-    private void OnPreviewPressed(object? sender, PointerPressedEventArgs e) {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-            return;
-        if (e.Source is not Visual source || !HitHeader(source, out var panel, out _))
-            return;
+    Panel IReorderablePanel.Surface => this;
+
+    IReadOnlyList<Control> IReorderablePanel.Items => _visible;
+
+    /// <summary>A press may drag from a header only, and must miss every control in it — Storage keeps
+    /// a drive picker up there, which a drag would otherwise swallow.</summary>
+    public bool TryGetHandle(Visual source, out ReorderHandle handle) {
+        handle = default;
+        if (!HitHeader(source, out var panel, out var header))
+            return false;
 
         var child = BoardChildOf(panel);
         if (child is null || !_visible.Contains(child))
-            return;
-
-        _dragged = child;
-        _draggedPanel = panel;
-        _pressPoint = e.GetPosition(this);
-        _dragSize = child.Bounds.Size;
-        _grabX = Fraction(_pressPoint.X - child.Bounds.X, _dragSize.Width);
-        _grabY = Fraction(_pressPoint.Y - child.Bounds.Y, _dragSize.Height);
-        _dragPending = true;
-        e.Pointer.Capture(this);
-    }
-
-    // A fraction, not a pixel offset: a widget grabbed near its right edge would otherwise end up
-    // beside the cursor rather than under it once its slot changed size.
-    private static double Fraction(double offset, double extent) =>
-        extent > 0 ? Math.Clamp(offset / extent, 0, 1) : 0;
-
-    private void OnPointerMove(object? sender, PointerEventArgs e) {
-        if (!_dragPending || _dragged is null) {
-            ShowHandleCursor(e.Source as Visual);
-            return;
-        }
-
-        _pointer = e.GetPosition(this);
-        if (!_dragging) {
-            var delta = _pointer - _pressPoint;
-            if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
-                return;
-            _dragging = true;
-            _preview.Clear();
-            _preview.AddRange(_order);
-            _draggedPanel?.Classes.Add("dragging");
-            _dragged.ZIndex = 10;
-            _hint = new DragDropHint(this, this.Radius("RadiusPanel", 4));
-            _hint.Attach();
-        }
-
-        // Re-pack under the order being tried, so the others shift as the drag moves.
-        if (MovePreviewTo(DropTarget()))
-            InvalidateMeasure();
-        InvalidateArrange();
-    }
-
-    protected override void OnPointerExited(PointerEventArgs e) {
-        base.OnPointerExited(e);
-        if (!_dragPending)
-            ShowHandleCursor(null);
-    }
-
-    /// <summary>Points the cursor at the drag handle under it, from the same predicate that starts a
-    /// drag. Driving both from one place is what stops a header advertising a drag it cannot do: a
-    /// panel outside a board, or a control sitting inside a header, offers none.</summary>
-    private void ShowHandleCursor(Visual? source) {
-        Panel? handle = null;
-        if (source is not null && HitHeader(source, out var panel, out var header)
-            && BoardChildOf(panel) is { } child && _visible.Contains(child))
-            handle = header;
-
-        if (ReferenceEquals(handle, _handleUnderPointer))
-            return;
-
-        if (_handleUnderPointer is not null)
-            _handleUnderPointer.Cursor = null;
-        if (handle is not null)
-            handle.Cursor = DragCursor;
-        _handleUnderPointer = handle;
-    }
-
-    private void OnPointerUp(object? sender, PointerReleasedEventArgs e) {
-        // Only a press this board claimed may release the capture. Releasing unconditionally strips the
-        // capture a button took on its own press, and it then never sees the release that clicks it.
-        if (!_dragPending)
-            return;
-
-        if (_dragging) {
-            _order.Clear();
-            _order.AddRange(_preview);
-            var ids = _visible.Select(WidgetIdOf).Where(id => id.Length > 0).ToList();
-            if (ids.Count > 0) {
-                _applyingOrder = true;
-                Order = ids;
-                _applyingOrder = false;
-                OrderChanged?.Invoke(ids);
-            }
-        }
-
-        e.Pointer.Capture(null);
-        EndDrag();
-    }
-
-    /// <summary>Where the pointer says the dragged widget belongs, in the preview order.</summary>
-    private int DropTarget() {
-        var drop = WidgetBoardLayout.DropIndex(
-            _slotRects.AsSpan(0, _visible.Count),
-            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
-            _pointer.X, _pointer.Y);
-
-        var current = _dragged is null ? -1 : _visible.IndexOf(_dragged);
-        return drop > current ? drop - 1 : drop;
-    }
-
-    /// <summary>Moves the dragged widget in the preview order; false when it is already there, so a
-    /// wobble does not re-pack every frame.</summary>
-    private bool MovePreviewTo(int target) {
-        if (_dragged is null)
             return false;
 
-        var child = Children.IndexOf(_dragged);
+        handle = new ReorderHandle(child, panel, header);
+        return true;
+    }
+
+    public int DropIndexAt(Point pointer) =>
+        WidgetBoardLayout.DropIndex(
+            _slotRects.AsSpan(0, _visible.Count),
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
+            pointer.X, pointer.Y);
+
+    public void BeginPreview() {
+        _preview.Clear();
+        _preview.AddRange(_order);
+    }
+
+    public bool PreviewMove(Control item, int target) {
+        var child = Children.IndexOf(item);
         var from = _preview.IndexOf(child);
         if (from < 0)
             return false;
 
-        target = Math.Clamp(target, 0, _preview.Count - 1);
-        if (target == from)
-            return false;
-
         _preview.RemoveAt(from);
-        _preview.Insert(target, child);
-        return true;
+        var to = PreviewPositionOf(target);
+        _preview.Insert(to, child);
+        return to != from;
     }
 
-    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
-        if (_dragPending)
-            EndDrag();
+    /// <summary>Where in the previewed order a widget dropped at this position among the VISIBLE ones
+    /// belongs. The two part company the moment a widget is collapsed: the order holds every child,
+    /// while a drop index counts only what is on screen.</summary>
+    private int PreviewPositionOf(int visibleTarget) {
+        var seen = 0;
+        for (var i = 0; i < _preview.Count; i++) {
+            if (_preview[i] >= Children.Count || !Children[_preview[i]].IsVisible)
+                continue;
+            if (seen == visibleTarget)
+                return i;
+            seen++;
+        }
+        return _preview.Count;
     }
 
-    /// <summary>The press must hit a header and miss every control in it — Storage keeps a drive
-    /// picker up there, which a drag would otherwise swallow.</summary>
+    public void CommitPreview() {
+        _order.Clear();
+        _order.AddRange(_preview);
+
+        var ids = _visible.Select(WidgetIdOf).Where(id => id.Length > 0).ToList();
+        if (ids.Count == 0)
+            return;
+
+        _applyingOrder = true;
+        Order = ids;
+        _applyingOrder = false;
+        OrderChanged?.Invoke(ids);
+    }
+
     private static bool HitHeader(Visual source, out WidgetPanel panel, out Panel header) {
         panel = null!;
         header = null!;
@@ -328,21 +244,6 @@ public class WidgetBoard : Panel {
             }
         }
         return false;
-    }
-
-    // Reached from release and from lost capture alike, so the lifted state can never stick.
-    private void EndDrag() {
-        _hint?.Hide();
-        _hint = null;
-        _draggedPanel?.Classes.Remove("dragging");
-        if (_dragged is not null)
-            _dragged.ZIndex = 0;
-        _draggedPanel = null;
-        _dragged = null;
-        _dragging = false;
-        _dragPending = false;
-        InvalidateMeasure();
-        InvalidateArrange();
     }
 
     private void EnsureOrder() {
@@ -400,8 +301,8 @@ public class WidgetBoard : Panel {
 
                 // The dragged widget keeps the width it was picked up at, so its content cannot
                 // re-wrap under the cursor while the rows behind it re-pack.
-                var measureWidth = _dragging && ReferenceEquals(child, _dragged)
-                    ? _dragSize.Width
+                var measureWidth = ReferenceEquals(child, _drag.Dragged)
+                    ? _drag.DragSize.Width
                     : rowWidths[i];
                 child.Measure(new Size(measureWidth, double.PositiveInfinity));
                 rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
@@ -440,16 +341,14 @@ public class WidgetBoard : Panel {
                 var box = new Rect(x, y, rowWidths[i], _rowHeights[r]);
                 _slotRects[index] = new Rect2(box.X, box.Y, box.Width, box.Height);
 
-                // Follows the pointer, keeping its place in Children so nothing is reparented and
-                // no binding is torn down. Anchored to the pointer rather than offset from its slot:
-                // the previewed slot jumps a whole column the moment a reorder commits, which threw
-                // the widget out from under the cursor. The slot keeps its real size, and is what the
-                // drop hint outlines.
-                if (_dragging && ReferenceEquals(_visible[index], _dragged)) {
-                    _hint?.ShowFrom(this, box);
-                    var drag = WidgetBoardLayout.DragRect(_dragSize.Width, _dragSize.Height,
-                                                          _pointer.X, _pointer.Y, _grabX, _grabY);
-                    box = new Rect(drag.Left, drag.Top, drag.Width, drag.Height);
+                // Follows the pointer, keeping its place in Children so nothing is reparented and no
+                // binding is torn down. Anchored to the pointer rather than offset from its slot: the
+                // previewed slot jumps a whole column the moment a reorder commits, which threw the
+                // widget out from under the cursor. The slot keeps its real size, and is what the drop
+                // hint outlines.
+                if (ReferenceEquals(_visible[index], _drag.Dragged)) {
+                    _drag.ShowHint(box);
+                    box = _drag.DragBox();
                 }
 
                 _visible[index].Arrange(box);
@@ -467,7 +366,7 @@ public class WidgetBoard : Panel {
     private void CollectVisible() {
         EnsureOrder();
         _visible.Clear();
-        foreach (var index in _dragging ? _preview : _order)
+        foreach (var index in _drag.IsDragging ? _preview : _order)
             if (index < Children.Count && Children[index].IsVisible)
                 _visible.Add(Children[index]);
     }

@@ -68,7 +68,11 @@ stays in its tab folder.
                                sampling pages implement it; Hardware/Toolkit/Settings/File Explorer own
                                no timer and do not)
       IReorderablePage.cs     (marker: a page whose widget order the user drags and the shell
-                               persists. The page only holds the order; the shell reads and writes it)
+                               persists. The page only holds the orders; the shell reads and writes
+                               them. PLURAL on purpose — Performance reorders its rail and its stat
+                               tiles separately, and the tiles keep one order per device kind)
+      SavedOrder.cs           (one of those orders: the key it saves under, the ids, and a change
+                               signal. Bound two-way to the panel that lays the strip out)
       SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
                                a page's timers care about, so the five do not each hand-roll the pair.
                                STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
@@ -192,12 +196,20 @@ stays in its tab folder.
 ```
       /Layout
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
-                                 so surplus buys a column, and drags by the header to reorder. The drag
+                                 so surplus buys a column, and drags by the header to reorder. Owns the
+                                 layout half of the drag only — the pointer half is ReorderDrag's)
+        ReorderDrag.cs          (drag-to-reorder for any panel that can say where its children are:
+                                 pointer, threshold, cursor, previewed order and drop hint. The drag
                                  cursor is set HERE, not in Widgets.axaml: a style cannot tell whether a
                                  panel is in a board, and one that could not advertised a drag on three
-                                 tabs that have none. A dragged widget is anchored to the pointer and
+                                 tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed)
+        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
+                                 handle is, and the previewed order. Reorder is always a permutation of
+                                 the panel's own index list — a panel that reordered Children instead
+                                 would re-enter its layout and, under an ItemsControl, fight the
+                                 generator)
         WidgetBoardLayout.cs    (its arithmetic + DropIndex + DragRect — no Avalonia types, so it tests
                                  without layout)
         DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's

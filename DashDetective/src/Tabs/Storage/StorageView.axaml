@@ -94,7 +94,7 @@
 
     <!-- One board for the whole page rather than a stack of fixed rows: a wide window buys another
          column instead of stretching every panel. -->
-    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding WidgetOrder, Mode=TwoWay}">
+    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding Widgets.Order, Mode=TwoWay}">
 
         <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
         <ItemsControl ItemsSource="{Binding Drives}" layout:WidgetBoard.Stretch="True">

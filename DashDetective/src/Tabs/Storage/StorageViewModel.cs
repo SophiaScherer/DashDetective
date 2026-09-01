@@ -34,25 +34,10 @@ namespace DashDetective.Tabs.Storage;
 /// rather than restarting the chart.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable, IReorderablePage {
-    /// <summary>Key this page's widget order is persisted under.</summary>
-    public string PageKey => "storage";
+    /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
+    public SavedOrder Widgets { get; } = new("storage");
 
-    private IReadOnlyList<string> _widgetOrder = [];
-
-    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
-    public IReadOnlyList<string> WidgetOrder {
-        get => _widgetOrder;
-        set {
-            if (ReferenceEquals(_widgetOrder, value))
-                return;
-            _widgetOrder = value ?? [];
-            OnPropertyChanged();
-            WidgetOrderChanged?.Invoke();
-        }
-    }
-
-    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
-    public event Action? WidgetOrderChanged;
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
 
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
     // (≈ every 15 s at the default cadence) rather than every tick.
