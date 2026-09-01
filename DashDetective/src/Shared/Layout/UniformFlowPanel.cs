@@ -1,9 +1,23 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Data;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Shared.Layout;
+
+/// <summary>What part of an item a drag may start from. A strip is a layout before it is a control,
+/// so <see cref="None"/> is the default and reordering is asked for.</summary>
+public enum ReorderGrip {
+    /// <summary>Not reorderable.</summary>
+    None,
+
+    /// <summary>Anywhere on the item, minus any control inside it that takes clicks of its own.</summary>
+    Item,
+}
 
 /// <summary>
 /// Lays children out in equal-width columns that wrap to a new row rather than shrinking past
@@ -13,8 +27,13 @@ namespace DashDetective.Shared.Layout;
 /// The panel owns the gutter via <see cref="ColumnSpacing"/> / <see cref="RowSpacing"/>, so call
 /// sites drop the negative-margin-on-panel idiom — that cancellation assumes a fixed column count
 /// and stops working once the count varies.
+///
+/// With <see cref="Reorder"/> set it also drags to reorder, through the same
+/// <see cref="ReorderDrag"/> a <see cref="WidgetBoard"/> uses. Unlike a board, its children are
+/// usually generated from a collection, so the ids come off the item view models and the order is
+/// re-applied whenever the generator rebuilds them.
 /// </summary>
-public class UniformFlowPanel : Panel {
+public class UniformFlowPanel : Panel, IReorderablePanel {
     /// <summary>Narrowest a column may get before the panel wraps to another row. 0 disables wrapping.</summary>
     public static readonly StyledProperty<double> MinItemWidthProperty =
         AvaloniaProperty.Register<UniformFlowPanel, double>(nameof(MinItemWidth));
@@ -29,14 +48,33 @@ public class UniformFlowPanel : Panel {
     public static readonly StyledProperty<double> RowSpacingProperty =
         AvaloniaProperty.Register<UniformFlowPanel, double>(nameof(RowSpacing));
 
+    /// <summary>What may start a drag here. Read once, when the panel enters the tree — set it in
+    /// markup, not from a binding that changes later.</summary>
+    public static readonly StyledProperty<ReorderGrip> ReorderProperty =
+        AvaloniaProperty.Register<UniformFlowPanel, ReorderGrip>(nameof(Reorder));
+
+    /// <summary>The item ids in display order, two-way so a drag reports its result back to the page
+    /// that persists it. Ids the panel does not have are ignored; ones it has that are missing keep
+    /// their declared position.</summary>
+    public static readonly StyledProperty<IReadOnlyList<string>?> OrderProperty =
+        AvaloniaProperty.Register<UniformFlowPanel, IReadOnlyList<string>?>(
+            nameof(Order), defaultBindingMode: BindingMode.TwoWay);
+
     private readonly List<Control> _visible = new();
     private readonly List<double> _rowHeights = new();
+    private readonly List<int> _rowEnds = new();
+    private readonly ChildOrder _childOrder = new();
+    private readonly ReorderDrag _drag;
+    private Rect2[] _slotRects = Array.Empty<Rect2>();
     private int _columns = 1;
+    private bool _applyingOrder;
 
     static UniformFlowPanel() {
         AffectsMeasure<UniformFlowPanel>(MinItemWidthProperty, MaxColumnsProperty,
                                          ColumnSpacingProperty, RowSpacingProperty);
     }
+
+    public UniformFlowPanel() => _drag = new ReorderDrag(this);
 
     public double MinItemWidth {
         get => GetValue(MinItemWidthProperty);
@@ -60,9 +98,92 @@ public class UniformFlowPanel : Panel {
         set => SetValue(RowSpacingProperty, value);
     }
 
+    public ReorderGrip Reorder {
+        get => GetValue(ReorderProperty);
+        set => SetValue(ReorderProperty, value);
+    }
+
+    public IReadOnlyList<string>? Order {
+        get => GetValue(OrderProperty);
+        set => SetValue(OrderProperty, value);
+    }
+
+    /// <summary>Raised with the new id order once a drag commits.</summary>
+    public event Action<IReadOnlyList<string>>? OrderChanged;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
+        base.OnPropertyChanged(change);
+        if (change.Property == OrderProperty && !_applyingOrder && ApplySavedOrder())
+            InvalidateMeasure();
+    }
+
+    // ----- Drag to reorder: the panel's half of it. The pointer is ReorderDrag's. -----
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnAttachedToVisualTree(e);
+        if (Reorder != ReorderGrip.None)
+            _drag.Attach();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
+        if (Reorder != ReorderGrip.None)
+            _drag.Detach();
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    Panel IReorderablePanel.Surface => this;
+
+    IReadOnlyList<Control> IReorderablePanel.Items => _visible;
+
+    /// <summary>The whole item is the handle, minus anything inside it that takes clicks of its own —
+    /// a press on a button in a card is aimed at the button.</summary>
+    public bool TryGetHandle(Visual source, out ReorderHandle handle) {
+        handle = default;
+        if (Reorder != ReorderGrip.Item)
+            return false;
+
+        foreach (var node in source.GetSelfAndVisualAncestors()) {
+            if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this)) {
+                if (!_visible.Contains(candidate))
+                    return false;
+                handle = new ReorderHandle(candidate, candidate, candidate);
+                return true;
+            }
+
+            // Below the item root, so this is a control the press belongs to rather than the card.
+            if (node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
+                return false;
+        }
+
+        return false;
+    }
+
+    public int DropIndexAt(Point pointer) =>
+        WidgetBoardLayout.DropIndex(
+            _slotRects.AsSpan(0, _visible.Count),
+            System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
+            pointer.X, pointer.Y);
+
+    public void BeginPreview() => _childOrder.BeginPreview();
+
+    public bool PreviewMove(Control item, int target) =>
+        _childOrder.Move(Children.IndexOf(item), target, IsChildVisible);
+
+    public void CommitPreview() {
+        var ids = _childOrder.Commit(DeclaredIds());
+        if (ids.Count == 0)
+            return;
+
+        _applyingOrder = true;
+        Order = ids;
+        _applyingOrder = false;
+        OrderChanged?.Invoke(ids);
+    }
+
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();
         _rowHeights.Clear();
+        _rowEnds.Clear();
         if (_visible.Count == 0) {
             _columns = 1;
             return default;
@@ -81,16 +202,23 @@ public class UniformFlowPanel : Panel {
         var widest = 0.0;
         for (var i = 0; i < _visible.Count; i++) {
             var child = _visible[i];
-            child.Measure(new Size(measureWidth, double.PositiveInfinity));
+
+            // The dragged item keeps the width it was picked up at, so its content cannot re-wrap
+            // under the cursor while the columns behind it reflow.
+            var childWidth = ReferenceEquals(child, _drag.Dragged) ? _drag.DragSize.Width : measureWidth;
+            child.Measure(new Size(childWidth, double.PositiveInfinity));
             rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
             widest = Math.Max(widest, child.DesiredSize.Width);
             if ((i + 1) % _columns == 0) {
                 _rowHeights.Add(rowHeight);
+                _rowEnds.Add(i + 1);
                 rowHeight = 0;
             }
         }
-        if (_visible.Count % _columns != 0)
+        if (_visible.Count % _columns != 0) {
             _rowHeights.Add(rowHeight);
+            _rowEnds.Add(_visible.Count);
+        }
 
         if (unconstrained)
             itemWidth = widest;
@@ -100,8 +228,8 @@ public class UniformFlowPanel : Panel {
             height += h;
         height += RowSpacing * Math.Max(0, _rowHeights.Count - 1);
 
-        var width = itemWidth * _columns + ColumnSpacing * (_columns - 1);
-        return new Size(width, height);
+        var totalWidth = itemWidth * _columns + ColumnSpacing * (_columns - 1);
+        return new Size(totalWidth, height);
     }
 
     protected override Size ArrangeOverride(Size finalSize) {
@@ -119,8 +247,19 @@ public class UniformFlowPanel : Panel {
                 var index = row * _columns + column;
                 if (index >= _visible.Count)
                     break;
+
                 var x = column * (itemWidth + ColumnSpacing);
-                _visible[index].Arrange(new Rect(x, y, itemWidth, rowHeight));
+                var box = new Rect(x, y, itemWidth, rowHeight);
+                _slotRects[index] = new Rect2(box.X, box.Y, box.Width, box.Height);
+
+                // The dragged item follows the pointer instead, and the slot it left is what the drop
+                // hint outlines. See WidgetBoard for why it is anchored to the pointer.
+                if (ReferenceEquals(_visible[index], _drag.Dragged)) {
+                    _drag.ShowHint(box);
+                    box = _drag.DragBox();
+                }
+
+                _visible[index].Arrange(box);
             }
             y += rowHeight + RowSpacing;
         }
@@ -130,9 +269,28 @@ public class UniformFlowPanel : Panel {
 
     /// <summary>Collapsed children are skipped entirely so one never occupies a column.</summary>
     private void CollectVisible() {
+        // The generator rebuilds these whenever its source changes, which resets the order — so put
+        // the saved one back before laying anything out.
+        if (_childOrder.Sync(Children.Count))
+            ApplySavedOrder();
+
         _visible.Clear();
+        foreach (var index in _childOrder.Shown(_drag.IsDragging))
+            if (index < Children.Count && Children[index].IsVisible)
+                _visible.Add(Children[index]);
+
+        if (_slotRects.Length < _visible.Count)
+            _slotRects = new Rect2[_visible.Count];
+    }
+
+    private bool ApplySavedOrder() => _childOrder.ApplySaved(Order, DeclaredIds());
+
+    private bool IsChildVisible(int index) => index < Children.Count && Children[index].IsVisible;
+
+    private List<string> DeclaredIds() {
+        var ids = new List<string>(Children.Count);
         foreach (var child in Children)
-            if (child.IsVisible)
-                _visible.Add(child);
+            ids.Add(WidgetIds.Of(child));
+        return ids;
     }
 }

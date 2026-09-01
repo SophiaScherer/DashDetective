@@ -221,7 +221,17 @@ stays in its tab folder.
                                  to — the Processes columns want the same semantics)
         OrderResolver.cs        (that resolver, knowing only ids: drop what is gone, keep what is new
                                  beside the neighbours its author put it next to)
-        UniformFlowPanel, FlowLayout, GridColumns, TableColumns, WeightedRowLayout
+        ChildOrder.cs           (the permutation both reorderable panels share: settled order, previewed
+                                 order, and the mapping from a drop index — which counts only what is on
+                                 screen — into an order that holds every child. No Avalonia types, so it
+                                 tests without a layout pass)
+        WidgetIds.cs            (how a panel names a child: the control's own id, or its item view
+                                 model's where the children are generated)
+        UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
+                                 With Reorder set it also drags to reorder, through the same ReorderDrag
+                                 a board uses — its children are usually generated, so the order is
+                                 re-applied every time the generator rebuilds them)
+        FlowLayout, GridColumns, TableColumns, WeightedRowLayout
 ```
 
 ## `src/Shared/Controls`

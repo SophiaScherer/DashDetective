@@ -60,10 +60,7 @@ public class WidgetBoard : Panel, IReorderablePanel {
     private double[] _rowHeights = Array.Empty<double>();
     private Rect2[] _slotRects = Array.Empty<Rect2>();
 
-    // _order is the board's ordering of Children, _preview the order being tried mid-drag. A drag
-    // never mutates Children: that is re-entrant mid-layout and would detach a live Sparkline.
-    private readonly List<int> _order = new();
-    private readonly List<int> _preview = new();
+    private readonly ChildOrder _childOrder = new();
     private readonly ReorderDrag _drag;
     private bool _applyingOrder;
 
@@ -94,35 +91,11 @@ public class WidgetBoard : Panel, IReorderablePanel {
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
         base.OnPropertyChanged(change);
-        if (change.Property == OrderProperty && !_applyingOrder)
-            ApplySavedOrder(Order);
+        if (change.Property == OrderProperty && !_applyingOrder && ApplySavedOrder())
+            InvalidateMeasure();
     }
 
-    /// <summary>Reorders the board to a saved order, keeping any widget the save does not name at its
-    /// declared position.</summary>
-    private void ApplySavedOrder(IReadOnlyList<string>? saved) {
-        if (saved is null || saved.Count == 0 || Children.Count == 0)
-            return;
-
-        var declared = new List<string>(Children.Count);
-        foreach (var child in Children)
-            declared.Add(WidgetIdOf(child));
-
-        var resolved = WidgetOrders.Resolve(declared.FindAll(id => id.Length > 0), saved);
-        var position = new Dictionary<string, int>();
-        for (var i = 0; i < resolved.Count; i++)
-            position[resolved[i]] = i;
-
-        // A child with no id (a card strip) keeps its declared index, so it cannot be dragged past.
-        EnsureOrder();
-        _order.Sort((a, b) => Key(a).CompareTo(Key(b)));
-        InvalidateMeasure();
-
-        double Key(int index) =>
-            declared[index].Length > 0 && position.TryGetValue(declared[index], out var rank)
-                ? rank
-                : index;
-    }
+    private bool ApplySavedOrder() => _childOrder.ApplySaved(Order, DeclaredIds());
 
     public static double GetWeight(Control control) => control.GetValue(WeightProperty);
 
@@ -182,43 +155,13 @@ public class WidgetBoard : Panel, IReorderablePanel {
             System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_rowEnds),
             pointer.X, pointer.Y);
 
-    public void BeginPreview() {
-        _preview.Clear();
-        _preview.AddRange(_order);
-    }
+    public void BeginPreview() => _childOrder.BeginPreview();
 
-    public bool PreviewMove(Control item, int target) {
-        var child = Children.IndexOf(item);
-        var from = _preview.IndexOf(child);
-        if (from < 0)
-            return false;
-
-        _preview.RemoveAt(from);
-        var to = PreviewPositionOf(target);
-        _preview.Insert(to, child);
-        return to != from;
-    }
-
-    /// <summary>Where in the previewed order a widget dropped at this position among the VISIBLE ones
-    /// belongs. The two part company the moment a widget is collapsed: the order holds every child,
-    /// while a drop index counts only what is on screen.</summary>
-    private int PreviewPositionOf(int visibleTarget) {
-        var seen = 0;
-        for (var i = 0; i < _preview.Count; i++) {
-            if (_preview[i] >= Children.Count || !Children[_preview[i]].IsVisible)
-                continue;
-            if (seen == visibleTarget)
-                return i;
-            seen++;
-        }
-        return _preview.Count;
-    }
+    public bool PreviewMove(Control item, int target) =>
+        _childOrder.Move(Children.IndexOf(item), target, IsChildVisible);
 
     public void CommitPreview() {
-        _order.Clear();
-        _order.AddRange(_preview);
-
-        var ids = _visible.Select(WidgetIdOf).Where(id => id.Length > 0).ToList();
+        var ids = _childOrder.Commit(DeclaredIds());
         if (ids.Count == 0)
             return;
 
@@ -246,14 +189,6 @@ public class WidgetBoard : Panel, IReorderablePanel {
         return false;
     }
 
-    private void EnsureOrder() {
-        if (_order.Count == Children.Count)
-            return;
-        _order.Clear();
-        for (var i = 0; i < Children.Count; i++)
-            _order.Add(i);
-    }
-
     /// <summary>The board's own child containing this control — not always the control itself, since
     /// a ConsolePanel wraps the WidgetPanel whose header was pressed.</summary>
     private Control? BoardChildOf(Control control) {
@@ -262,9 +197,6 @@ public class WidgetBoard : Panel, IReorderablePanel {
                 return candidate;
         return null;
     }
-
-    private static string WidgetIdOf(Control control) =>
-        control is IWidgetIdentity identity ? identity.WidgetId ?? "" : "";
 
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();
@@ -364,11 +296,22 @@ public class WidgetBoard : Panel, IReorderablePanel {
 
     /// <summary>Collapsed children are skipped, so a hidden widget takes no slot.</summary>
     private void CollectVisible() {
-        EnsureOrder();
+        if (_childOrder.Sync(Children.Count))
+            ApplySavedOrder();
+
         _visible.Clear();
-        foreach (var index in _drag.IsDragging ? _preview : _order)
+        foreach (var index in _childOrder.Shown(_drag.IsDragging))
             if (index < Children.Count && Children[index].IsVisible)
                 _visible.Add(Children[index]);
+    }
+
+    private bool IsChildVisible(int index) => index < Children.Count && Children[index].IsVisible;
+
+    private List<string> DeclaredIds() {
+        var ids = new List<string>(Children.Count);
+        foreach (var child in Children)
+            ids.Add(WidgetIds.Of(child));
+        return ids;
     }
 
     private void BuildSlots() {
