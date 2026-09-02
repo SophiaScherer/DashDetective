@@ -1009,7 +1009,7 @@ dragged by a card or by a marked grip.
 | What | Handle | Saved under |
 |---|---|---|
 | Dashboard / Network / Storage widgets | the header | `dashboard`, `network`, `storage` |
-| Storage drive cards | the card | `storage.drives` |
+| Storage drive cards | the card | `storage` — the same order as the panels they move among |
 | Hardware component cards | the card | `hardware` |
 | Processes summary tiles | the tile | `processes.summary` |
 | Performance device rail | a grip per row | `performance.resources` |
@@ -1033,7 +1033,12 @@ load-bearing:
    generator. `ChildOrder` owns that list for both panels.
 5. **A drop index counts what is on screen; an order holds every child.** The two agree until a widget
    is collapsed, and then disagree silently — `ChildOrder.Move` maps between them.
-6. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
+6. **A page whose items must move among each other is ONE list, not a strip inside a board.** A
+   strip's items are grandchildren, so the only order they can join is the strip's — Storage's drive
+   cards could not leave their band. Storage drives its board from one `PageItems` collection instead:
+   the drives are items already, and the two panels are markers (`StorageSection`) carrying the page
+   their markup binds through, since a board child's DataContext is its item.
+7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right.

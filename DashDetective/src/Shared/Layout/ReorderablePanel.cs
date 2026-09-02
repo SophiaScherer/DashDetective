@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Data;
 using System;
 using System.Collections.Generic;
@@ -62,6 +63,12 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     /// <summary>Whether this child is one of the ones on screen. A press on a collapsed child, or on
     /// something that is not a child at all, is not a drag.</summary>
     protected bool IsShown(Control child) => _visible.Contains(child);
+
+    /// <summary>What a child actually is. An ItemsControl hands the panel a ContentPresenter wrapped
+    /// around the real item, and everything authored on that item — its slot properties, its grip, the
+    /// picked-up look — belongs to what is inside the wrapper.</summary>
+    protected static Control Inner(Control child) =>
+        child is ContentPresenter { Child: Control content } ? content : child;
 
     public int SlotAt(Point point) =>
         WidgetBoardLayout.SlotAt(_slotRects.AsSpan(0, _visible.Count),

@@ -197,7 +197,10 @@ stays in its tab folder.
       /Layout
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
                                  so surplus buys a column, and drags by the header to reorder. A
-                                 ReorderablePanel, so all it owns is the packing and the header rule)
+                                 ReorderablePanel, so all it owns is the packing and the grip rule.
+                                 Children may be generated: it reads a child's slot properties and its
+                                 grip THROUGH the presenter an ItemsControl wraps around the item, since
+                                 that is where the markup authored them)
         ReorderDrag.cs          (drag-to-reorder for any panel that can say where its children are:
                                  pointer, threshold, cursor, previewed order and drop hint. The drag
                                  cursor is set HERE, not in Widgets.axaml: a style cannot tell whether a
@@ -1385,11 +1388,13 @@ stays in its tab folder.
 
 ```
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
-                                (LIVE — read-only drives/health view: a top row of DriveCard summary
-                                 cards (reorderable within their strip, saved under "storage.drives";
-                                 the strip itself is one pinned board row, so a card never leaves it)
-                                 over a Partitions table (PartitionRow item VMs) + a Disk Activity
-                                 card (shared Sparkline, ChartStorage key). Page-scrolls like Network
+                                (LIVE — read-only drives/health view: DriveCard summary cards over a
+                                 Partitions table (PartitionRow item VMs) + a Disk Activity
+                                 card (shared Sparkline, ChartStorage key). ONE ItemsControl over
+                                 PageItems with the WidgetBoard as its ItemsPanel, so a drive card is a
+                                 board child like the panels and reorders among them — the two panels
+                                 are StorageSection markers because a board child's DataContext is its
+                                 item and markup has none. Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
                                  VolumeProvider; Disk Activity + Queue from the page-local throughput sampler
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp

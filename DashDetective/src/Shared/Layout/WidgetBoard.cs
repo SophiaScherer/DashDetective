@@ -38,6 +38,12 @@ public class WidgetBoard : ReorderablePanel {
     public static readonly AttachedProperty<bool> StretchProperty =
         AvaloniaProperty.RegisterAttached<WidgetBoard, Control, bool>("Stretch");
 
+    /// <summary>What may start a drag on this child: its header, or — for a card that has none — its
+    /// whole surface. Those are the two a board understands.</summary>
+    public static readonly AttachedProperty<ReorderGrip> DragGripProperty =
+        AvaloniaProperty.RegisterAttached<WidgetBoard, Control, ReorderGrip>(
+            "DragGrip", ReorderGrip.Header);
+
     public static readonly StyledProperty<double> ColumnSpacingProperty =
         AvaloniaProperty.Register<WidgetBoard, double>(nameof(ColumnSpacing));
 
@@ -84,46 +90,52 @@ public class WidgetBoard : ReorderablePanel {
 
     public static void SetStretch(Control control, bool value) => control.SetValue(StretchProperty, value);
 
-    /// <summary>A press may drag from a header only, and must miss every control in it — Storage keeps
-    /// a drive picker up there, which a drag would otherwise swallow.</summary>
+    public static ReorderGrip GetDragGrip(Control control) => control.GetValue(DragGripProperty);
+
+    public static void SetDragGrip(Control control, ReorderGrip value) =>
+        control.SetValue(DragGripProperty, value);
+
+    /// <summary>
+    /// What this press may drag. A widget is dragged by its header and must miss every control in it —
+    /// Storage keeps a drive picker up there, which a drag would otherwise swallow. A child marked
+    /// <see cref="ReorderGrip.Item"/> has no header to offer and is dragged by its whole surface.
+    ///
+    /// One walk up to the board's own child, which is not always the pressed panel: a ConsolePanel
+    /// wraps the WidgetPanel whose header was pressed, and a generated item wraps it in a presenter.
+    /// </summary>
     public override bool TryGetHandle(Visual source, out ReorderHandle handle) {
         handle = default;
-        if (!HitHeader(source, out var panel, out var header))
-            return false;
 
-        var child = BoardChildOf(panel);
-        if (child is null || !IsShown(child))
-            return false;
+        WidgetPanel? panel = null;
+        Panel? header = null;
+        var blocked = false;
 
-        handle = new ReorderHandle(child, panel, header);
-        return true;
-    }
-
-    private static bool HitHeader(Visual source, out WidgetPanel panel, out Panel header) {
-        panel = null!;
-        header = null!;
         foreach (var node in source.GetSelfAndVisualAncestors()) {
-            switch (node) {
-                case Button or ToggleButton or TextBox or ComboBox or ScrollBar:
-                    return false;
-                case Panel { Name: "PART_Header" } hit:
-                    header = hit;
-                    break;
-                case WidgetPanel found:
-                    panel = found;
-                    return header is not null;
-            }
-        }
-        return false;
-    }
+            if (node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
+                blocked = true;
+            else if (node is Panel { Name: "PART_Header" } hit)
+                header ??= hit;
+            else if (node is WidgetPanel found)
+                panel ??= found;
 
-    /// <summary>The board's own child containing this control — not always the control itself, since
-    /// a ConsolePanel wraps the WidgetPanel whose header was pressed.</summary>
-    private Control? BoardChildOf(Control control) {
-        for (Visual? node = control; node is not null; node = node.GetVisualParent())
-            if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this))
-                return candidate;
-        return null;
+            if (node is not Control child || !ReferenceEquals(child.GetVisualParent(), this))
+                continue;
+            if (blocked || !IsShown(child))
+                return false;
+
+            if (GetDragGrip(Inner(child)) == ReorderGrip.Item) {
+                handle = new ReorderHandle(child, Inner(child), child);
+                return true;
+            }
+
+            if (header is null || panel is null)
+                return false;
+
+            handle = new ReorderHandle(child, panel, header);
+            return true;
+        }
+
+        return false;
     }
 
     protected override Size MeasureOverride(Size availableSize) {
@@ -217,7 +229,9 @@ public class WidgetBoard : ReorderablePanel {
         }
 
         for (var i = 0; i < Visible.Count; i++) {
-            var child = Visible[i];
+            // Read through the wrapper: a generated child's widths and breaks are authored on the item
+            // in the template, which is what a presenter is holding.
+            var child = Inner(Visible[i]);
             _slots[i] = new WidgetSlot(
                 Math.Max(0, GetWeight(child)),
                 child.MinWidth,

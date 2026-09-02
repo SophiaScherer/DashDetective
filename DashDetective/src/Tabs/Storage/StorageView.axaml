@@ -92,210 +92,218 @@
         </Style>
     </UserControl.Styles>
 
-    <!-- One board for the whole page rather than a stack of fixed rows: a wide window buys another
-         column instead of stretching every panel. -->
-    <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding Widgets.Order, Mode=TwoWay}">
+    <!-- One board for the whole page, over ONE list: the drive cards and the two panels are all
+         board children, so a drive can be dragged among the panels instead of being stuck in a strip
+         of its own. The panels are markers (StorageSection) because a board child's DataContext is its
+         item, and markup has none. -->
+    <ItemsControl ItemsSource="{Binding PageItems}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}"
+                                    RowSpacing="{StaticResource SpacePage}"
+                                    Order="{Binding Widgets.Order, Mode=TwoWay}"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.DataTemplates>
 
-        <!-- ===== Row 1: drive summary cards (one per physical drive) ===== -->
-        <ItemsControl ItemsSource="{Binding Drives}" layout:WidgetBoard.Stretch="True">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <!-- Wraps below 280px per card, where the used/free split and the
-                         read/write/temp row stop fitting on their lines. -->
-                    <layout:UniformFlowPanel MinItemWidth="280" ColumnSpacing="16" RowSpacing="16"
-                                             DragGrip="Item"
-                                             Order="{Binding DriveOrder.Order, Mode=TwoWay}"/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:DriveCard">
-                    <!-- Tag carries the physical disk number so a reveal can find this card without the
-                         view keeping a parallel list — the SettingsView.FindRow arrangement. -->
-                    <Border Classes="panel revealFlash" Tag="{Binding DiskNumber}">
-                        <StackPanel Spacing="0">
-                            <!-- Header: name + health pill. -->
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
-                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14"
-                                           FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                <Border Grid.Column="1" Classes="healthPill"
-                                        Background="{Binding HealthBackground}">
-                                    <TextBlock Text="{Binding Health}" Foreground="{Binding HealthForeground}"/>
-                                </Border>
-                            </Grid>
-                            <!-- Model subtitle. -->
-                            <TextBlock Text="{Binding Model}" FontSize="11.5" Margin="0,0,0,12"
-                                       Foreground="{DynamicResource TextSubtle}"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <!-- Usage bar. -->
-                            <ProgressBar Classes="usage" Value="{Binding UsagePercent}"
-                                         Foreground="{Binding BarBrush}" Margin="0,0,0,7"/>
-                            <!-- Used / free split. -->
-                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
-                                <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondary}">
-                                    <Run Text="{Binding Used}"/><Run Text=" used"/>
-                                </TextBlock>
-                                <TextBlock Grid.Column="1" FontSize="12" HorizontalAlignment="Right"
-                                           Foreground="{DynamicResource TextSecondary}">
-                                    <Run Text="{Binding Free}"/><Run Text=" free"/>
-                                </TextBlock>
-                            </Grid>
-                            <!-- Read / Write / Temp readouts (space-between). -->
-                            <Grid ColumnDefinitions="*,*,*">
-                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                    <TextBlock Classes="metricLabel" Text="Read "/>
-                                    <TextBlock Classes="metricValue" Text="{Binding Read}"
-                                               Foreground="{StaticResource Blue}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Classes="metricLabel" Text="Write "/>
-                                    <TextBlock Classes="metricValue" Text="{Binding Write}"
-                                               Foreground="{StaticResource Orange}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <TextBlock Classes="metricLabel" Text="Temp "/>
-                                    <TextBlock Classes="metricValue" Text="{Binding Temp}"
-                                               Foreground="{StaticResource Green}"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- ===== Row 2: Partitions table (left) · Disk Activity (right). The table keeps the wider
-             share while both clear their minimums; below that they stack. -->
-            <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="440"
-                                  layout:WidgetBoard.MaxSlotWidth="900"
-                                  WidgetId="storage.partitions" Title="Partitions">
-                <!-- Gutter 0: this table grows with the page rather than scrolling, so there is no
-                     scrollbar to inset for. -->
-                <controls:WidgetTable Gutter="0">
-                    <controls:WidgetTable.Header>
-                        <!-- Vol · Label · File System · Type · Capacity · Free. The rows below share this
-                             exact column template so the columns stay aligned. -->
-                        <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}"
-                              Margin="0,0,0,6">
-                            <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
-                            <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
-                            <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
-                            <TextBlock Grid.Column="3" Classes="colHead" Text="TYPE"/>
-                            <TextBlock Grid.Column="4" Classes="colHead" Text="CAPACITY"/>
-                            <TextBlock Grid.Column="5" Classes="colHead" Text="FREE" TextAlignment="Right"/>
+            <!-- ===== One drive. Dragged by its whole surface: it has a header of its own making, not a
+                 WidgetPanel's, so there is no PART_Header to grab. Capped at 420 so a wide window buys a
+                 second and third card rather than one enormous one. -->
+            <DataTemplate DataType="vm:DriveCard">
+                <!-- Tag carries the physical disk number so a reveal can find this card without the
+                     view keeping a parallel list — the SettingsView.FindRow arrangement. -->
+                <Border Classes="panel revealFlash" Tag="{Binding DiskNumber}"
+                        MinWidth="280" layout:WidgetBoard.MaxSlotWidth="420"
+                        layout:WidgetBoard.DragGrip="Item">
+                    <StackPanel Spacing="0">
+                        <!-- Header: name + health pill. -->
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <Border Grid.Column="1" Classes="healthPill"
+                                    Background="{Binding HealthBackground}">
+                                <TextBlock Text="{Binding Health}" Foreground="{Binding HealthForeground}"/>
+                            </Border>
                         </Grid>
-                    </controls:WidgetTable.Header>
-                    <ItemsControl ItemsSource="{Binding Partitions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PartitionRow">
-                                <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
-                                        Padding="0,9">
-                                    <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}">
-                                        <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
-                                                   FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"
-                                                   Foreground="{DynamicResource TextPrimary}"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="12.5"
-                                                   Foreground="{DynamicResource TextMuted}"/>
-                                        <TextBlock Grid.Column="3" Text="{Binding Type}" FontSize="12.5"
-                                                   Foreground="{DynamicResource TextMuted}"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Grid.Column="4" Text="{Binding Capacity}" FontSize="12.5"
-                                                   Foreground="{DynamicResource TextSecondary}"/>
-                                        <TextBlock Grid.Column="5" Text="{Binding Free}" FontSize="12.5"
-                                                   TextAlignment="Right"
-                                                   Foreground="{DynamicResource TextSecondary}"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </controls:WidgetTable>
-            </controls:WidgetPanel>
-
-            <!-- Disk Activity: the amber disk series on the shared Sparkline (fixed 0–100 axis + gridded
-                 area fill, like the Dashboard), over three readouts. Chart, title and readouts all describe
-                 the drive card selected above — one real physical disk, not the _Total average. -->
-            <controls:WidgetPanel WidgetId="storage.activity" MinWidth="280"
-                                  layout:WidgetBoard.MaxSlotWidth="620" Title="Disk Activity"
-                                  Subtitle="{Binding DiskChartCaption}">
-                <!-- The drive on show belongs to the title, so it sits in HeaderLead rather than at the
-                     far end of the row. With several drives the name becomes a chevron toggle that lists
-                     the others; with one there is nothing to switch to, so it stays text. -->
-                <controls:WidgetPanel.HeaderLead>
-                    <StackPanel Orientation="Horizontal" Spacing="2">
-                        <TextBlock Classes="panelTitle" Text="—" Margin="6,0" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextMuted}"/>
-                        <TextBlock Classes="panelTitle" VerticalAlignment="Center"
-                                   IsVisible="{Binding !HasMultipleDrives}"
-                                   Text="{Binding SelectedDrive.Name}"/>
-                        <Panel IsVisible="{Binding HasMultipleDrives}">
-                            <ToggleButton x:Name="DriveButton" Classes="drivePick"
-                                          IsChecked="{Binding DrivePickerOpen, Mode=TwoWay}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="{Binding SelectedDrive.Name}"/>
-                                    <TextBlock Text="▾"/>
-                                </StackPanel>
-                            </ToggleButton>
-                            <!-- Light dismiss closes it on an outside click; picking a drive closes it
-                                 through DrivePickerOpen, which SelectDrive clears. -->
-                            <Popup PlacementTarget="{Binding #DriveButton}"
-                                   Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
-                                   IsLightDismissEnabled="True"
-                                   IsOpen="{Binding DrivePickerOpen, Mode=TwoWay}">
-                                <Border Background="{DynamicResource CardBackground}"
-                                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                        CornerRadius="8" Padding="6" MinWidth="200"
-                                        BoxShadow="{StaticResource ShadowPopup}">
-                                    <ItemsControl ItemsSource="{Binding Drives}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:DriveCard">
-                                                <Button Classes="bare" Command="{Binding SelectCommand}"
-                                                        HorizontalAlignment="Stretch"
-                                                        HorizontalContentAlignment="Stretch">
-                                                    <Border Classes="driveOption"
-                                                            Classes.selected="{Binding IsSelected}">
-                                                        <Grid ColumnDefinitions="*,Auto">
-                                                            <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                                       TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
-                                                                       IsVisible="{Binding IsSelected}"
-                                                                       Foreground="{DynamicResource Accent}"/>
-                                                        </Grid>
-                                                    </Border>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Border>
-                            </Popup>
-                        </Panel>
+                        <!-- Model subtitle. -->
+                        <TextBlock Text="{Binding Model}" FontSize="11.5" Margin="0,0,0,12"
+                                   Foreground="{DynamicResource TextSubtle}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <!-- Usage bar. -->
+                        <ProgressBar Classes="usage" Value="{Binding UsagePercent}"
+                                     Foreground="{Binding BarBrush}" Margin="0,0,0,7"/>
+                        <!-- Used / free split. -->
+                        <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+                            <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondary}">
+                                <Run Text="{Binding Used}"/><Run Text=" used"/>
+                            </TextBlock>
+                            <TextBlock Grid.Column="1" FontSize="12" HorizontalAlignment="Right"
+                                       Foreground="{DynamicResource TextSecondary}">
+                                <Run Text="{Binding Free}"/><Run Text=" free"/>
+                            </TextBlock>
+                        </Grid>
+                        <!-- Read / Write / Temp readouts (space-between). -->
+                        <Grid ColumnDefinitions="*,*,*">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Classes="metricLabel" Text="Read "/>
+                                <TextBlock Classes="metricValue" Text="{Binding Read}"
+                                           Foreground="{StaticResource Blue}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Classes="metricLabel" Text="Write "/>
+                                <TextBlock Classes="metricValue" Text="{Binding Write}"
+                                           Foreground="{StaticResource Orange}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <TextBlock Classes="metricLabel" Text="Temp "/>
+                                <TextBlock Classes="metricValue" Text="{Binding Temp}"
+                                           Foreground="{StaticResource Green}"/>
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
-                </controls:WidgetPanel.HeaderLead>
-                <StackPanel Spacing="12">
-                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
-                                        YMin="0" YMax="100"
-                                        Stroke="{DynamicResource ChartStorage}" Points="{Binding DiskPoints}"
-                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                        StatusText="{Binding DiskChartStatus}"/>
-                    <Grid ColumnDefinitions="*,*,*">
-                        <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="tileLabel" Text="Active time"/>
-                            <TextBlock Classes="tileValue" Text="{Binding DiskActive}"
-                                       Foreground="{DynamicResource ChartStorage}"/>
+                </Border>
+            </DataTemplate>
+
+            <!-- ===== Partitions table. BreakBefore starts a row here, which is what keeps the drives a
+                 band of their own on arrival; past that the board packs the page as it fits. -->
+            <DataTemplate DataType="vm:PartitionsSection">
+    <controls:WidgetPanel layout:WidgetBoard.Weight="1.6" MinWidth="440"
+                                      layout:WidgetBoard.MaxSlotWidth="900"
+                                      layout:WidgetBoard.BreakBefore="True"
+                                      WidgetId="storage.partitions" Title="Partitions">
+                    <!-- Gutter 0: this table grows with the page rather than scrolling, so there is no
+                         scrollbar to inset for. -->
+                    <controls:WidgetTable Gutter="0">
+                        <controls:WidgetTable.Header>
+                            <!-- Vol · Label · File System · Type · Capacity · Free. The rows below share this
+                                 exact column template so the columns stay aligned. -->
+                            <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}"
+                                  Margin="0,0,0,6">
+                                <TextBlock Grid.Column="0" Classes="colHead" Text="VOL"/>
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="LABEL"/>
+                                <TextBlock Grid.Column="2" Classes="colHead" Text="FILE SYSTEM"/>
+                                <TextBlock Grid.Column="3" Classes="colHead" Text="TYPE"/>
+                                <TextBlock Grid.Column="4" Classes="colHead" Text="CAPACITY"/>
+                                <TextBlock Grid.Column="5" Classes="colHead" Text="FREE" TextAlignment="Right"/>
+                            </Grid>
+                        </controls:WidgetTable.Header>
+                        <ItemsControl ItemsSource="{Binding Page.Partitions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PartitionRow">
+                                    <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
+                                            Padding="0,9">
+                                        <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}">
+                                            <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
+                                                       FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"
+                                                       Foreground="{DynamicResource TextPrimary}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="12.5"
+                                                       Foreground="{DynamicResource TextMuted}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding Type}" FontSize="12.5"
+                                                       Foreground="{DynamicResource TextMuted}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding Capacity}" FontSize="12.5"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
+                                            <TextBlock Grid.Column="5" Text="{Binding Free}" FontSize="12.5"
+                                                       TextAlignment="Right"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </controls:WidgetTable>
+                </controls:WidgetPanel>
+            </DataTemplate>
+
+            <!-- ===== Disk Activity: the amber disk series on the shared Sparkline (fixed 0-100 axis +
+                 gridded area fill, like the Dashboard), over three readouts. Chart, title and readouts all
+                 describe the drive selected in the picker — one real physical disk, not the _Total
+                 average. -->
+            <DataTemplate DataType="vm:ActivitySection">
+    <controls:WidgetPanel WidgetId="storage.activity" MinWidth="280"
+                                      layout:WidgetBoard.MaxSlotWidth="620" Title="Disk Activity"
+                                      Subtitle="{Binding Page.DiskChartCaption}">
+                    <!-- The drive on show belongs to the title, so it sits in HeaderLead rather than at the
+                         far end of the row. With several drives the name becomes a chevron toggle that lists
+                         the others; with one there is nothing to switch to, so it stays text. -->
+                    <controls:WidgetPanel.HeaderLead>
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <TextBlock Classes="panelTitle" Text="—" Margin="6,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Classes="panelTitle" VerticalAlignment="Center"
+                                       IsVisible="{Binding !Page.HasMultipleDrives}"
+                                       Text="{Binding Page.SelectedDrive.Name}"/>
+                            <Panel IsVisible="{Binding Page.HasMultipleDrives}">
+                                <ToggleButton x:Name="DriveButton" Classes="drivePick"
+                                              IsChecked="{Binding Page.DrivePickerOpen, Mode=TwoWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Page.SelectedDrive.Name}"/>
+                                        <TextBlock Text="▾"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <!-- Light dismiss closes it on an outside click; picking a drive closes it
+                                     through DrivePickerOpen, which SelectDrive clears. -->
+                                <Popup PlacementTarget="{Binding #DriveButton}"
+                                       Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+                                       IsLightDismissEnabled="True"
+                                       IsOpen="{Binding Page.DrivePickerOpen, Mode=TwoWay}">
+                                    <Border Background="{DynamicResource CardBackground}"
+                                            BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                            CornerRadius="8" Padding="6" MinWidth="200"
+                                            BoxShadow="{StaticResource ShadowPopup}">
+                                        <ItemsControl ItemsSource="{Binding Page.Drives}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:DriveCard">
+                                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                                            HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Stretch">
+                                                        <Border Classes="driveOption"
+                                                                Classes.selected="{Binding IsSelected}">
+                                                            <Grid ColumnDefinitions="*,Auto">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
+                                                                           IsVisible="{Binding IsSelected}"
+                                                                           Foreground="{DynamicResource Accent}"/>
+                                                            </Grid>
+                                                        </Border>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </Popup>
+                            </Panel>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
-                            <TextBlock Classes="tileLabel" Text="Avg response"/>
-                            <TextBlock Classes="tileValue" Text="{Binding DiskResponse}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
-                            <TextBlock Classes="tileLabel" Text="Queue"/>
-                            <TextBlock Classes="tileValue" Text="{Binding DiskQueue}"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </controls:WidgetPanel>
-    </layout:WidgetBoard>
+                    </controls:WidgetPanel.HeaderLead>
+                    <StackPanel Spacing="12">
+                        <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                                            YMin="0" YMax="100"
+                                            Stroke="{DynamicResource ChartStorage}" Points="{Binding Page.DiskPoints}"
+                                            AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                            AxisStartLabel="{Binding Page.ChartRangeStart}" AxisEndLabel="now"
+                                            StatusText="{Binding Page.DiskChartStatus}"/>
+                        <Grid ColumnDefinitions="*,*,*">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Classes="tileLabel" Text="Active time"/>
+                                <TextBlock Classes="tileValue" Text="{Binding Page.DiskActive}"
+                                           Foreground="{DynamicResource ChartStorage}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
+                                <TextBlock Classes="tileLabel" Text="Avg response"/>
+                                <TextBlock Classes="tileValue" Text="{Binding Page.DiskResponse}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
+                                <TextBlock Classes="tileLabel" Text="Queue"/>
+                                <TextBlock Classes="tileValue" Text="{Binding Page.DiskQueue}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </controls:WidgetPanel>
+            </DataTemplate>
+        </ItemsControl.DataTemplates>
+    </ItemsControl>
 </UserControl>

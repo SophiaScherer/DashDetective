@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -8,20 +7,6 @@ using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Shared.Layout;
-
-/// <summary>What part of an item a drag may start from. A strip is a layout before it is a control,
-/// so <see cref="None"/> is the default and reordering is asked for.</summary>
-public enum ReorderGrip {
-    /// <summary>Not reorderable.</summary>
-    None,
-
-    /// <summary>Anywhere on the item, minus any control inside it that takes clicks of its own.</summary>
-    Item,
-
-    /// <summary>Only from an element marked <see cref="Reorder.IsGripProperty"/>. For an item that is
-    /// itself a control, so a press anywhere else belongs to that control.</summary>
-    Marked,
-}
 
 /// <summary>
 /// Lays children out in equal-width columns that wrap to a new row rather than shrinking past
@@ -107,7 +92,7 @@ public class UniformFlowPanel : ReorderablePanel {
                 if (!IsShown(candidate) || (DragGrip == ReorderGrip.Marked && marked is null))
                     return false;
 
-                handle = new ReorderHandle(candidate, Lifted(candidate), marked ?? candidate);
+                handle = new ReorderHandle(candidate, Inner(candidate), marked ?? candidate);
                 return true;
             }
 
@@ -122,11 +107,6 @@ public class UniformFlowPanel : ReorderablePanel {
 
         return false;
     }
-
-    // A generated item is a ContentPresenter wrapped around the card, and the picked-up look belongs
-    // on the card itself — a class on the presenter matches no style.
-    private static Control Lifted(Control item) =>
-        item is ContentPresenter { Child: Control card } ? card : item;
 
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();

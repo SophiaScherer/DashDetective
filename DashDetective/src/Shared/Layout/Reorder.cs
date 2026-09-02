@@ -4,6 +4,24 @@ using DashDetective.Shared.Controls;
 
 namespace DashDetective.Shared.Layout;
 
+/// <summary>What part of an item a drag may start from.</summary>
+public enum ReorderGrip {
+    /// <summary>Not reorderable. A strip is a layout before it is a control, so this is its default.</summary>
+    None,
+
+    /// <summary>The widget's header, and nothing else in it. A board's default: a titled panel is
+    /// picked up by its title.</summary>
+    Header,
+
+    /// <summary>Anywhere on the item, minus any control inside it that takes clicks of its own. For a
+    /// card, which has no header to grab.</summary>
+    Item,
+
+    /// <summary>Only from an element marked <see cref="Reorder.IsGripProperty"/>. For an item that is
+    /// itself a control, so a press anywhere else belongs to that control.</summary>
+    Marked,
+}
+
 /// <summary>How a reorderable panel names its children, so a saved order can point at them.</summary>
 public sealed class Reorder {
     /// <summary>An id for a child that is neither a widget nor generated from an item — a tile written
