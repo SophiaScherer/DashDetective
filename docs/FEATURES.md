@@ -979,13 +979,14 @@ shape now exists once. Five rules, all load-bearing:
    widget. `MaxSlotWidth` is attached to the board, not the child's own `MaxWidth`, because Avalonia
    clamps a stretched child and then *centres* it.
 3. **Order is dragged by the header and persisted by widget id**, never by index. `WidgetOrders.Resolve`
-   drops ids a page no longer has and keeps a newly added widget at its declared position.
+   drops ids a page no longer has and keeps a newly added widget at its declared position. A strip of
+   cards is dragged by the card instead — see *Drag to reorder* below.
 4. **The board must never touch `Panel.Children`.** Reorder is an arrange-time permutation over its own
    index list; mutating `Children` mid-layout is re-entrant and detaches a live `Sparkline` from its feed.
 5. **A tunneling input handler must only undo what it started.** `WidgetBoard.OnPointerUp` once released
    the pointer capture on *any* release, which stripped the capture a button took on its own press —
    every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
-   screenshots all clean. Guard on the press you actually claimed.
+   screenshots all clean. Only a drag that actually took the capture may release it.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
@@ -995,6 +996,57 @@ and `Dimensions.axaml`.
 
 **Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
 is doing design work first — do not start it without a task.
+
+## Drag to reorder
+
+*Shipped — branch `dragAndDropFix`, 2026-09.*
+
+**Six strips across five tabs reorder by dragging, and the affordance appears nowhere else.** The
+gesture is one implementation — `ReorderDrag` (`src/Shared/Layout`) — over any panel that implements
+`IReorderablePanel`. Two do: `WidgetBoard`, dragged by a widget's header, and `UniformFlowPanel`,
+dragged by a card or by a marked grip.
+
+| What | Handle | Saved under |
+|---|---|---|
+| Dashboard / Network / Storage widgets | the header | `dashboard`, `network`, `storage` |
+| Storage drive cards | the card | `storage` — the same order as the panels they move among |
+| Hardware component cards | the card | `hardware` |
+| Processes summary tiles | the tile | `processes.summary` |
+| Performance device rail | a grip per row | `performance.resources` |
+| Performance stat tiles | the tile | `performance.stats.{kind}` |
+
+Settings and Toolkit do not reorder, and their headers no longer claim to. Five rules, all
+load-bearing:
+
+1. **The drag cursor comes from the predicate that starts the drag**, never from a style. A style
+   cannot tell whether a panel sits in a board, and the one that tried put a drag cursor on every
+   `WidgetPanel` header in the app — including the nine on tabs with no board at all.
+2. **A picked-up item is anchored to the pointer and frozen at its pickup size.** It used to be offset
+   from its *previewed* slot, so the instant a reorder committed, the slot origin jumped and threw the
+   item a whole column away from the cursor. The grip is held as a fraction of the item, so a slot
+   that changes size cannot slide the item out from under the pointer either.
+3. **Capture is taken on the first move past the threshold, not on the press.** A grip can sit inside
+   a button — the Performance rail's rows are buttons — and a button captures on its own press, which
+   takes the capture straight back off a drag that grabbed it early.
+4. **A panel reorders its own index list, never `Children`.** Mutating `Children` is re-entrant
+   mid-layout, detaches a live `Sparkline` from its feed, and under an `ItemsControl` fights the item
+   generator. `ChildOrder` owns that list for both panels.
+5. **A drop index counts what is on screen; an order holds every child.** The two agree until a widget
+   is collapsed, and then disagree silently — `ChildOrder.Move` maps between them.
+6. **A page whose items must move among each other is ONE list, not a strip inside a board.** A
+   strip's items are grandchildren, so the only order they can join is the strip's — Storage's drive
+   cards could not leave their band. Storage drives its board from one `PageItems` collection instead:
+   the drives are items already, and the two panels are markers (`StorageSection`) carrying the page
+   their markup binds through, since a board child's DataContext is its item.
+7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
+   which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
+   was grabbed, and could not express dragging straight down at all: x never changes, so the item
+   landed one slot short — in two columns, the slot up and to the right.
+
+A page persists one `SavedOrder` per strip (`IReorderablePage.SavedOrders`), which is what lets
+Performance keep a rail order and a separate tile order per device kind. The drop hint is the nav
+bar's own drag-to-dock highlight, shared as `DragDropHint`. A grip's hit target must be a filled
+element: a bare stroked `Path` is hit-testable only along its own strokes.
 
 ## Multi-GPU
 

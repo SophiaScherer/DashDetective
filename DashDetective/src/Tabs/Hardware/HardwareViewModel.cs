@@ -19,7 +19,12 @@ namespace DashDetective.Tabs.Hardware;
 /// thermals/voltages are deferred (see the plan's appendix), so there is no live-sampling
 /// (<see cref="ILiveSamplingPage"/>) wiring here.
 /// </summary>
-public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
+public partial class HardwareViewModel : ViewModelBase, IRefreshablePage, IReorderablePage {
+    /// <summary>The order the cards are shown in, bound two-way to the page's grid.</summary>
+    public SavedOrder CardOrder { get; } = new("hardware");
+
+    public IEnumerable<SavedOrder> SavedOrders => [CardOrder];
+
     private readonly HardwareCard _processor;
     private readonly HardwareCard _graphics;
     private readonly HardwareCard _motherboard;
@@ -44,7 +49,7 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
     /// so the shell still builds this with <c>new()</c>.</summary>
     internal HardwareViewModel(IHardwareInfoProvider provider) {
         _provider = provider;
-        _processor = new HardwareCard("Processor", "—", HardwareIcons.Chip,
+        _processor = new HardwareCard("hardware.processor", "Processor", "—", HardwareIcons.Chip,
             HardwareIcons.Blue, HardwareIcons.BlueBg, new[] {
                 new HardwareSpec("Cores"),
                 new HardwareSpec("Logical Processors"),
@@ -53,9 +58,9 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
                 new HardwareSpec("TDP"),
                 new HardwareSpec("Socket"),
             });
-        _graphics = NewGraphicsCard();
+        _graphics = NewGraphicsCard(0);
         _graphicsCards.Add(_graphics);
-        _motherboard = new HardwareCard("Motherboard", "—", HardwareIcons.Grid,
+        _motherboard = new HardwareCard("hardware.motherboard", "Motherboard", "—", HardwareIcons.Grid,
             HardwareIcons.Purple, HardwareIcons.PurpleBg, new[] {
                 new HardwareSpec("Chipset"),
                 new HardwareSpec("BIOS"),
@@ -63,7 +68,7 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
                 new HardwareSpec("PCIe Slots"),
                 new HardwareSpec("M.2 Slots"),
             });
-        _memory = new HardwareCard("Memory", "—", HardwareIcons.Bars,
+        _memory = new HardwareCard("hardware.memory", "Memory", "—", HardwareIcons.Bars,
             HardwareIcons.Yellow, HardwareIcons.YellowBg, new[] {
                 new HardwareSpec("Installed"),
                 new HardwareSpec("Speed"),
@@ -71,14 +76,14 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
                 new HardwareSpec("Slots used"),
                 new HardwareSpec("Voltage"),
             });
-        _storage = new HardwareCard("Storage Devices", "—", HardwareIcons.Bars,
+        _storage = new HardwareCard("hardware.storage", "Storage Devices", "—", HardwareIcons.Bars,
             HardwareIcons.Orange, HardwareIcons.OrangeBg, new[] {
                 new HardwareSpec("Drive 1"),
                 new HardwareSpec("Drive 2"),
                 new HardwareSpec("Drive 3"),
                 new HardwareSpec("Total Health"),
             });
-        _sensors = new HardwareCard("Sensors", "—", HardwareIcons.Graph,
+        _sensors = new HardwareCard("hardware.sensors", "Sensors", "—", HardwareIcons.Graph,
             HardwareIcons.Red, HardwareIcons.RedBg, new[] {
                 new HardwareSpec("CPU Package"),
                 new HardwareSpec("GPU Core"),
@@ -96,8 +101,9 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
 
     /// <summary>Builds a Graphics card with the standard spec rows. One per physical adapter, so every GPU
     /// keeps its own Memory / CUDA Cores / Boost Clock / Driver / Bus rather than being reduced to a line.</summary>
-    private static HardwareCard NewGraphicsCard() =>
-        new("Graphics", "—", HardwareIcons.Graph, HardwareIcons.Green, HardwareIcons.GreenBg, new[] {
+    private static HardwareCard NewGraphicsCard(int adapter) =>
+        new($"hardware.graphics.{adapter}", "Graphics", "—", HardwareIcons.Graph, HardwareIcons.Green,
+            HardwareIcons.GreenBg, new[] {
             new HardwareSpec("Memory"),
             new HardwareSpec("CUDA Cores"),
             new HardwareSpec("Boost Clock"),
@@ -206,7 +212,7 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage {
 
         var firstAt = Cards.IndexOf(_graphicsCards[0]);
         for (var i = _graphicsCards.Count; i < g.Adapters.Count; i++) {
-            var card = NewGraphicsCard();
+            var card = NewGraphicsCard(i);
             _graphicsCards.Add(card);
             Cards.Insert(firstAt + i, card);
         }

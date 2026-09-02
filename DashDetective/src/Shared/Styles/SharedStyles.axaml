@@ -7,6 +7,22 @@
     -->
 
     <!-- ===== Surfaces ===== -->
+    <!-- Drag grip: two short bars, the usual "pick this up here" mark. Muted until the row is
+         hovered, so a rail of them does not read as a column of decoration. -->
+    <Style Selector="Path.dragGrip">
+        <Setter Property="Width" Value="5"/>
+        <Setter Property="Height" Value="15"/>
+        <Setter Property="Stretch" Value="None"/>
+        <Setter Property="Stroke" Value="{DynamicResource TextMuted}"/>
+        <Setter Property="StrokeThickness" Value="1.6"/>
+        <Setter Property="StrokeLineCap" Value="Round"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Opacity" Value="0.55"/>
+    </Style>
+    <Style Selector="Border:pointerover Path.dragGrip">
+        <Setter Property="Opacity" Value="1"/>
+    </Style>
+
     <Style Selector="Border.panel">
         <Setter Property="Background" Value="{DynamicResource PanelBackground}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>

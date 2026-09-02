@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Shared.Controls;
 using System;
 using System.Windows.Input;
 
@@ -18,7 +19,7 @@ namespace DashDetective.Tabs.Storage;
 /// <see cref="SelectCommand"/> shape as <c>Performance.ResourceRow</c> / <c>NavItem</c>, and picking one
 /// points the Disk Activity panel below at that physical disk.
 /// </summary>
-public sealed partial class DriveCard : ObservableObject {
+public sealed partial class DriveCard : ObservableObject, IWidgetIdentity {
     public DriveCard(int diskNumber, Action<DriveCard> onSelected) {
         DiskNumber = diskNumber;
         SelectCommand = new RelayCommand(() => onSelected(this));
@@ -26,6 +27,10 @@ public sealed partial class DriveCard : ObservableObject {
 
     /// <summary>Physical disk number this card describes — the key the throughput sampler reports under.</summary>
     public int DiskNumber { get; }
+
+    /// <summary>What a saved card order names this drive by. The disk number, not the name: a drive
+    /// letter moves between drives, and the model is not unique across identical disks.</summary>
+    public string? WidgetId => $"storage.drive.{DiskNumber}";
 
     /// <summary>Drive display name, e.g. "Local Disk (C:)".</summary>
     public string Name { get; init; } = "";

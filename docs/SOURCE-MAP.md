@@ -68,7 +68,11 @@ stays in its tab folder.
                                sampling pages implement it; Hardware/Toolkit/Settings/File Explorer own
                                no timer and do not)
       IReorderablePage.cs     (marker: a page whose widget order the user drags and the shell
-                               persists. The page only holds the order; the shell reads and writes it)
+                               persists. The page only holds the orders; the shell reads and writes
+                               them. PLURAL on purpose — Performance reorders its rail and its stat
+                               tiles separately, and the tiles keep one order per device kind)
+      SavedOrder.cs           (one of those orders: the key it saves under, the ids, and a change
+                               signal. Bound two-way to the panel that lays the strip out)
       SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
                                a page's timers care about, so the five do not each hand-roll the pair.
                                STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
@@ -131,6 +135,9 @@ stays in its tab folder.
                                 never nudges anything. Shared by NavigationView + the widget board)
       RevealFlash.cs           (tints an element when something elsewhere jumps to it. Toggles the
                                 class only; the fade is Border.revealFlash's transition)
+      ThemeResources.cs        (brush/shadow/radius lookups for visuals built in code. Asks with the
+                                element's ActualThemeVariant: FindResource returns null for every
+                                palette brush, all of which live in a theme dictionary)
 ```
 
 ## `src/Shared/Charts`
@@ -189,14 +196,59 @@ stays in its tab folder.
 ```
       /Layout
         WidgetBoard.cs          (a page's widgets as one flow: packs rows to fit, caps each widget's width
-                                 so surplus buys a column, and drags by the header to reorder)
-        WidgetBoardLayout.cs    (its arithmetic + DropIndex — no Avalonia types, so it tests without layout)
+                                 so surplus buys a column, and drags by the header to reorder. A
+                                 ReorderablePanel, so all it owns is the packing and the grip rule.
+                                 Children may be generated: it reads a child's slot properties and its
+                                 grip THROUGH the presenter an ItemsControl wraps around the item, since
+                                 that is where the markup authored them)
+        ReorderDrag.cs          (drag-to-reorder for any panel that can say where its children are:
+                                 pointer, threshold, cursor, previewed order and drop hint. The drag
+                                 cursor is set HERE, not in Widgets.axaml: a style cannot tell whether a
+                                 panel is in a board, and one that could not advertised a drag on three
+                                 tabs that have none. A dragged item is anchored to the pointer and
+                                 frozen at its pickup size — offsetting it from its previewed slot threw
+                                 it a whole column sideways the moment a reorder committed)
+        ReorderablePanel.cs     (the half of reordering both panels share: the saved order and its
+                                 re-entrancy guard, the previewed order, the children on screen and
+                                 where their slots were arranged. A base class rather than a helper
+                                 each panel forwards to — the forwarding would have been most of what
+                                 they shared, and Order would have had to become an attached property
+                                 to live anywhere else. Layout vocabulary stays with the panels)
+        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
+                                 handle is, and the previewed order. Reorder is always a permutation of
+                                 the panel's own index list — a panel that reordered Children instead
+                                 would re-enter its layout and, under an ItemsControl, fight the
+                                 generator)
+        WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
+                                 without layout. SlotAt is what a drag TAKES, not a gap it is inserted
+                                 into: the row whose band holds the point, then the slot in that row it
+                                 sits over. The gap reading could not express dragging straight down —
+                                 x never changes, so which side of a slot's middle the drag sat on could
+                                 not move it into the row below, and it landed one slot short, which in
+                                 two columns is the slot up and to the right)
+        DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's
+                                 OverlayLayer. Shared by the nav bar's drag-to-dock and the board's
+                                 drag-to-reorder; the board cannot host it as a child, which would
+                                 re-enter its own layout)
         WidgetOrders.cs         (per-page order codec; the resolver that survives a widget being added,
                                  removed or renamed now lives in OrderResolver.cs, which this delegates
                                  to — the Processes columns want the same semantics)
         OrderResolver.cs        (that resolver, knowing only ids: drop what is gone, keep what is new
                                  beside the neighbours its author put it next to)
-        UniformFlowPanel, FlowLayout, GridColumns, TableColumns, WeightedRowLayout
+        ChildOrder.cs           (the permutation both reorderable panels share: settled order, previewed
+                                 order, and the mapping from a drop index — which counts only what is on
+                                 screen — into an order that holds every child. No Avalonia types, so it
+                                 tests without a layout pass)
+        Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
+                                 start from, plus how a panel names a child: an id attached in markup, else the
+                                 control's own, else its item view model's where the children are
+                                 generated. The attached one is for a tile written out by hand, which
+                                 is the only kind that cannot name itself)
+        UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
+                                 With DragGrip set it also drags to reorder, through the same ReorderDrag
+                                 a board uses — its children are usually generated, so the order is
+                                 re-applied every time the generator rebuilds them)
+        FlowLayout, GridColumns, TableColumns, WeightedRowLayout
 ```
 
 ## `src/Shared/Controls`
@@ -1226,7 +1278,10 @@ stays in its tab folder.
                                                          — not self-scrolling. VM builds the six fixed
                                                          HardwareCard models, populates them from
                                                          HardwareInfoProvider in the ctor, and implements
-                                                         IRefreshablePage; Sensors card left as "—")
+                                                         IRefreshablePage; Sensors card left as "—".
+                                                         Every card drags to reorder — the grid is a
+                                                         UniformFlowPanel with Reorder="Item", saved under
+                                                         the "hardware" key)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the
@@ -1245,7 +1300,10 @@ stays in its tab folder.
                                 HardwareInfo.cs         (aggregate snapshot record + per-card sub-records,
                                                          each with .Unknown; fields default to "—")
                                 HardwareCard.cs         (observable: fixed title/icon/colours, observable
-                                                         Subtitle + ObservableCollection<HardwareSpec> Rows)
+                                                         Subtitle + ObservableCollection<HardwareSpec> Rows.
+                                                         Carries a WidgetId a saved order names it by — the
+                                                         title cannot, since a two-adapter machine has two
+                                                         cards called Graphics)
                                 HardwareSpec.cs         (observable: fixed Key, observable Value → "—")
                                 HardwareIcons.cs        (feature-local card glyph geometries + fixed
                                                          per-card icon colours)
@@ -1293,7 +1351,12 @@ stays in its tab folder.
                                  Fills the viewport via ISelfScrollingPage, like File Explorer. All five
                                  resources (CPU/Memory/Disk/GPU/Ethernet) subscribe to the shared
                                  SystemMetricsService; IRefreshablePage/ILiveSamplingPage/IActivatablePage/
-                                 IDisposable.)
+                                 IDisposable. Both strips reorder: the rail only by the GRIP on each row,
+                                 since the rows are buttons and a press anywhere else selects the device,
+                                 and the stat tiles by the tile. The tile order is saved PER DEVICE KIND
+                                 — performance.stats.cpu and so on — because the tiles are the same for
+                                 every CPU, and a key naming one adapter goes stale when the hardware
+                                 does. The chart panel between them does not move.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
@@ -1325,9 +1388,13 @@ stays in its tab folder.
 
 ```
       /Storage                  StorageView.axaml(.cs) + StorageViewModel.cs
-                                (LIVE — read-only drives/health view: a top row of DriveCard summary
-                                 cards over a Partitions table (PartitionRow item VMs) + a Disk Activity
-                                 card (shared Sparkline, ChartStorage key). Page-scrolls like Network
+                                (LIVE — read-only drives/health view: DriveCard summary cards over a
+                                 Partitions table (PartitionRow item VMs) + a Disk Activity
+                                 card (shared Sparkline, ChartStorage key). ONE ItemsControl over
+                                 PageItems with the WidgetBoard as its ItemsPanel, so a drive card is a
+                                 board child like the panels and reorders among them — the two panels
+                                 are StorageSection markers because a board child's DataContext is its
+                                 item and markup has none. Page-scrolls like Network
                                  (not ISelfScrollingPage). Cards from PhysicalDiskProvider/StorageComposer/
                                  VolumeProvider; Disk Activity + Queue from the page-local throughput sampler
                                  feed; per-disk Read/Write from IPhysicalDiskThroughputSampler; NVMe Temp
@@ -1339,7 +1406,9 @@ stays in its tab folder.
 
 ```
       /Processes                (the tab itself is described under Feature notes; only its seams and the
-                                 column model are mapped here)
+                                 column model are mapped here. The four summary tiles above the table
+                                 drag to reorder, saved under "processes.summary"; the table below them
+                                 does not move, and its own column drag is unrelated)
                                 ProcessColumnId.cs      (enum: the seven columns, declaration order =
                                                          the order the table ships in)
                                 ProcessColumns.cs       (one table of per-column minimum width + weight,

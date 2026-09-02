@@ -2,7 +2,9 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Theming;
+using DashDetective.Shared;
 using DashDetective.Shared.Charts;
+using DashDetective.Shared.Controls;
 using System;
 using System.Collections.Generic;
 using System.Windows.Input;
@@ -23,7 +25,7 @@ namespace DashDetective.Tabs.Performance;
 /// <see cref="Sub"/>, <see cref="Spec"/>, <see cref="Points"/>, and each tile's value) in place each
 /// sampling tick; <see cref="Name"/> / <see cref="Unit"/> / <see cref="Series"/> are fixed identity.
 /// </summary>
-public partial class ResourceRow : ObservableObject {
+public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
                        ChartSeries series, string points, IReadOnlyList<StatTile> stats,
                        Action<ResourceRow> onSelected) {
@@ -40,6 +42,13 @@ public partial class ResourceRow : ObservableObject {
 
     /// <summary>Resource name shown on the card and as the detail header (e.g. "CPU", "Disk 0 (C:)").</summary>
     public string Name { get; }
+
+    /// <summary>The name doubles as the id a saved rail order names this row by.</summary>
+    public string? WidgetId => Name;
+
+    /// <summary>The saved order of this resource's stat tiles. Shared by every resource of the same
+    /// kind, so arranging one CPU's tiles arranges every CPU's.</summary>
+    public SavedOrder StatOrder { get; init; } = new("performance.stats");
 
     /// <summary>Secondary caption under the name (e.g. "24 cores · 3.2 GHz", "NVMe SSD"). Loaded from
     /// the resource's static-info provider once available.</summary>

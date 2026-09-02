@@ -27,25 +27,10 @@ namespace DashDetective.Tabs.Network;
 /// connections, ping, DNS) are wired in later phases.
 /// </summary>
 public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IShortcutTarget, IDisposable, IReorderablePage {
-    /// <summary>Key this page's widget order is persisted under.</summary>
-    public string PageKey => "network";
+    /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
+    public SavedOrder Widgets { get; } = new("network");
 
-    private IReadOnlyList<string> _widgetOrder = [];
-
-    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
-    public IReadOnlyList<string> WidgetOrder {
-        get => _widgetOrder;
-        set {
-            if (ReferenceEquals(_widgetOrder, value))
-                return;
-            _widgetOrder = value ?? [];
-            OnPropertyChanged();
-            WidgetOrderChanged?.Invoke();
-        }
-    }
-
-    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
-    public event Action? WidgetOrderChanged;
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
 
     /// <summary>Width of the rolling throughput history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;

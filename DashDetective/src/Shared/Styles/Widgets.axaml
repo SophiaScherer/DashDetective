@@ -54,12 +54,20 @@
         <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
     </Style>
 
-    <!-- The header is the drag handle, so say so on hover. -->
+    <!-- The same, for a plain surface dragged out of a strip: those are cards rather than widgets,
+         so they have no template to reach into. -->
+    <Style Selector="Border.panel.dragging, Border.card.dragging">
+        <Setter Property="Opacity" Value="0.92"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
+    </Style>
+
+    <!-- Hit-testable so a press on the empty part of the header still reaches the board. The drag
+         cursor is NOT set here: a style cannot tell whether this panel sits in a WidgetBoard, and one
+         that said Hand on every header advertised a drag on the three tabs that have no board.
+         WidgetBoard sets it from the same predicate that starts a drag. -->
     <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header">
         <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="controls|WidgetPanel /template/ StackPanel#PART_Header:pointerover">
-        <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
     <!-- WidgetTable: header above a body that scrolls, both inset by the same scrollbar gutter. -->

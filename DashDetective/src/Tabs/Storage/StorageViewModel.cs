@@ -34,25 +34,11 @@ namespace DashDetective.Tabs.Storage;
 /// rather than restarting the chart.
 /// </summary>
 public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSamplingPage, IActivatablePage, IDisposable, IReorderablePage {
-    /// <summary>Key this page's widget order is persisted under.</summary>
-    public string PageKey => "storage";
+    /// <summary>This page's order, bound two-way to its WidgetBoard. One order for the whole page:
+    /// a drive card is a board child like the panels, not an item inside a strip.</summary>
+    public SavedOrder Widgets { get; } = new("storage");
 
-    private IReadOnlyList<string> _widgetOrder = [];
-
-    /// <summary>The widget ids in display order, bound two-way to the page's WidgetBoard.</summary>
-    public IReadOnlyList<string> WidgetOrder {
-        get => _widgetOrder;
-        set {
-            if (ReferenceEquals(_widgetOrder, value))
-                return;
-            _widgetOrder = value ?? [];
-            OnPropertyChanged();
-            WidgetOrderChanged?.Invoke();
-        }
-    }
-
-    /// <summary>Raised when a drag changes the order, so the shell can persist it.</summary>
-    public event Action? WidgetOrderChanged;
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
 
     // Temperature moves slowly and each read opens a drive handle, so refresh it only every N throughput ticks
     // (≈ every 15 s at the default cadence) rather than every tick.
@@ -90,6 +76,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _providers = providers;
 
         _service = service;
+
+        // The panels are markers standing in for markup, built before the first load so the board has
+        // them whatever the drives do.
+        PageItems.Add(new PartitionsSection(this));
+        PageItems.Add(new ActivitySection(this));
 
         // Built FIRST, before anything that reads it: every load captures _gate.Token, so a load started
         // above this line would dereference a null field and its soft-fail would wipe the page. The gate
@@ -135,6 +126,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/> at startup and rebuilt on Refresh;
     /// empty until the first load.</summary>
     public ObservableCollection<DriveCard> Drives { get; } = new();
+
+    /// <summary>Everything the board lays out, in one list: a card per drive, then the two panels. The
+    /// drives lead so the page opens as it always has, but nothing pins them there — a drive card is a
+    /// board child like the panels and reorders among them.</summary>
+    public ObservableCollection<object> PageItems { get; } = new();
 
     /// <summary>The partition rows shown in the Partitions table (one per volume, lettered or not). Loaded
     /// from <see cref="VolumeProvider"/> at startup and rebuilt on Refresh; empty until the first load.</summary>
@@ -303,6 +299,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
                     _temperatureDiskNumbers.Add(data.DiskNumber);
             }
 
+            SyncPageItems();
+
             Partitions.Clear();
             // Lettered volumes first and in letter order (Windows), then mounted ones shallowest-first
             // (Linux). Only one of the two keys is ever populated, so neither platform sees the other's.
@@ -324,6 +322,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             // back to.
         } catch {
             Drives.Clear();
+            SyncPageItems();
             _cardsByDisk.Clear();
             _temperatureDiskNumbers.Clear();
             Partitions.Clear();
@@ -332,6 +331,17 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _selectedDisk = -1;
             UpdateActivity();
         }
+    }
+
+    /// <summary>Puts the current drive cards in front of the panels. Only the drive entries are
+    /// touched — rebuilding the panels would throw the live chart away mid-sample for nothing.</summary>
+    private void SyncPageItems() {
+        for (var i = PageItems.Count - 1; i >= 0; i--)
+            if (PageItems[i] is DriveCard)
+                PageItems.RemoveAt(i);
+
+        for (var i = 0; i < Drives.Count; i++)
+            PageItems.Insert(i, Drives[i]);
     }
 
     /// <summary>Selects the drive the Disk Activity panel shows after a (re)load: whatever the user had

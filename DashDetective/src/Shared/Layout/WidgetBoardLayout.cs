@@ -209,34 +209,47 @@ public static class WidgetBoardLayout {
         widths[count - 1] += leftover;
     }
 
-    /// <summary>Where a widget dragged to (<paramref name="x"/>, <paramref name="y"/>) would be
-    /// inserted: the row whose band holds the pointer, then the first slot whose midpoint is right of
-    /// it.</summary>
-    public static int DropIndex(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
+    /// <summary>
+    /// The slot a drag held at (<paramref name="x"/>, <paramref name="y"/>) would take: the row whose
+    /// band holds the point, then the slot in that row it sits over.
+    ///
+    /// A drag TAKES the slot it covers; it is not inserted into the gap beside one. The gap reading
+    /// cannot express the most ordinary gesture there is — dragging straight down never changes x, so
+    /// asking which side of a slot's middle the drag is on can never move it into the row below, and
+    /// it landed one slot short every time, which in two columns is the slot up and to the right.
+    /// </summary>
+    public static int SlotAt(ReadOnlySpan<Rect2> slots, ReadOnlySpan<int> rowEnds, double x, double y) {
         if (slots.Length == 0)
             return 0;
 
         var row = rowEnds.Length - 1;
-        var start = 0;
-        for (var r = 0; r < rowEnds.Length; r++) {
-            var end = rowEnds[r];
-            if (y < slots[end - 1].Bottom) {
+        for (var r = 0; r < rowEnds.Length; r++)
+            if (y < slots[rowEnds[r] - 1].Bottom) {
                 row = r;
                 break;
             }
-            start = end;
-        }
 
-        // start tracks the row before the one chosen when the loop ran to the end, so recompute it.
-        start = row == 0 ? 0 : rowEnds[row - 1];
+        var start = row == 0 ? 0 : rowEnds[row - 1];
         var rowEnd = rowEnds[row];
 
+        // The last slot the drag has reached the start of. A gutter belongs to the slot before it, and
+        // anything short of the row's first slot belongs to that one.
+        var target = start;
         for (var i = start; i < rowEnd; i++)
-            if (x < slots[i].Left + slots[i].Width / 2)
-                return i;
+            if (x + Epsilon >= slots[i].Left)
+                target = i;
 
-        return rowEnd;
+        return target;
     }
+
+    /// <summary>Where a dragged widget is drawn: at the size it was picked up at, under the pointer at
+    /// the same relative grip. Anchoring to the pointer rather than to the slot is what stops a re-pack
+    /// mid-drag from pulling the widget out from under the cursor.</summary>
+    /// <param name="grabX">Where along the widget's width it was grabbed, as a fraction.</param>
+    /// <param name="grabY">Where down the widget's height it was grabbed, as a fraction.</param>
+    public static Rect2 DragRect(double width, double height, double pointerX, double pointerY,
+                                 double grabX, double grabY) =>
+        new(pointerX - grabX * width, pointerY - grabY * height, width, height);
 
     private static double Cap(WidgetSlot slot) =>
         slot.Stretch ? double.PositiveInfinity : Math.Max(slot.MinWidth, slot.MaxWidth);

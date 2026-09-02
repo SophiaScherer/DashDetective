@@ -1,5 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 
@@ -13,8 +16,13 @@ namespace DashDetective.Shared.Layout;
 /// The panel owns the gutter via <see cref="ColumnSpacing"/> / <see cref="RowSpacing"/>, so call
 /// sites drop the negative-margin-on-panel idiom — that cancellation assumes a fixed column count
 /// and stops working once the count varies.
+///
+/// With <see cref="DragGrip"/> set it also drags to reorder, through the same
+/// <see cref="ReorderablePanel"/> a <see cref="WidgetBoard"/> uses. Unlike a board, its children are
+/// usually generated from a collection, so the ids come off the item view models and the order is
+/// re-applied whenever the generator rebuilds them.
 /// </summary>
-public class UniformFlowPanel : Panel {
+public class UniformFlowPanel : ReorderablePanel {
     /// <summary>Narrowest a column may get before the panel wraps to another row. 0 disables wrapping.</summary>
     public static readonly StyledProperty<double> MinItemWidthProperty =
         AvaloniaProperty.Register<UniformFlowPanel, double>(nameof(MinItemWidth));
@@ -29,7 +37,11 @@ public class UniformFlowPanel : Panel {
     public static readonly StyledProperty<double> RowSpacingProperty =
         AvaloniaProperty.Register<UniformFlowPanel, double>(nameof(RowSpacing));
 
-    private readonly List<Control> _visible = new();
+    /// <summary>What may start a drag here. Read once, when the panel enters the tree — set it in
+    /// markup, not from a binding that changes later.</summary>
+    public static readonly StyledProperty<ReorderGrip> DragGripProperty =
+        AvaloniaProperty.Register<UniformFlowPanel, ReorderGrip>(nameof(DragGrip));
+
     private readonly List<double> _rowHeights = new();
     private int _columns = 1;
 
@@ -60,16 +72,53 @@ public class UniformFlowPanel : Panel {
         set => SetValue(RowSpacingProperty, value);
     }
 
+    public ReorderGrip DragGrip {
+        get => GetValue(DragGripProperty);
+        set => SetValue(DragGripProperty, value);
+    }
+
+    protected override bool Reorderable => DragGrip != ReorderGrip.None;
+
+    /// <summary>The whole item is the handle, minus anything inside it that takes clicks of its own —
+    /// a press on a button in a card is aimed at the button.</summary>
+    public override bool TryGetHandle(Visual source, out ReorderHandle handle) {
+        handle = default;
+        if (DragGrip == ReorderGrip.None)
+            return false;
+
+        Control? marked = null;
+        foreach (var node in source.GetSelfAndVisualAncestors()) {
+            if (node is Control candidate && ReferenceEquals(candidate.GetVisualParent(), this)) {
+                if (!IsShown(candidate) || (DragGrip == ReorderGrip.Marked && marked is null))
+                    return false;
+
+                handle = new ReorderHandle(candidate, Inner(candidate), marked ?? candidate);
+                return true;
+            }
+
+            if (node is Control element && Reorder.GetIsGrip(element))
+                marked = element;
+
+            // Below the item root, so this is a control the press belongs to rather than the card. A
+            // marked grip has already said which part is draggable, so it needs no such rule.
+            if (DragGrip == ReorderGrip.Item && node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
+                return false;
+        }
+
+        return false;
+    }
+
     protected override Size MeasureOverride(Size availableSize) {
         CollectVisible();
         _rowHeights.Clear();
-        if (_visible.Count == 0) {
+        RowEnds.Clear();
+        if (Visible.Count == 0) {
             _columns = 1;
             return default;
         }
 
         _columns = FlowLayout.ColumnCount(availableSize.Width, MinItemWidth, ColumnSpacing,
-                                          _visible.Count, MaxColumns);
+                                          Visible.Count, MaxColumns);
         var itemWidth = FlowLayout.ItemWidth(availableSize.Width, _columns, ColumnSpacing);
 
         // An unconstrained slot (Auto column, horizontal StackPanel) has no width to divide, so let
@@ -79,18 +128,25 @@ public class UniformFlowPanel : Panel {
 
         var rowHeight = 0.0;
         var widest = 0.0;
-        for (var i = 0; i < _visible.Count; i++) {
-            var child = _visible[i];
-            child.Measure(new Size(measureWidth, double.PositiveInfinity));
+        for (var i = 0; i < Visible.Count; i++) {
+            var child = Visible[i];
+
+            // The dragged item keeps the width it was picked up at, so its content cannot re-wrap
+            // under the cursor while the columns behind it reflow.
+            var childWidth = ReferenceEquals(child, Drag.Dragged) ? Drag.DragSize.Width : measureWidth;
+            child.Measure(new Size(childWidth, double.PositiveInfinity));
             rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
             widest = Math.Max(widest, child.DesiredSize.Width);
             if ((i + 1) % _columns == 0) {
                 _rowHeights.Add(rowHeight);
+                RowEnds.Add(i + 1);
                 rowHeight = 0;
             }
         }
-        if (_visible.Count % _columns != 0)
+        if (Visible.Count % _columns != 0) {
             _rowHeights.Add(rowHeight);
+            RowEnds.Add(Visible.Count);
+        }
 
         if (unconstrained)
             itemWidth = widest;
@@ -100,12 +156,12 @@ public class UniformFlowPanel : Panel {
             height += h;
         height += RowSpacing * Math.Max(0, _rowHeights.Count - 1);
 
-        var width = itemWidth * _columns + ColumnSpacing * (_columns - 1);
-        return new Size(width, height);
+        var totalWidth = itemWidth * _columns + ColumnSpacing * (_columns - 1);
+        return new Size(totalWidth, height);
     }
 
     protected override Size ArrangeOverride(Size finalSize) {
-        if (_visible.Count == 0 || _rowHeights.Count == 0)
+        if (Visible.Count == 0 || _rowHeights.Count == 0)
             return finalSize;
 
         // Column count is kept from the measure pass so it stays in step with the row heights
@@ -117,10 +173,11 @@ public class UniformFlowPanel : Panel {
             var rowHeight = _rowHeights[row];
             for (var column = 0; column < _columns; column++) {
                 var index = row * _columns + column;
-                if (index >= _visible.Count)
+                if (index >= Visible.Count)
                     break;
+
                 var x = column * (itemWidth + ColumnSpacing);
-                _visible[index].Arrange(new Rect(x, y, itemWidth, rowHeight));
+                Visible[index].Arrange(Placed(index, new Rect(x, y, itemWidth, rowHeight)));
             }
             y += rowHeight + RowSpacing;
         }
@@ -128,11 +185,4 @@ public class UniformFlowPanel : Panel {
         return finalSize;
     }
 
-    /// <summary>Collapsed children are skipped entirely so one never occupies a column.</summary>
-    private void CollectVisible() {
-        _visible.Clear();
-        foreach (var child in Children)
-            if (child.IsVisible)
-                _visible.Add(child);
-    }
 }
