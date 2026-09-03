@@ -578,6 +578,11 @@ CI builds, format-checks, tests **and** collects coverage on `windows-latest` an
 Debug and Release — four legs, none of them guarded. `dotnet format` gates the test code on both, so keep
 usings alphabetical (`System` is **not** sorted first).
 
+**`macos-latest` runs the same steps in a separate, non-gating job** (`continue-on-error`). There are no
+macOS provider arms, so every `ForCurrentPlatform()` resolves to `Unsupported*` — it is a build-and-test
+signal only. **A red macOS leg is still a real finding**: it means a test assumed "not Windows ⇒ Linux",
+the one shape the other four legs cannot catch.
+
 **A green Windows run proves nothing about the Linux leg.** Reader-identity tests branch on the host, so
 the arm asserting Linux never executes locally. Before calling any work that touches a
 `ForCurrentPlatform()` green, grep the test project for **both**:
@@ -754,7 +759,7 @@ temperature is the expected outcome, not a defect.
 - The build sets `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild` and `AnalysisLevel=latest`, so a
   style or platform-compatibility issue fails the build.
 - CI runs `dotnet format --verify-no-changes` before building, then the suite with coverage, on
-  `windows-latest` and `ubuntu-latest` in Debug and Release.
+  `windows-latest` and `ubuntu-latest` in Debug and Release, plus `macos-latest` in a non-gating job.
 - Build and test with `--artifacts-path`: a running app or an IDE holding `bin/` causes MSB3027.
 
 ## Working Style

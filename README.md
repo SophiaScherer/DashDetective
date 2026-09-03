@@ -86,6 +86,10 @@ platform fails the run. Every leg restores, verifies formatting with
 coverage report is uploaded per OS and configuration, and the Windows `Release` leg also publishes
 the compiled application as a downloadable artifact.
 
+Two further legs build and test on `macos-latest`, **reporting rather than gating** — the job carries
+`continue-on-error`. They claim nothing about macOS *support*: every `ForCurrentPlatform()` seam
+resolves to its `Unsupported*` arm there, so most readings would show "—".
+
 [CodeQL](.github/workflows/codeql.yml) scans the C# sources on every push and pull request, and
 weekly on a schedule. It covers what the in-build analyzers cannot: `CA1416` only sees annotated
 BCL APIs, so the hand-written `DllImport` declarations are invisible to it. Findings appear under
