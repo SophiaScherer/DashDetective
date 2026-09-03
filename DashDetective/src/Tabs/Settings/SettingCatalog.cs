@@ -18,6 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
+            UiScale, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -42,6 +43,21 @@ public sealed class SettingCatalog {
     public SettingEntry ClockFormat { get; } = new(
         SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
         Keywords: "12 hour 24 hour am pm military clock time");
+
+    // ----- Accessibility -----
+
+    // "Interface size" rather than "text size": the whole window scales together, and promising only
+    // text would be the wrong promise. Text scaling on its own is a separate setting, not shipped yet.
+    public SettingEntry UiScale { get; } = new(
+        SettingId.UiScale, "Accessibility", "Interface size",
+        "Draw everything larger — text, controls and charts together",
+        Keywords: "scale zoom bigger larger text size font enlarge magnify dpi accessibility readable");
+
+    // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
+    public SettingEntry AccessibilityDefaults { get; } = new(
+        SettingId.AccessibilityDefaults, "Accessibility", "Accessibility defaults",
+        "Put every accessibility option back the way it ships",
+        Keywords: "accessibility reset restore default revert undo");
 
     // ----- Navigation -----
 

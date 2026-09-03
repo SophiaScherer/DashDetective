@@ -250,31 +250,34 @@
                                        Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
                                        IsLightDismissEnabled="True"
                                        IsOpen="{Binding Page.DrivePickerOpen, Mode=TwoWay}">
-                                    <Border Background="{DynamicResource CardBackground}"
-                                            BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                            CornerRadius="8" Padding="6" MinWidth="200"
-                                            BoxShadow="{StaticResource ShadowPopup}">
-                                        <ItemsControl ItemsSource="{Binding Page.Drives}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:DriveCard">
-                                                    <Button Classes="bare" Command="{Binding SelectCommand}"
-                                                            HorizontalAlignment="Stretch"
-                                                            HorizontalContentAlignment="Stretch">
-                                                        <Border Classes="driveOption"
-                                                                Classes.selected="{Binding IsSelected}">
-                                                            <Grid ColumnDefinitions="*,Auto">
-                                                                <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                                           TextTrimming="CharacterEllipsis"/>
-                                                                <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
-                                                                           IsVisible="{Binding IsSelected}"
-                                                                           Foreground="{DynamicResource Accent}"/>
-                                                            </Grid>
-                                                        </Border>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Border>
+                                    <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                                    <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                                        <Border Background="{DynamicResource CardBackground}"
+                                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                                CornerRadius="8" Padding="6" MinWidth="200"
+                                                BoxShadow="{StaticResource ShadowPopup}">
+                                            <ItemsControl ItemsSource="{Binding Page.Drives}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:DriveCard">
+                                                        <Button Classes="bare" Command="{Binding SelectCommand}"
+                                                                HorizontalAlignment="Stretch"
+                                                                HorizontalContentAlignment="Stretch">
+                                                            <Border Classes="driveOption"
+                                                                    Classes.selected="{Binding IsSelected}">
+                                                                <Grid ColumnDefinitions="*,Auto">
+                                                                    <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
+                                                                               IsVisible="{Binding IsSelected}"
+                                                                               Foreground="{DynamicResource Accent}"/>
+                                                                </Grid>
+                                                            </Border>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </controls:ScaleHost>
                                 </Popup>
                             </Panel>
                         </StackPanel>

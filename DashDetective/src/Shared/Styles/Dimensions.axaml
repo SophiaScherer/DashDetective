@@ -2,7 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="using:System">
     <!-- Layout dimensions: spacings, insets, radii, control heights. Theme-invariant, so unlike
-         Palette.axaml's brushes these are always consumed with {StaticResource}. -->
+         Palette.axaml's brushes these are always consumed with {StaticResource} — with the two
+         exceptions in the UI scale section at the bottom. -->
 
     <!-- ===== Spacing ===== -->
     <!-- The gap between widgets, and the gap between a page's sections. -->
@@ -26,4 +27,11 @@
     <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
     <sys:Double x:Key="FieldHeight">32</sys:Double>
     <sys:Double x:Key="TableRowHeight">30</sys:Double>
+
+    <!-- ===== UI scale (rewritten at runtime by ThemeService.ApplyUiScale) =====
+         The only two keys in this file that change while the app runs, so the only two that must be
+         referenced with {DynamicResource}. The values here are the unscaled defaults, which is what
+         design time and the moment before the first apply both see. -->
+    <sys:Double x:Key="UiScale">1</sys:Double>
+    <sys:Double x:Key="PopupFontSize">12.5</sys:Double>
 </ResourceDictionary>

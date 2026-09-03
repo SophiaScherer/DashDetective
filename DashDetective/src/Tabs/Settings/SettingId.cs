@@ -8,6 +8,8 @@ public enum SettingId {
     Theme,
     Accent,
     ClockFormat,
+    UiScale,
+    AccessibilityDefaults,
     NavPosition,
     NavCollapse,
     RefreshInterval,

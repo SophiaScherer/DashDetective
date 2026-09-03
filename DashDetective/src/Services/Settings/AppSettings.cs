@@ -27,6 +27,10 @@ public sealed record AppSettings {
     /// sortable and machine-parseable.</summary>
     public ClockFormat ClockFormat { get; init; } = ClockFormat.TwentyFourHour;
 
+    /// <summary>How much larger to draw the whole interface, as a percentage. Text and chrome scale
+    /// together, so this is one setting rather than a font size the views would each have to honour.</summary>
+    public int UiScalePercent { get; init; } = 100;
+
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
 

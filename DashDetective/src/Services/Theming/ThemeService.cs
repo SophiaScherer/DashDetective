@@ -90,6 +90,20 @@ public sealed class ThemeService {
     }
 
     /// <summary>
+    /// Installs the UI scale. <c>ScaleHost</c> transforms by <paramref name="scale"/>; the two popup
+    /// surfaces that cannot host one — Fluent templates the tooltip and context-menu presenters — take
+    /// <paramref name="popupFontSize"/> instead. Both are computed by <c>Services/Accessibility</c>;
+    /// this only writes them, so the application still has a single writer.
+    /// </summary>
+    public void ApplyUiScale(double scale, double popupFontSize) {
+        if (Application.Current is not { } app)
+            return;
+
+        app.Resources["UiScale"] = scale;
+        app.Resources["PopupFontSize"] = popupFontSize;
+    }
+
+    /// <summary>
     /// Swaps the accent brushes in the application resource dictionary. Every accent-coloured
     /// element references these keys via {DynamicResource ...}, so the change is instant and global.
     /// </summary>

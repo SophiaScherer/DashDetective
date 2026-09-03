@@ -270,18 +270,21 @@
                            Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                            IsLightDismissEnabled="False"
                            IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
-                        <Border Background="{DynamicResource CardBackground}"
-                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
-                            <StackPanel Spacing="10">
-                                <!-- Reveals OS hidden/system entries in list + tree. -->
-                                <CheckBox Classes="optionCheck" Content="Show hidden"
-                                          IsChecked="{Binding ShowHidden}"/>
-                                <!-- Collapsing a parent also collapses everything under it. -->
-                                <CheckBox Classes="optionCheck" Content="Collapse children with parent"
-                                          IsChecked="{Binding CollapseChildrenWithParent}"/>
-                            </StackPanel>
-                        </Border>
+                        <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                        <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                            <Border Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
+                                <StackPanel Spacing="10">
+                                    <!-- Reveals OS hidden/system entries in list + tree. -->
+                                    <CheckBox Classes="optionCheck" Content="Show hidden"
+                                              IsChecked="{Binding ShowHidden}"/>
+                                    <!-- Collapsing a parent also collapses everything under it. -->
+                                    <CheckBox Classes="optionCheck" Content="Collapse children with parent"
+                                              IsChecked="{Binding CollapseChildrenWithParent}"/>
+                                </StackPanel>
+                            </Border>
+                        </controls:ScaleHost>
                     </Popup>
                 </Panel>
                 <Border Classes="segments" VerticalAlignment="Center">

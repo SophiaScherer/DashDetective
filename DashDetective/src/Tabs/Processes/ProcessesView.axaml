@@ -374,23 +374,26 @@
                                Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                                IsLightDismissEnabled="False"
                                IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
-                            <Border Background="{DynamicResource CardBackground}"
-                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
-                                <StackPanel Spacing="10">
-                                    <!-- Both start off: folding a section or re-sorting is usually a
-                                         glance rather than a preference. -->
-                                    <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
-                                              IsChecked="{Binding RememberCollapsedGroups}"/>
-                                    <CheckBox Classes="optionCheck" Content="Remember sort order"
-                                              IsChecked="{Binding RememberSort}"/>
-                                    <Border Height="1" Background="{DynamicResource Hairline}"/>
-                                    <!-- The column order IS remembered by default, so this is the way back. -->
-                                    <Button Classes="action" Content="Reset column order"
-                                            HorizontalAlignment="Stretch"
-                                            Command="{Binding ResetColumnOrderCommand}"/>
-                                </StackPanel>
-                            </Border>
+                            <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                            <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                                <Border Background="{DynamicResource CardBackground}"
+                                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
+                                    <StackPanel Spacing="10">
+                                        <!-- Both start off: folding a section or re-sorting is usually a
+                                             glance rather than a preference. -->
+                                        <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
+                                                  IsChecked="{Binding RememberCollapsedGroups}"/>
+                                        <CheckBox Classes="optionCheck" Content="Remember sort order"
+                                                  IsChecked="{Binding RememberSort}"/>
+                                        <Border Height="1" Background="{DynamicResource Hairline}"/>
+                                        <!-- The column order IS remembered by default, so this is the way back. -->
+                                        <Button Classes="action" Content="Reset column order"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding ResetColumnOrderCommand}"/>
+                                    </StackPanel>
+                                </Border>
+                            </controls:ScaleHost>
                         </Popup>
                     </Panel>
 

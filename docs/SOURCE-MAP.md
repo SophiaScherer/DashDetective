@@ -25,6 +25,7 @@ stays in its tab folder.
 - [`src/Services/Identity`](#srcservicesidentity)
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
+- [`src/Services/Accessibility`](#srcservicesaccessibility)
 - [`src/Services/Notifications`](#srcservicesnotifications)
 - [`src/Services/Links`](#srcserviceslinks)
 - [`src/Services/Platform`](#srcservicesplatform)
@@ -196,7 +197,12 @@ stays in its tab folder.
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
-                                 so always {StaticResource}. A token with no call site should not exist)
+                                 so always {StaticResource} — EXCEPT the two UI-scale keys at the bottom,
+                                 UiScale and PopupFontSize, which ThemeService rewrites at runtime and
+                                 which are therefore the only {DynamicResource} entries in this file. The
+                                 values authored here are the unscaled defaults, seen at design time and
+                                 in the moment before the first apply. A token with no call site should
+                                 not exist)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
                                  and the :collapsed rules. The chevron is a plain Button, not a
                                  ToggleButton: Fluent's checked/pressed states would all need undoing,
@@ -282,6 +288,15 @@ stays in its tab folder.
 
 ```
       /Controls
+        ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
+                                        content is MEASURED at the reduced size and RENDERED enlarged, so
+                                        text and chrome grow together and no view has to know its own font
+                                        size — which is why the app's ~87 FontSize literals needed no
+                                        change. ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
+                                        second window are each their own tree and inherit nothing from the
+                                        shell's. Fluent templates the tooltip and context-menu presenters,
+                                        so those two cannot host one and follow the scale by type size
+                                        instead — see PopupFontSize in Styles above)
         WidgetPanel, WidgetTable
                                        (WidgetPanel is one widget: surface, header row, body. Title /
                                         Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
@@ -466,6 +481,26 @@ stays in its tab folder.
                                  is what makes the blue swatch and the "Default" swatch agree. Pure HSL
                                  maths over Avalonia.Media value types — no render backend, so it is
                                  unit-testable)
+```
+
+## `src/Services/Accessibility`
+
+```
+      /Accessibility
+        AccessibilityService.cs (the state behind Settings -> Accessibility, and the one place it is
+                                 applied. Writes NOTHING to Application itself — appearance goes through
+                                 ThemeService, which stays the only writer. It exists so the card's options
+                                 have a single owner: that is what "Restore defaults" resets, and what the
+                                 shell reads to size its window minimum. Re-applying the current value is
+                                 deliberate — startup has to push it through either way — but only a real
+                                 change raises Changed, or every launch would report one and persist)
+        UiScale.cs              (the scale ladder and its arithmetic, pure so both are testable without a
+                                 layout pass. Factor() CLAMPS: the settings file is hand-editable and 0
+                                 would collapse the window rather than degrade. Nearest() snaps an
+                                 unrecognized value onto the ladder, so the segmented control always has a
+                                 selection. BasePopupFontSize is a C# mirror of Dimensions.axaml's
+                                 PopupFontSize, as SemanticBrushes mirrors Palette.axaml, and a test pins
+                                 the two together)
 ```
 
 ## `src/Services/Notifications`
@@ -1138,7 +1173,8 @@ stays in its tab folder.
 
 ```
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
-                                                        (fully live: Appearance + Navigation + Monitoring
+                                                        (fully live: Appearance + Accessibility +
+                                                         Navigation + Monitoring
                                                          + Layout + Export & Data; view code-behind owns the
                                                          export save dialog + clipboard, like MainWindow.
                                                          The Layout card resets every page's widget order,
@@ -1146,8 +1182,15 @@ stays in its tab folder.
                                                          like buildReport/buildMetricsCsv: the orders are the
                                                          shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
-                                IntervalOption.cs       (selectable item VMs for the Appearance +
-                                                         refresh-interval controls, like NavItem)
+                                IntervalOption.cs, UiScaleOption.cs
+                                                        (selectable item VMs for the Appearance,
+                                                         Accessibility + refresh-interval controls, like
+                                                         NavItem. The interface-size row is the only one
+                                                         with FIVE segments, and the only one its own
+                                                         setting narrows, so it alone wraps: both its grid
+                                                         columns are star, because a WrapPanel in an Auto
+                                                         column is measured against infinity and would
+                                                         overflow the card rather than wrap)
                                 NumericField.axaml(.cs) (a typed whole number with its unit beside it —
                                 ShortcutCaptureBox.axaml(.cs)
                                                         (arms, then captures the next key press as a

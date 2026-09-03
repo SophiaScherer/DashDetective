@@ -290,8 +290,10 @@
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="4"/>
     </Style>
+    <!-- Both this and the tooltip below follow the UI scale by type size: Fluent templates their
+         presenters, so neither can be wrapped in a ScaleHost the way the app's own popups are. -->
     <Style Selector="MenuFlyoutPresenter MenuItem">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource PopupFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Padding" Value="10,6"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -306,6 +308,11 @@
         <Setter Property="Background" Value="{DynamicResource Hairline}"/>
         <Setter Property="Height" Value="1"/>
         <Setter Property="Margin" Value="6,4"/>
+    </Style>
+
+    <!-- Tooltips size to content, so a scaled type size is all they need to follow the UI scale. -->
+    <Style Selector="ToolTip">
+        <Setter Property="FontSize" Value="{DynamicResource PopupFontSize}"/>
     </Style>
 
     <!-- ===== Segmented selector ===== -->

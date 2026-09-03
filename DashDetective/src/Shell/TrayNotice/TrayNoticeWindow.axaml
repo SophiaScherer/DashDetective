@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:controls="using:DashDetective.Shared.Controls"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="200"
         x:Class="DashDetective.Shell.TrayNotice.TrayNoticeWindow"
@@ -15,6 +16,7 @@
 
     <!-- Shown once, before the first hide-to-tray, while the window the user just closed is still on
          screen. A toast after the fact would have to guess where the tray is; this cannot be missed. -->
+    <controls:ScaleHost Scale="{DynamicResource UiScale}">
     <StackPanel Margin="24" Spacing="14">
         <TextBlock Classes="panelTitle" Text="DashDetective keeps running"/>
         <TextBlock Foreground="{DynamicResource TextSecondary}" FontSize="12.5" TextWrapping="Wrap"
@@ -26,4 +28,5 @@
             <Button Classes="action primary" Content="Keep running" IsDefault="True" Click="OnKeepRunningClick"/>
         </StackPanel>
     </StackPanel>
+    </controls:ScaleHost>
 </Window>

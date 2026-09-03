@@ -14,6 +14,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Dashboard](#dashboard)
 - [Universal search](#universal-search)
 - [Settings](#settings)
+- [Accessibility](#accessibility)
 - [File Explorer](#file-explorer)
 - [Network](#network)
 - [Processes](#processes)
@@ -316,6 +317,61 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   a record's `init` properties as constructor parameters and fills absent slots with `default(T)`, so
   deserializing directly discarded every non-default initializer — `ShowInTray` loaded as false for
   months, and every alert threshold would have loaded as `0`, which is how one is switched off.
+
+## Accessibility
+
+The Settings **Accessibility** card, and the first option on it. **Every feature that lands here is a
+setting the user can switch off** — nothing is forced on, and each row has its own `SettingId`,
+`SettingCatalog` entry and `AppSettings` property, so each is separately findable through universal
+search and revealable on its own row.
+
+- **Interface size** (100 / 125 / 150 / 175 / 200 %, default 100). Everything grows together — text,
+  controls, charts and icons.
+- **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
+  resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
+  becoming a property on that service.
+
+**One transform, not a font-size sweep.** `ScaleHost` (`src/Shared/Controls`) is a
+`LayoutTransformControl` that measures its content at the reduced size and renders it enlarged, so
+the app's ~87 authored `FontSize` literals needed no change and layout stays correct rather than
+merely bigger. `Sparkline` composes its own axis text with `FormattedText` and scales with the
+subtree, so charts needed nothing either.
+
+**One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
+and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
+five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
+menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
+resource.
+
+**The search dropdown's width moved inside its scale host.** It matches the search box, and
+`Bounds.Width` on a control inside the transform is *pre*-transform; sizing the popup to that content
+rather than setting `Popup.Width` makes it exactly as wide as the box renders, at any scale. Setting
+the width on the popup instead left the dropdown narrower than the box at every scale above 100 %.
+
+**Two resource keys are rewritten at runtime, and they live in `Dimensions.axaml`** — the only
+`{DynamicResource}` entries in a file whose whole point is that it is theme-invariant and static.
+`ThemeService.ApplyUiScale` writes them, so **`ThemeService` remains the only code that writes to
+`Application.Current`**; `AccessibilityService` owns the state and computes the values but touches
+the application not at all. `UiScale.BasePopupFontSize` is a C# mirror of the authored default, as
+`SemanticBrushes` mirrors `Palette.axaml`, and a test pins the two together.
+
+**The window's minimum size scales with it.** At 200 % the same page needs twice the room, and a
+window draggable below that would clip rather than reflow — so `MainWindowViewModel` exposes
+`MinWindowWidth`/`MinWindowHeight` off the base 640×480 and re-raises them when the scale changes.
+
+**Decisions inside it that must not be undone:**
+- **`UiScale.Factor` clamps, and that is load-bearing.** `settings.json` is hand-editable; `0` would
+  collapse the window to nothing rather than degrade to something usable.
+- **`Nearest` snaps an unrecognized percentage onto the ladder**, because the segmented control reads
+  the service's value back — an unmatched number leaves no segment selected and no obvious way out.
+- **`SetScalePercent` re-applies an unchanged value but announces only a real change.** Startup has
+  to push the value through either way; raising `Changed` unconditionally would report a change on
+  every launch and persist for nothing.
+- **The interface-size row's two grid columns are both star.** It is the only row with five segments
+  and the only row its own setting narrows, so it is the only one that wraps — and a `WrapPanel` in
+  an `Auto` column is measured against infinite width, so it never wraps and overflows the card
+  instead. A first attempt with `Auto` did exactly that at 200 %.
 
 ## File Explorer
 

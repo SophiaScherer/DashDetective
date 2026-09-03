@@ -73,6 +73,16 @@ plus all four exports **confirm** through `NoticeService` (`src/Services/Notific
 banner below the resource alert's. Their decisions are in
 [docs/FEATURES.md](docs/FEATURES.md) under *Settings* and *Widget system*.
 
+An **accessibility pass** is under way, and it is the one piece of work that is NOT finished. Phase 1
+added the non-gating macOS CI leg; phase 2 added the Settings **Accessibility** card and the **interface
+size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `AccessibilityService`
+(`src/Services/Accessibility`). Still to come, one phase each: focus indicator, high contrast, color
+independence, color-vision modes, accessible names, reduce motion, keyboard widget reordering, text
+scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
+touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
+writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
+
 A **cross-page linking pass** is complete, in two halves. The Ping and DNS panels' fields each carry a
 link icon opening the typed host in the browser, over a new `IWebLinkOpener` seam (`src/Services/Links`) —
 **https only**, the rule `ToolkitRunner` already enforces, and the third place the app starts a process

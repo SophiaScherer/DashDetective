@@ -5,6 +5,7 @@
         xmlns:nav="using:DashDetective.Shell.Navigation"
         xmlns:search="using:DashDetective.Shell.Search"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:controls="using:DashDetective.Shared.Controls"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
         x:Class="DashDetective.Shell.MainWindow"
@@ -12,7 +13,7 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="DashDetective"
         Width="1180" Height="760"
-        MinWidth="640" MinHeight="480"
+        MinWidth="{Binding MinWindowWidth}" MinHeight="{Binding MinWindowHeight}"
         Background="{DynamicResource AppBackground}"
         TransparencyLevelHint="None"
         SizeChanged="OnShellSizeChanged">
@@ -52,6 +53,11 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
     </Window.Styles>
+
+    <!-- Everything the window draws sits inside the scale host, so the interface size reaches the nav
+         bar, the toolbar, the banners, the pages and the Help modal alike. Popups are their own visual
+         roots and each carry their own. -->
+    <controls:ScaleHost Scale="{DynamicResource UiScale}">
 
     <!-- The Help modal is a sibling of the whole shell rather than a child of the content area, so its
          scrim dims and blocks the navigation bar too, matching the design document. -->
@@ -197,4 +203,6 @@
         <!-- ================= HELP MODAL ================= -->
         <help:HelpOverlay DataContext="{Binding Help}"/>
     </Panel>
+
+    </controls:ScaleHost>
 </Window>

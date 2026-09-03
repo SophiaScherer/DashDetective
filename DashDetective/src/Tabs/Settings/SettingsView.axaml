@@ -157,6 +157,68 @@
             </StackPanel>
         </controls:WidgetPanel>
 
+        <!-- ===== Accessibility ===== -->
+        <!-- Every option here is one the user can switch off; nothing in this card is forced on. The
+             interface size is applied by the AccessibilityService through the ScaleHost wrapping each
+             visual root, so no view has to know its own font size. -->
+        <controls:WidgetPanel WidgetId="settings.accessibility" Collapse="{Binding Collapse}"
+                              Title="{Binding Catalog.UiScale.Section}">
+            <StackPanel Spacing="16">
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.UiScale}">
+                <!-- The only row with five segments, and the one row whose own setting narrows it: at
+                     200% the page measures at half its width, so the fixed strip every other row uses
+                     would starve the label column to nothing. Both columns are star so the steps are
+                     measured against a real width and wrap onto a second line; an Auto column would
+                     measure them against infinity and they would never wrap, only overflow the card. -->
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.UiScale.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.UiScale.Description}"/>
+                    </StackPanel>
+                    <!-- Right-aligned, so at a width where nothing has to wrap the strip sits exactly
+                         where the Theme and Clock format strips above it do. -->
+                    <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
+                        <ItemsControl ItemsSource="{Binding UiScaleOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:UiScaleOption">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+                </Border>
+
+                <!-- Ungated, like the Layout card's reset: a button that vanishes when there is nothing
+                     to undo is worse than one that does nothing. -->
+                <Border Classes="settingRow revealFlash"
+                        Tag="{x:Static settings:SettingId.AccessibilityDefaults}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.AccessibilityDefaults.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.AccessibilityDefaults.Description}"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="action" Content="Restore defaults"
+                            Command="{Binding ResetAccessibilityCommand}"/>
+                </Grid>
+                </Border>
+            </StackPanel>
+        </controls:WidgetPanel>
+
         <!-- ===== Navigation ===== -->
         <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the bar's
              hover chevron, its right-click dock menu and the drag-to-dock gesture. -->

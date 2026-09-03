@@ -1,6 +1,7 @@
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Accessibility;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
 using DashDetective.Services.Settings;
@@ -26,6 +27,7 @@ namespace DashDetective.Tabs.Settings;
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
+    private readonly AccessibilityService _accessibility;
     private readonly SystemMetricsService _metrics;
     private readonly IStartupRegistration _startup;
     private readonly Func<DiagnosticsFormat, string> _buildReport;
@@ -39,6 +41,7 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<AccentOption> AccentOptions { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
+    public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
     // ----- Alerts: one row per watched resource, plus how long a breach must last -----
@@ -119,13 +122,15 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Internal because <see cref="IStartupRegistration"/> is: the class stays public for the
     /// <c>ViewLocator</c> and binding, but the shell is its only caller (and the tests, via
     /// <c>InternalsVisibleTo</c>).</summary>
-    internal SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
+    internal SettingsViewModel(ThemeService theme, AccessibilityService accessibility,
+                               NavigationViewModel nav, SystemMetricsService metrics,
                                AppSettings settings, IStartupRegistration startup,
                                ShortcutBindings shortcuts,
                                Func<DiagnosticsFormat, string> buildReport,
                                Func<string> buildMetricsCsv,
                                Action resetWidgetOrders) {
         _theme = theme;
+        _accessibility = accessibility;
         _metrics = metrics;
         _startup = startup;
         Nav = nav;
@@ -157,6 +162,10 @@ public partial class SettingsViewModel : ViewModelBase {
             new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
         };
 
+        UiScaleOptions = [];
+        foreach (var percent in UiScale.Percents)
+            UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
+
         IntervalOptions = new ObservableCollection<IntervalOption> {
             new("0.5s", 0.5, SelectInterval),
             new("1s", 1, SelectInterval),
@@ -177,6 +186,11 @@ public partial class SettingsViewModel : ViewModelBase {
         // The shell has already applied the clock format from the same settings, so this only reflects it.
         foreach (var option in ClockFormatOptions)
             option.IsSelected = option.Value == settings.ClockFormat;
+
+        // Likewise the scale: read it back off the accessibility service, which has already clamped a
+        // hand-edited value onto the ladder, rather than off the raw setting.
+        ReflectUiScale();
+        _accessibility.Changed += ReflectUiScale;
 
         // A usage threshold under 1% would fire constantly and 100 is a real (if rare) ceiling, so the
         // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
@@ -281,6 +295,14 @@ public partial class SettingsViewModel : ViewModelBase {
         Shortcuts.ResetAll();
         Changed?.Invoke();
         Notify?.Invoke(Notices.ShortcutsRestored);
+    }
+
+    /// <summary>Puts every accessibility option back the way it ships. The segmented controls follow
+    /// through the service's Changed event, so this does not touch them itself.</summary>
+    [RelayCommand]
+    private void ResetAccessibility() {
+        _accessibility.RestoreDefaults();
+        Notify?.Invoke(Notices.AccessibilityRestored);
     }
 
     /// <summary>Puts every page's widgets and cards back in their declared order. The shell owns the
@@ -394,6 +416,20 @@ public partial class SettingsViewModel : ViewModelBase {
     private void RaiseChanged() {
         if (!_initializing)
             Changed?.Invoke();
+    }
+
+    private void SelectUiScale(UiScaleOption option) {
+        _accessibility.SetScalePercent(option.Percent);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    /// <summary>Points the segmented control at whatever the service currently holds. Driven by the
+    /// service's event rather than by the click, so a selection and a "Restore defaults" move it the
+    /// same way and cannot disagree.</summary>
+    private void ReflectUiScale() {
+        foreach (var option in UiScaleOptions)
+            option.IsSelected = option.Percent == _accessibility.ScalePercent;
     }
 
     private void SelectClockFormat(ClockFormatOption option) {

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:nav="using:DashDetective.Shell.Navigation"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -302,33 +303,36 @@
              control, so all three re-dock paths stay in sync. -->
         <Border.ContextFlyout>
             <Flyout Placement="Pointer">
-                <StackPanel Spacing="2" MinWidth="168" Margin="2">
-                    <TextBlock Classes="dockMenuHeader" Text="DOCK NAVIGATION"/>
-                    <ItemsControl ItemsSource="{Binding Positions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="nav:NavPositionOption">
-                                <Button Classes="pickTile" Command="{Binding SelectCommand}"
-                                        Margin="0" HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch">
-                                    <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
-                                        <StackPanel Orientation="Horizontal" Spacing="9">
-                                            <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
-                                                <Panel Margin="3">
-                                                    <Rectangle Fill="{DynamicResource Accent}"
-                                                               Width="{Binding BarWidth}" Height="{Binding BarHeight}"
-                                                               HorizontalAlignment="{Binding BarHAlign}"
-                                                               VerticalAlignment="{Binding BarVAlign}"
-                                                               RadiusX="1" RadiusY="1"/>
-                                                </Panel>
-                                            </Border>
-                                            <TextBlock Text="{Binding Label}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                    <StackPanel Spacing="2" MinWidth="168" Margin="2">
+                        <TextBlock Classes="dockMenuHeader" Text="DOCK NAVIGATION"/>
+                        <ItemsControl ItemsSource="{Binding Positions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="nav:NavPositionOption">
+                                    <Button Classes="pickTile" Command="{Binding SelectCommand}"
+                                            Margin="0" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch">
+                                        <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
+                                            <StackPanel Orientation="Horizontal" Spacing="9">
+                                                <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
+                                                    <Panel Margin="3">
+                                                        <Rectangle Fill="{DynamicResource Accent}"
+                                                                   Width="{Binding BarWidth}" Height="{Binding BarHeight}"
+                                                                   HorizontalAlignment="{Binding BarHAlign}"
+                                                                   VerticalAlignment="{Binding BarVAlign}"
+                                                                   RadiusX="1" RadiusY="1"/>
+                                                    </Panel>
+                                                </Border>
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </controls:ScaleHost>
             </Flyout>
         </Border.ContextFlyout>
 

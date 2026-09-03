@@ -10,6 +10,7 @@ internal static class SettingCards {
     /// <summary>The card for a catalog section, or an empty string for one this page does not draw.</summary>
     internal static string WidgetIdFor(string section) => section switch {
         "Appearance" => "settings.appearance",
+        "Accessibility" => "settings.accessibility",
         "Navigation" => "settings.navigation",
         "Monitoring" => "settings.monitoring",
         "Alerts" => "settings.alerts",
