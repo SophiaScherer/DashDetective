@@ -40,6 +40,44 @@ public class ChildOrderTests {
         Assert.True(order.Sync(4));
     }
 
+    // ===== Resetting =====
+
+    [Fact]
+    public void Reset_PutsAPermutedOrderBackToDeclared() {
+        var order = Order(3);
+        order.ApplySaved(["c", "a", "b"], ["a", "b", "c"]);
+
+        Assert.True(order.Reset(3));
+
+        Assert.Equal("a b c", Shown(order, previewing: false, "a", "b", "c"));
+    }
+
+    /// <summary>What stops a reset costing a layout pass on every panel that was never dragged.</summary>
+    [Fact]
+    public void Reset_AlreadyDeclared_ReportsNoChange() {
+        Assert.False(Order(3).Reset(3));
+    }
+
+    [Fact]
+    public void Reset_AChildCountItHasNotSeen_BuildsTheDeclaredOrder() {
+        var order = new ChildOrder();
+
+        Assert.True(order.Reset(3));
+
+        Assert.Equal([0, 1, 2], order.Shown(previewing: false));
+    }
+
+    /// <summary>Sync early-returns on an unchanged count, so the next measure must not undo a reset.</summary>
+    [Fact]
+    public void Reset_ThenSync_KeepsTheDeclaredOrder() {
+        var order = Order(3);
+        order.ApplySaved(["c", "a", "b"], ["a", "b", "c"]);
+        order.Reset(3);
+
+        Assert.False(order.Sync(3));
+        Assert.Equal("a b c", Shown(order, previewing: false, "a", "b", "c"));
+    }
+
     // ===== Moving =====
 
     [Fact]

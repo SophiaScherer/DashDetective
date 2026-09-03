@@ -213,7 +213,10 @@ stays in its tab folder.
                                  where their slots were arranged. A base class rather than a helper
                                  each panel forwards to — the forwarding would have been most of what
                                  they shared, and Order would have had to become an attached property
-                                 to live anywhere else. Layout vocabulary stays with the panels)
+                                 to live anywhere else. Layout vocabulary stays with the panels. An EMPTY
+                                 Order is a reset, not "nothing saved": it routes to ChildOrder.Reset, and
+                                 it deliberately does not write Order back, so the two-way binding cannot
+                                 echo the reset into the page that asked for it)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
                                  handle is, and the previewed order. Reorder is always a permutation of
                                  the panel's own index list — a panel that reordered Children instead
@@ -238,7 +241,10 @@ stays in its tab folder.
         ChildOrder.cs           (the permutation both reorderable panels share: settled order, previewed
                                  order, and the mapping from a drop index — which counts only what is on
                                  screen — into an order that holds every child. No Avalonia types, so it
-                                 tests without a layout pass)
+                                 tests without a layout pass. Reset() is the way back to the declared
+                                 order, and it needs its own method because neither neighbour can do it:
+                                 ApplySaved is a deliberate no-op on an empty save, and Sync early-returns
+                                 whenever the child count is unchanged, which is every reset)
         Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
                                  start from, plus how a panel names a child: an id attached in markup, else the
                                  control's own, else its item view model's where the children are
