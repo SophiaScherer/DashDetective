@@ -244,6 +244,30 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.
+- **Layout.** One button, **Reset widget placements**, putting every page's dragged widgets and cards
+  back in the order its markup declares — Dashboard, Network, Storage, Hardware, the Processes summary
+  tiles and both Performance strips. It is **order only**: folded cards and the Processes column order
+  are separate preferences with their own controls, and the label says placements for that reason. The
+  mechanism is that the shell clears every `SavedOrder`, because an **empty order is what a panel reads
+  as a reset** — `ChildOrder.ApplySaved` treats an empty save as "nothing to apply" and deliberately
+  leaves the permutation in place, so `ChildOrder.Reset` is the way home and `ReorderablePanel` routes to
+  it. Nothing extra persists: the shell already subscribes to every `SavedOrder.Changed`, and
+  `EncodeWidgetOrders` drops an empty one, so the stored string collapses to `""`. The button is
+  **ungated**, like the Processes tab's "Reset column order" and unlike "Restore default shortcuts": the
+  shell cannot cheaply answer "is any page still on its declared order", and a button that vanishes is
+  worse than one that does nothing. The reset is the shell's `Action`, handed to `SettingsViewModel` the
+  way `buildReport` and `buildMetricsCsv` already are — the orders are the shell's, and Settings is
+  deliberately not itself reorderable.
+- **Folding a card.** Every card on this page carries a header chevron and folds shut, and the state
+  **persists with no "remember" toggle** — unlike the Processes tab's folded sections, where folding is
+  usually a glance rather than a preference; a settings card that is folded is a layout choice. Written
+  up under *Widget system* below, since the affordance is the widget layer's. One decision belongs here
+  though: **`Reveal` expands the card before the view looks for the row.** A folded card's body is never
+  measured, so its rows are never realized, and `SettingsView.FindRow` walks the visual tree for a `Tag`
+  — without the expand, every search jump into a folded card would fail silently, and no code-behind fix
+  is possible because there is nothing in the tree to walk up from. `SettingCards` maps a catalog
+  **section** (not an id) to the card's `WidgetId`, so there is no third table to keep in step with the
+  enum.
 - **Export & Data.** **Copy diagnostics** → clipboard (as text); **Export report** → the system
   snapshot as **text, JSON, Markdown, HTML or CSV**, picked in the native dialog's own type list; **Export
   CSV** → the rolling 60-sample metric histories, a different artifact from the report and so still its
@@ -262,6 +286,9 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   source-gen, load-on-start with full soft-fail to defaults, debounced atomic save, `schemaVersion`).
   The composition root (`App` → `MainWindowViewModel`) applies a loaded snapshot through the seams and
   observes them to save; `ThemeService` stays the single theming applier — the store only observes.
+  Widget order (`widgetOrders`) and folded cards (`collapsedWidgets`) ride along as **opaque encoded
+  strings** with codecs of their own — `WidgetOrders` and `CollapsedWidgets` — so the record and the file
+  stay free of any knowledge of what a widget is, and both store **ids, never indices**.
   `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
   that the app has disclosed, once, that closing the window does not stop it.
   Theme, accent and the navigation choices **persist** through this rather than lasting a session.
@@ -974,6 +1001,13 @@ shape now exists once. Five rules, all load-bearing:
 1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
    `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
    `Border Classes="panel"` is a *surface* — a pane, the Help modal, a drive card — not a widget.
+   It can also **fold shut from a header chevron**, opt-in by handing it a `WidgetCollapse`; the Settings
+   page is the only caller today. Three decisions inside it: **the store is the opt-in**, not a second
+   flag, so a page cannot offer the affordance without giving the state somewhere to live — and somewhere
+   the page itself can reach, which is what lets a search jump reopen a folded card. **Folding hides the
+   body, never the panel**, because hiding the panel would drop it out of `CollectVisible` and change what
+   a drop index means. And the state is saved **by widget id, never by index**, for the same reason the
+   order is.
 2. **A page's widgets go in one `WidgetBoard`, never fixed rows.** The board packs rows to fit and caps
    each widget with `WidgetBoard.MaxSlotWidth`, so a wide window buys another column rather than a wider
    widget. `MaxSlotWidth` is attached to the board, not the child's own `MaxWidth`, because Avalonia
@@ -1042,6 +1076,15 @@ load-bearing:
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right.
+
+A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
+which is what lets the fold chevron share a header with the drag.
+
+**Clearing a `SavedOrder` is how a page is put back.** The Settings *Layout* card does exactly that, and
+`ReorderablePanel` reads an empty `Order` as a reset rather than as nothing saved — `ChildOrder.ApplySaved`
+leaves the permutation in place for an empty save on purpose, and `ChildOrder.Sync` early-returns whenever
+the child count is unchanged, so `ChildOrder.Reset` is the only way home. The branch never writes `Order`
+back, so the two-way binding cannot echo a reset into the page that asked for it.
 
 A page persists one `SavedOrder` per strip (`IReorderablePage.SavedOrders`), which is what lets
 Performance keep a rail order and a separate tile order per device kind. The drop hint is the nav
