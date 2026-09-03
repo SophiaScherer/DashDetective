@@ -19,6 +19,9 @@ internal static class Notices {
     /// <summary>One shortcut is. Names the action rather than the key, which the row already shows.</summary>
     public static string ShortcutRestored(string action) => $"Shortcut restored for {action}";
 
+    /// <summary>A web address could not be handed to a browser. Names it, since nothing appeared.</summary>
+    public static string CouldNotOpenLink(string url) => $"Could not open {url}";
+
     /// <summary>The diagnostics report is on the clipboard.</summary>
     public const string DiagnosticsCopied = "Diagnostics copied to clipboard";
 }

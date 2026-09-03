@@ -169,6 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // confirmations are not something it needs to be constructed with.
         _settings.Notify = Notify;
         _toolkit.Notify = Notify;
+        _network.Notify = Notify;
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;

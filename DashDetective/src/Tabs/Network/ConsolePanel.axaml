@@ -3,22 +3,49 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              x:Class="DashDetective.Tabs.Network.ConsolePanel"
              x:Name="Root" x:CompileBindings="False">
-    <!-- A target field, its submit button, and two lines of terminal output. The Ping and DNS Lookup
-         panels are the same shape down to the node, differing only in their labels, bindings and the two
-         console colours, so the shape lives here once.
+    <!-- A target field with an optional "open in browser" icon, its submit button, and two lines of
+         terminal output. The Ping and DNS Lookup panels are the same shape down to the node, differing
+         only in their labels, bindings and the two console colours, so the shape lives here once.
 
          Tab-local by the repo's promotion rule: both users are the Network tab. The console TOKENS are
          app-level (Palette.axaml) because the Toolkit tab draws them too — this panel is not. -->
+    <UserControl.Styles>
+        <!-- The link icon greys out with its button rather than vanishing, so the affordance is visible
+             before a host is typed. The glyph draws its own Stroke, so opacity is what dims it. -->
+        <Style Selector="Button.clearField:disabled Path">
+            <Setter Property="Opacity" Value="0.35"/>
+        </Style>
+        <Style Selector="Button.clearField:disabled">
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+    </UserControl.Styles>
+
     <controls:WidgetPanel WidgetId="{Binding #Root.WidgetId}" Title="{Binding #Root.Title}">
         <DockPanel LastChildFill="True">
             <Grid DockPanel.Dock="Top" Margin="0,0,0,10" ColumnDefinitions="*,Auto" ColumnSpacing="6">
                 <Border Grid.Column="0" Classes="field">
-                    <TextBox Text="{Binding #Root.Target, Mode=TwoWay}"
-                             PlaceholderText="{Binding #Root.Placeholder}">
-                        <TextBox.KeyBindings>
-                            <KeyBinding Gesture="Enter" Command="{Binding #Root.EnterCommand}"/>
-                        </TextBox.KeyBindings>
-                    </TextBox>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <!-- flat, like every other box inside a field Border: Fluent's focus block
+                             otherwise paints a filled rectangle around the text alone, beside the icon. -->
+                        <TextBox Classes="flat" Text="{Binding #Root.Target, Mode=TwoWay}"
+                                 PlaceholderText="{Binding #Root.Placeholder}">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding #Root.EnterCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <!-- The tooltip sits on the wrapper, not the button: a disabled button takes no
+                             pointer-over, and the disabled state is the one needing an explanation. -->
+                        <Border Grid.Column="1" Margin="0,0,4,0"
+                                IsVisible="{Binding #Root.LinkCommand, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                ToolTip.Tip="{Binding #Root.LinkToolTip}">
+                            <Button Classes="clearField" Command="{Binding #Root.LinkCommand}">
+                                <Path Width="10" Height="10" Stretch="Uniform"
+                                      Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.5"
+                                      StrokeLineCap="Round" StrokeJoin="Round"
+                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                            </Button>
+                        </Border>
+                    </Grid>
                 </Border>
                 <Button Grid.Column="1" Classes="go" Content="{Binding #Root.ButtonText}"
                         Command="{Binding #Root.SubmitCommand}"/>

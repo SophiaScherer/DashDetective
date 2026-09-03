@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Network;
+using DashDetective.Services.Notifications;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
@@ -201,7 +202,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private bool _hasNextPage;
 
     /// <summary>The ping target, editable in the Ping panel. Seeded with the machine's own gateway.</summary>
-    [ObservableProperty] private string _pingTarget = "";
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenPingSiteCommand))]
+    [NotifyPropertyChangedFor(nameof(PingLinkTip))]
+    private string _pingTarget = "";
 
     /// <summary>Whether the user has switched the ping monitor on. Off on every launch — the app must not
     /// send ICMP nobody asked for — and it survives leaving the tab, so returning finds it as it was left.</summary>
@@ -220,7 +224,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     [ObservableProperty] private string _pingSummary = PingIdleSummary;
 
     /// <summary>The DNS lookup host, editable in the DNS panel. Applied via <see cref="LookupDnsCommand"/>.</summary>
-    [ObservableProperty] private string _dnsHost = DnsLookupProvider.DefaultHost;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenDnsSiteCommand))]
+    [NotifyPropertyChangedFor(nameof(DnsLinkTip))]
+    private string _dnsHost = DnsLookupProvider.DefaultHost;
 
     /// <summary>Console-style DNS output (name + resolved addresses).</summary>
     [ObservableProperty] private string _dnsConsole = "";
@@ -231,6 +238,10 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Whether a lookup has been run this session, so Refresh re-resolves what the user asked
     /// for rather than reaching out to a host they never requested.</summary>
     private bool _dnsResolved;
+
+    /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner; left null
+    /// in a test, where there is nothing to draw on.</summary>
+    internal Action<string>? Notify { get; set; }
 
     public NetworkViewModel() : this(NetworkProviders.ForCurrentPlatform()) { }
 
@@ -535,6 +546,44 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// only thing that ever resolves a name: the panel stays idle until the user asks.</summary>
     [RelayCommand]
     private void LookupDns() => _ = LoadDnsAsync();
+
+    // ----- Opening a target in the browser -----
+    // Each panel's field carries a link icon, disabled rather than hidden while the field holds nothing
+    // openable so its tooltip can say why. https only, which is HostLink's rule.
+
+    private bool CanOpenDnsSite => HostLink.For(DnsHost) is not null;
+
+    private bool CanOpenPingSite => HostLink.For(PingTarget) is not null;
+
+    /// <summary>The DNS icon's tooltip, in both its states.</summary>
+    public string DnsLinkTip => LinkTip(DnsHost);
+
+    /// <summary>The Ping icon's tooltip, in both its states.</summary>
+    public string PingLinkTip => LinkTip(PingTarget);
+
+    /// <summary>Opens the DNS panel's host in the default browser.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenDnsSite))]
+    private void OpenDnsSite() => OpenSite(DnsHost);
+
+    /// <summary>Opens the Ping panel's target in the default browser. A gateway's admin page is often
+    /// http-only, which fails in the browser rather than here.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenPingSite))]
+    private void OpenPingSite() => OpenSite(PingTarget);
+
+    private static string LinkTip(string host) =>
+        HostLink.For(host) is { } url
+            ? $"Open {url} in your browser"
+            : "Enter a host to open it in your browser";
+
+    /// <summary>Hands the host's https address to the shell. Only a failure is announced: a browser that
+    /// opens is its own confirmation, one that does not is invisible.</summary>
+    private void OpenSite(string host) {
+        if (HostLink.For(host) is not { } url)
+            return;
+
+        if (!_providers.Links.Open(url))
+            Notify?.Invoke(Notices.CouldNotOpenLink(url));
+    }
 
     /// <summary>The Ping panel's Start/Stop button.</summary>
     [RelayCommand]
