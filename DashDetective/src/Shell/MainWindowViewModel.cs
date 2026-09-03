@@ -359,6 +359,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
         WidgetOrders = EncodeWidgetOrders(),
+        CollapsedWidgets = _settings.Collapse.Encode(),
         ProcessColumns = ProcessColumnOrder.Encode(_processes.ColumnOrder),
         ProcessesRememberCollapsed = _processes.RememberCollapsedGroups,
         ProcessesRememberSort = _processes.RememberSort,

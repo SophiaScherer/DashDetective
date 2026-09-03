@@ -72,7 +72,13 @@ stays in its tab folder.
                                them. PLURAL on purpose — Performance reorders its rail and its stat
                                tiles separately, and the tiles keep one order per device kind)
       SavedOrder.cs           (one of those orders: the key it saves under, the ids, and a change
-                               signal. Bound two-way to the panel that lays the strip out)
+                               signal. Bound two-way to the panel that lays the strip out. An EMPTY
+                               order is how the shell resets a page — see ReorderablePanel)
+      WidgetCollapse.cs       (which of a page's widgets are folded shut, plus the id that moved. Held
+                               off the panel, the same split SavedOrder makes, so the state survives a
+                               restart and the page can reopen a card a search needs on screen. Load is
+                               a RESTORE and deliberately raises nothing; Encode is order-stable, since
+                               a set's iteration order would churn the debounced save)
       SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
                                a page's timers care about, so the five do not each hand-roll the pair.
                                STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
@@ -267,6 +273,9 @@ stays in its tab folder.
                                         Border Classes="panel" is a SURFACE, not a widget.
                                         WidgetTable is a table's chrome: header above a scrolling body,
                                         one gutter for both. Columns and sorting stay at the call site)
+        CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
+                                        encodes as WidgetOrders is. By id, never by index: a page that
+                                        gains or loses a widget must not silently fold a different one)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —

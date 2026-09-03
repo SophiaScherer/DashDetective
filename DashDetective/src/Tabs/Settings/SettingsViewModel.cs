@@ -57,6 +57,10 @@ public partial class SettingsViewModel : ViewModelBase {
     /// this page edits what is actually in force rather than a copy of it.</summary>
     public ShortcutBindings Shortcuts { get; }
 
+    /// <summary>Which cards on this page are folded shut. Handed to each WidgetPanel that may fold,
+    /// and read by <see cref="Reveal"/> so a search jump can reopen the card it lands in.</summary>
+    public WidgetCollapse Collapse { get; } = new();
+
     /// <summary>The Keyboard card's rows, grouped by scope exactly as Help lists them.</summary>
     public ObservableCollection<ShortcutRowGroup> ShortcutGroups { get; } = [];
 
@@ -121,6 +125,10 @@ public partial class SettingsViewModel : ViewModelBase {
         _buildMetricsCsv = buildMetricsCsv;
         _resetWidgetOrders = resetWidgetOrders;
         _initializing = true;
+
+        // Load before subscribing: a restore is not an edit, and the page is still being built.
+        Collapse.Load(settings.CollapsedWidgets);
+        Collapse.Changed += _ => RaiseChanged();
 
         ThemeOptions = new ObservableCollection<ThemeOption> {
             new("Dark", AppTheme.Dark, SelectTheme),
