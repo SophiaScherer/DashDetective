@@ -86,8 +86,12 @@ public partial class SettingsViewModel : ViewModelBase {
     public event Action<SettingId>? RevealRequested;
 
     /// <summary>Scrolls a setting into view and flashes it, so a jump from search lands on the row the
-    /// user asked for rather than at the top of a page of toggles.</summary>
-    public void Reveal(SettingId id) => RevealRequested?.Invoke(id);
+    /// user asked for rather than at the top of a page of toggles. Opens the card first: a folded one's
+    /// body is never measured, so its rows are not in the visual tree for the view to find at all.</summary>
+    public void Reveal(SettingId id) {
+        Collapse.Expand(SettingCards.WidgetIdFor(Catalog.Get(id).Section));
+        RevealRequested?.Invoke(id);
+    }
 
     /// <summary>Start DashDetective with Windows (per-user HKCU Run entry).</summary>
     [ObservableProperty] private bool _launchAtStartup;

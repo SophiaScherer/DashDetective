@@ -64,7 +64,7 @@
     <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
 
         <!-- ===== Appearance ===== -->
-        <controls:WidgetPanel WidgetId="settings.appearance" Title="Appearance">
+        <controls:WidgetPanel WidgetId="settings.appearance" Collapse="{Binding Collapse}" Title="Appearance">
             <StackPanel Spacing="16">
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Theme}">
@@ -160,7 +160,7 @@
         <!-- ===== Navigation ===== -->
         <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the bar's
              hover chevron, its right-click dock menu and the drag-to-dock gesture. -->
-        <controls:WidgetPanel WidgetId="settings.navigation" Title="Navigation">
+        <controls:WidgetPanel WidgetId="settings.navigation" Collapse="{Binding Collapse}" Title="Navigation">
             <StackPanel Spacing="16">
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.NavPosition}">
@@ -217,7 +217,7 @@
         </controls:WidgetPanel>
 
         <!-- ===== Monitoring ===== -->
-        <controls:WidgetPanel WidgetId="settings.monitoring" Title="Monitoring">
+        <controls:WidgetPanel WidgetId="settings.monitoring" Collapse="{Binding Collapse}" Title="Monitoring">
             <StackPanel Spacing="16">
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.RefreshInterval}">
@@ -309,7 +309,8 @@
              per-row switch is what turns a resource off, so the number survives being switched off and
              the field never has to carry a magic "Off" member. "Warn after" has no switch — it is the
              wait before a warning, not a warning. -->
-        <controls:WidgetPanel WidgetId="settings.alerts" Title="{Binding Catalog.AlertCpu.Section}"
+        <controls:WidgetPanel WidgetId="settings.alerts" Collapse="{Binding Collapse}"
+                              Title="{Binding Catalog.AlertCpu.Section}"
                               Subtitle="Watched only while Resource alerts is on">
             <StackPanel Spacing="16">
 
@@ -435,7 +436,8 @@
              Help modal can never describe different keys. A row arms its capture box, the box swallows the
              next press, and the view model accepts or refuses it — a clash inside the same scope is
              refused and explained on the row itself. -->
-        <controls:WidgetPanel WidgetId="settings.keyboard" Title="{Binding Catalog.Shortcuts.Section}"
+        <controls:WidgetPanel WidgetId="settings.keyboard" Collapse="{Binding Collapse}"
+                              Title="{Binding Catalog.Shortcuts.Section}"
                               Subtitle="{Binding Catalog.Shortcuts.Description}">
             <StackPanel Spacing="18">
 
@@ -497,7 +499,8 @@
         <!-- The reset is ungated, like the Processes tab's "Reset column order": the shell cannot
              cheaply answer "is any page still on its declared order", and a button that vanishes is
              worse than one that does nothing. Order only — folded cards are a separate preference. -->
-        <controls:WidgetPanel WidgetId="settings.layout" Title="{Binding Catalog.WidgetPlacements.Section}">
+        <controls:WidgetPanel WidgetId="settings.layout" Collapse="{Binding Collapse}"
+                              Title="{Binding Catalog.WidgetPlacements.Section}">
             <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.WidgetPlacements}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
@@ -511,7 +514,8 @@
         </controls:WidgetPanel>
 
         <!-- ===== Export & Data ===== -->
-        <controls:WidgetPanel WidgetId="settings.export" Title="{Binding Catalog.ExportData.Section}">
+        <controls:WidgetPanel WidgetId="settings.export" Collapse="{Binding Collapse}"
+                              Title="{Binding Catalog.ExportData.Section}">
             <StackPanel Spacing="14">
                 <!-- The three actions share one search entry, so the row tag sits on the group rather
                      than on any one button. -->

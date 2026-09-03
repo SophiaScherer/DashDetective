@@ -16,17 +16,28 @@
                         <!-- Title | HeaderLead | HeaderContent (right). Each reserves room only when set. -->
                         <StackPanel x:Name="PART_Header" DockPanel.Dock="Top" Spacing="2"
                                     Margin="{StaticResource WidgetHeaderMargin}">
-                            <Grid ColumnDefinitions="Auto,Auto,*">
-                                <TextBlock Grid.Column="0" Classes="panelTitle"
+                            <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+                                <!-- The fold chevron, present only for a panel handed a store. A plain
+                                     Button rather than a ToggleButton: Fluent's checked/pressed states
+                                     would all need undoing, and the shared Button.bare already strips
+                                     the chrome. WidgetBoard.TryGetHandle refuses a drag with a button in
+                                     its path, which is what lets this share a header with the drag. -->
+                                <Button Grid.Column="0" x:Name="PART_Collapse" Classes="bare"
+                                        Width="16" Margin="0,0,6,0" VerticalAlignment="Center"
+                                        IsVisible="{TemplateBinding Collapse,
+                                                    Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <TextBlock x:Name="PART_ChevronGlyph"/>
+                                </Button>
+                                <TextBlock Grid.Column="1" Classes="panelTitle"
                                            VerticalAlignment="Center"
                                            Text="{TemplateBinding Title}"
                                            IsVisible="{TemplateBinding Title,
                                                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
+                                <ContentPresenter Grid.Column="2" VerticalAlignment="Center"
                                                   Content="{TemplateBinding HeaderLead}"
                                                   IsVisible="{TemplateBinding HeaderLead,
                                                               Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                <ContentPresenter Grid.Column="2" VerticalAlignment="Center"
+                                <ContentPresenter Grid.Column="3" VerticalAlignment="Center"
                                                   HorizontalAlignment="Right"
                                                   Content="{TemplateBinding HeaderContent}"
                                                   IsVisible="{TemplateBinding HeaderContent,
@@ -37,7 +48,8 @@
                                        IsVisible="{TemplateBinding Subtitle,
                                                    Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
-                        <ContentPresenter Content="{TemplateBinding Content}"
+                        <ContentPresenter x:Name="PART_Body"
+                                          Content="{TemplateBinding Content}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"/>
                     </DockPanel>
                 </Border>
@@ -88,6 +100,31 @@
                 </DockPanel>
             </ControlTemplate>
         </Setter>
+    </Style>
+
+    <!-- Folded shut. The glyph is the app's own disclosure pair, the one the Processes group headers
+         draw, set from the pseudo-class so nothing has to select it in code. Only the BODY is hidden —
+         hiding the panel itself would drop it out of a board's visible children and change what a drop
+         index means. -->
+    <Style Selector="controls|WidgetPanel /template/ TextBlock#PART_ChevronGlyph">
+        <!-- 11, not the Processes table's 9: that one is read against a 12.5 row, this against a
+             13.5 SemiBold panel title, where 9 reads as a dot rather than a chevron. -->
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+        <Setter Property="Text" Value="&#x25BE;"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel /template/ Button#PART_Collapse:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel:collapsed /template/ TextBlock#PART_ChevronGlyph">
+        <Setter Property="Text" Value="&#x25B8;"/>
+    </Style>
+    <Style Selector="controls|WidgetPanel:collapsed /template/ ContentPresenter#PART_Body">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <!-- Same trick as .headless below: with no body, the header's bottom margin is a dangling gap. -->
+    <Style Selector="controls|WidgetPanel:collapsed /template/ StackPanel#PART_Header">
+        <Setter Property="Margin" Value="0"/>
     </Style>
 
     <!-- A widget with no heading at all: drop the header's bottom margin so the body starts at the

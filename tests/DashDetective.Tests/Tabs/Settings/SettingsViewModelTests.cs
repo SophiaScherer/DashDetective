@@ -21,12 +21,13 @@ public class SettingsViewModelTests {
     private static SettingsViewModel Create(IStartupRegistration startup) =>
         Create(startup, () => { });
 
-    private static SettingsViewModel Create(IStartupRegistration startup, Action resetWidgetOrders) {
+    private static SettingsViewModel Create(IStartupRegistration startup, Action resetWidgetOrders,
+                                            AppSettings? settings = null) {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         return new SettingsViewModel(
-            new ThemeService(), new NavigationViewModel(), metrics, AppSettings.Defaults, startup,
+            new ThemeService(), new NavigationViewModel(), metrics, settings ?? AppSettings.Defaults, startup,
             new ShortcutBindings(), _ => "", () => "", resetWidgetOrders);
     }
 
@@ -69,6 +70,63 @@ public class SettingsViewModelTests {
         viewModel.ResetWidgetPlacementsCommand.Execute(null);
 
         Assert.Equal(2, resets);
+    }
+
+    /// <summary>A folded card's body is never measured, so its rows are not in the visual tree for the
+    /// view to scroll to. The jump has to open the card before it asks.</summary>
+    [Fact]
+    public void Reveal_ExpandsTheCardTheSettingSitsOn() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        viewModel.Collapse.Set("settings.alerts", collapsed: true);
+        var revealed = new List<SettingId>();
+        viewModel.RevealRequested += revealed.Add;
+
+        viewModel.Reveal(SettingId.AlertCpu);
+
+        Assert.False(viewModel.Collapse.IsCollapsed("settings.alerts"));
+        Assert.Equal([SettingId.AlertCpu], revealed);
+    }
+
+    [Fact]
+    public void Reveal_LeavesEveryOtherCardFolded() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        viewModel.Collapse.Set("settings.keyboard", collapsed: true);
+
+        viewModel.Reveal(SettingId.Theme);
+
+        Assert.True(viewModel.Collapse.IsCollapsed("settings.keyboard"));
+    }
+
+    [Fact]
+    public void Ctor_SeedsCollapseFromSettings() {
+        var settings = AppSettings.Defaults with { CollapsedWidgets = "settings.keyboard" };
+
+        var viewModel = Create(new FakeStartupRegistration(enabled: false), () => { }, settings);
+
+        Assert.True(viewModel.Collapse.IsCollapsed("settings.keyboard"));
+    }
+
+    /// <summary>Seeding is a restore, not an edit — the shell must not save back what it just read.</summary>
+    [Fact]
+    public void Ctor_SeedingCollapse_RaisesNoChange() {
+        var settings = AppSettings.Defaults with { CollapsedWidgets = "settings.keyboard" };
+        var changes = 0;
+
+        var viewModel = Create(new FakeStartupRegistration(enabled: false), () => { }, settings);
+        viewModel.Changed += () => changes++;
+
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void Collapse_RaisesChangedSoTheShellPersists() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.Collapse.Set("settings.alerts", collapsed: true);
+
+        Assert.Equal(1, changes);
     }
 
     /// <summary>The tray toggle is shown disabled rather than removed where there is no tray to hide

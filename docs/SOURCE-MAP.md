@@ -194,6 +194,12 @@ stays in its tab folder.
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource}. A token with no call site should not exist)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
+                                 and the :collapsed rules. The chevron is a plain Button, not a
+                                 ToggleButton: Fluent's checked/pressed states would all need undoing,
+                                 and Button.bare already strips the chrome. The glyph is set from the
+                                 pseudo-class rather than a converter, which keeps it out of Icons —
+                                 touching Icons at all throws without a render backend, so a test could
+                                 not reach the rule.
                                  which is what satisfies compiled bindings without an x:DataType)
 ```
 
@@ -271,6 +277,11 @@ stays in its tab folder.
                                        (WidgetPanel is one widget: surface, header row, body. Title /
                                         Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
                                         Border Classes="panel" is a SURFACE, not a widget.
+                                        Hand it a WidgetCollapse and it grows a header chevron; the
+                                        STORE IS THE OPT-IN, so a page cannot offer the affordance
+                                        without giving the state somewhere to live. Folding hides the
+                                        BODY, never the panel — hiding the panel would drop it out of a
+                                        board's visible children and change what a drop index means.
                                         WidgetTable is a table's chrome: header above a scrolling body,
                                         one gutter for both. Columns and sorting stay at the call site)
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
@@ -1097,6 +1108,13 @@ stays in its tab folder.
                                                          TrayIntegration shape — one named capability, read by
                                                          SettingDescriptions.NvidiaGpuMetricsFor and by
                                                          SettingsViewModel.CanUseNvidiaMetrics)
+                                SettingCards.cs         (which card a catalog SECTION is drawn on, as the
+                                                         panel's WidgetId. Keyed off the section rather
+                                                         than the id, so there is no third table to keep
+                                                         in step with the enum. Reveal expands that card
+                                                         BEFORE the view looks for the row: a folded card's
+                                                         body is never measured, so its rows are not in the
+                                                         visual tree to find, and the jump dies silently)
                                 SettingDescriptions.cs  (the descriptions that name a MECHANISM rather
                                                          than an effect, or a platform that cannot honor
                                                          one, so cannot be shared — "Start with Windows",
