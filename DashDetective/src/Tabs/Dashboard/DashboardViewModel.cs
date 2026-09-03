@@ -1,5 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
@@ -58,9 +59,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// are inserted once enumerated, so several drives each get their own card (up to five per row, wrapping).</summary>
     public ObservableCollection<DashboardCard> Cards { get; } = new();
 
-    private readonly DashboardCard _cpuCard = new(DeviceCategory.Cpu, "CPU", "%");
-    private readonly DashboardCard _memoryCard = new(DeviceCategory.Memory, "MEMORY", "GB");
-    private readonly DashboardCard _networkCard = new(DeviceCategory.Network, "NETWORK", "Mbps");
+    // Each card opens its own device on the Performance tab; the charts below do the same through the
+    // three commands at the end of this file.
+    private readonly DashboardCard _cpuCard;
+    private readonly DashboardCard _memoryCard;
+    private readonly DashboardCard _networkCard;
 
     // Per-disk cards + rolling active-time histories keyed by disk number, and the page-local sampler/timer that
     // drives them (like the Storage tab). A disk card's value + chart show Task Manager's disk "Active time";
@@ -199,6 +202,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             () => service.SubscribeCpu(OnCpu, OnCpuFailed),
             () => service.SubscribeMemory(OnMemory, OnMemoryFailed),
             () => service.SubscribeNetwork(OnNetwork, OnNetworkFailed));
+
+        _cpuCard = new DashboardCard(DeviceCategory.Cpu, DeviceIds.Cpu, "CPU", "%", OpenInPerformance);
+        _memoryCard = new DashboardCard(DeviceCategory.Memory, DeviceIds.Memory, "MEMORY", "GB", OpenInPerformance);
+        _networkCard = new DashboardCard(DeviceCategory.Network, DeviceIds.Network, "NETWORK", "Mbps", OpenInPerformance);
 
         // Seed the top stat row: the singleton cards show live data immediately; disk cards insert once
         // enumerated (before the Network card, keeping the CPU→Memory→GPU→Disks→Network grouping).
@@ -397,7 +404,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         foreach (var gpu in gpus)
             rebuilt.Add((
                 gpu.GpuLuid ?? gpu.Id,
-                new DashboardCard(DeviceCategory.Gpu, gpu.Name.ToUpperInvariant(), "%") { Sub = gpu.Sub },
+                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "%",
+                                  OpenInPerformance) { Sub = gpu.Sub },
                 gpu.GpuPci?.VendorId));
 
         var modelText = gpus.Count > 0
@@ -672,8 +680,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>
     /// Enumerates the physical disks + volumes once (off the UI thread) and rebuilds the per-disk stat cards.
     /// Both providers soft-fail to empty lists, so any failure just leaves the existing cards in place.
+    /// Internal rather than private so a test can await the read the ctor fires and forgets, like
+    /// <see cref="LoadGpusAsync"/>.
     /// </summary>
-    private async Task LoadDisksAsync() {
+    internal async Task LoadDisksAsync() {
         var token = _gate.Token;
         try {
             var disksTask = _providers.Disks.GetAsync();
@@ -701,7 +711,8 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         foreach (var drive in drives)
             rebuilt.Add((
                 drive.DiskNumber,
-                new DashboardCard(DeviceCategory.Disk, drive.Name.ToUpperInvariant(), "%") {
+                new DashboardCard(DeviceCategory.Disk, DeviceIds.Disk(drive.DiskNumber),
+                                  drive.Name.ToUpperInvariant(), "%", OpenInPerformance) {
                     Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
                 }));
 
@@ -764,6 +775,28 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Unsubscribes from the shared metrics and tears down the uptime + throughput timers and the
     /// per-disk sampler. The shared feed's samplers are owned (and disposed) by the service. Safe to call more
     /// than once.</summary>
+    // ----- Opening a graph on the Performance tab -----
+    // The ToolkitViewModel.FileExplorerRevealRequested shape: this page names a device and says nothing
+    // about which tab shows it, so only the shell knows the wiring.
+
+    /// <summary>Raised with an inventory device id when a card or chart asks to be opened in Performance.</summary>
+    public event Action<string>? PerformanceRevealRequested;
+
+    /// <summary>Opens the CPU chart's device on the Performance tab.</summary>
+    [RelayCommand]
+    private void OpenCpuChart() => OpenInPerformance(DeviceIds.Cpu);
+
+    /// <summary>Opens the Memory chart's device.</summary>
+    [RelayCommand]
+    private void OpenMemoryChart() => OpenInPerformance(DeviceIds.Memory);
+
+    /// <summary>Opens the Network chart's adapter.</summary>
+    [RelayCommand]
+    private void OpenNetworkChart() => OpenInPerformance(DeviceIds.Network);
+
+    // Named commands rather than one taking a CommandParameter, so the id scheme is never spelled in XAML.
+    private void OpenInPerformance(string deviceId) => PerformanceRevealRequested?.Invoke(deviceId);
+
     public void Dispose() {
         _gate.Dispose();
         _subscriptions.Dispose();

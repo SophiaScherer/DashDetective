@@ -17,6 +17,18 @@
         <Style Selector="controls|StatCard.gpu"><Setter Property="Accent" Value="{DynamicResource ChartGpu}"/></Style>
         <Style Selector="controls|StatCard.disk"><Setter Property="Accent" Value="{DynamicResource ChartStorage}"/></Style>
         <Style Selector="controls|StatCard.net"><Setter Property="Accent" Value="{DynamicResource ChartNetDown}"/></Style>
+
+        <!-- A chart body that opens its device in Performance. Button.bare carries the hand cursor; this
+             adds the hover tint, since a chart has no card surface of its own to pick one up from. -->
+        <Style Selector="Button.openChart">
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.openChart:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+        </Style>
     </UserControl.Styles>
 
     <!-- Surfaces/typography come from src/Shared/Styles; StatCard / Sparkline / InfoRow come from
@@ -38,13 +50,19 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DashboardCard">
-                    <controls:StatCard Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
-                                       Classes.gpu="{Binding IsGpu}" Classes.disk="{Binding IsDisk}"
-                                       Classes.net="{Binding IsNetwork}"
-                                       Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
-                                       Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"
-                                       AxisMaxLabel="{Binding AxisMaxLabel}" AxisMinLabel="0"
-                                       ToolTip.Tip="{Binding NoteTip}"/>
+                    <!-- The card is a click target that opens its own device in Performance. A button
+                         rather than a tap handler, so it takes focus and answers Enter/Space too; the
+                         cards' panel sets no DragGrip, so nothing here competes for the press. -->
+                    <Button Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                        <controls:StatCard Selectable="True"
+                                           Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
+                                           Classes.gpu="{Binding IsGpu}" Classes.disk="{Binding IsDisk}"
+                                           Classes.net="{Binding IsNetwork}"
+                                           Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
+                                           Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"
+                                           AxisMaxLabel="{Binding AxisMaxLabel}" AxisMinLabel="0"/>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -56,22 +74,29 @@
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
                 </controls:WidgetPanel.HeaderContent>
-                <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
-                                    YMin="0" YMax="100" Points="{Binding CpuPoints}"
-                                    AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
-                                    AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                    StatusText="{Binding CpuChartStatus}"/>
+                <!-- The body opens this device in Performance; the header keeps its drag and fold. -->
+                <Button Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
+                        ToolTip.Tip="Open CPU in Performance">
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
+                                        YMin="0" YMax="100" Points="{Binding CpuPoints}"
+                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding CpuChartStatus}"/>
+                </Button>
             </controls:WidgetPanel>
             <controls:WidgetPanel WidgetId="dashboard.memory" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="Memory Utilization" Subtitle="{Binding MemoryChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
                 </controls:WidgetPanel.HeaderContent>
-                <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
-                                    YMin="0" YMax="100" Points="{Binding MemoryPoints}"
-                                    AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
-                                    AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                    StatusText="{Binding MemoryChartStatus}"/>
+                <Button Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
+                        ToolTip.Tip="Open Memory in Performance">
+                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
+                                        YMin="0" YMax="100" Points="{Binding MemoryPoints}"
+                                        AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
+                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                        StatusText="{Binding MemoryChartStatus}"/>
+                </Button>
             </controls:WidgetPanel>
 
             <!-- ===== System info + Network throughput. System info keeps the wider share of whatever
@@ -133,14 +158,17 @@
                                               Label1="Download" Brush1="{DynamicResource ChartNetDown}"
                                               Label2="Upload" Brush2="{DynamicResource ChartNetUp}"/>
                     </Grid>
-                    <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
-                                        Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
-                                        Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
-                                        YMin="0" YMax="100"
-                                        AxisMaxLabel="{Binding NetworkAxisMax}" AxisMidLabel="{Binding NetworkAxisMid}"
-                                        AxisMinLabel="0"
-                                        AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
-                                        StatusText="{Binding NetworkChartStatus}"/>
+                    <Button Classes="bare openChart" Command="{Binding OpenNetworkChartCommand}"
+                            ToolTip.Tip="Open this adapter in Performance">
+                        <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
+                                            Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
+                                            Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
+                                            YMin="0" YMax="100"
+                                            AxisMaxLabel="{Binding NetworkAxisMax}" AxisMidLabel="{Binding NetworkAxisMid}"
+                                            AxisMinLabel="0"
+                                            AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
+                                            StatusText="{Binding NetworkChartStatus}"/>
+                    </Button>
                 </StackPanel>
             </controls:WidgetPanel>
     </layout:WidgetBoard>

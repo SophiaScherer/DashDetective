@@ -76,18 +76,18 @@ public class DashboardGpuCardTests {
         Assert.Equal("", card.Unit);
         // …and the card can say why, since it has no room for a line of its own.
         Assert.Equal("Turn on \"NVIDIA GPU utilization\" in Settings to read this card.", card.Note);
-        Assert.Equal(card.Note, card.NoteTip);
+        Assert.Equal(card.Note, card.Tip);
     }
 
-    /// <summary>A card that reports carries no note — nothing to explain. Its tooltip is null rather than
-    /// empty, or hovering the card would pop an empty box.</summary>
+    /// <summary>A card that reports carries no note — nothing to explain — so its tooltip falls back to
+    /// where a click on it goes.</summary>
     [Fact]
     public async Task LoadGpusAsync_AdapterThatReports_CarriesNoNote() {
         var viewModel = await LoadedAsync(
             () => new FakeGpuUsageSampler().Reporting(Amd, 37), Adapter(Amd, "AMD amdgpu (1002:73df)"));
 
         Assert.Equal("", GpuCard(viewModel).Note);
-        Assert.Null(GpuCard(viewModel).NoteTip);
+        Assert.Equal(DashboardCard.OpenHint, GpuCard(viewModel).Tip);
     }
 
     [Fact]

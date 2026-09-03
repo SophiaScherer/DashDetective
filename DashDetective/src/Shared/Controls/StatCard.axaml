@@ -4,7 +4,9 @@
              x:Class="DashDetective.Shared.Controls.StatCard"
              x:Name="Root" x:CompileBindings="False">
     <!-- A dashboard metric card: label, colour dot, big value + unit, caption, sparkline. -->
-    <Border Classes="card">
+    <!-- Selectable is opt-in: it adds the shared card.selectable hover + hand cursor for a card that is
+         also a click target, and leaves a plain readout alone. -->
+    <Border Classes="card" Classes.selectable="{Binding #Root.Selectable}">
         <StackPanel Spacing="6">
             <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Classes="cardLabel" Text="{Binding #Root.Label}"/>
