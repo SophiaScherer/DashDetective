@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using DashDetective.Shared.Controls;
 
 namespace DashDetective.Shared.Layout;
@@ -34,6 +35,12 @@ public sealed class Reorder {
     /// tell a drag from a click.</summary>
     public static readonly AttachedProperty<bool> IsGripProperty =
         AvaloniaProperty.RegisterAttached<Reorder, Control, bool>("IsGrip");
+
+    /// <summary>Whether this node takes clicks of its own, so a gesture that started inside it is not
+    /// the surrounding surface's to act on. The list <see cref="ReorderGrip.Item"/> describes, in one
+    /// place: a drag refuses a press that began here, and a widget header refuses a double-tap.</summary>
+    public static bool OwnsItsOwnGesture(object node) =>
+        node is Button or ToggleButton or TextBox or ComboBox or ScrollBar;
 
     public static string? GetId(Control control) => control.GetValue(IdProperty);
 

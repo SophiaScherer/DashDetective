@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.VisualTree;
+using DashDetective.Shared.Layout;
 
 namespace DashDetective.Shared.Controls;
 
@@ -35,6 +38,7 @@ public class WidgetPanel : ContentControl, IWidgetIdentity {
         AvaloniaProperty.Register<WidgetPanel, bool>(nameof(IsCollapsed));
 
     private Button? _toggle;
+    private Panel? _header;
     private WidgetCollapse? _listening;
     private bool _attached;
     private bool _applyingCollapse;
@@ -91,10 +95,16 @@ public class WidgetPanel : ContentControl, IWidgetIdentity {
 
         if (_toggle is not null)
             _toggle.Click -= OnToggleClick;
+        if (_header is not null)
+            _header.DoubleTapped -= OnHeaderDoubleTapped;
 
         _toggle = e.NameScope.Find<Button>("PART_Collapse");
         if (_toggle is not null)
             _toggle.Click += OnToggleClick;
+
+        _header = e.NameScope.Find<Panel>("PART_Header");
+        if (_header is not null)
+            _header.DoubleTapped += OnHeaderDoubleTapped;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
@@ -128,6 +138,28 @@ public class WidgetPanel : ContentControl, IWidgetIdentity {
 
     private void OnToggleClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
         IsCollapsed = !IsCollapsed;
+
+    /// <summary>Double-clicking the heading does what the chevron does — the gesture a folding surface
+    /// is expected to answer, and the Processes rows already do. Gated on the store, so a panel with no
+    /// chevron cannot be folded by a gesture either.
+    ///
+    /// A tap that started on a control of its own is left alone: on the chevron the Click has already
+    /// toggled twice and a third would land inverted, and on Storage's drive picker or Performance's
+    /// jump link this would fold the card out from under what was actually clicked.</summary>
+    private void OnHeaderDoubleTapped(object? sender, TappedEventArgs e) {
+        if (Collapse is null || e.Source is not Visual source)
+            return;
+
+        foreach (var node in source.GetSelfAndVisualAncestors()) {
+            if (ReferenceEquals(node, _header))
+                break;
+            if (Reorder.OwnsItsOwnGesture(node))
+                return;
+        }
+
+        IsCollapsed = !IsCollapsed;
+        e.Handled = true;
+    }
 
     /// <summary>Takes the fold state from the store, without writing it straight back.</summary>
     private void ReadCollapse() {
