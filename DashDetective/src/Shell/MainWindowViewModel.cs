@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Notifications;
 using DashDetective.Services.Search;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
@@ -41,6 +42,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ResourceAlertWatcher _alerts;
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
+    private readonly NoticeService _notices = new();
     private readonly DashboardViewModel _dashboard;
     private readonly FileExplorerViewModel _fileExplorer = new();
     private readonly ProcessesViewModel _processes;
@@ -79,6 +81,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     /// <summary>The resource-alert banner message, naming the resource and device that breached.</summary>
     [ObservableProperty] private string _alertText = "";
+
+    /// <summary>Whether the confirmation banner is currently shown in the shell.</summary>
+    [ObservableProperty] private bool _noticeBannerVisible;
+
+    /// <summary>The confirmation message: what the action that was just taken did.</summary>
+    [ObservableProperty] private string _noticeText = "";
 
     /// <summary>Whether live sampling is running. Drives the toolbar's Live pill.</summary>
     [ObservableProperty]
@@ -167,6 +175,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         foreach (var order in SavedOrders)
             order.Changed += Persist;
         _alerts.AlertChanged += OnAlertChanged;
+        _notices.Changed += OnNoticeChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
         Nav.Initialize(new[] {
@@ -468,6 +477,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         UpdateAlertBanner();
     }
 
+    /// <summary>The notice service raised or expired a confirmation. The text is kept while it is
+    /// showing only — clearing it on the way out would blank the banner mid-fade.</summary>
+    private void OnNoticeChanged(string? message) {
+        if (message is not null)
+            NoticeText = message;
+        NoticeBannerVisible = message is not null;
+    }
+
+    /// <summary>Takes the confirmation down early — the banner's × or Esc.</summary>
+    [RelayCommand]
+    private void DismissNotice() => _notices.Dismiss();
+
+    /// <summary>Raises a confirmation from view code-behind, which has no injection point of its own and
+    /// calls the view model it already resolved from its DataContext.</summary>
+    public void Notify(string message) => _notices.Show(message);
+
     private void UpdateClock() => Clock = TimeOfDayFormatter.Format(DateTime.Now, _clockFormat);
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
@@ -549,8 +574,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.ShowHelp => Open(Help),
         ShortcutId.FocusSearch => FocusSearch(),
         ShortcutId.ToggleTheme => Run(_settings.ToggleThemeCommand),
-        // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is the banner.
-        ShortcutId.Escape => DismissAlertIfShowing(),
+        // Nothing higher up the chain claimed Esc, so the only thing left to dismiss is a banner.
+        ShortcutId.Escape => DismissBannerIfShowing(),
         _ => false,
     };
 
@@ -584,8 +609,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         return true;
     }
 
-    /// <summary>Dismisses the resource-alert banner, or leaves Esc unconsumed when it isn't showing.</summary>
-    private bool DismissAlertIfShowing() {
+    /// <summary>Dismisses a banner, or leaves Esc unconsumed when neither is showing. The confirmation
+    /// goes first: it is the newer of the two, and the warning under it is the one worth keeping.</summary>
+    private bool DismissBannerIfShowing() {
+        if (NoticeBannerVisible) {
+            DismissNotice();
+            return true;
+        }
+
         if (!AlertBannerVisible)
             return false;
 

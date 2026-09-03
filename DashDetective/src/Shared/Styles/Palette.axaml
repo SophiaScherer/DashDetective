@@ -69,6 +69,7 @@
     <SolidColorBrush x:Key="RedLine" Color="{StaticResource RedColor}" Opacity="0.30"/>
     <SolidColorBrush x:Key="RedLineHover" Color="{StaticResource RedColor}" Opacity="0.40"/>
     <SolidColorBrush x:Key="YellowLine" Color="{StaticResource YellowColor}" Opacity="0.30"/>
+    <SolidColorBrush x:Key="GreenLine" Color="{StaticResource GreenColor}" Opacity="0.30"/>
 
     <!-- ===== Semantic: elevation =====
          Three roles, replacing five ad-hoc alphas. A popup sits just off the surface; a dragged item
