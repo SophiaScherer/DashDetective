@@ -26,6 +26,7 @@ stays in its tab folder.
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
 - [`src/Services/Notifications`](#srcservicesnotifications)
+- [`src/Services/Links`](#srcserviceslinks)
 - [`src/Services/Platform`](#srcservicesplatform)
 - [`src/Services/SystemMetrics`](#srcservicessystemmetrics)
 - [`src/Services/Network`](#srcservicesnetwork)
@@ -477,6 +478,22 @@ stays in its tab folder.
                                  subscribes and draws the banner; Settings and Toolkit only raise)
         Notices.cs              (the confirmation copy, in one file — the SettingCatalog reasoning: four
                                  call sites announce a saved export and the wording has to be one string)
+```
+
+## `src/Services/Links`
+
+```
+      /Links
+        IWebLinkOpener.cs       (seam over opening a web address in the default browser; never throws, so
+                                 a refused or failed launch reports false. NO PLATFORM ARMS and no
+                                 Unsupported twin — UseShellExecute reaches the shell on Windows and
+                                 xdg-open on Linux, so the implementation is portable and keeps its plain
+                                 name)
+        WebLinkOpener.cs        (the real one. https ONLY, the same rule as ToolkitRunner: the shell acts
+                                 on any scheme it has an association for, so a caller's typo must not
+                                 become an arbitrary launch. Soft-fails through Log.Warn — a service logs,
+                                 a view model does not. The Action<string> ctor is the test seam, so the
+                                 guard is provable without a browser existing)
 ```
 
 ## `src/Services/Platform`
@@ -1352,6 +1369,23 @@ stays in its tab folder.
                                                          from launch — and since SetTarget ignores a blank
                                                          value, leaving the constant would let an empty box
                                                          silently resolve back to it)
+                                ConsolePanel.axaml(.cs) (the shape Ping and DNS Lookup share: target
+                                                         field, optional link icon, submit button and two
+                                                         console lines. LinkCommand null hides the icon, so
+                                                         the control stays general; its tooltip is on a
+                                                         WRAPPER because a disabled button takes no
+                                                         pointer-over and the disabled state is the one
+                                                         needing an explanation. The box is Classes="flat"
+                                                         like every box inside a field Border — Fluent's
+                                                         focus block otherwise paints a filled rectangle
+                                                         around the text alone, beside the icon)
+                                HostLink.cs             (the https URL a typed target means, or null when
+                                                         it is not a usable host — which is what leaves the
+                                                         link icon disabled. Uri.CheckHostName decides, and
+                                                         an IPv6 literal is BRACKETED: a bare one is not a
+                                                         legal URL authority, its colons reading as a port.
+                                                         NOT ToolkitHostValidator, whose rule is about a
+                                                         value becoming a command-line flag)
                                 IDnsLookupProvider.cs   (seam + the DnsResult record)
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync with a 3 s CTS;
                                                          record type by address family. DefaultHost seeds

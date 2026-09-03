@@ -73,6 +73,11 @@ plus all four exports **confirm** through `NoticeService` (`src/Services/Notific
 banner below the resource alert's. Their decisions are in
 [docs/FEATURES.md](docs/FEATURES.md) under *Settings* and *Widget system*.
 
+A **cross-page linking pass** is under way. Its first half is live: the Ping and DNS panels' fields each
+carry a link icon opening the typed host in the browser, over a new `IWebLinkOpener` seam
+(`src/Services/Links`) — **https only**, the rule `ToolkitRunner` already enforces. It is the third place
+the app starts a process, after the Toolkit's launcher and File Explorer's `IShellInterop`.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.

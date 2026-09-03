@@ -39,7 +39,7 @@ DashDetective/
       Platform/      Linux (IProcFileSystem + the /proc and /sys parsers), Windows (WmiRead)
       Theming/       ThemeService, ChartPalette, AccentPreset
       Settings/      AppSettings, SettingsStore, SettingsJsonContext
-      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/
+      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/ Links/
     Shell/           MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help, Shortcuts
     Tabs/<Feature>/  one folder per tab: view, view-model, feature-local helpers
 tests/DashDetective.Tests/   mirrors src/ path for path

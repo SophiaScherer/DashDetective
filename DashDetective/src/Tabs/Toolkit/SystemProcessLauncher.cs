@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Toolkit;
 
 /// <summary>
-/// The real <see cref="IProcessLauncher"/> — **the only place in the app that starts a process**
-/// (File Explorer's <c>IShellInterop.Open</c> aside, which opens what the user picked in its own tree and
-/// deliberately fails invisibly).
+/// The real <see cref="IProcessLauncher"/> — the only place the app starts a process *with arguments*.
+/// The other two start one target and nothing else: File Explorer's <c>IShellInterop.Open</c>, which opens
+/// what the user picked in its own tree and deliberately fails invisibly, and
+/// <c>Services/Links/WebLinkOpener</c>, which hands an https URL to the browser.
 ///
 /// Arguments always go through <c>ProcessStartInfo.ArgumentList</c>, never the joined
 /// <c>Arguments</c> string, so nothing is concatenated into a command line: there is no quoting to get

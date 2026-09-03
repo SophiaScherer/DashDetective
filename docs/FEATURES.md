@@ -496,6 +496,13 @@ Settings. Panels:
   seeded with `example.com` but **nothing resolves until Look up is pressed**, and Refresh re-resolves
   only once a lookup has been run — a manual refresh must not become the first packet the panel ever
   sent. It, too, used to fire from the constructor.
+- **Open in browser** — both probe panels' fields carry a small link icon that opens the typed host in
+  the default browser (`HostLink` composes the URL, `IWebLinkOpener` launches it). **https only**, the
+  rule `ToolkitRunner` already enforces on every URL the app opens: a router's admin page reached from
+  the Ping field is often http-only and will fail in the browser, which the user fixes in the address
+  bar — the app never hands the shell another scheme. The icon is **disabled rather than hidden** on an
+  empty or unusable host, so the affordance is discoverable before anything is typed, and only a failed
+  launch raises a notice: a browser that opens is its own confirmation.
 - **Lifecycle** — the tab is **no longer always-on**. `IActivatablePage` + `SamplingGate` start its
   timers when it becomes the visible tab and stop them when it stops being one; the ping monitor
   additionally waits for the user, and its on/off survives leaving the tab, so returning finds it as
