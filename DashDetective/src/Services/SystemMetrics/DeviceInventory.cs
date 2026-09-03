@@ -30,6 +30,23 @@ public sealed record DeviceInstance(
     int? DiskNumber = null, string? GpuLuid = null, ulong? VramBytes = null, GpuPciId? GpuPci = null);
 
 /// <summary>
+/// The ids <see cref="DeviceInventory"/> gives a <see cref="DeviceInstance"/>. Minted here rather than
+/// interpolated at each call site: pages key on them to point at one another's devices, and an id spelled
+/// one way in the composer and another in a caller would silently reveal nothing.
+/// </summary>
+public static class DeviceIds {
+    public const string Cpu = "cpu";
+    public const string Memory = "mem";
+    public const string Network = "net";
+
+    /// <summary>Keyed by adapter LUID, which is what the per-adapter samplers join on.</summary>
+    public static string Gpu(string luid) => $"gpu:{luid}";
+
+    /// <summary>Keyed by the OS's own disk number (on Linux, the packed major:minor).</summary>
+    public static string Disk(int number) => $"disk:{number.ToString(CultureInfo.InvariantCulture)}";
+}
+
+/// <summary>
 /// The single source of truth for "what hardware exists, grouped by kind." Composes the existing static-info
 /// providers (<see cref="CpuInfoProvider"/>, <see cref="MemoryInfoProvider"/>, <see cref="GpuAdapterProvider"/>,
 /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/>, and the primary network adapter) into an
@@ -121,10 +138,10 @@ public sealed class DeviceInventory {
         IReadOnlyList<PhysicalDiskInfo> disks, IReadOnlyList<VolumeInfo> volumes,
         string networkName, string networkSpec) {
         var instances = new List<DeviceInstance> {
-            new(DeviceCategory.Cpu, "cpu", "CPU", HardwareNameFormatter.CoreSummary(cpu.PhysicalCores, cpu.LogicalCores, cpu.MaxClockMhz), HardwareNameFormatter.ShortenCpu(cpu.Name)),
+            new(DeviceCategory.Cpu, DeviceIds.Cpu, "CPU", HardwareNameFormatter.CoreSummary(cpu.PhysicalCores, cpu.LogicalCores, cpu.MaxClockMhz), HardwareNameFormatter.ShortenCpu(cpu.Name)),
             // Memory's caption is the live used/total figure the view model fills each tick, so the static Sub
             // is blank; the Spec carries the module type/speed/slots.
-            new(DeviceCategory.Memory, "mem", "Memory", "", HardwareNameFormatter.MemorySummary(memory.TypeLabel, memory.SpeedMhz, memory.ModuleCount)),
+            new(DeviceCategory.Memory, DeviceIds.Memory, "Memory", "", HardwareNameFormatter.MemorySummary(memory.TypeLabel, memory.SpeedMhz, memory.ModuleCount)),
         };
 
         // GPUs: one instance per real adapter — DXGI's non-software adapters intersected with the LUIDs
@@ -136,7 +153,7 @@ public sealed class DeviceInventory {
             var gpu = realGpus[i];
             var name = realGpus.Count > 1 ? $"GPU {i.ToString(CultureInfo.InvariantCulture)}" : "GPU";
             instances.Add(new DeviceInstance(
-                DeviceCategory.Gpu, $"gpu:{gpu.LuidToken}", name,
+                DeviceCategory.Gpu, DeviceIds.Gpu(gpu.LuidToken), name,
                 HardwareNameFormatter.ShortenGpu(gpu.Name), gpu.Name,
                 GpuLuid: gpu.LuidToken, VramBytes: gpu.DedicatedVideoMemory, GpuPci: gpu.Pci));
         }
@@ -147,14 +164,14 @@ public sealed class DeviceInventory {
         foreach (var disk in disks.OrderBy(d => d.DeviceId)) {
             var name = namesByDisk.TryGetValue(disk.DeviceId, out var composed) ? composed : $"Disk {disk.DeviceId}";
             instances.Add(new DeviceInstance(
-                DeviceCategory.Disk, $"disk:{disk.DeviceId.ToString(CultureInfo.InvariantCulture)}",
-                name, string.IsNullOrEmpty(disk.TypeLabel) ? "Drive" : disk.TypeLabel,
+                DeviceCategory.Disk, DeviceIds.Disk(disk.DeviceId), name,
+                string.IsNullOrEmpty(disk.TypeLabel) ? "Drive" : disk.TypeLabel,
                 FormatDiskSpec(disk.Model, disk.SizeBytes), disk.DeviceId));
         }
 
         // Network's caption (link speed) is filled live, so the static Sub is blank; the Spec is the adapter
         // description.
-        instances.Add(new DeviceInstance(DeviceCategory.Network, "net", networkName, "", networkSpec));
+        instances.Add(new DeviceInstance(DeviceCategory.Network, DeviceIds.Network, networkName, "", networkSpec));
 
         return new DeviceInventory(instances);
     }

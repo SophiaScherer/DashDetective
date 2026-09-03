@@ -98,6 +98,46 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Raised when a resource's Overall/Detailed view changes, so the shell can persist the choice.</summary>
     public event Action? DetailChanged;
 
+    // ----- Jumps INTO this page -----
+
+    /// <summary>A reveal waiting for the row it names, or null. Disk and GPU rows are built by an async
+    /// inventory load, so a jump can land before the device exists.</summary>
+    private string? _pendingReveal;
+
+    /// <summary>Selects the device with this inventory id, the counterpart to the jumps above. An id
+    /// matching nothing yet is held until the rows are built; one matching nothing at all is ignored, so
+    /// the jump degrades to a plain navigate.</summary>
+    public void Reveal(string deviceId) {
+        if (string.IsNullOrEmpty(deviceId))
+            return;
+
+        _pendingReveal = deviceId;
+        ApplyPendingReveal();
+    }
+
+    /// <summary>Applies a pending reveal once its row exists, expanding the rail when the Primary scope
+    /// hides the device — the user asked for that one, not the primary of its kind. Cleared before the
+    /// scope flip, whose rebuild calls back in here.</summary>
+    private void ApplyPendingReveal() {
+        if (_pendingReveal is not { } deviceId || FindRow(deviceId) is not { } row)
+            return;
+
+        _pendingReveal = null;
+        if (!Resources.Contains(row))
+            ShowAllDevices = true;
+
+        Select(row);
+    }
+
+    private ResourceRow? FindRow(string deviceId) {
+        if (_cpuRow.DeviceId == deviceId) return _cpuRow;
+        if (_memoryRow.DeviceId == deviceId) return _memoryRow;
+        if (_networkRow.DeviceId == deviceId) return _networkRow;
+
+        return _disks.Find(disk => disk.Row.DeviceId == deviceId)?.Row
+            ?? _gpus.Find(gpu => gpu.Row.DeviceId == deviceId)?.Row;
+    }
+
     /// <summary>Whether the GPU resources show their per-engine "Detailed" charts. Persisted by the shell as a
     /// single category-wide flag applied to every GPU row (multi-GPU machines share the choice).</summary>
     public bool GpuDetailedView {
@@ -255,7 +295,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select) {
-            Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
+            DeviceId = DeviceIds.Cpu, Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
         };
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
@@ -264,7 +304,8 @@ public partial class PerformanceViewModel : ViewModelBase,
                                          _memInUseTile, _memAvailableTile,
                                          _memCachedTile, _memCommittedTile,
                                      }, Select) {
-            Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Memory),
+            DeviceId = DeviceIds.Memory, Link = HardwareLink(),
+            StatOrder = StatOrderFor(ChartSeries.Memory),
         };
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
@@ -278,6 +319,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           _netReceiveTile, _netSendTile,
                                           new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
+            DeviceId = DeviceIds.Network,
             StatOrder = StatOrderFor(ChartSeries.NetDown),
             Series2 = ChartSeries.NetUp,
             LegendLabel1 = "Receive",
@@ -354,7 +396,26 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyChartWindow();
         ApplyPalette();
 
-        Select(previous is not null && Resources.Contains(previous) ? previous : Resources[0]);
+        // Matched by device id rather than by reference: a rebuilt disk or GPU row is a NEW object, so a
+        // reference match dropped the selection back to the CPU on every inventory reload — which the
+        // toolbar Refresh triggers.
+        Select(Resurvive(previous) ?? Resources[0]);
+
+        // A reveal that arrived before its device was enumerated has been waiting for a row to point at.
+        ApplyPendingReveal();
+    }
+
+    /// <summary>The rebuilt rail's counterpart to the row that was selected, or null when the device it
+    /// named is gone.</summary>
+    private ResourceRow? Resurvive(ResourceRow? previous) {
+        if (previous is null)
+            return null;
+        if (Resources.Contains(previous))
+            return previous;
+
+        return previous.DeviceId is { } deviceId
+            ? Resources.FirstOrDefault(row => row.DeviceId == deviceId)
+            : null;
     }
 
     partial void OnShowAllDevicesChanged(bool value) {
@@ -603,7 +664,8 @@ public partial class PerformanceViewModel : ViewModelBase,
             var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select) {
-                Link = StorageLink(disk.DiskNumber), StatOrder = StatOrderFor(ChartSeries.Storage),
+                DeviceId = disk.Id, Link = StorageLink(disk.DiskNumber),
+                StatOrder = StatOrderFor(ChartSeries.Storage),
             };
             var resource = new DiskResource {
                 DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
@@ -648,7 +710,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
                                           tempTile, powerTile,
                                       }, Select) {
-                IsDetailed = _gpuDetailed, Link = HardwareLink(),
+                DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
