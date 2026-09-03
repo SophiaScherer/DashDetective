@@ -31,6 +31,19 @@ public sealed class ChildOrder {
         return true;
     }
 
+    /// <summary>Puts the order back to the declared one, which is what an empty saved order means.
+    /// <see cref="Sync"/> cannot do this job: it early-returns whenever the child count is unchanged,
+    /// and a reset never changes it. False when it was already declared, so a no-op costs no layout.</summary>
+    public bool Reset(int childCount) {
+        if (IsDeclared(childCount))
+            return false;
+
+        _order.Clear();
+        for (var i = 0; i < childCount; i++)
+            _order.Add(i);
+        return true;
+    }
+
     /// <summary>Starts previewing a reorder from the settled order.</summary>
     public void BeginPreview() {
         _preview.Clear();
@@ -99,6 +112,17 @@ public sealed class ChildOrder {
             seen++;
         }
         return _preview.Count;
+    }
+
+    /// <summary>Whether the order is already the declared one, top to bottom.</summary>
+    private bool IsDeclared(int childCount) {
+        if (_order.Count != childCount)
+            return false;
+
+        for (var i = 0; i < _order.Count; i++)
+            if (_order[i] != i)
+                return false;
+        return true;
     }
 
     private static List<string> Named(IReadOnlyList<string> declared) {

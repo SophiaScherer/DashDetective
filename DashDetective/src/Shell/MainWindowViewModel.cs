@@ -154,7 +154,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // interval), the loaded settings (toggle/interval seed) and the report/CSV builders.
         _settings = new SettingsViewModel(_theme, Nav, metrics, settings,
                                           IStartupRegistration.ForCurrentPlatform(), Shortcuts,
-                                          BuildReport, BuildMetricsCsv);
+                                          BuildReport, BuildMetricsCsv, ResetWidgetOrders);
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;
@@ -308,6 +308,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         return WidgetOrders.Encode(orders);
     }
 
+    /// <summary>Puts every page's widgets and cards back in the order its markup declares. An empty
+    /// SavedOrder is what a panel reads as a reset; the encoded string collapses to "" with it, and the
+    /// ctor's own Changed subscription persists it exactly as a drag would.</summary>
+    private void ResetWidgetOrders() {
+        foreach (var saved in SavedOrders)
+            saved.Order = [];
+    }
+
     /// <summary>Resolves a persisted accent name to its preset, or <c>null</c> for the default look
     /// (an unknown name also falls back to default).</summary>
     private static AccentPreset? FindAccent(string? name) {
@@ -351,6 +359,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
         WidgetOrders = EncodeWidgetOrders(),
+        CollapsedWidgets = _settings.Collapse.Encode(),
         ProcessColumns = ProcessColumnOrder.Encode(_processes.ColumnOrder),
         ProcessesRememberCollapsed = _processes.RememberCollapsedGroups,
         ProcessesRememberSort = _processes.RememberSort,

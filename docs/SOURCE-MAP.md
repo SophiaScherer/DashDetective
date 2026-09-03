@@ -72,7 +72,13 @@ stays in its tab folder.
                                them. PLURAL on purpose — Performance reorders its rail and its stat
                                tiles separately, and the tiles keep one order per device kind)
       SavedOrder.cs           (one of those orders: the key it saves under, the ids, and a change
-                               signal. Bound two-way to the panel that lays the strip out)
+                               signal. Bound two-way to the panel that lays the strip out. An EMPTY
+                               order is how the shell resets a page — see ReorderablePanel)
+      WidgetCollapse.cs       (which of a page's widgets are folded shut, plus the id that moved. Held
+                               off the panel, the same split SavedOrder makes, so the state survives a
+                               restart and the page can reopen a card a search needs on screen. Load is
+                               a RESTORE and deliberately raises nothing; Encode is order-stable, since
+                               a set's iteration order would churn the debounced save)
       SamplingGate.cs         (composes ILiveSamplingPage's answer with IActivatablePage's into the one
                                a page's timers care about, so the five do not each hand-roll the pair.
                                STARTS live BUT NOT ACTIVE — this is what makes a tab that is never
@@ -188,6 +194,12 @@ stays in its tab folder.
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource}. A token with no call site should not exist)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
+                                 and the :collapsed rules. The chevron is a plain Button, not a
+                                 ToggleButton: Fluent's checked/pressed states would all need undoing,
+                                 and Button.bare already strips the chrome. The glyph is set from the
+                                 pseudo-class rather than a converter, which keeps it out of Icons —
+                                 touching Icons at all throws without a render backend, so a test could
+                                 not reach the rule.
                                  which is what satisfies compiled bindings without an x:DataType)
 ```
 
@@ -213,7 +225,10 @@ stays in its tab folder.
                                  where their slots were arranged. A base class rather than a helper
                                  each panel forwards to — the forwarding would have been most of what
                                  they shared, and Order would have had to become an attached property
-                                 to live anywhere else. Layout vocabulary stays with the panels)
+                                 to live anywhere else. Layout vocabulary stays with the panels. An EMPTY
+                                 Order is a reset, not "nothing saved": it routes to ChildOrder.Reset, and
+                                 it deliberately does not write Order back, so the two-way binding cannot
+                                 echo the reset into the page that asked for it)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
                                  handle is, and the previewed order. Reorder is always a permutation of
                                  the panel's own index list — a panel that reordered Children instead
@@ -238,7 +253,10 @@ stays in its tab folder.
         ChildOrder.cs           (the permutation both reorderable panels share: settled order, previewed
                                  order, and the mapping from a drop index — which counts only what is on
                                  screen — into an order that holds every child. No Avalonia types, so it
-                                 tests without a layout pass)
+                                 tests without a layout pass. Reset() is the way back to the declared
+                                 order, and it needs its own method because neither neighbour can do it:
+                                 ApplySaved is a deliberate no-op on an empty save, and Sync early-returns
+                                 whenever the child count is unchanged, which is every reset)
         Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
                                  start from, plus how a panel names a child: an id attached in markup, else the
                                  control's own, else its item view model's where the children are
@@ -259,8 +277,16 @@ stays in its tab folder.
                                        (WidgetPanel is one widget: surface, header row, body. Title /
                                         Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
                                         Border Classes="panel" is a SURFACE, not a widget.
+                                        Hand it a WidgetCollapse and it grows a header chevron; the
+                                        STORE IS THE OPT-IN, so a page cannot offer the affordance
+                                        without giving the state somewhere to live. Folding hides the
+                                        BODY, never the panel — hiding the panel would drop it out of a
+                                        board's visible children and change what a drop index means.
                                         WidgetTable is a table's chrome: header above a scrolling body,
                                         one gutter for both. Columns and sorting stay at the call site)
+        CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
+                                        encodes as WidgetOrders is. By id, never by index: a page that
+                                        gains or loses a widget must not silently fold a different one)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
@@ -1038,8 +1064,12 @@ stays in its tab folder.
 ```
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
                                                         (fully live: Appearance + Navigation + Monitoring
-                                                         + Export & Data; view code-behind owns the
-                                                         export save dialog + clipboard, like MainWindow)
+                                                         + Layout + Export & Data; view code-behind owns the
+                                                         export save dialog + clipboard, like MainWindow.
+                                                         The Layout card resets every page's widget order,
+                                                         and the reset is an Action HANDED IN BY THE SHELL,
+                                                         like buildReport/buildMetricsCsv: the orders are the
+                                                         shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
                                 IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
@@ -1078,6 +1108,13 @@ stays in its tab folder.
                                                          TrayIntegration shape — one named capability, read by
                                                          SettingDescriptions.NvidiaGpuMetricsFor and by
                                                          SettingsViewModel.CanUseNvidiaMetrics)
+                                SettingCards.cs         (which card a catalog SECTION is drawn on, as the
+                                                         panel's WidgetId. Keyed off the section rather
+                                                         than the id, so there is no third table to keep
+                                                         in step with the enum. Reveal expands that card
+                                                         BEFORE the view looks for the row: a folded card's
+                                                         body is never measured, so its rows are not in the
+                                                         visual tree to find, and the jump dies silently)
                                 SettingDescriptions.cs  (the descriptions that name a MECHANISM rather
                                                          than an effect, or a platform that cannot honor
                                                          one, so cannot be shared — "Start with Windows",

@@ -107,6 +107,11 @@ public sealed record AppSettings {
     /// what a widget is.</summary>
     public string WidgetOrders { get; init; } = "";
 
+    /// <summary>The widgets the user has folded shut, encoded by <c>CollapsedWidgets</c>. Opaque here
+    /// for the same reason as the ones above. Unlike the Processes fold there is no "remember" toggle
+    /// gating it: folding a settings card is a layout choice, not a glance.</summary>
+    public string CollapsedWidgets { get; init; } = "";
+
     /// <summary>The Processes table's column order, encoded by <c>ProcessColumnOrder</c>. Opaque here
     /// for the same reason as the four above: this record — and the settings file — stay free of any
     /// knowledge of what a process column is.</summary>

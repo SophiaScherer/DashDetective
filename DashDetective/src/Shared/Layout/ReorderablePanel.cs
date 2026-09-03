@@ -92,7 +92,13 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
         base.OnPropertyChanged(change);
-        if (change.Property == OrderProperty && !_applyingOrder && ApplySavedOrder())
+        if (change.Property != OrderProperty || _applyingOrder)
+            return;
+
+        // An empty order is a RESET, not "nothing to apply": ApplySaved deliberately leaves the
+        // permutation in place, so the way back to the declared order has to be asked for.
+        var moved = Order is { Count: > 0 } ? ApplySavedOrder() : _childOrder.Reset(Children.Count);
+        if (moved)
             InvalidateMeasure();
     }
 

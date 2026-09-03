@@ -59,7 +59,10 @@ A **customization pass** is also complete, and it reached five features rather t
 defaults), **per-metric resource alerts** (`ResourceAlertWatcher`, now including GPU, disk activity and
 low disk space), **multi-format diagnostics export** (text / JSON / Markdown / HTML / CSV over a
 structured `DiagnosticsReport`), a **12/24-hour clock format**, and the **device account picture** in
-the nav footer (`IUserPictureProvider`). Each has an entry in
+the nav footer (`IUserPictureProvider`). Two later additions belong to the same pass: **foldable Settings
+cards** (a `WidgetPanel` handed a `WidgetCollapse` grows a header chevron; state persists by widget id)
+and the Settings **Layout card**, whose "Reset widget placements" clears every `SavedOrder` — which
+`ReorderablePanel` reads as a return to the declared order. Each has an entry in
 [docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the

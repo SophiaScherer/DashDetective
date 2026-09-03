@@ -22,6 +22,7 @@ public sealed class SettingCatalog {
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
             Shortcuts,
+            WidgetPlacements,
             ExportData,
         ];
     }
@@ -125,6 +126,14 @@ public sealed class SettingCatalog {
     public SettingEntry Shortcuts { get; } = new(
         SettingId.Shortcuts, "Keyboard", "Keyboard shortcuts", "Change the keys any action is bound to",
         Keywords: "keyboard shortcut hotkey key binding keybinding rebind remap customize reset");
+
+    // ----- Layout -----
+
+    // One entry for the card, like Shortcuts and ExportData: the reset is the whole card.
+    public SettingEntry WidgetPlacements { get; } = new(
+        SettingId.WidgetPlacements, "Layout", "Widget placements",
+        "Put every page's widgets and cards back in the order they ship in",
+        Keywords: "widget card panel tile layout order arrange rearrange reorder drag drop reset restore default position placement");
 
     // ----- Export & Data -----
 

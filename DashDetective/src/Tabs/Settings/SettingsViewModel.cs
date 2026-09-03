@@ -29,6 +29,7 @@ public partial class SettingsViewModel : ViewModelBase {
     private readonly IStartupRegistration _startup;
     private readonly Func<DiagnosticsFormat, string> _buildReport;
     private readonly Func<string> _buildMetricsCsv;
+    private readonly Action _resetWidgetOrders;
 
     // Guards the constructor's initial application of persisted values from raising Changed or writing
     // to the registry (we only react to real user edits after construction).
@@ -56,6 +57,10 @@ public partial class SettingsViewModel : ViewModelBase {
     /// this page edits what is actually in force rather than a copy of it.</summary>
     public ShortcutBindings Shortcuts { get; }
 
+    /// <summary>Which cards on this page are folded shut. Handed to each WidgetPanel that may fold,
+    /// and read by <see cref="Reveal"/> so a search jump can reopen the card it lands in.</summary>
+    public WidgetCollapse Collapse { get; } = new();
+
     /// <summary>The Keyboard card's rows, grouped by scope exactly as Help lists them.</summary>
     public ObservableCollection<ShortcutRowGroup> ShortcutGroups { get; } = [];
 
@@ -81,8 +86,12 @@ public partial class SettingsViewModel : ViewModelBase {
     public event Action<SettingId>? RevealRequested;
 
     /// <summary>Scrolls a setting into view and flashes it, so a jump from search lands on the row the
-    /// user asked for rather than at the top of a page of toggles.</summary>
-    public void Reveal(SettingId id) => RevealRequested?.Invoke(id);
+    /// user asked for rather than at the top of a page of toggles. Opens the card first: a folded one's
+    /// body is never measured, so its rows are not in the visual tree for the view to find at all.</summary>
+    public void Reveal(SettingId id) {
+        Collapse.Expand(SettingCards.WidgetIdFor(Catalog.Get(id).Section));
+        RevealRequested?.Invoke(id);
+    }
 
     /// <summary>Start DashDetective with Windows (per-user HKCU Run entry).</summary>
     [ObservableProperty] private bool _launchAtStartup;
@@ -109,7 +118,8 @@ public partial class SettingsViewModel : ViewModelBase {
                                AppSettings settings, IStartupRegistration startup,
                                ShortcutBindings shortcuts,
                                Func<DiagnosticsFormat, string> buildReport,
-                               Func<string> buildMetricsCsv) {
+                               Func<string> buildMetricsCsv,
+                               Action resetWidgetOrders) {
         _theme = theme;
         _metrics = metrics;
         _startup = startup;
@@ -117,7 +127,12 @@ public partial class SettingsViewModel : ViewModelBase {
         Shortcuts = shortcuts;
         _buildReport = buildReport;
         _buildMetricsCsv = buildMetricsCsv;
+        _resetWidgetOrders = resetWidgetOrders;
         _initializing = true;
+
+        // Load before subscribing: a restore is not an edit, and the page is still being built.
+        Collapse.Load(settings.CollapsedWidgets);
+        Collapse.Changed += _ => RaiseChanged();
 
         ThemeOptions = new ObservableCollection<ThemeOption> {
             new("Dark", AppTheme.Dark, SelectTheme),
@@ -259,6 +274,12 @@ public partial class SettingsViewModel : ViewModelBase {
         Shortcuts.ResetAll();
         Changed?.Invoke();
     }
+
+    /// <summary>Puts every page's widgets and cards back in their declared order. The shell owns the
+    /// orders, so it also persists the result — raising Changed here would only re-apply the alert
+    /// settings for nothing.</summary>
+    [RelayCommand]
+    private void ResetWidgetPlacements() => _resetWidgetOrders();
 
     /// <summary>What the conflicting shortcut does, so the refusal names an action rather than an id.</summary>
     private string DescribeAction(ShortcutId id) {
