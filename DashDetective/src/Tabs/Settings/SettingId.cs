@@ -22,5 +22,6 @@ public enum SettingId {
     ShowInTray,
     LaunchAtStartup,
     Shortcuts,
+    WidgetPlacements,
     ExportData,
 }

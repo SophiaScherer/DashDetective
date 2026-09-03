@@ -493,6 +493,23 @@
             </StackPanel>
         </controls:WidgetPanel>
 
+        <!-- ===== Layout ===== -->
+        <!-- The reset is ungated, like the Processes tab's "Reset column order": the shell cannot
+             cheaply answer "is any page still on its declared order", and a button that vanishes is
+             worse than one that does nothing. Order only — folded cards are a separate preference. -->
+        <controls:WidgetPanel WidgetId="settings.layout" Title="{Binding Catalog.WidgetPlacements.Section}">
+            <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.WidgetPlacements}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.WidgetPlacements.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.WidgetPlacements.Description}"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="action" Content="Reset widget placements"
+                            Command="{Binding ResetWidgetPlacementsCommand}"/>
+                </Grid>
+            </Border>
+        </controls:WidgetPanel>
+
         <!-- ===== Export & Data ===== -->
         <controls:WidgetPanel WidgetId="settings.export" Title="{Binding Catalog.ExportData.Section}">
             <StackPanel Spacing="14">

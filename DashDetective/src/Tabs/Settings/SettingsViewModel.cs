@@ -29,6 +29,7 @@ public partial class SettingsViewModel : ViewModelBase {
     private readonly IStartupRegistration _startup;
     private readonly Func<DiagnosticsFormat, string> _buildReport;
     private readonly Func<string> _buildMetricsCsv;
+    private readonly Action _resetWidgetOrders;
 
     // Guards the constructor's initial application of persisted values from raising Changed or writing
     // to the registry (we only react to real user edits after construction).
@@ -109,7 +110,8 @@ public partial class SettingsViewModel : ViewModelBase {
                                AppSettings settings, IStartupRegistration startup,
                                ShortcutBindings shortcuts,
                                Func<DiagnosticsFormat, string> buildReport,
-                               Func<string> buildMetricsCsv) {
+                               Func<string> buildMetricsCsv,
+                               Action resetWidgetOrders) {
         _theme = theme;
         _metrics = metrics;
         _startup = startup;
@@ -117,6 +119,7 @@ public partial class SettingsViewModel : ViewModelBase {
         Shortcuts = shortcuts;
         _buildReport = buildReport;
         _buildMetricsCsv = buildMetricsCsv;
+        _resetWidgetOrders = resetWidgetOrders;
         _initializing = true;
 
         ThemeOptions = new ObservableCollection<ThemeOption> {
@@ -259,6 +262,12 @@ public partial class SettingsViewModel : ViewModelBase {
         Shortcuts.ResetAll();
         Changed?.Invoke();
     }
+
+    /// <summary>Puts every page's widgets and cards back in their declared order. The shell owns the
+    /// orders, so it also persists the result — raising Changed here would only re-apply the alert
+    /// settings for nothing.</summary>
+    [RelayCommand]
+    private void ResetWidgetPlacements() => _resetWidgetOrders();
 
     /// <summary>What the conflicting shortcut does, so the refusal names an action rather than an id.</summary>
     private string DescribeAction(ShortcutId id) {

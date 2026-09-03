@@ -8,6 +8,7 @@ using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Navigation;
 using DashDetective.Tabs.Settings;
 using DashDetective.Tests.Fakes;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -17,13 +18,16 @@ namespace DashDetective.Tests.Tabs.Settings;
 /// <see cref="IStartupRegistration"/> seam: it is seeded from the real registration, construction
 /// itself must never write, and a user edit writes through exactly once.</summary>
 public class SettingsViewModelTests {
-    private static SettingsViewModel Create(IStartupRegistration startup) {
+    private static SettingsViewModel Create(IStartupRegistration startup) =>
+        Create(startup, () => { });
+
+    private static SettingsViewModel Create(IStartupRegistration startup, Action resetWidgetOrders) {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
         return new SettingsViewModel(
             new ThemeService(), new NavigationViewModel(), metrics, AppSettings.Defaults, startup,
-            new ShortcutBindings(), _ => "", () => "");
+            new ShortcutBindings(), _ => "", () => "", resetWidgetOrders);
     }
 
     [Fact]
@@ -52,6 +56,19 @@ public class SettingsViewModelTests {
         viewModel.LaunchAtStartup = true;
 
         Assert.Equal(new[] { true }, startup.Writes);
+    }
+
+    /// <summary>The orders live on the shell, not here, so the button is a forwarder and the test is
+    /// that it forwards. Resetting is idempotent, so nothing gates the command.</summary>
+    [Fact]
+    public void ResetWidgetPlacements_InvokesTheShellsResetAction() {
+        var resets = 0;
+        var viewModel = Create(new FakeStartupRegistration(enabled: false), () => resets++);
+
+        viewModel.ResetWidgetPlacementsCommand.Execute(null);
+        viewModel.ResetWidgetPlacementsCommand.Execute(null);
+
+        Assert.Equal(2, resets);
     }
 
     /// <summary>The tray toggle is shown disabled rather than removed where there is no tray to hide

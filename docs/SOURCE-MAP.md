@@ -1044,8 +1044,12 @@ stays in its tab folder.
 ```
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
                                                         (fully live: Appearance + Navigation + Monitoring
-                                                         + Export & Data; view code-behind owns the
-                                                         export save dialog + clipboard, like MainWindow)
+                                                         + Layout + Export & Data; view code-behind owns the
+                                                         export save dialog + clipboard, like MainWindow.
+                                                         The Layout card resets every page's widget order,
+                                                         and the reset is an Action HANDED IN BY THE SHELL,
+                                                         like buildReport/buildMetricsCsv: the orders are the
+                                                         shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
                                 IntervalOption.cs       (selectable item VMs for the Appearance +
                                                          refresh-interval controls, like NavItem)
