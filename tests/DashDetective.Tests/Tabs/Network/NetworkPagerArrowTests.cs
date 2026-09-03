@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Network;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -39,7 +40,8 @@ public class NetworkPagerArrowTests {
 
     private static async Task<NetworkViewModel> LoadedAsync(int rowCount, IConnectionsProvider? provider = null) {
         var vm = new NetworkViewModel(
-            new NetworkProviders(new StubAdapters(), provider ?? new Rows(rowCount), new StubDns()));
+            new NetworkProviders(new StubAdapters(), provider ?? new Rows(rowCount), new StubDns(),
+                                 new FakeWebLinkOpener()));
         vm.Refresh();
         await Task.Yield();
         return vm;

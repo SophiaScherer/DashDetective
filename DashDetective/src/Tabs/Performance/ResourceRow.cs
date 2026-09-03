@@ -46,6 +46,10 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     /// <summary>The name doubles as the id a saved rail order names this row by.</summary>
     public string? WidgetId => Name;
 
+    /// <summary>The <c>DeviceInstance.Id</c> this row was built from, which is how another page names it
+    /// (see <c>PerformanceViewModel.Reveal</c>). Null for a row backing no inventory device.</summary>
+    public string? DeviceId { get; init; }
+
     /// <summary>The saved order of this resource's stat tiles. Shared by every resource of the same
     /// kind, so arranging one CPU's tiles arranges every CPU's.</summary>
     public SavedOrder StatOrder { get; init; } = new("performance.stats");

@@ -8,8 +8,9 @@ using System.Windows.Input;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// A network probe panel: an editable target, a submit button, and two lines of terminal output. Ping
-/// and DNS Lookup are the same panel with different labels and colours, so the markup lives here once.
+/// A network probe panel: an editable target, an optional "open in browser" icon, a submit button, and
+/// two lines of terminal output. Ping and DNS Lookup are the same panel with different labels and
+/// colours, so the markup lives here once.
 ///
 /// Kept in the Network tab folder rather than <c>src/Shared</c>: both users are this one feature, which
 /// is the promotion bar the architecture doc sets.
@@ -41,6 +42,15 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
     /// <see cref="SubmitCommand"/>: ping applies the target and starts, where the button toggles.</summary>
     public static readonly StyledProperty<ICommand?> EnterCommandProperty =
         AvaloniaProperty.Register<ConsolePanel, ICommand?>(nameof(EnterCommand));
+
+    /// <summary>Run by the "open in browser" icon inside the target field. Null hides the icon, which is
+    /// what keeps this control general.</summary>
+    public static readonly StyledProperty<ICommand?> LinkCommandProperty =
+        AvaloniaProperty.Register<ConsolePanel, ICommand?>(nameof(LinkCommand));
+
+    /// <summary>The icon's tooltip. Shown in both states, so it can say why the icon is disabled.</summary>
+    public static readonly StyledProperty<string?> LinkToolTipProperty =
+        AvaloniaProperty.Register<ConsolePanel, string?>(nameof(LinkToolTip));
 
     public static readonly StyledProperty<string?> ConsoleTextProperty =
         AvaloniaProperty.Register<ConsolePanel, string?>(nameof(ConsoleText));
@@ -98,6 +108,16 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
     public ICommand? EnterCommand {
         get => GetValue(EnterCommandProperty);
         set => SetValue(EnterCommandProperty, value);
+    }
+
+    public ICommand? LinkCommand {
+        get => GetValue(LinkCommandProperty);
+        set => SetValue(LinkCommandProperty, value);
+    }
+
+    public string? LinkToolTip {
+        get => GetValue(LinkToolTipProperty);
+        set => SetValue(LinkToolTipProperty, value);
     }
 
     public string? ConsoleText {

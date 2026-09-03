@@ -169,6 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // confirmations are not something it needs to be constructed with.
         _settings.Notify = Notify;
         _toolkit.Notify = Notify;
+        _network.Notify = Notify;
 
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;
@@ -236,6 +237,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // The Performance rail names real devices, so its detail header offers a jump to the tab that owns
         // the selected one. Same arrangement as the Toolkit row above: the page raises what it is looking
         // at, and only the shell knows which tab that means.
+        // And the same arrangement inbound: a Dashboard card or chart names its device, and this is what
+        // knows that Performance is the tab showing it.
+        _dashboard.PerformanceRevealRequested += RevealResource;
+
         _performance.StorageRevealRequested += RevealDrive;
         _performance.NetworkRevealRequested += RevealAdapter;
         _performance.HardwareRevealRequested += ShowHardware;
@@ -774,6 +779,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void RevealAdapter(string adapterName) {
         NavigateToPage(_network);
         _network.Reveal(adapterName);
+    }
+
+    /// <summary>Opens Performance with the named device's rail row selected.</summary>
+    private void RevealResource(string deviceId) {
+        NavigateToPage(_performance);
+        _performance.Reveal(deviceId);
     }
 
     /// <summary>Opens Hardware. No reveal: it is a static spec sheet with nothing to select.</summary>

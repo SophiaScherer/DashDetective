@@ -1,4 +1,5 @@
 using DashDetective.Tabs.Network;
+using DashDetective.Tests.Fakes;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,7 +44,15 @@ public class NetworkViewModelTests {
 
     private static (NetworkViewModel Vm, RecordingDns Dns) Create() {
         var dns = new RecordingDns();
-        return (new NetworkViewModel(new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns)), dns);
+        return (new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener())), dns);
+    }
+
+    /// <summary>The page over a link opener the test keeps hold of, for the browser-link commands.</summary>
+    private static (NetworkViewModel Vm, FakeWebLinkOpener Links) CreateWithLinks() {
+        var links = new FakeWebLinkOpener();
+        return (new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), new RecordingDns(), links)), links);
     }
 
     [Fact]
@@ -127,7 +136,7 @@ public class NetworkViewModelTests {
             Fail = new System.InvalidOperationException("the TCP table is gone"),
         };
         var vm = new NetworkViewModel(
-            new NetworkProviders(new EmptyAdapters(), connections, new RecordingDns()));
+            new NetworkProviders(new EmptyAdapters(), connections, new RecordingDns(), new FakeWebLinkOpener()));
 
         vm.Refresh();
         await Task.Yield();
@@ -145,12 +154,75 @@ public class NetworkViewModelTests {
             Fail = new System.InvalidOperationException("the adapter enumeration is gone"),
         };
         var vm = new NetworkViewModel(
-            new NetworkProviders(adapters, new EmptyConnections(), new RecordingDns()));
+            new NetworkProviders(adapters, new EmptyConnections(), new RecordingDns(), new FakeWebLinkOpener()));
 
         vm.Refresh();
         await Task.Yield();
 
         Assert.Empty(vm.Adapters);
         Assert.Same(IpConfigInfo.Unknown, vm.IpConfig);
+    }
+
+    // ----- Opening a target in the browser -----
+
+    [Fact]
+    public void OpenDnsSite_OpensTheFieldsHostOverHttps() {
+        var (vm, links) = CreateWithLinks();
+        vm.DnsHost = "example.com";
+
+        vm.OpenDnsSiteCommand.Execute(null);
+
+        Assert.Equal("https://example.com/", links.Single);
+    }
+
+    [Fact]
+    public async Task OpenPingSite_OpensTheTargetInTheField() {
+        var (vm, links) = CreateWithLinks();
+        await vm.PingTargetSeeded;
+        vm.PingTarget = "192.168.1.1";
+
+        vm.OpenPingSiteCommand.Execute(null);
+
+        Assert.Equal("https://192.168.1.1/", links.Single);
+    }
+
+    [Fact]
+    public void OpenSiteCommands_AreDisabledUntilTheFieldHoldsAHost() {
+        var (vm, _) = CreateWithLinks();
+
+        vm.DnsHost = "";
+        Assert.False(vm.OpenDnsSiteCommand.CanExecute(null));
+
+        vm.DnsHost = "-not-a-host-";
+        Assert.False(vm.OpenDnsSiteCommand.CanExecute(null));
+
+        vm.DnsHost = "example.com";
+        Assert.True(vm.OpenDnsSiteCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void LinkTip_SaysWhatWillOpenOrWhyItCannot() {
+        var (vm, _) = CreateWithLinks();
+
+        vm.DnsHost = "example.com";
+        Assert.Contains("https://example.com/", vm.DnsLinkTip);
+
+        vm.DnsHost = "";
+        Assert.Contains("Enter a host", vm.DnsLinkTip);
+    }
+
+    [Fact]
+    public void OpenDnsSite_FailedLaunch_IsAnnouncedAndASuccessfulOneIsNot() {
+        var (vm, links) = CreateWithLinks();
+        var notices = new List<string>();
+        vm.Notify = notices.Add;
+        vm.DnsHost = "example.com";
+
+        vm.OpenDnsSiteCommand.Execute(null);
+        Assert.Empty(notices);
+
+        links.Succeeds = false;
+        vm.OpenDnsSiteCommand.Execute(null);
+        Assert.Contains("https://example.com/", Assert.Single(notices));
     }
 }

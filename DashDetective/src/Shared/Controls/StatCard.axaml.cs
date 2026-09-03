@@ -9,6 +9,11 @@ namespace DashDetective.Shared.Controls;
 /// label, coloured dot, value/unit, caption and a <see cref="Sparkline"/>.
 /// </summary>
 public partial class StatCard : UserControl {
+    /// <summary>Whether the card is also a click target, which adds the shared selectable-card hover and
+    /// hand cursor. The click itself belongs to the call site, which wraps the card in a button.</summary>
+    public static readonly StyledProperty<bool> SelectableProperty =
+        AvaloniaProperty.Register<StatCard, bool>(nameof(Selectable));
+
     public static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<StatCard, string?>(nameof(Label));
 
@@ -44,6 +49,11 @@ public partial class StatCard : UserControl {
     }
 
     /// <summary>Uppercase metric name, e.g. "CPU".</summary>
+    public bool Selectable {
+        get => GetValue(SelectableProperty);
+        set => SetValue(SelectableProperty, value);
+    }
+
     public string? Label {
         get => GetValue(LabelProperty);
         set => SetValue(LabelProperty, value);

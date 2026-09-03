@@ -39,7 +39,7 @@ DashDetective/
       Platform/      Linux (IProcFileSystem + the /proc and /sys parsers), Windows (WmiRead)
       Theming/       ThemeService, ChartPalette, AccentPreset
       Settings/      AppSettings, SettingsStore, SettingsJsonContext
-      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/
+      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/ Links/
     Shell/           MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help, Shortcuts
     Tabs/<Feature>/  one folder per tab: view, view-model, feature-local helpers
 tests/DashDetective.Tests/   mirrors src/ path for path
@@ -69,6 +69,12 @@ files, Help's own copy — with no routing layer; each target exposes a `Reveal(
 result. It sits in
 the toolbar as an icon until asked for, by the icon itself or Ctrl+F, and puts itself away again when
 it loses focus with nothing typed. That state is deliberately not persisted.
+
+**Pages point at each other through the same seam.** A page raises what it is looking at — a disk number,
+an adapter name, a `DeviceIds` device id — and says nothing about which tab shows it; `MainWindowViewModel`
+alone knows the wiring, and navigates before revealing, since a page that is not current has no visual tree
+to scroll or select in yet. Performance's detail header jumps out to Storage, Network and Hardware, and the
+Dashboard's charts and cards jump in to Performance.
 
 ## Page lifecycle
 

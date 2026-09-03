@@ -26,6 +26,7 @@ stays in its tab folder.
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
 - [`src/Services/Notifications`](#srcservicesnotifications)
+- [`src/Services/Links`](#srcserviceslinks)
 - [`src/Services/Platform`](#srcservicesplatform)
 - [`src/Services/SystemMetrics`](#srcservicessystemmetrics)
 - [`src/Services/Network`](#srcservicesnetwork)
@@ -300,7 +301,10 @@ stays in its tab folder.
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
         Sparkline, StatCard, ChartLegend, InfoRow
-                                       (reusable widgets; Sparkline auto-fits to its data
+                                       (reusable widgets; StatCard.Selectable is opt-in and adds the
+                                        shared card.selectable hover for a card that is also a click
+                                        target — the click itself belongs to the call site, which wraps
+                                        the card in a button. Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
                                         StatCard forwards YMin/YMax to its inner sparkline.
                                         Fixed-axis mode also supports an optional second series
@@ -477,6 +481,22 @@ stays in its tab folder.
                                  subscribes and draws the banner; Settings and Toolkit only raise)
         Notices.cs              (the confirmation copy, in one file — the SettingCatalog reasoning: four
                                  call sites announce a saved export and the wording has to be one string)
+```
+
+## `src/Services/Links`
+
+```
+      /Links
+        IWebLinkOpener.cs       (seam over opening a web address in the default browser; never throws, so
+                                 a refused or failed launch reports false. NO PLATFORM ARMS and no
+                                 Unsupported twin — UseShellExecute reaches the shell on Windows and
+                                 xdg-open on Linux, so the implementation is portable and keeps its plain
+                                 name)
+        WebLinkOpener.cs        (the real one. https ONLY, the same rule as ToolkitRunner: the shell acts
+                                 on any scheme it has an association for, so a caller's typo must not
+                                 become an arbitrary launch. Soft-fails through Log.Warn — a service logs,
+                                 a view model does not. The Action<string> ctor is the test seam, so the
+                                 guard is provable without a browser existing)
 ```
 
 ## `src/Services/Platform`
@@ -745,6 +765,12 @@ stays in its tab folder.
                                  Performance, Storage) and handed to DeviceInventory.LoadAsync.
                                  EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
                                  members run concurrently; stateful providers are deliberately excluded)
+        DeviceInventory.cs      (what hardware exists, grouped by kind: the DeviceCategory enum, the
+                                 DeviceInstance record and DeviceIds, which mints each instance's id —
+                                 cpu / mem / net / gpu:{luid} / disk:{n}. THE IDS ARE A CROSS-PAGE
+                                 IDENTITY, not a local detail: a Dashboard card names its device by one
+                                 and the Performance rail reveals the row carrying it, so minting them
+                                 here is what stops the two spelling the same device differently)
         IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
                                  pure, unit-tested — lives on the record, not the DXGI reader.
                                  GpuAdapter.LuidToken IS NAMED FOR WINDOWS BUT IS NOT ALWAYS A LUID: it is
@@ -986,6 +1012,13 @@ stays in its tab folder.
                                 LinuxCpuInfoProvider.cs (the same card from /proc/cpuinfo + cpufreq, via the
                                                          shared CpuFacts. Substitutes only the placeholder
                                                          name; physical cores and clock stay 0 → "—")
+                                DashboardCard.cs        (one stat card's live state, plus the identity that
+                                                         makes it a link: DeviceId (the inventory id) and
+                                                         OpenCommand, which asks the shell to reveal it in
+                                                         Performance. Tip is ONE tooltip with a fallback —
+                                                         the card's no-reading note when it has one, else
+                                                         the open hint — because a card has no room for a
+                                                         line of its own and the note has more to say)
                                 CpuStaticInfo.cs        (record for the result)
                                 IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
                                                         (RAM info via WMI, async)
@@ -1352,6 +1385,23 @@ stays in its tab folder.
                                                          from launch — and since SetTarget ignores a blank
                                                          value, leaving the constant would let an empty box
                                                          silently resolve back to it)
+                                ConsolePanel.axaml(.cs) (the shape Ping and DNS Lookup share: target
+                                                         field, optional link icon, submit button and two
+                                                         console lines. LinkCommand null hides the icon, so
+                                                         the control stays general; its tooltip is on a
+                                                         WRAPPER because a disabled button takes no
+                                                         pointer-over and the disabled state is the one
+                                                         needing an explanation. The box is Classes="flat"
+                                                         like every box inside a field Border — Fluent's
+                                                         focus block otherwise paints a filled rectangle
+                                                         around the text alone, beside the icon)
+                                HostLink.cs             (the https URL a typed target means, or null when
+                                                         it is not a usable host — which is what leaves the
+                                                         link icon disabled. Uri.CheckHostName decides, and
+                                                         an IPv6 literal is BRACKETED: a bare one is not a
+                                                         legal URL authority, its colons reading as a port.
+                                                         NOT ToolkitHostValidator, whose rule is about a
+                                                         value becoming a command-line flag)
                                 IDnsLookupProvider.cs   (seam + the DnsResult record)
                                 DnsLookupProvider.cs    (one-shot Dns.GetHostEntryAsync with a 3 s CTS;
                                                          record type by address family. DefaultHost seeds
@@ -1446,6 +1496,15 @@ stays in its tab folder.
                                  — performance.stats.cpu and so on — because the tiles are the same for
                                  every CPU, and a key naming one adapter goes stale when the hardware
                                  does. The chart panel between them does not move.)
+                                (Reveal(deviceId) is the jump INTO this page, the counterpart to the
+                                 detail header's jumps out of it. Rows carry the DeviceInstance id they
+                                 were built from. Two things it must keep doing: EXPAND THE RAIL when the
+                                 Primary scope hides the device — the caller asked for that one, not the
+                                 primary of its kind — and HOLD a reveal whose row does not exist yet,
+                                 since disk and GPU rows arrive with an async inventory load.
+                                 RebuildResources matches the surviving selection BY DEVICE ID, not by
+                                 reference: a rebuilt disk or GPU row is a new object, so the toolbar
+                                 Refresh used to drop the selection back to the CPU.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the

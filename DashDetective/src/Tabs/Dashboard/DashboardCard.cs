@@ -1,5 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
+using System;
+using System.Windows.Input;
 
 namespace DashDetective.Tabs.Dashboard;
 
@@ -14,13 +17,27 @@ namespace DashDetective.Tabs.Dashboard;
 /// several GPUs/CPUs) each get their own card grouped with their kind.
 /// </summary>
 public partial class DashboardCard : ObservableObject {
-    public DashboardCard(DeviceCategory category, string label, string unit) {
+    /// <summary>What a card's tooltip says when it has no note of its own.</summary>
+    public const string OpenHint = "Open in Performance";
+
+    public DashboardCard(
+        DeviceCategory category, string deviceId, string label, string unit, Action<string> onOpen) {
         Category = category;
+        DeviceId = deviceId;
         Label = label;
         _unit = unit;
+        OpenCommand = new RelayCommand(() => onOpen(deviceId));
     }
 
     public DeviceCategory Category { get; }
+
+    /// <summary>The inventory id of the device this card shows, which is how the Performance tab is asked
+    /// for it (<c>PerformanceViewModel.Reveal</c>).</summary>
+    public string DeviceId { get; }
+
+    /// <summary>Opens this card's device on the Performance tab. The <c>PageLink</c> shape: the item holds
+    /// the command and calls back into the view model that owns it.</summary>
+    public ICommand OpenCommand { get; }
 
     /// <summary>Uppercase card heading (e.g. "CPU", "LOCAL DISK (C:)").</summary>
     public string Label { get; }
@@ -39,11 +56,12 @@ public partial class DashboardCard : ObservableObject {
     /// a line of its own, so the template hangs it off the tooltip.</summary>
     [ObservableProperty] private string _note = "";
 
-    /// <summary><see cref="Note"/> as a tooltip, or null when there is nothing to say. Avalonia only skips
-    /// a tooltip on null, so binding the bare string pops an empty one on every healthy card.</summary>
-    public string? NoteTip => Note.Length > 0 ? Note : null;
+    /// <summary>The card's tooltip: its note when it has one, otherwise where a click goes. A card has no
+    /// room for a line of its own, so both hang off the tooltip and the note wins — a card explaining why it
+    /// reads "—" has more to say than one repeating an affordance.</summary>
+    public string Tip => Note.Length > 0 ? Note : OpenHint;
 
-    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(NoteTip));
+    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(Tip));
 
     // Category flags the StatCard template binds to Classes.* so each card picks up its semantic accent brush
     // (ChartCpu / ChartMemory / …) via style setters, keeping the accents theme/accent-aware.
