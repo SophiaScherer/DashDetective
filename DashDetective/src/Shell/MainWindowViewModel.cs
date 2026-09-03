@@ -164,6 +164,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                                           IStartupRegistration.ForCurrentPlatform(), Shortcuts,
                                           BuildReport, BuildMetricsCsv, ResetWidgetOrders);
 
+        // The two pages that confirm something report to the banner this owns. Set here rather than
+        // taken by ctor: Toolkit's ctor is a test seam a dozen tests build directly, and a page's
+        // confirmations are not something it needs to be constructed with.
+        _settings.Notify = Notify;
+        _toolkit.Notify = Notify;
+
         // Persist whenever a control changes. The store debounces, so calling Persist freely is fine.
         _settings.Changed += OnSettingChanged;
         Nav.HelpRequested += Help.Open;

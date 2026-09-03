@@ -65,6 +65,14 @@ and the Settings **Layout card**, whose "Reset widget placements" clears every `
 `ReorderablePanel` reads as a return to the declared order. Each has an entry in
 [docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
+A **UI-affordance pass** is also complete, across four small changes: the widget fold chevron got the
+Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's edge
+puck moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
+stroked arrows alone; a `WidgetPanel` header now **folds on a double-click**; and every Settings action
+plus all four exports **confirm** through `NoticeService` (`src/Services/Notifications`) in a green
+banner below the resource alert's. Their decisions are in
+[docs/FEATURES.md](docs/FEATURES.md) under *Settings* and *Widget system*.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.
@@ -133,7 +141,7 @@ DashDetective/
     Shared/     ViewModelBase, page markers, formatters, Charts, Controls, Layout, Styles,
                 Shortcuts, Completion
     Services/   SystemMetrics, Platform, Theming, Settings, Network, Search, Startup,
-                Threading, Identity, Diagnostics
+                Threading, Identity, Diagnostics, Notifications
     Shell/      MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help,
                 Shortcuts, TrayNotice
     Tabs/       Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware,

@@ -39,7 +39,7 @@ DashDetective/
       Platform/      Linux (IProcFileSystem + the /proc and /sys parsers), Windows (WmiRead)
       Theming/       ThemeService, ChartPalette, AccentPreset
       Settings/      AppSettings, SettingsStore, SettingsJsonContext
-      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/
+      Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/
     Shell/           MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help, Shortcuts
     Tabs/<Feature>/  one folder per tab: view, view-model, feature-local helpers
 tests/DashDetective.Tests/   mirrors src/ path for path
@@ -157,6 +157,12 @@ tabs watching CPU cause one poll. `MetricChannel` wraps a sampler with its failu
 turns a throw into the on-screen placeholder. It is **pure fan-out**: GPU and disk have no shared feed
 there, because an aggregate across several devices would report an average under a label naming one of
 them.
+
+**`NoticeService`** (`src/Services/Notifications`) is the other half of that surface: where the watcher
+reports a condition that persists, this reports an action that has just completed — a reset, a copy, an
+export naming the file it wrote. A page raises one and the shell alone draws it, in a banner below the
+alert's, and it takes itself down on an `IUiTimer` rather than waiting to be cleared. `Notices` holds the
+copy, so four callers announcing a saved export cannot word it four ways.
 
 `ResourceAlertWatcher` lives outside it for that reason. It subscribes to the shared CPU and memory
 feeds like any page, but owns its own GPU and disk samplers — which their contracts require, both being

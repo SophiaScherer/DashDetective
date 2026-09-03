@@ -1,4 +1,6 @@
+using Avalonia.Input;
 using DashDetective.Services.Network;
+using DashDetective.Services.Notifications;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
@@ -70,6 +72,43 @@ public class SettingsViewModelTests {
         viewModel.ResetWidgetPlacementsCommand.Execute(null);
 
         Assert.Equal(2, resets);
+    }
+
+    /// <summary>The reset happens on pages the user is not looking at, so it has to say it happened.</summary>
+    [Fact]
+    public void ResetWidgetPlacements_Confirms() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false), () => { });
+        var notices = new List<string>();
+        viewModel.Notify = notices.Add;
+
+        viewModel.ResetWidgetPlacementsCommand.Execute(null);
+
+        Assert.Equal([Notices.WidgetPlacementsReset], notices);
+    }
+
+    /// <summary>Nothing was rebound, so the command returns early and there is nothing to confirm. A
+    /// banner here would claim an undo that never happened.</summary>
+    [Fact]
+    public void ResetAllShortcuts_NothingRebound_StaysSilent() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        var notices = new List<string>();
+        viewModel.Notify = notices.Add;
+
+        viewModel.ResetAllShortcutsCommand.Execute(null);
+
+        Assert.Empty(notices);
+    }
+
+    [Fact]
+    public void ResetAllShortcuts_AfterARebind_Confirms() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        Assert.True(viewModel.Shortcuts.TryRebind(ShortcutId.Refresh, new KeyGesture(Key.F8), out _));
+        var notices = new List<string>();
+        viewModel.Notify = notices.Add;
+
+        viewModel.ResetAllShortcutsCommand.Execute(null);
+
+        Assert.Equal([Notices.ShortcutsRestored], notices);
     }
 
     /// <summary>A folded card's body is never measured, so its rows are not in the visual tree for the

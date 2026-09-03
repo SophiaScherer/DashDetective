@@ -4,6 +4,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Notifications;
 using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
@@ -117,11 +118,14 @@ public partial class ToolkitView : UserControl {
         if (DataContext is not ToolkitViewModel vm)
             return;
 
-        await FileSave.SaveAsync(
+        var path = await FileSave.SaveAsync(
             this,
             title: "Export execution log",
             suggestedName: $"DashDetective-toolkit-log-{DateTime.Now:yyyyMMdd-HHmmss}",
             formats: [DiagnosticsFormat.Text],
             content: _ => vm.BuildLogText());
+
+        if (path is not null)
+            vm.Notify?.Invoke(Notices.Exported(path));
     }
 }
