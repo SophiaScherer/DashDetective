@@ -150,6 +150,15 @@ don't implement it (Settings) simply ignore it (`MainWindowViewModel.Refresh` ro
 needs the window's `TopLevel`). Export uses the in-box `Avalonia.Platform.Storage` picker — no new
 package.
 
+**Every graph on the page is a link into Performance.** The three chart widgets and each stat card open
+their own device on the Performance tab, so a GPU or a specific disk card lands on that device's row
+rather than on whichever row was last selected there. Cards carry the `DeviceIds` id they were built
+from, and the page raises it without knowing which tab shows it — the shell wires that, the same way it
+does for the jumps in the other direction. The affordance is the chart itself, a `Button Classes="bare"`
+that adds a hand cursor, a hover tint and keyboard activation; the **widget header is untouched**, so the
+drag and its double-tap fold behave as they did. A card's tooltip prefers its no-reading note over
+the open hint, since the note has more to say and there is only room for one.
+
 ## Universal search
 
 **Fully live**. The toolbar box (`Ctrl+F`) searches
@@ -728,6 +737,15 @@ adapter that reader is asked about (measured ~37 ms for NVIDIA, ~26 ms for AMD, 
 other vendors' adapters, listing each GPU once per display output — hence `PnpPciParser`. This reached
 outside `src/Tabs/Performance/` only to add `GpuPciId` to `GpuAdapterProvider` and thread it through
 `DeviceInventory`, both under explicit sign-off.
+
+**`Reveal(deviceId)` is the jump in**, the counterpart to the detail header's jumps out, and the Dashboard
+is its first caller. Rows carry the `DeviceInstance` id they were built from, so an id names one device
+rather than a kind. Two decisions inside it: a reveal **expands the rail to "All devices"** when the
+Primary scope hides the device — the caller asked for that one, not the primary of its kind — and one
+that arrives **before its row exists** is held until the async inventory load builds it, the arrangement
+the Network tab already uses for an early adapter reveal. That second one needed a fix to hold: the rail
+matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
+toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
 ## Toolkit
 

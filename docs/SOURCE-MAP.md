@@ -301,7 +301,10 @@ stays in its tab folder.
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
         Sparkline, StatCard, ChartLegend, InfoRow
-                                       (reusable widgets; Sparkline auto-fits to its data
+                                       (reusable widgets; StatCard.Selectable is opt-in and adds the
+                                        shared card.selectable hover for a card that is also a click
+                                        target — the click itself belongs to the call site, which wraps
+                                        the card in a button. Sparkline auto-fits to its data
                                         by default, or set YMin/YMax for a fixed axis —
                                         StatCard forwards YMin/YMax to its inner sparkline.
                                         Fixed-axis mode also supports an optional second series
@@ -762,6 +765,12 @@ stays in its tab folder.
                                  Performance, Storage) and handed to DeviceInventory.LoadAsync.
                                  EVERY MEMBER MUST BE STATELESS — it is constructed three times and its
                                  members run concurrently; stateful providers are deliberately excluded)
+        DeviceInventory.cs      (what hardware exists, grouped by kind: the DeviceCategory enum, the
+                                 DeviceInstance record and DeviceIds, which mints each instance's id —
+                                 cpu / mem / net / gpu:{luid} / disk:{n}. THE IDS ARE A CROSS-PAGE
+                                 IDENTITY, not a local detail: a Dashboard card names its device by one
+                                 and the Performance rail reveals the row carrying it, so minting them
+                                 here is what stops the two spelling the same device differently)
         IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
                                  pure, unit-tested — lives on the record, not the DXGI reader.
                                  GpuAdapter.LuidToken IS NAMED FOR WINDOWS BUT IS NOT ALWAYS A LUID: it is
@@ -1003,6 +1012,13 @@ stays in its tab folder.
                                 LinuxCpuInfoProvider.cs (the same card from /proc/cpuinfo + cpufreq, via the
                                                          shared CpuFacts. Substitutes only the placeholder
                                                          name; physical cores and clock stay 0 → "—")
+                                DashboardCard.cs        (one stat card's live state, plus the identity that
+                                                         makes it a link: DeviceId (the inventory id) and
+                                                         OpenCommand, which asks the shell to reveal it in
+                                                         Performance. Tip is ONE tooltip with a fallback —
+                                                         the card's no-reading note when it has one, else
+                                                         the open hint — because a card has no room for a
+                                                         line of its own and the note has more to say)
                                 CpuStaticInfo.cs        (record for the result)
                                 IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
                                                         (RAM info via WMI, async)
@@ -1480,6 +1496,15 @@ stays in its tab folder.
                                  — performance.stats.cpu and so on — because the tiles are the same for
                                  every CPU, and a key naming one adapter goes stale when the hardware
                                  does. The chart panel between them does not move.)
+                                (Reveal(deviceId) is the jump INTO this page, the counterpart to the
+                                 detail header's jumps out of it. Rows carry the DeviceInstance id they
+                                 were built from. Two things it must keep doing: EXPAND THE RAIL when the
+                                 Primary scope hides the device — the caller asked for that one, not the
+                                 primary of its kind — and HOLD a reveal whose row does not exist yet,
+                                 since disk and GPU rows arrive with an async inventory load.
+                                 RebuildResources matches the surviving selection BY DEVICE ID, not by
+                                 reference: a rebuilt disk or GPU row is a new object, so the toolbar
+                                 Refresh used to drop the selection back to the CPU.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
