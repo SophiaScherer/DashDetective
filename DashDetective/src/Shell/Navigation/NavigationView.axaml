@@ -243,7 +243,7 @@
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style Selector="Panel.railHost Path.chevronGlyph">
-            <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Fill" Value="{DynamicResource TextSecondary}"/>
         </Style>
         <!-- Hover picks up the accent rather than a fill overlay: the puck is opaque, so a translucent
              overlay would let the content behind it show through. -->
@@ -251,7 +251,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
         </Style>
         <Style Selector="Button.railChevron:pointerover Path.chevronGlyph">
-            <Setter Property="Stroke" Value="{DynamicResource Accent}"/>
+            <Setter Property="Fill" Value="{DynamicResource Accent}"/>
         </Style>
 
         <!-- Drag-to-dock: dim the bar where it still sits so it reads as picked up, while the overlay's
@@ -459,8 +459,9 @@
                 HorizontalAlignment="{Binding ChevronHAlign}" VerticalAlignment="{Binding ChevronVAlign}"
                 ToolTip.Tip="Collapse or expand navigation">
             <Border Classes="puck" CornerRadius="{Binding ChevronCornerRadius}">
+                <!-- Filled, not stroked: ChevronIcon is one of the Icons.Caret* triangles, the app's
+                     one disclosure glyph. Stretch="None" keeps it at its authored 8x5. -->
                 <Path Classes="chevronGlyph" Width="18" Height="18" Stretch="None"
-                      StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
                       HorizontalAlignment="Center" VerticalAlignment="Center"
                       Data="{Binding ChevronIcon}"/>
             </Border>

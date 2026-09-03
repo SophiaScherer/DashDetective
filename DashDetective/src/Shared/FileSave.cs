@@ -28,12 +28,14 @@ internal static class FileSave {
     /// <param name="suggestedName">The filename to offer, without an extension.</param>
     /// <param name="formats">The formats to offer, in order; the first is the default.</param>
     /// <param name="content">Renders the report in whichever format the chosen filename means.</param>
-    public static async Task SaveAsync(Visual owner, string title, string suggestedName,
-                                       IReadOnlyList<DiagnosticsFormat> formats,
-                                       Func<DiagnosticsFormat, string> content) {
+    /// <returns>Where the file was written, for a caller that confirms it; null for a cancelled pick or
+    /// a failed write, which are the two things there is nothing to announce about.</returns>
+    public static async Task<string?> SaveAsync(Visual owner, string title, string suggestedName,
+                                                IReadOnlyList<DiagnosticsFormat> formats,
+                                                Func<DiagnosticsFormat, string> content) {
         var storage = TopLevel.GetTopLevel(owner)?.StorageProvider;
         if (storage is null || formats.Count == 0)
-            return;
+            return null;
 
         var choices = new FilePickerFileType[formats.Count];
         for (var i = 0; i < formats.Count; i++) {
@@ -49,7 +51,7 @@ internal static class FileSave {
         });
 
         if (file is null)
-            return; // user cancelled
+            return null; // user cancelled
 
         try {
             // The name is the authority on the format: the dialog does not report which filter was
@@ -62,6 +64,11 @@ internal static class FileSave {
         } catch (Exception) {
             // Disk full, permission denied, drive removed mid-write, etc. Swallow so a failed export
             // can't take the app down; the file simply isn't written.
+            return null;
         }
+
+        // The local path where there is one, so a confirmation can name somewhere the user can go look.
+        // A picker on a provider that has no local file (a cloud location) still has a name.
+        return file.TryGetLocalPath() ?? file.Name;
     }
 }

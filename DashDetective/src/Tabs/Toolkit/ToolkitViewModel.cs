@@ -28,6 +28,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     private ToolkitCategory? _category;
     private string? _pendingReveal;
 
+    /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner and is the
+    /// only thing that can draw one; left null in a test, where there is nothing to draw on.</summary>
+    internal Action<string>? Notify { get; set; }
+
     public ToolkitViewModel() : this(IToolkitCatalog.ForCurrentPlatform()) { }
 
     /// <summary>Test seam: the same page over an explicit command set. The public ctor resolves this

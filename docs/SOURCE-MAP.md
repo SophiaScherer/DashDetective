@@ -25,6 +25,7 @@ stays in its tab folder.
 - [`src/Services/Identity`](#srcservicesidentity)
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
+- [`src/Services/Notifications`](#srcservicesnotifications)
 - [`src/Services/Platform`](#srcservicesplatform)
 - [`src/Services/SystemMetrics`](#srcservicessystemmetrics)
 - [`src/Services/Network`](#srcservicesnetwork)
@@ -130,7 +131,9 @@ stays in its tab folder.
                                 near-identical copies — toolbar Export, the two Settings buttons, the
                                 Toolkit log — which is what made adding a format a three-place edit.
                                 Content is rendered only after a destination is picked, and only in the
-                                one format chosen)
+                                one format chosen. RETURNS the path it wrote, or null for a cancelled pick
+                                or a failed write, so all four callers confirm from one value rather than
+                                each deciding what counts as a success)
                                 arms: the 12-hour one must say AM/PM rather than whatever the host
                                 locale designates. Display only — export names, the report's
                                 "Generated" line and the app log stay 24-hour so files stay sortable)
@@ -196,7 +199,10 @@ stays in its tab folder.
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
                                  and the :collapsed rules. The chevron is a plain Button, not a
                                  ToggleButton: Fluent's checked/pressed states would all need undoing,
-                                 and Button.bare already strips the chrome. The glyph is set from the
+                                 and Button.bare already strips the chrome. Its hit target is the
+                                 Processes table's Button.chev idiom — stretched, with a NEGATIVE vertical
+                                 margin bleeding over the panel's padding, since Button.bare zeroes
+                                 MinHeight and a MinHeight instead would make every folding card taller. The glyph is set from the
                                  pseudo-class rather than a converter, which keeps it out of Icons —
                                  touching Icons at all throws without a render backend, so a test could
                                  not reach the rule.
@@ -258,7 +264,9 @@ stays in its tab folder.
                                  ApplySaved is a deliberate no-op on an empty save, and Sync early-returns
                                  whenever the child count is unchanged, which is every reset)
         Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
-                                 start from, plus how a panel names a child: an id attached in markup, else the
+                                 start from; OwnsItsOwnGesture, the one list of controls that take clicks
+                                 of their own, which a drag and a widget header's double-tap both refuse;
+                                 plus how a panel names a child: an id attached in markup, else the
                                  control's own, else its item view model's where the children are
                                  generated. The attached one is for a tile written out by hand, which
                                  is the only kind that cannot name itself)
@@ -279,7 +287,11 @@ stays in its tab folder.
                                         Border Classes="panel" is a SURFACE, not a widget.
                                         Hand it a WidgetCollapse and it grows a header chevron; the
                                         STORE IS THE OPT-IN, so a page cannot offer the affordance
-                                        without giving the state somewhere to live. Folding hides the
+                                        without giving the state somewhere to live. It also folds on a
+                                        DOUBLE-TAP of the header, gated on the same store, refusing a tap
+                                        that started on anything Reorder.OwnsItsOwnGesture claims — on the
+                                        chevron the two Clicks have already toggled twice and a third
+                                        would land inverted. Folding hides the
                                         BODY, never the panel — hiding the panel would drop it out of a
                                         board's visible children and change what a drop index means.
                                         WidgetTable is a table's chrome: header above a scrolling body,
@@ -450,6 +462,21 @@ stays in its tab folder.
                                  is what makes the blue swatch and the "Default" swatch agree. Pure HSL
                                  maths over Avalonia.Media value types — no render backend, so it is
                                  unit-testable)
+```
+
+## `src/Services/Notifications`
+
+```
+      /Notifications
+        NoticeService.cs        (the ONE place a completed action says so: Show puts a message up, an
+                                 IUiTimer takes it down again after Duration, Dismiss is the early exit.
+                                 A second Show REPLACES rather than queues — the newer message is the one
+                                 matching the click the user just made, and a queue reports actions out of
+                                 step with the clicks that caused them. Expiry is on the IUiTimer seam and
+                                 not DispatcherTimer.RunOnce, which no headless test can drive. The shell
+                                 subscribes and draws the banner; Settings and Toolkit only raise)
+        Notices.cs              (the confirmation copy, in one file — the SettingCatalog reasoning: four
+                                 call sites announce a saved export and the wording has to be one string)
 ```
 
 ## `src/Services/Platform`
@@ -866,7 +893,15 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer)
+                                 the viewport — see File Explorer.
+                                 Between the toolbar and the page sit the TWO banners, in a StackPanel so
+                                 a confirmation cannot displace a live warning: the amber resource alert,
+                                 pinned, and the green NoticeService confirmation below it, which takes
+                                 itself down. Its message is trimmed with the full text on a tooltip,
+                                 since an export names a path and a deep one is exactly the case worth
+                                 reading. Esc dismisses the confirmation first and the warning only if
+                                 there is no confirmation. Notify(string) is the forwarder view
+                                 code-behind calls — MainWindow's own Export among them)
 ```
 
 ## `src/Shell/TrayNotice`
@@ -926,7 +961,14 @@ stays in its tab folder.
                                      scroll axis, puck geometry — no converters. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
-        NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries)
+        NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all
+                                     authored in an 18x18 space and STROKED — except the Caret* set, which
+                                     is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
+                                     widget headers and the Processes table draw as text. A consumer of a
+                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
+                                     First/Last stop-bar variants are the Network pager's alone: paging is
+                                     navigation rather than disclosure, and a stop bar only reads against a
+                                     stroked arrow)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
         ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
@@ -1141,7 +1183,17 @@ stays in its tab folder.
 
 ```
       /FileExplorer             FileExplorerView.axaml(.cs) + FileExplorerViewModel.cs
-                                                        (VM implements ISelfScrollingPage +
+                                                        (the view REPLACES the tree chevron
+                                                         ToggleButton's template to draw the app's filled
+                                                         caret instead of Fluent's stroked V. Restyling
+                                                         that button's inner Path is not reachable: a
+                                                         selector cannot cross two template boundaries and
+                                                         the Path lives in the button's own control theme,
+                                                         so a `/template/ ToggleButton#… /template/ Path`
+                                                         selector compiles and matches nothing.
+                                                         Both carets sit on one Panel with exactly one
+                                                         visible, for the same reason.
+                                                         VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
                                                          auto-refresh + scroll-to-top-on-navigation)

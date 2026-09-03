@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Notifications;
 using DashDetective.Shared;
 using System;
 using System.Linq;
@@ -80,8 +81,12 @@ public partial class SettingsView : UserControl {
         try {
             await clipboard.SetTextAsync(vm.BuildReport(DiagnosticsFormat.Text));
         } catch (Exception) {
-            // Clipboard busy/denied — swallow so a failed copy can't take the app down.
+            // Clipboard busy/denied — swallow so a failed copy can't take the app down, and say nothing:
+            // a confirmation for a copy that did not happen is worse than none.
+            return;
         }
+
+        vm.Notify?.Invoke(Notices.DiagnosticsCopied);
     }
 
     /// <summary>Exports the system report, in whichever format the chosen filename asks for (mirrors the
@@ -90,12 +95,15 @@ public partial class SettingsView : UserControl {
         if (DataContext is not SettingsViewModel vm)
             return;
 
-        await FileSave.SaveAsync(
+        var path = await FileSave.SaveAsync(
             this,
             title: "Export system report",
             suggestedName: $"DashDetective-report-{DateTime.Now:yyyyMMdd-HHmmss}",
             formats: DiagnosticsFormats.Offered,
             content: vm.BuildReport);
+
+        if (path is not null)
+            vm.Notify?.Invoke(Notices.Exported(path));
     }
 
     /// <summary>Exports the rolling metric histories as a CSV file. A different artifact from the report
@@ -105,12 +113,15 @@ public partial class SettingsView : UserControl {
         if (DataContext is not SettingsViewModel vm)
             return;
 
-        await FileSave.SaveAsync(
+        var path = await FileSave.SaveAsync(
             this,
             title: "Export metrics CSV",
             suggestedName: $"DashDetective-metrics-{DateTime.Now:yyyyMMdd-HHmmss}",
             formats: [DiagnosticsFormat.Csv],
             content: _ => vm.BuildMetricsCsv());
+
+        if (path is not null)
+            vm.Notify?.Invoke(Notices.Exported(path));
     }
 
 }

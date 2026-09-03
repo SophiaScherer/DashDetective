@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Notifications;
 using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
@@ -120,15 +121,18 @@ public partial class MainWindow : Window {
 
     /// <summary>Exports the current system snapshot, in whichever format the chosen filename asks for.
     /// The dialog itself is <see cref="FileSave"/>, shared with the Settings export buttons.</summary>
-    private Task ExportReportAsync() {
+    private async Task ExportReportAsync() {
         if (DataContext is not MainWindowViewModel vm)
-            return Task.CompletedTask;
+            return;
 
-        return FileSave.SaveAsync(
+        var path = await FileSave.SaveAsync(
             this,
             title: "Export system report",
             suggestedName: $"DashDetective-report-{DateTime.Now:yyyyMMdd-HHmmss}",
             formats: DiagnosticsFormats.Offered,
             content: vm.BuildReport);
+
+        if (path is not null)
+            vm.Notify(Notices.Exported(path));
     }
 }

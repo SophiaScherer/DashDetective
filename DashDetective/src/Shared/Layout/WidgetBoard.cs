@@ -111,7 +111,7 @@ public class WidgetBoard : ReorderablePanel {
         var blocked = false;
 
         foreach (var node in source.GetSelfAndVisualAncestors()) {
-            if (node is Button or ToggleButton or TextBox or ComboBox or ScrollBar)
+            if (Reorder.OwnsItsOwnGesture(node))
                 blocked = true;
             else if (node is Panel { Name: "PART_Header" } hit)
                 header ??= hit;

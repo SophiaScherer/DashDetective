@@ -65,6 +65,14 @@ and the Settings **Layout card**, whose "Reset widget placements" clears every `
 `ReorderablePanel` reads as a return to the declared order. Each has an entry in
 [docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
+A **UI-affordance pass** is also complete, across four small changes: the widget fold chevron got the
+Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's edge
+puck moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
+stroked arrows alone; a `WidgetPanel` header now **folds on a double-click**; and every Settings action
+plus all four exports **confirm** through `NoticeService` (`src/Services/Notifications`) in a green
+banner below the resource alert's. Their decisions are in
+[docs/FEATURES.md](docs/FEATURES.md) under *Settings* and *Widget system*.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.
@@ -133,7 +141,7 @@ DashDetective/
     Shared/     ViewModelBase, page markers, formatters, Charts, Controls, Layout, Styles,
                 Shortcuts, Completion
     Services/   SystemMetrics, Platform, Theming, Settings, Network, Search, Startup,
-                Threading, Identity, Diagnostics
+                Threading, Identity, Diagnostics, Notifications
     Shell/      MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help,
                 Shortcuts, TrayNotice
     Tabs/       Dashboard, FileExplorer, Processes, Performance, Network, Storage, Hardware,
@@ -155,7 +163,8 @@ where it matters, the trap it exists to avoid. Jump straight to the folder you a
   [Settings](docs/SOURCE-MAP.md#srcservicessettings) ·
   [Network](docs/SOURCE-MAP.md#srcservicesnetwork) ·
   [Startup](docs/SOURCE-MAP.md#srcservicesstartup) ·
-  [Diagnostics](docs/SOURCE-MAP.md#srcservicesdiagnostics)
+  [Diagnostics](docs/SOURCE-MAP.md#srcservicesdiagnostics) ·
+  [Notifications](docs/SOURCE-MAP.md#srcservicesnotifications)
 - Shell: [root](docs/SOURCE-MAP.md#srcshell) ·
   [Navigation](docs/SOURCE-MAP.md#srcshellnavigation) ·
   [TrayNotice](docs/SOURCE-MAP.md#srcshelltraynotice)
@@ -695,6 +704,13 @@ temperature is the expected outcome, not a defect.
   regardless of selector specificity. `Border.settingRow` set `Background="Transparent"` locally, which
   silently outranked `Border.revealFlash.highlighted` and left Settings with no reveal flash — build,
   format and 2246 tests all green. After promoting a style, delete the local same-property setter.
+- **A selector cannot cross two template boundaries.** `TreeViewItem /template/ ToggleButton#PART_X
+  /template/ Path` compiles, raises nothing, and matches nothing — and, like the rule above, leaves build,
+  format and the whole suite green while the screen is unchanged. Reaching an element inside a templated
+  child's *own* control theme means **replacing that child's `Template`**, which is how the File Explorer
+  tree draws the app's caret instead of Fluent's stroked V. A consequence: a style rule cannot then select
+  inside the template you just supplied either, so a two-state glyph goes in as both states on one `Panel`
+  with one visible, the way the Processes group headers do it.
 - **Layer rather than restate.** `Classes="bare rowRun"`, `Classes="card selectable"` — not a new style
   repeating six setters.
 - **Dimensions are adopted by contact, not by sweep.** New code uses the `Dimensions.axaml` tokens; a

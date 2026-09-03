@@ -309,8 +309,8 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => IsRailCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
     };
 
-    /// <summary>The chevron glyph shown on the puck.</summary>
-    public Geometry ChevronIcon => Icons.Chevron(ChevronPointing);
+    /// <summary>The caret glyph shown on the puck. Filled, so the view sets Fill rather than Stroke.</summary>
+    public Geometry ChevronIcon => Icons.Caret(ChevronPointing);
 
     /// <summary>Puck width: the stand-off axis on a vertical rail, the flat side on a horizontal bar.</summary>
     public double ChevronWidth => IsHorizontal ? PuckLength : PuckRadius;

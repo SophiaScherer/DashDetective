@@ -258,6 +258,16 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   worse than one that does nothing. The reset is the shell's `Action`, handed to `SettingsViewModel` the
   way `buildReport` and `buildMetricsCsv` already are — the orders are the shell's, and Settings is
   deliberately not itself reorderable.
+- **Confirmations.** Every action on this page that changes something out of sight now says so, in a
+  green banner in the resource alert's slot that takes itself down after five seconds — "Reset widget
+  placements", "Restore default shortcuts", a per-row shortcut reset, "Copy diagnostics", and both
+  exports, which name the path they wrote. Three decisions: a command that **returns early confirms
+  nothing** (restoring shortcuts with none rebound, a copy the clipboard refused), so a banner never
+  claims something that did not happen; the copy lives in `Notices` rather than at the call sites,
+  because four sites announce a saved export; and the colour is the **fixed status green**, not the
+  accent — an accent-following banner turns red for a user who picked red, and a red success message
+  reads as an error. The toolbar Export and the Toolkit log export confirm the same way, since all four
+  go through the one `FileSave`, which now returns the path it wrote.
 - **Folding a card.** Every card on this page carries a header chevron and folds shut, and the state
   **persists with no "remember" toggle** — unlike the Processes tab's folded sections, where folding is
   usually a glance rather than a preference; a settings card that is folded is a layout choice. Written
@@ -1001,8 +1011,13 @@ shape now exists once. Five rules, all load-bearing:
 1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
    `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
    `Border Classes="panel"` is a *surface* — a pane, the Help modal, a drive card — not a widget.
-   It can also **fold shut from a header chevron**, opt-in by handing it a `WidgetCollapse`; the Settings
-   page is the only caller today. Three decisions inside it: **the store is the opt-in**, not a second
+   It can also **fold shut from a header chevron or a double-click of the heading**, opt-in by handing it
+   a `WidgetCollapse`; the Settings page is the only caller today. The chevron's hit target is the
+   Processes table's `Button.chev` idiom — stretched, bleeding over the panel's padding with a *negative*
+   margin, since `Button.bare` zeroes `MinHeight` and a `MinHeight` instead would make every folding card
+   taller. The double-tap is gated on the same store and refuses a tap that started on a control of its
+   own (`Reorder.OwnsItsOwnGesture`, shared with the drag's blocked-control walk): on the chevron the two
+   Clicks have already toggled twice, and a third would land inverted. Three decisions inside it: **the store is the opt-in**, not a second
    flag, so a page cannot offer the affordance without giving the state somewhere to live — and somewhere
    the page itself can reach, which is what lets a search jump reopen a folded card. **Folding hides the
    body, never the panel**, because hiding the panel would drop it out of `CollectVisible` and change what

@@ -4,7 +4,8 @@ namespace DashDetective.Shell.Navigation;
 
 /// <summary>
 /// Shared navigation icon geometries. Paths are authored in an 18x18 coordinate
-/// space (matching the design document) and are drawn as stroked outlines.
+/// space (matching the design document) and are drawn as stroked outlines — except the
+/// <c>Caret*</c> disclosure set, which is filled.
 /// </summary>
 public static class Icons {
     // Four rounded tiles forming a dashboard grid.
@@ -91,27 +92,35 @@ public static class Icons {
     public static readonly Geometry PanelRailTop = Geometry.Parse(PanelFrame + "M2.5,6.5 H15.5");
     public static readonly Geometry PanelRailBottom = Geometry.Parse(PanelFrame + "M2.5,11.5 H15.5");
 
-    // Plain chevrons (stroked) for the edge puck that collapses/expands the bar. Authored in the same
-    // 18x18 space as the other glyphs, apexed on the centre so they read as centred at any puck size.
+    // Plain chevrons (stroked) for the Network connections pager's prev/next. Authored in the same 18x18
+    // space as the other glyphs, apexed on the centre so they read as centred at any size.
     public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
     public static readonly Geometry ChevronRight = Geometry.Parse("M7,4 L12,9 L7,14");
-    public static readonly Geometry ChevronUp = Geometry.Parse("M4,11 L9,6 L14,11");
-    public static readonly Geometry ChevronDown = Geometry.Parse("M4,7 L9,12 L14,7");
 
-    // Skip-to-end chevrons for the Network connections pager: the same stroke against a stop bar, so the
-    // four arrows read as one set with ChevronLeft/ChevronRight above.
+    // Skip-to-end chevrons for the same pager: the same stroke against a stop bar, so the four arrows
+    // read as one set with ChevronLeft/ChevronRight above.
     public static readonly Geometry ChevronFirst = Geometry.Parse("M12,4 L7,9 L12,14 M5,4 V14");
     public static readonly Geometry ChevronLast = Geometry.Parse("M6,4 L11,9 L6,14 M13,4 V14");
 
+    // Filled disclosure carets — the app's one expand/collapse glyph, matching the ▾/▸ the widget
+    // headers and the Processes table draw as text. FILLED, not stroked like everything above: a
+    // consumer must set Fill rather than Stroke. Authored as an 8x5 triangle centred in the 18x18 space,
+    // which is the size the 12.5px text glyph renders at.
+    public static readonly Geometry CaretLeft = Geometry.Parse("M11.5,5 L11.5,13 L6.5,9 Z");
+    public static readonly Geometry CaretRight = Geometry.Parse("M6.5,5 L6.5,13 L11.5,9 Z");
+    public static readonly Geometry CaretUp = Geometry.Parse("M5,11.5 L13,11.5 L9,6.5 Z");
+    public static readonly Geometry CaretDown = Geometry.Parse("M5,6.5 L13,6.5 L9,11.5 Z");
+
     /// <summary>
-    /// The chevron geometry for a direction. A plain map — the rule deciding which way the puck points
-    /// lives on <c>NavigationViewModel.ChevronPointing</c>, where it is testable without a render backend.
+    /// The disclosure caret for a direction, used by the nav bar's edge puck. A plain map — the rule
+    /// deciding which way the puck points lives on <c>NavigationViewModel.ChevronPointing</c>, where it
+    /// is testable without a render backend.
     /// </summary>
-    public static Geometry Chevron(ChevronDirection direction) => direction switch {
-        ChevronDirection.Left => ChevronLeft,
-        ChevronDirection.Right => ChevronRight,
-        ChevronDirection.Up => ChevronUp,
-        _ => ChevronDown,
+    public static Geometry Caret(ChevronDirection direction) => direction switch {
+        ChevronDirection.Left => CaretLeft,
+        ChevronDirection.Right => CaretRight,
+        ChevronDirection.Up => CaretUp,
+        _ => CaretDown,
     };
 
     /// <summary>

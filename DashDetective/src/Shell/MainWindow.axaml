@@ -128,23 +128,53 @@
                     </Grid>
                 </Border>
 
-                <!-- Resource-alert banner: shown when CPU/memory stays above the threshold and the user's
-                     "Resource alerts" setting is on. Auto-clears on recovery; the × dismisses the current
-                     breach. Fixed amber so it reads as a warning in both themes. -->
-                <Border Grid.Row="1" IsVisible="{Binding AlertBannerVisible}"
-                        Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                        <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                              Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
-                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
-                                   Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
-                        <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
-                                ToolTip.Tip="Dismiss" Command="{Binding DismissAlertCommand}">
-                            <Path Width="11" Height="11" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
-                                  StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L11,11 M11,1 L1,11"/>
-                        </Button>
-                    </Grid>
-                </Border>
+                <!-- The two banners, stacked so a confirmation cannot displace a live warning. The
+                     warning stays pinned under the toolbar; the confirmation, which is transient, sits
+                     below it. -->
+                <StackPanel Grid.Row="1">
+
+                    <!-- Resource-alert banner: shown when CPU/memory stays above the threshold and the
+                         user's "Resource alerts" setting is on. Auto-clears on recovery; the × dismisses
+                         the current breach. Fixed amber so it reads as a warning in both themes. -->
+                    <Border IsVisible="{Binding AlertBannerVisible}"
+                            Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                                  Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                                       Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
+                            <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
+                                    ToolTip.Tip="Dismiss" Command="{Binding DismissAlertCommand}">
+                                <Path Width="11" Height="11" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                      StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L11,11 M11,1 L1,11"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Confirmation banner: what an action that changes something out of sight just did.
+                         The alert's geometry, so the two read as one surface, but green and a tick rather
+                         than amber and a warning triangle — an accent-following colour would turn this red
+                         for a user who picked red, and a red success message reads as an error. Takes
+                         itself down after NoticeService.Duration; the × and Esc are early exits. -->
+                    <Border IsVisible="{Binding NoticeBannerVisible}"
+                            Background="{StaticResource GreenSoft}" BorderBrush="{StaticResource GreenLine}" BorderThickness="0,0,0,1" Padding="18,9">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                                  Stroke="{StaticResource Green}" StrokeThickness="2"
+                                  StrokeLineCap="Round" StrokeJoin="Round" Data="M2,8.5 L6.5,13 L14,4"/>
+                            <!-- The tooltip carries what the trim drops: an export names a path, and a
+                                 deep one is exactly the case where the user needs to read all of it. -->
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                                       Foreground="{DynamicResource TextPrimary}" Text="{Binding NoticeText}"
+                                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding NoticeText}"/>
+                            <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
+                                    ToolTip.Tip="Dismiss" Command="{Binding DismissNoticeCommand}">
+                                <Path Width="11" Height="11" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                      StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L11,11 M11,1 L1,11"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </StackPanel>
 
                 <!-- Page content: normal pages get an outer scroll region; self-scrolling pages
                      (File Explorer) get a bounded, non-scrolling host so their panes scroll on their own.

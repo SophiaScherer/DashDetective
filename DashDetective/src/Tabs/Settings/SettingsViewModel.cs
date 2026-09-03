@@ -2,6 +2,7 @@ using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Notifications;
 using DashDetective.Services.Settings;
 using DashDetective.Services.Startup;
 using DashDetective.Services.SystemMetrics;
@@ -75,6 +76,10 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Raised after any persisted setting changes (theme, accent, interval, or a toggle), so the
     /// composition root can capture and save the current state.</summary>
     public event Action? Changed;
+
+    /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner and is the
+    /// only thing that can draw one; left null in a test, where there is nothing to draw on.</summary>
+    internal Action<string>? Notify { get; set; }
 
     /// <summary>The name and description of every setting, which the page's labels bind to. Exposed here
     /// so the copy on screen and the copy universal search matches against are the same strings.</summary>
@@ -262,9 +267,11 @@ public partial class SettingsViewModel : ViewModelBase {
 
         Shortcuts.ResetToDefault(row.Id);
         Changed?.Invoke();
+        Notify?.Invoke(Notices.ShortcutRestored(row.Description));
     }
 
-    /// <summary>Puts every shortcut back on its shipped binding.</summary>
+    /// <summary>Puts every shortcut back on its shipped binding. Confirms past the early return, so a
+    /// press with nothing to undo stays silent rather than claiming it did something.</summary>
     [RelayCommand]
     private void ResetAllShortcuts() {
         ClearNotes();
@@ -273,13 +280,17 @@ public partial class SettingsViewModel : ViewModelBase {
 
         Shortcuts.ResetAll();
         Changed?.Invoke();
+        Notify?.Invoke(Notices.ShortcutsRestored);
     }
 
     /// <summary>Puts every page's widgets and cards back in their declared order. The shell owns the
     /// orders, so it also persists the result — raising Changed here would only re-apply the alert
-    /// settings for nothing.</summary>
+    /// settings for nothing. It also happens off screen, which is why it confirms.</summary>
     [RelayCommand]
-    private void ResetWidgetPlacements() => _resetWidgetOrders();
+    private void ResetWidgetPlacements() {
+        _resetWidgetOrders();
+        Notify?.Invoke(Notices.WidgetPlacementsReset);
+    }
 
     /// <summary>What the conflicting shortcut does, so the refusal names an action rather than an id.</summary>
     private string DescribeAction(ShortcutId id) {
