@@ -163,7 +163,8 @@ where it matters, the trap it exists to avoid. Jump straight to the folder you a
   [Settings](docs/SOURCE-MAP.md#srcservicessettings) ·
   [Network](docs/SOURCE-MAP.md#srcservicesnetwork) ·
   [Startup](docs/SOURCE-MAP.md#srcservicesstartup) ·
-  [Diagnostics](docs/SOURCE-MAP.md#srcservicesdiagnostics)
+  [Diagnostics](docs/SOURCE-MAP.md#srcservicesdiagnostics) ·
+  [Notifications](docs/SOURCE-MAP.md#srcservicesnotifications)
 - Shell: [root](docs/SOURCE-MAP.md#srcshell) ·
   [Navigation](docs/SOURCE-MAP.md#srcshellnavigation) ·
   [TrayNotice](docs/SOURCE-MAP.md#srcshelltraynotice)
@@ -703,6 +704,13 @@ temperature is the expected outcome, not a defect.
   regardless of selector specificity. `Border.settingRow` set `Background="Transparent"` locally, which
   silently outranked `Border.revealFlash.highlighted` and left Settings with no reveal flash — build,
   format and 2246 tests all green. After promoting a style, delete the local same-property setter.
+- **A selector cannot cross two template boundaries.** `TreeViewItem /template/ ToggleButton#PART_X
+  /template/ Path` compiles, raises nothing, and matches nothing — and, like the rule above, leaves build,
+  format and the whole suite green while the screen is unchanged. Reaching an element inside a templated
+  child's *own* control theme means **replacing that child's `Template`**, which is how the File Explorer
+  tree draws the app's caret instead of Fluent's stroked V. A consequence: a style rule cannot then select
+  inside the template you just supplied either, so a two-state glyph goes in as both states on one `Panel`
+  with one visible, the way the Processes group headers do it.
 - **Layer rather than restate.** `Classes="bare rowRun"`, `Classes="card selectable"` — not a new style
   repeating six setters.
 - **Dimensions are adopted by contact, not by sweep.** New code uses the `Dimensions.axaml` tokens; a
