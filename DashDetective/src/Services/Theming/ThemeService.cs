@@ -48,9 +48,8 @@ public sealed class ThemeService {
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
-    /// <summary>The colour-vision mode in force. While it is not
-    /// <see cref="ColorVisionMode.None"/> it OVERRIDES the accent's chart palette: a hue rotation applied
-    /// to a colour-blind-safe set is no longer colour-blind safe. The accent still drives the highlight.</summary>
+    /// <summary>The colour-vision mode in force. Anything but None overrides the accent's chart palette;
+    /// the accent still drives the highlight.</summary>
     public ColorVisionMode ColorVision { get; private set; }
 
     /// <summary>Whether high contrast is in force. Composes with light/dark rather than replacing them,
@@ -70,7 +69,6 @@ public sealed class ThemeService {
     public void ApplyDefaults() {
         ApplyTheme(CurrentTheme);
         ApplyDefaultAppearance();
-
     }
 
     /// <summary>Switches the light/dark/system colour scheme via the app's ThemeVariant.</summary>
@@ -79,25 +77,16 @@ public sealed class ThemeService {
         ApplyVariant();
     }
 
-    /// <summary>
-    /// Turns chart patterns on or off. A top-level key, so it can be written straight into the
-    /// application's resources — unlike the surfaces, which need a variant.
-    /// </summary>
+    /// <summary>Turns chart patterns on or off. A top-level key, so a plain resource write reaches it —
+    /// unlike the surfaces, which need a variant.</summary>
     public void ApplyChartPatterns(bool enabled) {
         if (Application.Current is { } app)
             app.Resources["ChartPatterns"] = enabled;
     }
 
-    /// <summary>
-    /// Turns high contrast on or off. It is a separate axis from light/dark rather than a fourth
-    /// <see cref="AppTheme"/>, so it composes with whichever scheme is chosen.
-    ///
-    /// <b>It has to be a ThemeVariant.</b> The surfaces and the text ramp live in
-    /// <c>ResourceDictionary.ThemeDictionaries</c>, and a key declared there cannot be shadowed by
-    /// writing the same key into <c>Application.Resources</c> — the theme lookup wins and the write is
-    /// silently ignored, which is why the accent (a top-level key) can be swapped that way and these
-    /// cannot.
-    /// </summary>
+    /// <summary>Turns high contrast on or off — a separate axis from light/dark, so it composes with
+    /// either. It has to be a ThemeVariant: a key inside <c>ThemeDictionaries</c> cannot be shadowed by
+    /// writing to <c>Application.Resources</c>, the theme lookup wins and the write is ignored.</summary>
     public void ApplyContrast(bool enabled) {
         HighContrast = enabled;
         ApplyVariant();
@@ -133,9 +122,8 @@ public sealed class ThemeService {
     private static bool OsPrefersDark(Application? app) =>
         app?.PlatformSettings?.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
 
-    /// <summary>Follows the OS scheme while high contrast is on under "System". Without this the app
-    /// would pick a high-contrast variant once and stay on it when the OS flipped, because resolving
-    /// System ourselves is what took Avalonia's own automatic switch out of the picture.</summary>
+    /// <summary>Follows the OS scheme while high contrast is on under "System". Resolving System here is
+    /// what takes Avalonia's automatic switch out of the picture, so it has to be replaced.</summary>
     private void WatchOsTheme(Application app) {
         if (_watchingOs || app.PlatformSettings is not { } settings)
             return;
@@ -158,33 +146,28 @@ public sealed class ThemeService {
         SetChartSeries(SeriesForCurrentSelections());
     }
 
-    /// <summary>
-    /// Applies a colour-vision mode: the status brushes are re-pointed at its set, and the charts take
-    /// its series palette in place of the accent-derived one.
-    /// </summary>
+    /// <summary>Applies a colour-vision mode: status brushes re-pointed, charts on its series palette
+    /// instead of the accent-derived one.</summary>
     public void ApplyColorVision(ColorVisionMode mode) {
         ColorVision = mode;
         ApplyVisionPalettes();
     }
 
-    /// <summary>Installs the tables for the current mode AND the current theme. Called again whenever the
-    /// theme changes, because the safe colours differ by background: what clears 3:1 on near-black is
-    /// light, what clears it on white is dark, and one set cannot be both.</summary>
+    /// <summary>Installs the tables for the current mode and theme. Re-run on a theme change: the safe
+    /// colours differ by background, so one set cannot serve both.</summary>
     private void ApplyVisionPalettes() {
         SemanticBrushes.Apply(Theming.ColorVision.Status(ColorVision, IsDarkIntended()));
         SetChartSeries(SeriesForCurrentSelections());
     }
 
-    /// <summary>The series palette the current pair of selections implies. A colour-vision mode wins over
-    /// the accent, because rotating a safe palette by the accent's hue offset would undo exactly what
-    /// makes it safe.</summary>
+    /// <summary>The series palette the current selections imply. A colour-vision mode beats the accent:
+    /// rotating a safe palette by the accent's hue offset would undo what makes it safe.</summary>
     private ChartSeriesColors SeriesForCurrentSelections() =>
         Theming.ColorVision.Series(ColorVision, IsDarkIntended())
         ?? (CurrentAccent is { } accent ? ChartPalette.Derive(accent.Color) : ChartPalette.Default);
 
-    /// <summary>Whether the variant about to be applied is a dark one. Read from the SELECTION rather
-    /// than from <c>ActualThemeVariant</c>, which has not caught up yet at the moment the palettes are
-    /// installed.</summary>
+    /// <summary>Whether the variant about to be applied is dark. Read from the selection, not
+    /// <c>ActualThemeVariant</c>, which has not caught up when the palettes are installed.</summary>
     private bool IsDarkIntended() => CurrentTheme switch {
         AppTheme.Light => false,
         AppTheme.Dark => true,

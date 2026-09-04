@@ -21,13 +21,9 @@ public enum ColorVisionMode {
 public sealed record SemanticColors(Color Good, Color Warn, Color Bad, Color Info, Color Idle);
 
 /// <summary>
-/// The colour-blind-safe palettes, and the one place their hues are chosen.
-///
-/// Every table here is per-theme
-///
-/// The hues are Okabe-Ito, lightened or darkened for the theme. Red-green modes move "good" off green and
-/// onto blue, because green beside red is the pair those deficiencies actually lose; tritanopia keeps
-/// green and red, which it sees, and moves the middle step instead.
+/// The colour-blind-safe palettes, per mode and per theme. Okabe-Ito hues, searched against a dichromacy
+/// simulation rather than chosen by eye — see ColorVisionTests, which fails if any pair collapses.
+/// Red-green modes move "good" off green, since green beside red is the pair they lose.
 /// </summary>
 public static class ColorVision {
     // ----- Status ---------------------------------------------------------
@@ -48,11 +44,9 @@ public static class ColorVision {
         Good: Color.Parse("#009E73"), Warn: Color.Parse("#A16F00"), Bad: Color.Parse("#D55E00"),
         Info: Color.Parse("#003F62"), Idle: Color.Parse("#767C82"));
 
-    // ----- Chart series ---------------------------------------------------
-    //
-    // NetDown repeats CPU and NetUp repeats Storage, exactly as the authored palette pairs them: the two
-    // are drawn on one axis, so what matters is that THEY separate, and taking both from the verified
-    // five means they inherit that set's guarantee rather than needing a rule of their own.
+    // ----- Chart series -----
+    // NetDown repeats Cpu and NetUp repeats Storage, so the pair sharing an axis inherits the verified
+    // set's separation rather than needing a rule of its own.
 
     private static readonly ChartSeriesColors DarkRedGreenSeries = new(
         Cpu: Color.Parse("#03A4FF"), Memory: Color.Parse("#A53F77"), Gpu: Color.Parse("#EDDE17"),

@@ -55,10 +55,9 @@ public partial class ChartLegend : UserControl {
         set => SetValue(Brush2Property, value);
     }
 
-    /// <summary>Whether the chart is drawing its second series dashed. Both swatches become line marks
-    /// when it is — solid and dashed — so the key shows the same distinction the chart makes rather than
-    /// repeating the colour twice. Mirrors <c>Sparkline.PatternSecondSeries</c>; a legend saying one thing
-    /// while the chart beside it does another would be worse than no legend.</summary>
+    /// <summary>Whether the chart dashes its second series. Both swatches become line marks — solid and
+    /// dashed — so the key shows the distinction rather than repeating the colour. Mirrors
+    /// <c>Sparkline.PatternSecondSeries</c>.</summary>
     public bool Pattern2 {
         get => GetValue(Pattern2Property);
         set => SetValue(Pattern2Property, value);

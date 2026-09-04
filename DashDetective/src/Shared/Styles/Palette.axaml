@@ -188,12 +188,9 @@
         </ResourceDictionary>
 
         <!-- ===== HIGH CONTRAST (DARK) =====
-             Each high-contrast variant INHERITS from the plain one it thickens, so only the keys that
-             actually change are authored here and everything else falls back. Two things change: every
-             surface collapses to one flat black, so a panel is told apart by its border rather than by a
-             few percent of lightness, and the text ramp loses its opacity steps — an emphasis ladder
-             built from translucency is exactly what costs contrast. Hierarchy survives as weight and
-             size, which the type styles already carry. -->
+             Inherits the plain variant, so only what changes is authored. Surfaces collapse to one flat
+             black (a panel is told apart by its border) and the text ramp drops its opacity steps, since
+             an emphasis ladder built from translucency is what costs contrast. -->
         <ResourceDictionary x:Key="{x:Static theming:AppVariants.HighContrastDark}">
             <SolidColorBrush x:Key="AppBackground" Color="#000000"/>
             <SolidColorBrush x:Key="SidebarBackground" Color="#000000"/>

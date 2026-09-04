@@ -7,12 +7,9 @@ using Xunit;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Checks that each colour-vision mode's palette actually survives the deficiency it is chosen for, on
-/// the theme it is drawn on.
-///
-/// This is the whole point of the feature. A palette picked by eye on trichromatic vision cannot be
-/// verified by looking at it, and "these hues are colour-blind safe" is exactly the sort of claim that
-/// passes review and fails in use — every hand-picked assignment tried for this phase failed here.
+/// Checks that each mode's palette survives the deficiency it is chosen for, on the theme it is drawn on.
+/// A palette picked by eye cannot be verified by looking at it on trichromatic vision — every hand-picked
+/// assignment tried for this phase failed here.
 /// </summary>
 public class ColorVisionTests {
     private static string KindFor(ColorVisionMode mode) => mode switch {
@@ -21,8 +18,8 @@ public class ColorVisionTests {
         _ => "deutan",
     };
 
-    /// <summary>Every mode on every theme. The two are inseparable here: the tables differ by theme, so
-    /// checking one would leave the other unproven.</summary>
+    /// <summary>Every mode on every theme: the tables differ by theme, so checking one proves nothing
+    /// about the other.</summary>
     public static TheoryData<ColorVisionMode, bool> Cases() {
         var data = new TheoryData<ColorVisionMode, bool>();
         foreach (var mode in new[] {
@@ -71,9 +68,8 @@ public class ColorVisionTests {
             $"below the {ColorVisionSimulator.MinimumSeparation} minimum.");
     }
 
-    /// <summary>A colour has to be visible before its hue matters. This is the constraint that forced the
-    /// tables to be per-theme in the first place: one set cannot clear 3:1 on both near-black and white
-    /// and still spread five categories far enough apart.</summary>
+    /// <summary>A colour has to be visible before its hue matters. This is what forced per-theme tables:
+    /// one set cannot clear 3:1 on both backgrounds and still spread five categories apart.</summary>
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryColor_IsVisibleOnItsOwnTheme(ColorVisionMode mode, bool dark) {
@@ -98,17 +94,10 @@ public class ColorVisionTests {
             $"{mode}/{Theme(dark)} draws these below 3:1 on its own background: {string.Join(", ", dim)}");
     }
 
-    /// <summary>
-    /// What the modes exist to fix, measured on the authored palette rather than asserted.
-    ///
-    /// <b>Deuteranopia is the severe case:</b> the authored green "good" and red "bad" come out about
-    /// <c>1.7</c> apart — the same colour, on the one pair a user most needs to tell apart. Tritanopia
-    /// falls just under the bar. <b>Protanopia is the interesting one:</b> it scrapes over, because
-    /// protanopia darkens red enough that green and red separate by lightness where deuteranopia leaves
-    /// them identical. It keeps a mode anyway — a 0.9 margin is inside the error of any simulation, and it
-    /// shares deuteranopia's confusion axis — but the number is recorded here so nobody has to guess
-    /// whether it was measured or assumed.
-    /// </summary>
+    /// <summary>What the modes exist to fix, measured rather than asserted. Deuteranopia is severe — the
+    /// authored green "good" and red "bad" land ~1.7 apart. Protanopia scrapes over the bar, since it
+    /// darkens red enough to separate by lightness; it keeps a mode as that margin is inside simulation
+    /// error.</summary>
     [Theory]
     [InlineData("deutan", 0.0, 5.0)]
     [InlineData("tritan", 15.0, ColorVisionSimulator.MinimumSeparation)]
@@ -129,7 +118,7 @@ public class ColorVisionTests {
     }
 
     /// <summary>None keeps the authored colours on both themes, which is what makes the setting genuinely
-    /// switchable off — a "None" that quietly swapped something would not be off.</summary>
+    /// switchable off.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

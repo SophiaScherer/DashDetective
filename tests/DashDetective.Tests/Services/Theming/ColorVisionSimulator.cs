@@ -4,28 +4,14 @@ using System;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Simulates dichromatic vision, so a colour-blind-safe palette can be checked rather than asserted.
-///
-/// Viénot, Brettel and Mollon (1999): convert to long/medium/short cone response, collapse the missing
-/// cone onto the plane the remaining two span, and convert back. The projection planes are the standard
-/// ones, anchored on the blue and yellow the dichromat still sees correctly.
-///
-/// It is an approximation of a *dichromat* — the complete forms. Someone with the far commoner anomalous
-/// trichromacy sees more than this, so a palette that survives here survives the milder case too, which
-/// is the direction an accessibility check should err in.
+/// Simulates dichromatic vision (Viénot, Brettel and Mollon 1999), so a colour-blind-safe palette can be
+/// checked rather than asserted. It models the complete forms, so a palette surviving here also survives
+/// the commoner anomalous trichromacy — the direction an accessibility check should err in.
 /// </summary>
 internal static class ColorVisionSimulator {
-    /// <summary>
-    /// How far apart two colours must stay under simulation. CIE76 ΔE of 2.3 is the "just noticeable
-    /// difference"; this asks for roughly nine times that, because these are small marks — a dot, a
-    /// two-pixel line — seen at a glance rather than large patches compared side by side.
-    ///
-    /// <b>20 is where the light theme runs out, not a number picked for comfort.</b> Searching every
-    /// candidate that clears 3:1 on white, the best five mutually distinguishable colours separate by
-    /// about 21.5 under red-green deficiency; the dark theme reaches 35-50 in the same search. The bar is
-    /// set just under what the harder of the two themes can actually achieve, so raising it means finding
-    /// colours nobody has found yet rather than relaxing the palettes.
-    /// </summary>
+    /// <summary>How far apart two colours must stay under simulation, against a 2.3 ΔE just-noticeable
+    /// difference. 20 is the light theme's measured ceiling — the best five colours clearing 3:1 on white
+    /// separate by ~21.5, where dark reaches 35-50 — so raising it means finding better colours.</summary>
     internal const double MinimumSeparation = 20.0;
 
     /// <summary>A colour as a dichromat of the given kind would see it.</summary>

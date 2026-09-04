@@ -29,13 +29,9 @@
     <sys:Double x:Key="TableRowHeight">30</sys:Double>
 
     <!-- ===== Runtime-swapped values (rewritten by ThemeService) =====
-         The only keys in this file that change while the app runs, so the only ones that must be
-         referenced with {DynamicResource}. The values here are the defaults, which is what design time
-         and the moment before the first apply both see.
-
-         ChartPatterns is not a dimension and sits here for one reason: these are the app's non-colour
-         runtime-swapped keys, and a third file holding a single bool would be worse. Palette.axaml is
-         colour only, and this value decides a stroke pattern, not a hue. -->
+         The only keys here that change while the app runs, so the only ones needing {DynamicResource}.
+         ChartPatterns is not a dimension; it sits here because Palette.axaml is colour only and a third
+         file for one bool would be worse. -->
     <sys:Double x:Key="UiScale">1</sys:Double>
     <sys:Double x:Key="PopupFontSize">12.5</sys:Double>
     <sys:Boolean x:Key="ChartPatterns">False</sys:Boolean>

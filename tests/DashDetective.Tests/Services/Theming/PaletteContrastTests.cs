@@ -10,12 +10,9 @@ using Xunit;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Measures Palette.axaml's text ramp against every surface it is drawn on, in all four variants, so
-/// "high contrast" is a proven claim rather than an asserted one.
-///
-/// It reads the authored file rather than a copy of the numbers, because a copy is the thing that
-/// drifts. The ramp is opacity over a surface, so <see cref="ContrastRatio"/> composites first — read
-/// as plain white every entry would score 21:1 and this would pass while proving nothing.
+/// Measures Palette.axaml's text ramp against every surface it is drawn on, in all four variants. It
+/// reads the authored file rather than a copy, and composites opacity onto the surface first — read as
+/// plain white, every ramp entry would score 21:1 and this would pass while proving nothing.
 /// </summary>
 public class PaletteContrastTests {
     /// <summary>The surfaces body text is drawn on.</summary>
@@ -26,10 +23,8 @@ public class PaletteContrastTests {
     private static readonly string[] BodyText =
         ["TextStrong", "TextPrimary", "TextSecondary", "TextTertiary", "TextMuted", "TextSubtle"];
 
-    /// <summary>The two that are deliberately below body weight, and why. <c>TextFaint</c> is for
-    /// decoration and dividers' labels; <c>TextGhost</c> is the completion suggestion sitting beside what
-    /// is being typed, which has to read as a suggestion rather than as input. Neither is exempt in high
-    /// contrast, where the whole point is that faded text stops being faded.</summary>
+    /// <summary>The two deliberately below body weight: decoration, and the completion suggestion that
+    /// must read as a suggestion. Neither is exempt in high contrast.</summary>
     private static readonly string[] BelowBodyWeight = ["TextFaint", "TextGhost"];
 
     [Theory]
@@ -78,13 +73,9 @@ public class PaletteContrastTests {
 
     // ----- The shipped themes -----
 
-    /// <summary>
-    /// The dark theme clears AA everywhere except <c>TextSubtle</c> on the three raised surfaces, where it
-    /// lands at 4.36-4.48 against a 4.5 bar. Recorded rather than fixed: the ramp's steps are 5% apart, so
-    /// lifting this one to clear AA puts it within 2% of <c>TextMuted</c> above it and the two stop being
-    /// distinguishable — rebalancing the ramp is a design decision, not a test fix. High contrast is the
-    /// answer offered today, and it takes every one of these past AAA.
-    /// </summary>
+    /// <summary>Dark clears AA except <c>TextSubtle</c> on the three raised surfaces, at 4.36-4.48
+    /// against 4.5. Recorded, not fixed: the ramp's steps are 5% apart, so lifting this one collapses it
+    /// into <c>TextMuted</c>. Rebalancing is a design decision; high contrast is the answer today.</summary>
     [Fact]
     public void Dark_RecordsExactlyWhichBodyPairsMissAa() {
         var failing = Measure("Dark", BodyText, ContrastRatio.AA)
@@ -101,14 +92,9 @@ public class PaletteContrastTests {
         Assert.Equal(known, failing);
     }
 
-    /// <summary>
-    /// <b>The light theme does not meet AA across its whole ramp, and this records which pairs.</b> Dark
-    /// text on a white card is a smaller step than white text on a near-black one at the same opacity, so
-    /// the ramp that clears AA in dark falls short of it in light. Nothing is changed here: rebalancing
-    /// the light ramp changes the app's normal appearance, which is a decision of its own — high contrast
-    /// is the answer offered today. The list is asserted exactly, so a new failure fails the build and
-    /// fixing one of these fails it too, with a message saying so.
-    /// </summary>
+    /// <summary>Light misses AA more widely: dark text on white is a smaller step than white on
+    /// near-black at the same opacity. Asserted exactly, so a new failure fails the build and so does
+    /// fixing one of these.</summary>
     [Fact]
     public void Light_RecordsExactlyWhichBodyPairsMissAa() {
         var failing = Measure("Light", BodyText, ContrastRatio.AA)
