@@ -103,8 +103,14 @@ rules with it: a bare type selector matches the EXACT type (`Window` never match
 style outranks an app-level one. Phase 9 added **keyboard widget reordering**
 (`Ctrl+Shift+←/→`), which calls the drag's own Begin/Preview/Commit rather than a second mechanism. Its
 lesson is about the test harness, not the app: **synthesized arrow keys need `KEYEVENTF_EXTENDEDKEY`**,
-or Windows delivers a numpad press and eats the Shift — which looks exactly like a dead shortcut. Still
-to come: text scale, plus the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+or Windows delivers a numpad press and eats the Shift — which looks exactly like a dead shortcut. A reorderable item is made a tab stop **by `ReorderablePanel`, on the children it lays out** — not by
+the view. `Focusable="True"` on a card's `Border` does nothing, and a `Border` has no automation peer, so
+a UIA audit will wrongly report such a page unreachable: verify keyboard reordering by what it persists.
+Phase 10 added **text scale**: every
+`FontSize` in the app now comes from the `TextSize*` ladder in Dimensions.axaml, which `ThemeService`
+rewrites — see the sweep exception in the styling rules. Two containers had to learn to grow with it (the
+toolbar row and the navigation rail); a fixed size holding scaled text is where this breaks next. Still
+to come: the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
@@ -777,6 +783,10 @@ temperature is the expected outcome, not a defect.
   site should not exist.** `Dimensions.axaml` shipped with eighteen keys and nine users; the nine
   spare ones were guesses at what would be wanted, which is the same aspirational cruft the rule
   exists to stop. Add a token when the second site asks for it, not before.
+  **The one authorized exception is the `TextSize*` ladder**, which was swept across every view at once
+  in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
+  left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
+  authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 - **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions

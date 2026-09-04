@@ -196,7 +196,7 @@
         <!-- Right-click dock menu: one row per edge, the current one highlighted. Selection is declared
              after hover so an already-docked row keeps reading as selected while the pointer is on it. -->
         <Style Selector="TextBlock.dockMenuHeader">
-            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeMini}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
             <Setter Property="Margin" Value="8,4,8,2"/>
@@ -213,7 +213,7 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
         <Style Selector="Border.dockRow TextBlock">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -370,8 +370,8 @@
                         </Viewbox>
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
-                        <TextBlock Text="DashDetective" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="System Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="DashDetective" FontSize="{DynamicResource TextSizeSubhead}" FontWeight="SemiBold"/>
+                        <TextBlock Text="System Information Suite" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
             </Panel>
@@ -398,7 +398,7 @@
                             </LinearGradientBrush>
                         </Border.Background>
                         <Panel>
-                            <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
+                            <TextBlock Text="{Binding UserInitials}" FontSize="{DynamicResource TextSizeBody}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
                                        IsVisible="{Binding !HasUserPicture}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             <Image Source="{Binding UserPicture}" Stretch="UniformToFill"
@@ -416,8 +416,8 @@
 
                     <StackPanel Spacing="1" Margin="10,0" VerticalAlignment="Center"
                                 IsVisible="{Binding ShowFullFooter}">
-                        <TextBlock Text="{Binding UserName}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding UserRole}" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="{Binding UserName}" FontSize="{DynamicResource TextSizeBody}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding UserRole}" FontSize="{DynamicResource TextSizeMini}" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -435,8 +435,14 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="nav:NavItem">
+                            <!-- The tooltip is switched off while the label is on screen beside it:
+                                 it said nothing the item did not already say. Named outright rather
+                                 than through the tooltip, so the name survives either state. -->
                             <Button Classes="nav" Classes.selected="{Binding IsSelected}"
-                                    Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Label}">
+                                    Command="{Binding SelectCommand}"
+                                    AutomationProperties.Name="{Binding Label}"
+                                    ToolTip.Tip="{Binding Label}"
+                                    ToolTip.ServiceEnabled="{Binding !$parent[UserControl].DataContext.ShowLabels}">
                                 <Border Classes="navRow" CornerRadius="6">
                                     <Panel>
                                         <Rectangle Classes="navIndicator" Width="3" Height="18"
@@ -450,7 +456,7 @@
                                                   Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
                                                   StrokeJoin="Round" VerticalAlignment="Center"/>
                                             <TextBlock Classes="navLabel" Text="{Binding Label}"
-                                                       FontSize="13" VerticalAlignment="Center"/>
+                                                       FontSize="{DynamicResource TextSizeMedium}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Panel>
                                 </Border>

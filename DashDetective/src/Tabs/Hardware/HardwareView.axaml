@@ -24,7 +24,8 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
-                <Border Classes="panel" VerticalAlignment="Top">
+                <Border Classes="panel" VerticalAlignment="Top"
+                        AutomationProperties.Name="{Binding Title}">
                     <StackPanel Spacing="12">
                         <!-- Header: tinted icon tile + title / subtitle. A Grid rather than a
                              horizontal StackPanel so the text column is bounded and can ellipsize —
@@ -39,10 +40,10 @@
                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-                                <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold"
+                                <TextBlock Text="{Binding Title}" FontSize="{DynamicResource TextSizeSubhead}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextPrimary}"
                                            TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                <TextBlock Text="{Binding Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
                                            Foreground="{DynamicResource TextSubtle}"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>

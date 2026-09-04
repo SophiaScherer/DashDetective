@@ -334,8 +334,13 @@ search and revealable on its own row.
   draws two, and turns the legend's swatches into matching line marks.
 - **Color vision** (Off / Deuter. / Protan. / Tritan., default **Off**). Swaps the chart series and the
   status colors for a set searched and verified against a simulation of that deficiency.
+- **Navigation tooltips** appear only on a collapsed rail. Expanded, the tooltip repeated the label
+  sitting next to it; each item is named through `AutomationProperties.Name` directly, so a screen
+  reader keeps the name in either state.
 - **Reduce motion** (toggle, default **off**). Switches off the sliding and fading transitions and stops
   the loading pulse repeating.
+- **Text size** (100 / 125 / 150 / 175 / 200 %, default **100 %**). Grows type alone, leaving the
+  controls around it as they are. Multiplies with the interface size rather than replacing it.
 - **Keyboard reordering** (toggle, default **on**). `Ctrl+Shift+←/→` moves the widget or card the
   keyboard is on. On by default because an unused gesture costs nothing.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
@@ -450,6 +455,45 @@ selector reached, saw no change, and looked like a failure. The rail sets `Backg
 in markup, and a local value beats any style setter — so the probe could never have shown anything. Pick
 a property the target has no local value for, or measure the real effect.
 
+### Text size
+
+Interface size transforms the whole app; text size grows only the type. They multiply, so 150 % of each
+gives text at 2.25x while the chrome grows 1.5x.
+
+**One ladder, swept across every view.** All ~110 authored `FontSize` values are now
+`{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
+`ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
+rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
+option on this card must not do. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins them
+together, as `SemanticBrushes` mirrors Palette.axaml.
+
+**This is a deliberate exception to the adopt-by-contact rule** for dimensions. The feature *is* the
+sweep: a literal left behind would not grow, and would fail invisibly on one page. A test fails on any
+authored `FontSize` literal, so the sweep cannot rot back.
+
+**Two surfaces do not follow it for free**, and both were found by driving the app rather than by
+reading:
+
+- **Tooltips and context menus** sit outside every `ScaleHost`, so `PopupFontSize` is the one value
+  carrying both scales itself.
+- **Fixed containers holding scaled text.** The toolbar was a fixed 54px row and the navigation rail a
+  fixed 236px, so at 200 % the page subtitle was cut off and the brand read "DashDetectiv". The toolbar
+  row is now `Auto` with a 54px minimum, and `NavigationViewModel.RailThickness` multiplies by the text
+  scale. **This is where the feature breaks next:** any new pixel dimension around text needs the same
+  treatment.
+
+**Verified by measurement.** The height of the same label, in pixels, across both scales:
+
+| | text 100 % | text 150 % | text 200 % |
+| --- | --- | --- | --- |
+| interface 100 % | 14 | 20 | 27 |
+| interface 150 % | 21 | 30 | — |
+
+A note on the startup path: the rail stayed 236px on the first attempt because `ApplySettings` runs
+*before* `MainWindowViewModel` subscribes to the accessibility `Changed` event, so a stored scale reached
+the service but never the navigation bar. Anything driven off that event needs pushing from the apply
+too.
+
 ### Keyboard reordering
 
 Dragging a widget was the only way to rearrange a page, which is a WCAG 2.1.1 failure on the mechanism
@@ -460,6 +504,21 @@ calls the same `BeginPreview` / `PreviewMove` / `CommitPreview` sequence a point
 order it produces, the identity it keys on and the `WidgetOrders` it persists are all the existing ones.
 Both panels that implement the seam get it, so it covers `WidgetBoard`'s widgets and `UniformFlowPanel`'s
 cards together.
+
+**Every reorderable item is a tab stop**, set by `ReorderablePanel` on the children it lays out rather
+than by each view. Most cards are a plain `Border` with no control inside, so before this a page was
+reachable only if one of its items happened to contain a button: Hardware, Storage and the Processes
+summary tiles were dead zones for Tab, and could not be reordered at all. Avalonia draws its own focus
+ring on the focused card, so the target is visible without a style of ours.
+
+Two things about that are worth knowing:
+
+- **`Focusable="True"` in the view does not work.** Setting it on the card's `Border`, with or without
+  `IsTabStop`, produced no tab stop; setting it from the panel on the children it actually lays out does.
+  The panel's children are the generated containers, not the template roots the view writes.
+- **UI Automation cannot see these stops.** A `Border` has no automation peer, so it never appears in
+  the UIA tree and `IsKeyboardFocusable` reports nothing — an audit through UIA says the page is still
+  unreachable when it is not. Measure this one by what a move persists, not by asking UIA where focus is.
 
 The gesture is answered in `MainWindow` rather than the view model, because it turns on which control has
 focus and only the window knows that. Focus lands on something *inside* a widget — a chevron, a button in

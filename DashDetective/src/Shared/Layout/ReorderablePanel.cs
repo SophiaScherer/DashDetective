@@ -165,6 +165,13 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
         if (_slotRects.Length < _visible.Count)
             _slotRects = new Rect2[_visible.Count];
+
+        // Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
+        // rather than per view because a card is usually a plain Border with no control inside: pages
+        // whose items happened to contain a button were reachable, the rest were not reachable at all.
+        if (Reorderable)
+            foreach (var child in _visible)
+                child.Focusable = true;
     }
 
     /// <summary>Records where a slot was arranged — which is what a drop is measured against — and

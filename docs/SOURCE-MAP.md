@@ -209,12 +209,15 @@ stays in its tab folder.
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
-                                 so always {StaticResource} — EXCEPT the two UI-scale keys at the bottom,
-                                 UiScale and PopupFontSize, which ThemeService rewrites at runtime and
-                                 which are therefore the only {DynamicResource} entries in this file. The
-                                 values authored here are the unscaled defaults, seen at design time and
-                                 in the moment before the first apply. A token with no call site should
-                                 not exist)
+                                 so always {StaticResource} — EXCEPT the runtime-swapped block at the
+                                 bottom: UiScale, PopupFontSize and the TextSize* ladder, which
+                                 ThemeService rewrites and which are therefore the only
+                                 {DynamicResource} entries in this file. The values authored here are
+                                 the unscaled defaults, seen at design time and in the moment before the
+                                 first apply. TEXT SCALE: the ladder is every font size in the app,
+                                 TextScale.BaseSizes mirrors it, and a test fails on any authored
+                                 FontSize literal. A token with no call site should not exist — the
+                                 ladder is the one authorized sweep, see AGENTS.md)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
                                  and the :collapsed rules. The chevron is a plain Button, not a
                                  ToggleButton: Fluent's checked/pressed states would all need undoing,
@@ -246,7 +249,9 @@ stays in its tab folder.
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed)
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
-                                 a drag does, so both persist through one path
+                                 a drag does, so both persist through one path. It also makes every
+                                 item it lays out a tab stop — a card is usually a plain Border, and
+                                 Focusable in the view does not work, only this does
                                  the half of reordering both panels share: the saved order and its
                                  re-entrancy guard, the previewed order, the children on screen and
                                  where their slots were arranged. A base class rather than a helper
