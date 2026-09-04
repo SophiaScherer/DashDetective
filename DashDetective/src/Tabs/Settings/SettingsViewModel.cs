@@ -194,6 +194,7 @@ public partial class SettingsViewModel : ViewModelBase {
             option.IsSelected = option.Value == _theme.CurrentTheme;
         foreach (var option in AccentOptions)
             option.IsSelected = Equals(option.Preset, _theme.CurrentAccent);
+        RefreshAccentSwatches();
 
         // Select and apply the persisted refresh interval (falling back to 1 s if it's an unknown value).
         var interval = MatchInterval(settings.RefreshIntervalSeconds);
@@ -408,7 +409,15 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var other in ThemeOptions)
             other.IsSelected = other == option;
         _theme.ApplyTheme(option.Value);
+        RefreshAccentSwatches();
         Changed?.Invoke();
+    }
+
+    /// <summary>Repaints the swatches for the theme now in force, since an accent renders at a different
+    /// lightness in each.</summary>
+    private void RefreshAccentSwatches() {
+        foreach (var option in AccentOptions)
+            option.Refresh(_theme.RendersDark);
     }
 
     private void SelectAccent(AccentOption option) {

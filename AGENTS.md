@@ -84,14 +84,18 @@ in the app**: every status indicator already carries text beside its colour, so 
 added **colour-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
 simulates each deficiency and measures the result.
 
+The **accent is per-theme** for the same reason the colour-vision tables are: it is drawn as text, and
+every accent measured about 2:1 on white before the light shades existed. `AccentPreset.Color` stays the
+dark hue — that is the accent's identity, used to derive the chart palette, not something rendered.
+
 Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
 instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
 would recolour the file-type glyphs and icon tints too. And **a colour palette is searched against the
 simulation, never chosen by eye**: every hand-picked assignment tried for that phase failed, in ways that
-are invisible on trichromatic vision. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
-theme already draws a focus ring, and the styles written against template parts never matched. Still to
-come, one phase each: color independence, color-vision modes, accessible names, reduce motion, keyboard
-widget reordering, text scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+are invisible on trichromatic vision. **Phase 3 (focus indicator) was reverted**: its premise was wrong —
+Avalonia's Fluent theme already draws a focus ring, and the styles written against template parts never
+matched. Still to come, one phase each: accessible names, reduce motion, keyboard widget reordering, text
+scale — plus making the accent follow a colour-vision mode, which it does not yet. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.

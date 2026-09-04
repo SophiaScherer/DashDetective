@@ -16,9 +16,13 @@ namespace DashDetective.Tabs.Settings;
 public partial class AccentOption : ObservableObject {
     public AccentOption(AccentPreset? preset, Action<AccentOption> onSelected) {
         Preset = preset;
-        Swatch = preset is null ? null : new SolidColorBrush(preset.Color);
         SelectCommand = new RelayCommand(() => onSelected(this));
     }
+
+    /// <summary>Repaints the swatch for the theme in force. The two themes render an accent at different
+    /// lightnesses, so a fixed swatch would advertise a colour the app does not draw.</summary>
+    public void Refresh(bool dark) =>
+        Swatch = Preset is null ? null : new SolidColorBrush(Preset.For(dark).Fill);
 
     /// <summary>The single accent, or <c>null</c> for the default multi-colour option.</summary>
     public AccentPreset? Preset { get; }
@@ -27,7 +31,7 @@ public partial class AccentOption : ObservableObject {
     public bool IsDefault => Preset is null;
 
     /// <summary>The single-colour swatch fill; <c>null</c> for the default option.</summary>
-    public IBrush? Swatch { get; }
+    [ObservableProperty] private IBrush? _swatch;
 
     public ICommand SelectCommand { get; }
 

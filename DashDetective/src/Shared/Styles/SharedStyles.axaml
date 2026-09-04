@@ -359,6 +359,7 @@
     <Style Selector="ToggleButton.toggle:checked /template/ Ellipse#Thumb">
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="Margin" Value="0,0,3,0"/>
+        <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
     </Style>
 
     <!-- ===== Action buttons ===== -->

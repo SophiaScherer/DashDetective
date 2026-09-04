@@ -100,7 +100,9 @@ public sealed class ThemeService {
         WatchOsTheme(app);
         app.RequestedThemeVariant = Variant();
 
-        // The colour-vision tables are per-theme, so a theme change has to reinstall them.
+        // The accent shades and the colour-vision tables are both per-theme, so a theme change
+        // reinstalls them.
+        SetAccent(CurrentAccent ?? AccentPreset.Default);
         if (ColorVision != ColorVisionMode.None)
             ApplyVisionPalettes();
     }
@@ -166,8 +168,10 @@ public sealed class ThemeService {
         Theming.ColorVision.Series(ColorVision, IsDarkIntended())
         ?? (CurrentAccent is { } accent ? ChartPalette.Derive(accent.Color) : ChartPalette.Default);
 
-    /// <summary>Whether the variant about to be applied is dark. Read from the selection, not
+    /// <summary>Whether the app renders dark under the current selections. Read from the selection, not
     /// <c>ActualThemeVariant</c>, which has not caught up when the palettes are installed.</summary>
+    public bool RendersDark => IsDarkIntended();
+
     private bool IsDarkIntended() => CurrentTheme switch {
         AppTheme.Light => false,
         AppTheme.Dark => true,
@@ -198,21 +202,20 @@ public sealed class ThemeService {
         app.Resources["PopupFontSize"] = popupFontSize;
     }
 
-    /// <summary>
-    /// Swaps the accent brushes in the application resource dictionary. Every accent-coloured
-    /// element references these keys via {DynamicResource ...}, so the change is instant and global.
-    /// </summary>
-    private static void SetAccent(AccentPreset accent) {
+    /// <summary>Swaps the accent brushes, taking the shades for the theme being rendered. Every
+    /// accent-coloured element binds these keys with {DynamicResource}, so the change is global.</summary>
+    private void SetAccent(AccentPreset accent) {
         if (Application.Current is not { } app)
             return;
 
+        var shades = accent.For(IsDarkIntended());
         var res = app.Resources;
-        res["Accent"] = new SolidColorBrush(accent.Color);
-        res["AccentHover"] = new SolidColorBrush(accent.Hover);
-        res["OnAccent"] = new SolidColorBrush(accent.OnAccent);
-        res["AccentSoft"] = new SolidColorBrush(accent.Color, 0.12); // faint fill (e.g. sidebar highlight)
-        res["AccentColor"] = accent.Color;                            // brand-gradient top stop
-        res["AccentDeep"] = accent.Deep;                              // brand-gradient bottom stop
+        res["Accent"] = new SolidColorBrush(shades.Fill);
+        res["AccentHover"] = new SolidColorBrush(shades.Hover);
+        res["OnAccent"] = new SolidColorBrush(shades.OnAccent);
+        res["AccentSoft"] = new SolidColorBrush(shades.Fill, 0.12); // faint fill (e.g. sidebar highlight)
+        res["AccentColor"] = shades.Fill;                           // brand-gradient top stop
+        res["AccentDeep"] = shades.Deep;                            // brand-gradient bottom stop
     }
 
     /// <summary>Sets the per-graph chart brushes the dashboard binds to via {DynamicResource ...}, then

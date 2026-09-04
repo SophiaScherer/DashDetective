@@ -486,6 +486,11 @@ stays in its tab folder.
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
+        AccentPreset.cs         (the four accents, each with an AccentShades set PER THEME. Authored, not
+                                 derived: on near-black an accent must be light, on white dark enough to
+                                 read as text — every accent scored ~2:1 on white before this. Color
+                                 stays the dark hue, since that is the accent's identity for
+                                 ChartPalette.Derive and nothing renders it directly)
         ColorVision.cs          (the colour-blind-safe tables: status and chart series, per MODE and per
                                  THEME. Per-theme is not a nicety — a colour must clear 3:1 on its
                                  background before its hue matters, and one set doing that on both

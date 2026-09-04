@@ -421,6 +421,36 @@ one — so this phase reaches the charts and stops.
 the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
 line on white. Patterns help tell two series apart; they do not make either easier to see.
 
+### The accent is per-theme
+
+Every accent scored about **2:1 on the light theme** — Blue 2.01, Green 2.03, Orange 2.32, Purple 2.40 —
+against a 4.5:1 bar for text. That matters because the accent *is* text in places: a stat card's figure,
+"18.9 / 31 GB". High contrast did not fix it, because that phase scoped the accent out.
+
+So `AccentPreset` now holds an `AccentShades` set per theme. The two are authored rather than derived
+because they answer opposite questions: on near-black the accent must be light, on white it must be dark
+enough to read. `ThemeService.SetAccent` picks by theme and `ApplyVariant` reinstalls on a theme change,
+the same way the colour-vision tables do. `AccentContrastTests` pins all of it — accent-as-text on its
+background, and on-accent text against both the fill and the hover fill.
+
+Two things the visual check caught that the numbers did not:
+
+- **The pill toggle's thumb was `TextStrong`**, which only worked while the checked track was a light
+  tint. With a dark accent fill on the light theme it became black-on-dark-orange. It is `OnAccent` now,
+  which also fixes the dark theme, where a white thumb on a bright accent had been about 1.9:1.
+- **The Settings swatches advertised the wrong colour.** They painted the dark set on both themes, so
+  picking "orange" on light produced a shade the swatch never showed. `AccentOption.Refresh` repaints
+  them for the theme in force.
+
+The accent's *identity* is still the dark hue: `AccentPreset.Color` feeds `ChartPalette.Derive`, so an
+accent rotates the chart palette by the same angle in either theme.
+
+**Still open: the accent does not follow a colour-vision mode.** Measured against the mode palettes, a
+blue accent lands 6.7 ΔE from the GPU series under tritanopia and purple lands 10.2 from status Good
+under deuteranopia — close enough to be confusable where an accent fill and a status mark are read
+together. Fixing it means a CVD-safe accent set per mode and theme, verified the same way the other
+tables are.
+
 ### Color-vision modes
 
 **Mutating the brush is the whole mechanism.** The five status colors are read by code, not by
