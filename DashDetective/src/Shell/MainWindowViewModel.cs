@@ -1,7 +1,9 @@
+using Avalonia.Automation;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Accessibility;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
 using DashDetective.Services.Search;
@@ -35,6 +37,10 @@ using System.Text;
 namespace DashDetective.Shell;
 
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
+    /// <summary>The window minimum at 100%: the width an expanded nav bar plus a usable page needs.</summary>
+    private const double BaseMinWindowWidth = 640;
+    private const double BaseMinWindowHeight = 480;
+
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
     private static readonly IBrush PausedDot = SemanticBrushes.StatusIdle;
 
@@ -42,6 +48,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ResourceAlertWatcher _alerts;
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
+    private readonly AccessibilityService _accessibility;
     private readonly NoticeService _notices = new();
     private readonly DashboardViewModel _dashboard;
     private readonly FileExplorerViewModel _fileExplorer = new();
@@ -130,6 +137,29 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// however the setting is left — hiding behind an icon that never appears would strand the app.</summary>
     public bool ShowInTray => _settings.ShowInTray && TrayIntegration.HidesOnClose;
 
+    /// <summary>Whether the keyboard reorder gesture is allowed. Read by the window, which owns focus.</summary>
+    public bool KeyboardReordering => _accessibility.KeyboardReordering;
+
+    /// <summary>Whether animated transitions are suppressed. The window carries this as a style class,
+    /// which is what the motion rules select through.</summary>
+    public bool ReduceMotion => _accessibility.ReduceMotion;
+
+    /// <summary>How a screen reader treats the alert banner. Assertive because it reports a condition
+    /// the user has not asked about and may need to act on.</summary>
+    public AutomationLiveSetting AlertLiveSetting =>
+        _accessibility.AnnounceUpdates ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Off;
+
+    /// <summary>How a screen reader treats the confirmation banner. Polite: it reports something the user
+    /// just did, so it can wait for a pause.</summary>
+    public AutomationLiveSetting NoticeLiveSetting =>
+        _accessibility.AnnounceUpdates ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off;
+
+    /// <summary>The window's smallest usable size, scaled with the interface. At 200% the same page
+    /// needs twice the room, and a window draggable below that would clip its content rather than
+    /// reflow it.</summary>
+    public double MinWindowWidth => BaseMinWindowWidth * _accessibility.ScaleFactor;
+    public double MinWindowHeight => BaseMinWindowHeight * _accessibility.ScaleFactor;
+
     /// <summary>Whether the current page manages its own scrolling (e.g. File Explorer): such pages
     /// fill the viewport and scroll their own panes, so the shell hosts them in a bounded,
     /// non-scrolling container instead of the page-scrolling <c>ScrollViewer</c>.</summary>
@@ -147,6 +177,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // sample (Dashboard, Performance, Processes); the rest are self-contained.
         _metrics = metrics;
         _store = store;
+        _accessibility = new AccessibilityService(_theme);
         _alerts = new ResourceAlertWatcher(metrics);
         Help = new HelpViewModel(Shortcuts);
         _dashboard = new DashboardViewModel(metrics);
@@ -160,7 +191,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         // Build the Settings page with the shared theming seam + nav, the metrics service (refresh
         // interval), the loaded settings (toggle/interval seed) and the report/CSV builders.
-        _settings = new SettingsViewModel(_theme, Nav, metrics, settings,
+        _settings = new SettingsViewModel(_theme, _accessibility, Nav, metrics, settings,
                                           IStartupRegistration.ForCurrentPlatform(), Shortcuts,
                                           BuildReport, BuildMetricsCsv, ResetWidgetOrders);
 
@@ -183,6 +214,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             order.Changed += Persist;
         _alerts.AlertChanged += OnAlertChanged;
         _notices.Changed += OnNoticeChanged;
+        _accessibility.Changed += OnAccessibilityChanged;
 
         // Build the nav items pointing their select callback at the nav VM, then let it own selection.
         Nav.Initialize(new[] {
@@ -255,10 +287,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Applies persisted appearance + layout through the owning seams: theme/accent via
     /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
+    /// <summary>The interface size moved, so the window's floor moves with it.</summary>
+    private void OnAccessibilityChanged() {
+        SyncNavTextScale();
+        OnPropertyChanged(nameof(MinWindowWidth));
+        OnPropertyChanged(nameof(MinWindowHeight));
+        OnPropertyChanged(nameof(ReduceMotion));
+        OnPropertyChanged(nameof(AlertLiveSetting));
+        OnPropertyChanged(nameof(NoticeLiveSetting));
+    }
+
+    /// <summary>Sizes the navigation bar against the text scale. Called from both the startup apply and
+    /// the change event, because settings are applied before that event is subscribed to.</summary>
+    private void SyncNavTextScale() =>
+        Nav.SetTextScale(TextScale.Factor(_accessibility.TextScalePercent));
+
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
         _theme.ApplyTheme(settings.Theme);
+        _accessibility.Apply(settings);
+        SyncNavTextScale();
         var accent = FindAccent(settings.AccentName);
         if (accent is { } preset)
             _theme.ApplyAccent(preset);
@@ -354,6 +403,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,
+        UiScalePercent = _accessibility.ScalePercent,
+        TextScalePercent = _accessibility.TextScalePercent,
+        HighContrast = _accessibility.HighContrast,
+        DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
+        ColorVision = _accessibility.ColorVision,
+        AnnounceUpdates = _accessibility.AnnounceUpdates,
+        ReduceMotion = _accessibility.ReduceMotion,
+        KeyboardReordering = _accessibility.KeyboardReordering,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

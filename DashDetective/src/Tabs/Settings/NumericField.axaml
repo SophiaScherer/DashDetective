@@ -10,7 +10,7 @@
             <TextBox Name="Entry" Classes="flat" TextAlignment="Right"
                      VerticalAlignment="Stretch" MaxLength="5"/>
         </Border>
-        <TextBlock Name="SuffixLabel" FontSize="12" VerticalAlignment="Center"
+        <TextBlock Name="SuffixLabel" FontSize="{DynamicResource TextSizeCompact}" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextSubtle}"/>
     </StackPanel>
 </UserControl>

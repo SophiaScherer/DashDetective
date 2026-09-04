@@ -54,6 +54,7 @@
                          rather than a tap handler, so it takes focus and answers Enter/Space too; the
                          cards' panel sets no DragGrip, so nothing here competes for the press. -->
                     <Button Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
+                            AutomationProperties.Name="{Binding AccessibleName}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                         <controls:StatCard Selectable="True"
                                            Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"
@@ -72,7 +73,7 @@
             <controls:WidgetPanel WidgetId="dashboard.cpu" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="CPU Utilization" Subtitle="{Binding CpuChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
+                    <TextBlock Text="{Binding CpuPercentText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartCpu}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <!-- The body opens this device in Performance; the header keeps its drag and fold. -->
                 <Button Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
@@ -87,7 +88,7 @@
             <controls:WidgetPanel WidgetId="dashboard.memory" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="Memory Utilization" Subtitle="{Binding MemoryChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
+                    <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartMemory}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <Button Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
                         ToolTip.Tip="Open Memory in Performance">
@@ -126,22 +127,22 @@
             <controls:WidgetPanel WidgetId="dashboard.network" MinWidth="300"
                                   layout:WidgetBoard.MaxSlotWidth="700" Title="Network Throughput">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                    <TextBlock Text="{Binding NetworkAdapterName}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↓ Download" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="↓ Download" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetDown}"/>
-                                <TextBlock Text="{Binding NetworkDownUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkDownText}" FontSize="{DynamicResource TextSizeDisplay}" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetDown}"/>
+                                <TextBlock Text="{Binding NetworkDownUnit}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↑ Upload" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="↑ Upload" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding NetworkUpText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetUp}"/>
-                                <TextBlock Text="{Binding NetworkUpUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkUpText}" FontSize="{DynamicResource TextSizeDisplay}" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetUp}"/>
+                                <TextBlock Text="{Binding NetworkUpUnit}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -156,13 +157,15 @@
                                    Text="{Binding NetworkChartCaption}"/>
                         <controls:ChartLegend Grid.Column="1"
                                               Label1="Download" Brush1="{DynamicResource ChartNetDown}"
-                                              Label2="Upload" Brush2="{DynamicResource ChartNetUp}"/>
+                                              Label2="Upload" Brush2="{DynamicResource ChartNetUp}"
+                                              Pattern2="{DynamicResource ChartPatterns}"/>
                     </Grid>
                     <Button Classes="bare openChart" Command="{Binding OpenNetworkChartCommand}"
                             ToolTip.Tip="Open this adapter in Performance">
                         <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
                                             Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                             Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
+                                            PatternSecondSeries="{DynamicResource ChartPatterns}"
                                             YMin="0" YMax="100"
                                             AxisMaxLabel="{Binding NetworkAxisMax}" AxisMidLabel="{Binding NetworkAxisMid}"
                                             AxisMinLabel="0"

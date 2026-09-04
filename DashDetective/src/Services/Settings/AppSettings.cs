@@ -27,6 +27,35 @@ public sealed record AppSettings {
     /// sortable and machine-parseable.</summary>
     public ClockFormat ClockFormat { get; init; } = ClockFormat.TwentyFourHour;
 
+    /// <summary>How much larger to draw the whole interface, as a percentage. Text and chrome scale
+    /// together, so this is one setting rather than a font size the views would each have to honour.</summary>
+    public int UiScalePercent { get; init; } = 100;
+
+    /// <summary>How much larger to draw text alone, as a percentage. Separate from the interface size
+    /// because growing type is often all that is wanted, and it multiplies with it.</summary>
+    public int TextScalePercent { get; init; } = 100;
+
+    /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. A separate axis from
+    /// <see cref="Theme"/>, so it composes with light and dark rather than replacing either.</summary>
+    public bool HighContrast { get; init; }
+
+    /// <summary>Dash a chart's second series, so download and upload on one axis are told apart by
+    /// pattern as well as by hue. Off by default: it changes every two-series chart.</summary>
+    public bool DistinguishWithoutColor { get; init; }
+
+    /// <summary>Which color-vision deficiency the chart and status palettes are chosen for. None by
+    /// default, which keeps the authored colors.</summary>
+    public ColorVisionMode ColorVision { get; init; } = ColorVisionMode.None;
+
+    /// <summary>Let a screen reader announce the alert and confirmation banners as they appear.</summary>
+    public bool AnnounceUpdates { get; init; } = true;
+
+    /// <summary>Suppress animated transitions and the loading pulse. Off by default.</summary>
+    public bool ReduceMotion { get; init; }
+
+    /// <summary>Let the keyboard move widgets and cards. On by default.</summary>
+    public bool KeyboardReordering { get; init; } = true;
+
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
 

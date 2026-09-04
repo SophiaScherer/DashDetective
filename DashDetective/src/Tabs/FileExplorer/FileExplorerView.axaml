@@ -77,7 +77,7 @@
         </Style>
 
         <Style Selector="TreeViewItem TextBlock.nodeName">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
         <Style Selector="TreeViewItem:selected TextBlock.nodeName">
@@ -99,7 +99,7 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
         <Style Selector="Border.fileRow TextBlock">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Border.fileRow TextBlock.cellName">
@@ -134,7 +134,7 @@
             <Setter Property="Padding" Value="2,0"/>
         </Style>
         <Style Selector="TextBlock.crumbText">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
         <Style Selector="TextBlock.crumbText.current">
@@ -144,7 +144,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
         <Style Selector="TextBlock.crumbSep">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextTertiary}"/>
             <Setter Property="Margin" Value="5,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -153,7 +153,7 @@
         <!-- The path box's refusal. Orange rather than a theme brush, matching the app's other
              transient failures (Processes' ActionMessage, the Toolkit form's field error). -->
         <Style Selector="TextBlock.pathError">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="Foreground" Value="{StaticResource Orange}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
@@ -242,7 +242,7 @@
                          through the shell, since the shortcut layer deliberately leaves Enter to
                          whatever text box has focus. -->
                     <controls:GhostCompletionBox x:Name="PathBox" IsVisible="{Binding IsPathEditing}"
-                                                 FontSize="12.5" LostFocus="OnPathBoxLostFocus"
+                                                 FontSize="{DynamicResource TextSizeBody}" LostFocus="OnPathBoxLostFocus"
                                                  Text="{Binding PathText, Mode=TwoWay}"
                                                  Completion="{Binding PathCompletionText}"
                                                  EnterCommand="{Binding CommitPathCommand}"/>
@@ -270,18 +270,21 @@
                            Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                            IsLightDismissEnabled="False"
                            IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
-                        <Border Background="{DynamicResource CardBackground}"
-                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
-                            <StackPanel Spacing="10">
-                                <!-- Reveals OS hidden/system entries in list + tree. -->
-                                <CheckBox Classes="optionCheck" Content="Show hidden"
-                                          IsChecked="{Binding ShowHidden}"/>
-                                <!-- Collapsing a parent also collapses everything under it. -->
-                                <CheckBox Classes="optionCheck" Content="Collapse children with parent"
-                                          IsChecked="{Binding CollapseChildrenWithParent}"/>
-                            </StackPanel>
-                        </Border>
+                        <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                        <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                            <Border Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
+                                <StackPanel Spacing="10">
+                                    <!-- Reveals OS hidden/system entries in list + tree. -->
+                                    <CheckBox Classes="optionCheck" Content="Show hidden"
+                                              IsChecked="{Binding ShowHidden}"/>
+                                    <!-- Collapsing a parent also collapses everything under it. -->
+                                    <CheckBox Classes="optionCheck" Content="Collapse children with parent"
+                                              IsChecked="{Binding CollapseChildrenWithParent}"/>
+                                </StackPanel>
+                            </Border>
+                        </controls:ScaleHost>
                     </Popup>
                 </Panel>
                 <Border Classes="segments" VerticalAlignment="Center">
@@ -424,11 +427,11 @@
                          wording comes from FolderMessages so the pane can tell them apart. -->
                     <StackPanel Spacing="6" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Center"
                                 IsVisible="{Binding FolderMessageTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                        <TextBlock Text="{Binding FolderMessageTitle}" FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="{Binding FolderMessageTitle}" FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding FolderMessageHint}" FontSize="11.5"
+                        <TextBlock Text="{Binding FolderMessageHint}" FontSize="{DynamicResource TextSizeSmall}"
                                    Foreground="{DynamicResource TextSubtle}"
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    HorizontalAlignment="Center"/>
@@ -466,7 +469,7 @@
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
-                        <TextBlock Text="{Binding SelectedEntry.Name}" FontSize="14"
+                        <TextBlock Text="{Binding SelectedEntry.Name}" FontSize="{DynamicResource TextSizeTitle}"
                                    FontWeight="SemiBold" TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextStrong}"/>
 

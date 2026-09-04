@@ -6,10 +6,12 @@
 # Packaging (WAP / .wapproj) project or MSIX signing. The MSBuild/MSIX steps
 # from that template have therefore been removed.
 #
-# The job runs on Windows and Linux. Both legs restore, format-check, build and
-# test, so a change that only breaks one platform fails the run. Only Windows
+# The gating job runs on Windows and Linux. Both legs restore, format-check, build
+# and test, so a change that only breaks one platform fails the run. Only Windows
 # publishes: Linux packaging (RID choice, self-contained vs framework-dependent,
 # .desktop file, icons) is deliberately out of scope for now.
+#
+# A third job builds and tests on macOS, and does NOT gate — see build-macos below.
 #
 # For more information on GitHub Actions, refer to https://github.com/features/actions
 
@@ -25,7 +27,7 @@ on:
 permissions:
   contents: read
 
-# One live run per branch. A new push to a pull request cancels the four legs still running for the
+# One live run per branch. A new push to a pull request cancels the legs still running for the
 # previous one; pushes to main are never cancelled, so every commit there keeps its own result.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,7 +41,8 @@ jobs:
       fail-fast: false
       matrix:
         configuration: [Debug, Release]
-        # macos-latest joins this list when macOS gets its own milestone.
+        # macOS runs as its own non-gating job (build-macos) so continue-on-error applies to it
+        # alone. Promoting it means deleting that job and adding macos-latest here.
         os: [windows-latest, ubuntu-latest]
 
     runs-on: ${{ matrix.os }}  # For a list of available runner types, refer to
@@ -117,3 +120,65 @@ jobs:
       with:
         name: DashDetective-${{ matrix.os }}
         path: publish
+
+  # A reporting leg, not a gate: it proves the code builds and the suite passes on macOS, and claims
+  # nothing about macOS support — every ForCurrentPlatform() seam resolves to its Unsupported* arm
+  # there. What it watches for is a test assuming "not Windows ⇒ Linux", which the other four legs
+  # cannot catch.
+  build-macos:
+
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    runs-on: macos-latest
+
+    env:
+      Solution_Name: DashDetective.sln
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+
+    # Same shape as the gating job; runner.os is "macOS" here, so it keys its own entry.
+    - name: Cache NuGet packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+        restore-keys: ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.Solution_Name }}
+
+    # Formatting is host-independent, so a failure means the macOS SDK reads .editorconfig differently.
+    - name: Verify formatting
+      run: dotnet format ${{ env.Solution_Name }} --verify-no-changes --no-restore
+
+    - name: Build
+      run: dotnet build ${{ env.Solution_Name }} --configuration ${{ matrix.configuration }} --no-restore
+
+    # Two things the other legs cannot exercise: PathComparison returns Ordinal while the default APFS
+    # volume is case-insensitive, and UseShellExecute hands its target to `open` rather than throwing.
+    - name: Execute unit tests
+      run: dotnet test ${{ env.Solution_Name }} --configuration ${{ matrix.configuration }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v7
+      with:
+        name: coverage-macos-latest-${{ matrix.configuration }}
+        path: coverage/**/coverage.cobertura.xml
+        if-no-files-found: error
+
+    # No publish step: macOS packaging (.app bundle, signing, notarization) is out of scope, as
+    # Linux packaging is.

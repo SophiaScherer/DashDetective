@@ -1,6 +1,7 @@
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Accessibility;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
 using DashDetective.Services.Settings;
@@ -26,6 +27,7 @@ namespace DashDetective.Tabs.Settings;
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase {
     private readonly ThemeService _theme;
+    private readonly AccessibilityService _accessibility;
     private readonly SystemMetricsService _metrics;
     private readonly IStartupRegistration _startup;
     private readonly Func<DiagnosticsFormat, string> _buildReport;
@@ -39,6 +41,10 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<AccentOption> AccentOptions { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
+    public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
+
+    public ObservableCollection<UiScaleOption> TextScaleOptions { get; }
+    public ObservableCollection<ColorVisionOption> ColorVisionOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
     // ----- Alerts: one row per watched resource, plus how long a breach must last -----
@@ -112,6 +118,21 @@ public partial class SettingsViewModel : ViewModelBase {
     /// only reading in the app that costs a process launch.</summary>
     [ObservableProperty] private bool _nvidiaGpuMetrics;
 
+    /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. Off by default.</summary>
+    [ObservableProperty] private bool _highContrast;
+
+    /// <summary>Dash a chart's second series. Off by default.</summary>
+    [ObservableProperty] private bool _distinguishWithoutColor;
+
+    /// <summary>Let a screen reader announce the banners. On by default.</summary>
+    [ObservableProperty] private bool _announceUpdates;
+
+    /// <summary>Suppress animated transitions. Off by default.</summary>
+    [ObservableProperty] private bool _reduceMotion;
+
+    /// <summary>Let the keyboard move widgets and cards. On by default.</summary>
+    [ObservableProperty] private bool _keyboardReordering;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -119,13 +140,15 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Internal because <see cref="IStartupRegistration"/> is: the class stays public for the
     /// <c>ViewLocator</c> and binding, but the shell is its only caller (and the tests, via
     /// <c>InternalsVisibleTo</c>).</summary>
-    internal SettingsViewModel(ThemeService theme, NavigationViewModel nav, SystemMetricsService metrics,
+    internal SettingsViewModel(ThemeService theme, AccessibilityService accessibility,
+                               NavigationViewModel nav, SystemMetricsService metrics,
                                AppSettings settings, IStartupRegistration startup,
                                ShortcutBindings shortcuts,
                                Func<DiagnosticsFormat, string> buildReport,
                                Func<string> buildMetricsCsv,
                                Action resetWidgetOrders) {
         _theme = theme;
+        _accessibility = accessibility;
         _metrics = metrics;
         _startup = startup;
         Nav = nav;
@@ -157,6 +180,23 @@ public partial class SettingsViewModel : ViewModelBase {
             new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
         };
 
+        UiScaleOptions = [];
+        foreach (var percent in UiScale.Percents)
+            UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
+
+        TextScaleOptions = [];
+        foreach (var percent in TextScale.Percents)
+            TextScaleOptions.Add(new UiScaleOption(percent, SelectTextScale));
+
+        // Named for the deficiency rather than for the colors it swaps, because that is what someone
+        // looking for this already knows the name of.
+        ColorVisionOptions = new ObservableCollection<ColorVisionOption> {
+            new("Off", ColorVisionMode.None, SelectColorVision),
+            new("Deuter.", ColorVisionMode.Deuteranopia, SelectColorVision),
+            new("Protan.", ColorVisionMode.Protanopia, SelectColorVision),
+            new("Tritan.", ColorVisionMode.Tritanopia, SelectColorVision),
+        };
+
         IntervalOptions = new ObservableCollection<IntervalOption> {
             new("0.5s", 0.5, SelectInterval),
             new("1s", 1, SelectInterval),
@@ -169,6 +209,7 @@ public partial class SettingsViewModel : ViewModelBase {
             option.IsSelected = option.Value == _theme.CurrentTheme;
         foreach (var option in AccentOptions)
             option.IsSelected = Equals(option.Preset, _theme.CurrentAccent);
+        RefreshAccentSwatches();
 
         // Select and apply the persisted refresh interval (falling back to 1 s if it's an unknown value).
         var interval = MatchInterval(settings.RefreshIntervalSeconds);
@@ -177,6 +218,11 @@ public partial class SettingsViewModel : ViewModelBase {
         // The shell has already applied the clock format from the same settings, so this only reflects it.
         foreach (var option in ClockFormatOptions)
             option.IsSelected = option.Value == settings.ClockFormat;
+
+        // Likewise the accessibility options: read them back off the service, which has already clamped a
+        // hand-edited scale onto the ladder, rather than off the raw settings.
+        ReflectAccessibility();
+        _accessibility.Changed += ReflectAccessibility;
 
         // A usage threshold under 1% would fire constantly and 100 is a real (if rare) ceiling, so the
         // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
@@ -283,6 +329,14 @@ public partial class SettingsViewModel : ViewModelBase {
         Notify?.Invoke(Notices.ShortcutsRestored);
     }
 
+    /// <summary>Puts every accessibility option back the way it ships. The segmented controls follow
+    /// through the service's Changed event, so this does not touch them itself.</summary>
+    [RelayCommand]
+    private void ResetAccessibility() {
+        _accessibility.RestoreDefaults();
+        Notify?.Invoke(Notices.AccessibilityRestored);
+    }
+
     /// <summary>Puts every page's widgets and cards back in their declared order. The shell owns the
     /// orders, so it also persists the result — raising Changed here would only re-apply the alert
     /// settings for nothing. It also happens off screen, which is why it confirms.</summary>
@@ -370,7 +424,15 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var other in ThemeOptions)
             other.IsSelected = other == option;
         _theme.ApplyTheme(option.Value);
+        RefreshAccentSwatches();
         Changed?.Invoke();
+    }
+
+    /// <summary>Repaints the swatches for the theme now in force, since an accent renders at a different
+    /// lightness in each.</summary>
+    private void RefreshAccentSwatches() {
+        foreach (var option in AccentOptions)
+            option.Refresh(_theme.RendersDark);
     }
 
     private void SelectAccent(AccentOption option) {
@@ -392,6 +454,75 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>The alert rows' change callback. Guarded like the other seeded controls, though the rows
     /// only report real edits anyway.</summary>
     private void RaiseChanged() {
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    private void SelectUiScale(UiScaleOption option) {
+        _accessibility.SetScalePercent(option.Percent);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    private void SelectTextScale(UiScaleOption option) {
+        _accessibility.SetTextScalePercent(option.Percent);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    /// <summary>Points the card's controls at whatever the service currently holds. Driven by the
+    /// service's event rather than by the click, so an edit and a "Restore defaults" move them the same
+    /// way and cannot disagree. Writing the toggle back through its own property is safe rather than
+    /// circular: the service re-applies an unchanged value silently, so the round trip stops there.</summary>
+    private void ReflectAccessibility() {
+        foreach (var option in UiScaleOptions)
+            option.IsSelected = option.Percent == _accessibility.ScalePercent;
+
+        foreach (var option in TextScaleOptions)
+            option.IsSelected = option.Percent == _accessibility.TextScalePercent;
+
+        HighContrast = _accessibility.HighContrast;
+        DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
+        AnnounceUpdates = _accessibility.AnnounceUpdates;
+        ReduceMotion = _accessibility.ReduceMotion;
+        KeyboardReordering = _accessibility.KeyboardReordering;
+
+        foreach (var option in ColorVisionOptions)
+            option.IsSelected = option.Value == _accessibility.ColorVision;
+    }
+
+    private void SelectColorVision(ColorVisionOption option) {
+        _accessibility.SetColorVision(option.Value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnKeyboardReorderingChanged(bool value) {
+        _accessibility.SetKeyboardReordering(value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnReduceMotionChanged(bool value) {
+        _accessibility.SetReduceMotion(value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnAnnounceUpdatesChanged(bool value) {
+        _accessibility.SetAnnounceUpdates(value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnDistinguishWithoutColorChanged(bool value) {
+        _accessibility.SetDistinguishWithoutColor(value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnHighContrastChanged(bool value) {
+        _accessibility.SetHighContrast(value);
         if (!_initializing)
             Changed?.Invoke();
     }

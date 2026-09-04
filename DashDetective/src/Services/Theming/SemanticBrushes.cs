@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace DashDetective.Services.Theming;
 
@@ -51,25 +52,45 @@ public static class SemanticBrushes {
     public static IBrush RedSoft { get; } = new SolidColorBrush(RedColor, SoftAlpha);
 
     // ----- Status: what a colour means, rather than which hue it is -----
+    // Each is its OWN brush, not an alias of the fixed hue above: a color-vision mode mutates these, and
+    // an alias would drag the file-type glyphs and icon tints along too.
 
     /// <summary>Healthy, running, connected, live.</summary>
-    public static IBrush StatusGood { get; } = Green;
+    public static SolidColorBrush StatusGood { get; } = new(GreenColor);
 
     /// <summary>Degraded, suspended, transitional — not an error.</summary>
-    public static IBrush StatusWarn { get; } = Yellow;
+    public static SolidColorBrush StatusWarn { get; } = new(YellowColor);
 
     /// <summary>Failed or destructive.</summary>
-    public static IBrush StatusBad { get; } = Red;
+    public static SolidColorBrush StatusBad { get; } = new(RedColor);
 
     /// <summary>Informational, or a live-but-not-physical thing (a virtual adapter).</summary>
-    public static IBrush StatusInfo { get; } = Blue;
+    public static SolidColorBrush StatusInfo { get; } = new(BlueColor);
 
     /// <summary>Off, paused, disconnected, unknown.</summary>
-    public static IBrush StatusIdle { get; } = Neutral;
+    public static SolidColorBrush StatusIdle { get; } = new(NeutralColor);
 
     /// <summary>The soft fill paired with <see cref="StatusGood"/>.</summary>
-    public static IBrush StatusGoodSoft { get; } = GreenSoft;
+    public static SolidColorBrush StatusGoodSoft { get; } = new(GreenColor, SoftAlpha);
 
     /// <summary>The soft fill paired with <see cref="StatusWarn"/>.</summary>
-    public static IBrush StatusWarnSoft { get; } = YellowSoft;
+    public static SolidColorBrush StatusWarnSoft { get; } = new(YellowColor, SoftAlpha);
+
+    /// <summary>Re-points the status brushes for a color-vision mode; mutating them repaints every
+    /// consumer with no event. The hop is because <c>Color</c> is a styled property with UI-thread
+    /// affinity — the app is always on it, xUnit is not.</summary>
+    public static void Apply(SemanticColors colors) {
+        if (!Dispatcher.UIThread.CheckAccess()) {
+            Dispatcher.UIThread.Post(() => Apply(colors));
+            return;
+        }
+
+        StatusGood.Color = colors.Good;
+        StatusWarn.Color = colors.Warn;
+        StatusBad.Color = colors.Bad;
+        StatusInfo.Color = colors.Info;
+        StatusIdle.Color = colors.Idle;
+        StatusGoodSoft.Color = colors.Good;
+        StatusWarnSoft.Color = colors.Warn;
+    }
 }

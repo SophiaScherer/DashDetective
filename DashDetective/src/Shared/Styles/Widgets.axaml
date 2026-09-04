@@ -32,6 +32,7 @@
                                      and is negative so it does NOT feed back into measure — a MinHeight
                                      would make every folding card taller instead. -->
                                 <Button Grid.Column="0" x:Name="PART_Collapse" Classes="bare"
+                                        AutomationProperties.Name="{TemplateBinding Title}"
                                         Width="22" Margin="0,-4,6,-4"
                                         VerticalAlignment="Stretch" VerticalContentAlignment="Center"
                                         IsVisible="{TemplateBinding Collapse,
@@ -120,7 +121,7 @@
         <!-- 12.5, not the Processes table's 9: that one is read against a 12.5 row, this against a
              13.5 SemiBold panel title, where anything under about 12 reads as a dot rather than a
              chevron. -->
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         <Setter Property="Text" Value="&#x25BE;"/>
     </Style>

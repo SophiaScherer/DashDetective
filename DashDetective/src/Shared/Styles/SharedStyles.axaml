@@ -82,28 +82,44 @@
     <Style Selector="Border.revealFlash.highlighted">
         <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
     </Style>
+    <!-- Reduce motion. The tint still appears and still clears; only the fade between goes. -->
+    <Style Selector=":is(Window).reduceMotion Border.revealFlash">
+        <Setter Property="Transitions">
+            <Transitions/>
+        </Setter>
+    </Style>
+
+    <!-- ===== Accessible names =====
+         An icon-only button reports its CONTENT's type name to a screen reader — "Avalonia.Controls.Border"
+         for every nav item — so the tooltip becomes the name. One rule rather than forty attributes, and
+         the two cannot drift apart. A local AutomationProperties.Name in markup still wins where a control
+         needs to say more than its tooltip does. -->
+    <Style Selector="Button">
+        <Setter Property="AutomationProperties.Name"
+                Value="{Binding (ToolTip.Tip), RelativeSource={RelativeSource Self}}"/>
+    </Style>
 
     <!-- ===== Typography ===== -->
     <Style Selector="TextBlock.panelTitle">
-        <Setter Property="FontSize" Value="13.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSubhead}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
     <Style Selector="TextBlock.cardLabel">
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardValue">
-        <Setter Property="FontSize" Value="26"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeHero}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
     </Style>
     <Style Selector="TextBlock.cardUnit">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardSub">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
@@ -112,11 +128,11 @@
          read at one size; Processes' 22pt summary figure is a genuinely different scale and stays local
          to that tab until a second one wants it. -->
     <Style Selector="TextBlock.tileLabel">
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.tileValue">
-        <Setter Property="FontSize" Value="16.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeHeadingLarge}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
     </Style>
@@ -124,7 +140,7 @@
     <!-- Chart key entry (used by the ChartLegend widget). Matches cardSub, so a legend reads as part of
          the chart's caption line rather than as another readout. -->
     <Style Selector="TextBlock.legendLabel">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
@@ -134,7 +150,7 @@
          TextSubtle vs TextMuted) while rendering the same thing, so the header row now reads the same
          on every tab. -->
     <Style Selector="TextBlock.colHead">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
@@ -142,7 +158,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="TextBlock.sortArrow">
-        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeMicro}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
     </Style>
@@ -154,11 +170,11 @@
         <Setter Property="Padding" Value="0,7"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoKey">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoVal">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -190,7 +206,7 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         <Setter Property="VerticalAlignment" Value="Top"/>
@@ -225,7 +241,7 @@
          its row and group selection. -->
     <Style Selector="CheckBox.optionCheck">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
@@ -257,7 +273,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="12,7"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
@@ -290,8 +306,10 @@
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="4"/>
     </Style>
+    <!-- Both this and the tooltip below follow the UI scale by type size: Fluent templates their
+         presenters, so neither can be wrapped in a ScaleHost the way the app's own popups are. -->
     <Style Selector="MenuFlyoutPresenter MenuItem">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource PopupFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Padding" Value="10,6"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -308,6 +326,11 @@
         <Setter Property="Margin" Value="6,4"/>
     </Style>
 
+    <!-- Tooltips size to content, so a scaled type size is all they need to follow the UI scale. -->
+    <Style Selector="ToolTip">
+        <Setter Property="FontSize" Value="{DynamicResource PopupFontSize}"/>
+    </Style>
+
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
         <Setter Property="Background" Value="{DynamicResource FieldBackground}"/>
@@ -322,7 +345,7 @@
         <Setter Property="Background" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="Border.seg TextBlock">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
     </Style>
     <Style Selector="Border.seg.selected TextBlock">
@@ -352,13 +375,14 @@
     <Style Selector="ToggleButton.toggle:checked /template/ Ellipse#Thumb">
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="Margin" Value="0,0,3,0"/>
+        <Setter Property="Fill" Value="{DynamicResource OnAccent}"/>
     </Style>
 
     <!-- ===== Action buttons ===== -->
     <Style Selector="Button.action">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="16,9"/>
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -384,7 +408,7 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="6,2"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -420,7 +444,7 @@
     <Style Selector="Border.field TextBox">
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="9,0"/>
     </Style>

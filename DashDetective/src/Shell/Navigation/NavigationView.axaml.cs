@@ -126,7 +126,7 @@ public partial class NavigationView : UserControl {
             VerticalAlignment = VerticalAlignment.Center,
         };
         _dragChipLabel = new TextBlock {
-            FontSize = 12, VerticalAlignment = VerticalAlignment.Center,
+            FontSize = this.TextSize("TextSizeCompact", 12), VerticalAlignment = VerticalAlignment.Center,
             Foreground = this.Brush("TextStrong", Colors.White),
         };
         _dragChip = new Border {

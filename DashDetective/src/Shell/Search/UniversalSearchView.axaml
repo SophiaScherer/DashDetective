@@ -98,54 +98,60 @@
         <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #SearchBox}"
                Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
                IsLightDismissEnabled="False" Focusable="False"
-               Width="{Binding #SearchBox.Bounds.Width}"
                IsOpen="{Binding IsOpen}">
-            <Border Background="{DynamicResource CardBackground}"
-                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                    CornerRadius="8" Padding="6" BoxShadow="{StaticResource ShadowPopup}">
-                <Panel>
-                    <!-- Exactly one of these three shows at a time (see the view model): a blank card
-                         while the filesystem answers would read as "nothing found". -->
-                    <TextBlock Text="Searching…" Margin="10,12" FontSize="12.5"
-                               Foreground="{DynamicResource TextSubtle}"
-                               IsVisible="{Binding ShowSearching}"/>
-                    <TextBlock Text="No matches" Margin="10,12" FontSize="12.5"
-                               Foreground="{DynamicResource TextSubtle}"
-                               IsVisible="{Binding ShowNoResults}"/>
+            <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+            <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                <!-- Width matched inside the scale host rather than on the Popup: the search box's
+                     Bounds are pre-transform, so a popup sized to this content is exactly as wide as the
+                     box renders at any scale. -->
+                <Border Width="{Binding #SearchBox.Bounds.Width}"
+                        Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                        CornerRadius="8" Padding="6" BoxShadow="{StaticResource ShadowPopup}">
+                    <Panel>
+                        <!-- Exactly one of these three shows at a time (see the view model): a blank card
+                             while the filesystem answers would read as "nothing found". -->
+                        <TextBlock Text="Searching…" Margin="10,12" FontSize="{DynamicResource TextSizeBody}"
+                                   Foreground="{DynamicResource TextSubtle}"
+                                   IsVisible="{Binding ShowSearching}"/>
+                        <TextBlock Text="No matches" Margin="10,12" FontSize="{DynamicResource TextSizeBody}"
+                                   Foreground="{DynamicResource TextSubtle}"
+                                   IsVisible="{Binding ShowNoResults}"/>
 
-                    <ListBox Classes="results" ItemsSource="{Binding Results}"
-                             SelectedIndex="{Binding SelectedIndex}"
-                             SelectionChanged="OnResultsSelectionChanged"
-                             MaxHeight="380" IsVisible="{Binding ShowResultList}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="search:SearchResult">
-                                <Border Background="Transparent" Padding="10,7" Tapped="OnResultTapped">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                        <Path Grid.Column="0" Width="15" Height="15" Stretch="Uniform"
-                                              Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.3"
-                                              StrokeLineCap="Round" StrokeJoin="Round"
-                                              VerticalAlignment="Center" Data="{Binding Icon}"
-                                              IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-                                        <StackPanel Grid.Column="1" Margin="10,0" Spacing="1">
-                                            <TextBlock Text="{Binding Title}" FontSize="12.5"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Foreground="{DynamicResource TextPrimary}"/>
-                                            <TextBlock Text="{Binding Subtitle}" FontSize="11"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Foreground="{DynamicResource TextSubtle}"
-                                                       IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                        </StackPanel>
-                                        <Border Grid.Column="2" Classes="resultTag">
-                                            <TextBlock Text="{Binding CategoryLabel}" FontSize="10"
-                                                       Foreground="{DynamicResource TextMuted}"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Panel>
-            </Border>
+                        <ListBox Classes="results" ItemsSource="{Binding Results}"
+                                 SelectedIndex="{Binding SelectedIndex}"
+                                 SelectionChanged="OnResultsSelectionChanged"
+                                 MaxHeight="380" IsVisible="{Binding ShowResultList}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="search:SearchResult">
+                                    <Border Background="Transparent" Padding="10,7" Tapped="OnResultTapped">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Path Grid.Column="0" Width="15" Height="15" Stretch="Uniform"
+                                                  Stroke="{DynamicResource TextTertiary}" StrokeThickness="1.3"
+                                                  StrokeLineCap="Round" StrokeJoin="Round"
+                                                  VerticalAlignment="Center" Data="{Binding Icon}"
+                                                  IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                            <StackPanel Grid.Column="1" Margin="10,0" Spacing="1">
+                                                <TextBlock Text="{Binding Title}" FontSize="{DynamicResource TextSizeBody}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="{DynamicResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="{DynamicResource TextSubtle}"
+                                                           IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="resultTag">
+                                                <TextBlock Text="{Binding CategoryLabel}" FontSize="{DynamicResource TextSizeMicro}"
+                                                           Foreground="{DynamicResource TextMuted}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Panel>
+                </Border>
+            </controls:ScaleHost>
         </Popup>
     </Panel>
 </UserControl>

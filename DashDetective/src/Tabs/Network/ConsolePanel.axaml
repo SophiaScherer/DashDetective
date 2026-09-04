@@ -58,10 +58,10 @@
                      idle console reads the same as it did before the box started filling the widget. -->
                 <StackPanel Spacing="3" VerticalAlignment="Top">
                     <TextBlock Text="{Binding #Root.ConsoleText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="11" LineHeight="15" TextWrapping="NoWrap"
+                               FontSize="{DynamicResource TextSizeCaption}" LineHeight="15" TextWrapping="NoWrap"
                                Foreground="{Binding #Root.ConsoleBrush}"/>
                     <TextBlock Text="{Binding #Root.FooterText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="11" LineHeight="15" Foreground="{Binding #Root.FooterBrush}"/>
+                               FontSize="{DynamicResource TextSizeCaption}" LineHeight="15" Foreground="{Binding #Root.FooterBrush}"/>
                 </StackPanel>
             </Border>
         </DockPanel>

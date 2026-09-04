@@ -5,6 +5,7 @@
         xmlns:nav="using:DashDetective.Shell.Navigation"
         xmlns:search="using:DashDetective.Shell.Search"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:controls="using:DashDetective.Shared.Controls"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
         x:Class="DashDetective.Shell.MainWindow"
@@ -12,7 +13,8 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="DashDetective"
         Width="1180" Height="760"
-        MinWidth="640" MinHeight="480"
+        MinWidth="{Binding MinWindowWidth}" MinHeight="{Binding MinWindowHeight}"
+        Classes.reduceMotion="{Binding ReduceMotion}"
         Background="{DynamicResource AppBackground}"
         TransparencyLevelHint="None"
         SizeChanged="OnShellSizeChanged">
@@ -53,6 +55,11 @@
         </Style>
     </Window.Styles>
 
+    <!-- Everything the window draws sits inside the scale host, so the interface size reaches the nav
+         bar, the toolbar, the banners, the pages and the Help modal alike. Popups are their own visual
+         roots and each carry their own. -->
+    <controls:ScaleHost Scale="{DynamicResource UiScale}">
+
     <!-- The Help modal is a sibling of the whole shell rather than a child of the content area, so its
          scrim dims and blocks the navigation bar too, matching the design document. -->
     <Panel>
@@ -65,19 +72,20 @@
             <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}"/>
 
             <!-- ================= MAIN ================= -->
-            <Grid RowDefinitions="54,Auto,*">
+            <Grid RowDefinitions="Auto,Auto,*">
 
-                <!-- Toolbar -->
-                <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+                <!-- Toolbar. Auto with a minimum rather than a fixed 54: the title and subtitle
+                     inside it follow the text scale, and a fixed row clipped the subtitle. -->
+                <Border Grid.Row="0" MinHeight="54" Background="{DynamicResource SidebarBackground}"
                         BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*" Margin="18,0">
 
                         <!-- Trimmed rather than pushed off: at the window's minimum the subtitle no
                              longer fits beside the search field. -->
                         <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="{DynamicResource TextSizeTitleLarge}" FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="11"
+                            <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
                                        Foreground="{DynamicResource TextSubtle}"
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
@@ -91,7 +99,7 @@
                                     ToolTip.Tip="Pause or resume live updates (Ctrl+P)">
                                 <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                                     <Ellipse Width="8" Height="8" Fill="{Binding LiveDotBrush}"/>
-                                    <TextBlock Text="{Binding LiveLabel}" FontSize="12"
+                                    <TextBlock Text="{Binding LiveLabel}" FontSize="{DynamicResource TextSizeCompact}"
                                                Foreground="{DynamicResource TextTertiary}"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
@@ -111,7 +119,7 @@
                                  reserves constant space and never reflows the toolbar. Sized for the
                                  wider 12-hour string ("11:59:59 PM"), so switching clock format does not
                                  shift the toolbar either. -->
-                            <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{DynamicResource TextTertiary}"
+                            <TextBlock Text="{Binding Clock}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextTertiary}"
                                        VerticalAlignment="Center" Width="76" TextAlignment="Center"/>
                             </StackPanel>
 
@@ -137,11 +145,13 @@
                          user's "Resource alerts" setting is on. Auto-clears on recovery; the × dismisses
                          the current breach. Fixed amber so it reads as a warning in both themes. -->
                     <Border IsVisible="{Binding AlertBannerVisible}"
+                            AutomationProperties.LiveSetting="{Binding AlertLiveSetting}"
+                            AutomationProperties.Name="{Binding AlertText}"
                             Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
-                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
                             <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
                                     ToolTip.Tip="Dismiss" Command="{Binding DismissAlertCommand}">
@@ -157,6 +167,8 @@
                          for a user who picked red, and a red success message reads as an error. Takes
                          itself down after NoticeService.Duration; the × and Esc are early exits. -->
                     <Border IsVisible="{Binding NoticeBannerVisible}"
+                            AutomationProperties.LiveSetting="{Binding NoticeLiveSetting}"
+                            AutomationProperties.Name="{Binding NoticeText}"
                             Background="{StaticResource GreenSoft}" BorderBrush="{StaticResource GreenLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
@@ -164,7 +176,7 @@
                                   StrokeLineCap="Round" StrokeJoin="Round" Data="M2,8.5 L6.5,13 L14,4"/>
                             <!-- The tooltip carries what the trim drops: an export names a path, and a
                                  deep one is exactly the case where the user needs to read all of it. -->
-                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding NoticeText}"
                                        TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding NoticeText}"/>
                             <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
@@ -197,4 +209,6 @@
         <!-- ================= HELP MODAL ================= -->
         <help:HelpOverlay DataContext="{Binding Help}"/>
     </Panel>
+
+    </controls:ScaleHost>
 </Window>

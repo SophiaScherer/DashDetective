@@ -25,6 +25,7 @@ stays in its tab folder.
 - [`src/Services/Identity`](#srcservicesidentity)
 - [`src/Services/Diagnostics`](#srcservicesdiagnostics)
 - [`src/Services/Theming`](#srcservicestheming)
+- [`src/Services/Accessibility`](#srcservicesaccessibility)
 - [`src/Services/Notifications`](#srcservicesnotifications)
 - [`src/Services/Links`](#srcserviceslinks)
 - [`src/Services/Platform`](#srcservicesplatform)
@@ -190,13 +191,33 @@ stays in its tab folder.
 ```
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
-                                 ResourceDictionary.ThemeDictionaries; accent + chart-series keys
-                                 sit top-level and are swapped at runtime — see Theming below)
-        SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
+                                 ResourceDictionary.ThemeDictionaries, alongside a high-contrast
+                                 dictionary for each keyed by {x:Static theming:AppVariants...}; accent +
+                                 chart-series keys sit top-level and are swapped at runtime — see Theming
+                                 below. The high-contrast tables author only their DIFFERENCES and inherit
+                                 the rest. Their chart grid deliberately does NOT strengthen with the
+                                 other lines: at that weight it outshouts the trace drawn over it)
+        SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it
+                                 is declared here; the nav bar's and the Processes pulse's live in their
+                                 own files, since a local style outranks an app-level one. The selector
+                                 is :is(Window) — a bare "Window" matches the exact type, not MainWindow.
+                                 ACCESSIBLE NAMES: one rule points a Button's
+                                 AutomationProperties.Name at its tooltip, because an icon-only button
+                                 otherwise reports its content's type name — "Avalonia.Controls.Border"
+                                 for every nav item. A local Name in markup still wins.
+                                 Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
-                                 so always {StaticResource}. A token with no call site should not exist)
+                                 so always {StaticResource} — EXCEPT the runtime-swapped block at the
+                                 bottom: UiScale, PopupFontSize and the TextSize* ladder, which
+                                 ThemeService rewrites and which are therefore the only
+                                 {DynamicResource} entries in this file. The values authored here are
+                                 the unscaled defaults, seen at design time and in the moment before the
+                                 first apply. TEXT SCALE: the ladder is every font size in the app,
+                                 TextScale.BaseSizes mirrors it, and a test fails on any authored
+                                 FontSize literal. A token with no call site should not exist — the
+                                 ladder is the one authorized sweep, see AGENTS.md)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
                                  and the :collapsed rules. The chevron is a plain Button, not a
                                  ToggleButton: Fluent's checked/pressed states would all need undoing,
@@ -227,7 +248,11 @@ stays in its tab folder.
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed)
-        ReorderablePanel.cs     (the half of reordering both panels share: the saved order and its
+        ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
+                                 a drag does, so both persist through one path. It also makes every
+                                 item it lays out a tab stop — a card is usually a plain Border, and
+                                 Focusable in the view does not work, only this does
+                                 the half of reordering both panels share: the saved order and its
                                  re-entrancy guard, the previewed order, the children on screen and
                                  where their slots were arranged. A base class rather than a helper
                                  each panel forwards to — the forwarding would have been most of what
@@ -282,6 +307,21 @@ stays in its tab folder.
 
 ```
       /Controls
+        ChartLegend.axaml(.cs)         (a chart's key: up to two series, each a swatch beside its name.
+                                        Pattern2 swaps both swatches for line marks — solid and dashed —
+                                        mirroring Sparkline.PatternSecondSeries, so the key shows the
+                                        same distinction the chart makes rather than repeating the
+                                        color. Its dash array is in multiples of StrokeThickness, which
+                                        is why the numbers differ from the chart's for the same rhythm)
+        ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
+                                        content is MEASURED at the reduced size and RENDERED enlarged, so
+                                        text and chrome grow together and no view has to know its own font
+                                        size — which is why the app's ~87 FontSize literals needed no
+                                        change. ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
+                                        second window are each their own tree and inherit nothing from the
+                                        shell's. Fluent templates the tooltip and context-menu presenters,
+                                        so those two cannot host one and follow the scale by type size
+                                        instead — see PopupFontSize in Styles above)
         WidgetPanel, WidgetTable
                                        (WidgetPanel is one widget: surface, header row, body. Title /
                                         Subtitle / HeaderLead / HeaderContent / WidgetId. A surviving
@@ -450,12 +490,44 @@ stays in its tab folder.
 
 ```
       /Theming
-        ThemeService.cs         (single seam that applies theme + accent to Application at runtime. Also
+        ThemeService.cs         (single seam that applies theme + accent + CONTRAST to Application at
+                                 runtime. ApplyContrast picks a ThemeVariant rather than writing keys, for
+                                 the reason in AppVariants below; under "System" it resolves which scheme
+                                 the OS is showing via PlatformSettings and re-applies on
+                                 ColorValuesChanged, since resolving System itself is what takes
+                                 Avalonia's automatic switch out of the picture. Also
                                  the brush seam for a page that assigns colours in code rather than through
                                  {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
+        AccentPreset.cs         (the four accents, each with an AccentShades set PER THEME. Authored, not
+                                 derived: on near-black an accent must be light, on white dark enough to
+                                 read as text — every accent scored ~2:1 on white before this. Color
+                                 stays the dark hue, since that is the accent's identity for
+                                 ChartPalette.Derive and nothing renders it directly)
+        ColorVision.cs          (the color-blind-safe tables: status and chart series, per MODE and per
+                                 THEME. Per-theme is not a nicety — a color must clear 3:1 on its
+                                 background before its hue matters, and one set doing that on both
+                                 near-black and white leaves too narrow a lightness band to separate five
+                                 categories (measured: 11-16, against a bar of 20). The hues are
+                                 Okabe-Ito and the assignments were SEARCHED against a dichromacy
+                                 simulation; every hand-picked attempt failed. Its hex literals are why it
+                                 is in PaletteOwnershipTests' allowed list)
+        SemanticBrushes.cs      (the fixed semantic colors as brushes, for code that cannot reach
+                                 {StaticResource}. The STATUS brushes are mutable and each is its OWN
+                                 instance: Apply() re-points them for a color-vision mode, and because
+                                 SolidColorBrush.Color is a styled property every consumer repaints with
+                                 no event and no service threaded through it. Aliasing them back onto the
+                                 fixed hues beside them — which is how they started — would drag the
+                                 file-type glyphs and the icon tints along with them)
+        AppVariants.cs          (the app's own ThemeVariants: HighContrastDark / HighContrastLight, each
+                                 INHERITING from the plain variant it thickens so only the differences
+                                 need authoring. High contrast has to be a variant because a key inside
+                                 ResourceDictionary.ThemeDictionaries CANNOT be shadowed by writing the
+                                 same key into Application.Resources — the theme lookup wins and the write
+                                 is silently ignored. That is why the accent and chart series, which are
+                                 top-level keys, can be swapped that way and the surfaces cannot)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
         ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
                                  accent, plus the ChartSeries enum and the ChartSeriesColors record.
@@ -466,6 +538,26 @@ stays in its tab folder.
                                  is what makes the blue swatch and the "Default" swatch agree. Pure HSL
                                  maths over Avalonia.Media value types — no render backend, so it is
                                  unit-testable)
+```
+
+## `src/Services/Accessibility`
+
+```
+      /Accessibility
+        AccessibilityService.cs (the state behind Settings -> Accessibility, and the one place it is
+                                 applied. Writes NOTHING to Application itself — appearance goes through
+                                 ThemeService, which stays the only writer. It exists so the card's options
+                                 have a single owner: that is what "Restore defaults" resets, and what the
+                                 shell reads to size its window minimum. Re-applying the current value is
+                                 deliberate — startup has to push it through either way — but only a real
+                                 change raises Changed, or every launch would report one and persist)
+        UiScale.cs              (the scale ladder and its arithmetic, pure so both are testable without a
+                                 layout pass. Factor() CLAMPS: the settings file is hand-editable and 0
+                                 would collapse the window rather than degrade. Nearest() snaps an
+                                 unrecognized value onto the ladder, so the segmented control always has a
+                                 selection. BasePopupFontSize is a C# mirror of Dimensions.axaml's
+                                 PopupFontSize, as SemanticBrushes mirrors Palette.axaml, and a test pins
+                                 the two together)
 ```
 
 ## `src/Services/Notifications`
@@ -1138,7 +1230,8 @@ stays in its tab folder.
 
 ```
       /Settings                 SettingsView.axaml(.cs) + SettingsViewModel.cs
-                                                        (fully live: Appearance + Navigation + Monitoring
+                                                        (fully live: Appearance + Accessibility +
+                                                         Navigation + Monitoring
                                                          + Layout + Export & Data; view code-behind owns the
                                                          export save dialog + clipboard, like MainWindow.
                                                          The Layout card resets every page's widget order,
@@ -1146,8 +1239,15 @@ stays in its tab folder.
                                                          like buildReport/buildMetricsCsv: the orders are the
                                                          shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
-                                IntervalOption.cs       (selectable item VMs for the Appearance +
-                                                         refresh-interval controls, like NavItem)
+                                IntervalOption.cs, UiScaleOption.cs
+                                                        (selectable item VMs for the Appearance,
+                                                         Accessibility + refresh-interval controls, like
+                                                         NavItem. The interface-size row is the only one
+                                                         with FIVE segments, and the only one its own
+                                                         setting narrows, so it alone wraps: both its grid
+                                                         columns are star, because a WrapPanel in an Auto
+                                                         column is measured against infinity and would
+                                                         overflow the card rather than wrap)
                                 NumericField.axaml(.cs) (a typed whole number with its unit beside it —
                                 ShortcutCaptureBox.axaml(.cs)
                                                         (arms, then captures the next key press as a

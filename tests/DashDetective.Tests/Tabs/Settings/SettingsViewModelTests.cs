@@ -1,4 +1,5 @@
 using Avalonia.Input;
+using DashDetective.Services.Accessibility;
 using DashDetective.Services.Network;
 using DashDetective.Services.Notifications;
 using DashDetective.Services.Settings;
@@ -28,8 +29,10 @@ public class SettingsViewModelTests {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
         var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var theme = new ThemeService();
         return new SettingsViewModel(
-            new ThemeService(), new NavigationViewModel(), metrics, settings ?? AppSettings.Defaults, startup,
+            theme, new AccessibilityService(theme), new NavigationViewModel(), metrics,
+            settings ?? AppSettings.Defaults, startup,
             new ShortcutBindings(), _ => "", () => "", resetWidgetOrders);
     }
 

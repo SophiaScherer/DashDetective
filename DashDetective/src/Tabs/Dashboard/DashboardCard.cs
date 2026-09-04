@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
 using System;
+using System.Linq;
 using System.Windows.Input;
 
 namespace DashDetective.Tabs.Dashboard;
@@ -61,7 +62,22 @@ public partial class DashboardCard : ObservableObject {
     /// reads "—" has more to say than one repeating an affordance.</summary>
     public string Tip => Note.Length > 0 ? Note : OpenHint;
 
-    partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(Tip));
+    /// <summary>What a screen reader announces. The tooltip alone would read "Open in Performance" on
+    /// every card, so this leads with the heading and the reading.</summary>
+    public string AccessibleName => Note.Length > 0
+        ? $"{Label}, {Note}"
+        : string.Join(", ", new[] { Label, $"{Value} {Unit}".Trim(), Sub }.Where(p => p.Length > 0));
+
+    partial void OnNoteChanged(string value) {
+        OnPropertyChanged(nameof(Tip));
+        OnPropertyChanged(nameof(AccessibleName));
+    }
+
+    partial void OnValueChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
+
+    partial void OnUnitChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
+
+    partial void OnSubChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
 
     // Category flags the StatCard template binds to Classes.* so each card picks up its semantic accent brush
     // (ChartCpu / ChartMemory / …) via style setters, keeping the accents theme/accent-aware.

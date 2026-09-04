@@ -14,6 +14,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Dashboard](#dashboard)
 - [Universal search](#universal-search)
 - [Settings](#settings)
+- [Accessibility](#accessibility)
 - [File Explorer](#file-explorer)
 - [Network](#network)
 - [Processes](#processes)
@@ -316,6 +317,394 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   a record's `init` properties as constructor parameters and fills absent slots with `default(T)`, so
   deserializing directly discarded every non-default initializer — `ShowInTray` loaded as false for
   months, and every alert threshold would have loaded as `0`, which is how one is switched off.
+
+## Accessibility
+
+The Settings **Accessibility** card, and the first option on it. **Every feature that lands here is a
+setting the user can switch off** — nothing is forced on, and each row has its own `SettingId`,
+`SettingCatalog` entry and `AppSettings` property, so each is separately findable through universal
+search and revealable on its own row.
+
+- **Interface size** (100 / 125 / 150 / 175 / 200 %, default 100). Everything grows together — text,
+  controls, charts and icons.
+- **High contrast** (toggle, default **off**). Flattens every surface to one flat black or white and
+  drops the text ramp's opacity steps. A separate axis from Light/Dark, so it composes with whichever
+  scheme is chosen rather than replacing it.
+- **Distinguish without color** (toggle, default **off**). Dashes the second series on a chart that
+  draws two, and turns the legend's swatches into matching line marks.
+- **Color vision** (Off / Deuter. / Protan. / Tritan., default **Off**). Swaps the chart series and the
+  status colors for a set searched and verified against a simulation of that deficiency.
+- **Navigation tooltips** appear only on a collapsed rail. Expanded, the tooltip repeated the label
+  sitting next to it; each item is named through `AutomationProperties.Name` directly, so a screen
+  reader keeps the name in either state.
+- **Reduce motion** (toggle, default **off**). Switches off the sliding and fading transitions and stops
+  the loading pulse repeating.
+- **Text size** (100 / 125 / 150 / 175 / 200 %, default **100 %**). Grows type alone, leaving the
+  controls around it as they are. Multiplies with the interface size rather than replacing it.
+- **Keyboard reordering** (toggle, default **on**). `Ctrl+Shift+←/→` moves the widget or card the
+  keyboard is on. On by default because an unused gesture costs nothing.
+- **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
+  resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
+  becoming a property on that service.
+
+**One transform, not a font-size sweep.** `ScaleHost` (`src/Shared/Controls`) is a
+`LayoutTransformControl` that measures its content at the reduced size and renders it enlarged, so
+the app's ~87 authored `FontSize` literals needed no change and layout stays correct rather than
+merely bigger. `Sparkline` composes its own axis text with `FormattedText` and scales with the
+subtree, so charts needed nothing either.
+
+**One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
+and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
+five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
+menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
+resource.
+
+**The search dropdown's width moved inside its scale host.** It matches the search box, and
+`Bounds.Width` on a control inside the transform is *pre*-transform; sizing the popup to that content
+rather than setting `Popup.Width` makes it exactly as wide as the box renders, at any scale. Setting
+the width on the popup instead left the dropdown narrower than the box at every scale above 100 %.
+
+**Two resource keys are rewritten at runtime, and they live in `Dimensions.axaml`** — the only
+`{DynamicResource}` entries in a file whose whole point is that it is theme-invariant and static.
+`ThemeService.ApplyUiScale` writes them, so **`ThemeService` remains the only code that writes to
+`Application.Current`**; `AccessibilityService` owns the state and computes the values but touches
+the application not at all. `UiScale.BasePopupFontSize` is a C# mirror of the authored default, as
+`SemanticBrushes` mirrors `Palette.axaml`, and a test pins the two together.
+
+### High contrast
+
+**It has to be a `ThemeVariant`, and that is the whole design.** `AppVariants` (`src/Services/Theming`)
+declares `HighContrastDark` and `HighContrastLight`, each inheriting from the plain variant it thickens,
+and `Palette.axaml` gains a theme dictionary for each. Only the differences are authored — anything a
+high-contrast dictionary does not override falls back to Dark or Light.
+
+**A key declared inside `ResourceDictionary.ThemeDictionaries` cannot be shadowed by writing the same
+key into `Application.Resources`.** The theme lookup wins and the write is silently ignored — no
+exception, no warning, no visible change. That is the difference between the accent and the chart series
+(top-level keys, swapped at runtime exactly that way) and the surfaces and text ramp (theme-dictionary
+keys, which need a variant). This was measured, not assumed: a probe that set `AppBackground` to magenta
+through `Application.Resources` left the app untouched, and the same color reached through a custom
+variant changed it.
+
+**What changes, and what deliberately does not:**
+- Surfaces collapse to one flat black or white, so a panel is told apart by its border rather than by a
+  few percent of lightness, and lines become opaque to carry that structure.
+- The text ramp loses its opacity steps — an emphasis ladder built from translucency is exactly what
+  costs contrast. Hierarchy survives as weight and size, which the type styles already carry.
+- **The chart grid does not strengthen with the rest.** At the other lines' weight it outshouts the
+  trace drawn over it, which defeats the chart; the grid is a scale, not the subject. It sits lower in
+  the light table than the dark one, because black on white reads heavier than white on black.
+- `TextGhost` stays translucent, at 55%. It is the completion suggestion sitting beside what is being
+  typed and has to read as a suggestion rather than as input.
+
+**"System" is resolved rather than followed.** High contrast has no follow-the-OS variant of its own, so
+under `AppTheme.System` the service asks `PlatformSettings.GetColorValues()` which scheme the OS is
+actually showing and picks the matching high-contrast variant. That takes Avalonia's own automatic
+switch out of the picture, so the service subscribes to `ColorValuesChanged` to re-apply — without it
+the app would pick a variant once and stay on it when the OS flipped.
+
+### Color independence
+
+Two charts draw two series on one axis — the Dashboard's Network Throughput and the Performance detail
+chart — and both separated download from upload by hue alone. `Sparkline.PatternSecondSeries` dashes the
+second line, and `ChartLegend.Pattern2` turns both swatches into line marks, solid and dashed, so the key
+shows the same distinction the chart makes instead of repeating the color twice.
+
+**Decisions inside it that must not be undone:**
+- **Only the second series is dashed.** One dashed line against one solid reads as two; dashing both
+  would only make each harder to follow.
+- **The dashed pen uses flat caps.** A round cap adds half the stroke width to each end of every dash,
+  which at this thickness closes the gaps back up and the line reads solid again.
+- **The legend's dash array is in multiples of stroke thickness**, so its `1.6,1.33` at 3px is the
+  chart's own `3,2.5` at 1.6px. A legend that dashed at a different rhythm from the chart would be worse
+  than a plain swatch.
+
+**The audit found nothing else to fix.** Every other status indicator in the app already carries text
+beside its color: the Network adapter has a `StatusText` label beside its dot, a connection's state *is*
+text that happens to be colored, Processes has a Status column beside its dot, the Storage health pills
+are labeled, and the Live pill reads "Live" or "Paused". Color is a second channel there, never the only
+one — so this phase reaches the charts and stops.
+
+**What it does not reach**, and Phase 6 will: the chart series colors themselves. High contrast flattens
+the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
+line on white. Patterns help tell two series apart; they do not make either easier to see.
+
+### Reduce motion
+
+The setting puts a `reduceMotion` class on the window and the motion rules select through it. Two things
+about that selector are easy to get wrong, and both were measured rather than assumed:
+
+- **`Window` does not match `MainWindow`.** A bare type selector matches the exact type, so the rule has
+  to read `:is(Window).reduceMotion`. The first version silently matched nothing.
+- **A rule has to sit beside the transitions it undoes.** A local `UserControl.Styles` rule outranks an
+  app-level one whatever the selector says, so the navigation bar's rule lives in `NavigationView.axaml`
+  and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
+  is undone from `SharedStyles.axaml`.
+
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+the Processes loading pulse — the app's only endlessly repeating animation, which drops from
+`IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+**Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
+the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against
+**70px and 70px** with reduce motion on.
+
+A note on probing this one: the first attempt set a magenta `Background` on the rail to prove the
+selector reached, saw no change, and looked like a failure. The rail sets `Background` as a local value
+in markup, and a local value beats any style setter — so the probe could never have shown anything. Pick
+a property the target has no local value for, or measure the real effect.
+
+### Text size
+
+Interface size transforms the whole app; text size grows only the type. They multiply, so 150 % of each
+gives text at 2.25x while the chrome grows 1.5x.
+
+**One ladder, swept across every view.** All ~110 authored `FontSize` values are now
+`{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
+`ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
+rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
+option on this card must not do. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins them
+together, as `SemanticBrushes` mirrors Palette.axaml.
+
+**This is a deliberate exception to the adopt-by-contact rule** for dimensions. The feature *is* the
+sweep: a literal left behind would not grow, and would fail invisibly on one page. A test fails on any
+authored `FontSize` literal, so the sweep cannot rot back.
+
+**Two surfaces do not follow it for free**, and both were found by driving the app rather than by
+reading:
+
+- **Tooltips and context menus** sit outside every `ScaleHost`, so `PopupFontSize` is the one value
+  carrying both scales itself.
+- **Fixed containers holding scaled text.** The toolbar was a fixed 54px row and the navigation rail a
+  fixed 236px, so at 200 % the page subtitle was cut off and the brand read "DashDetectiv". The toolbar
+  row is now `Auto` with a 54px minimum, and `NavigationViewModel.RailThickness` multiplies by the text
+  scale. **This is where the feature breaks next:** any new pixel dimension around text needs the same
+  treatment.
+
+**Verified by measurement.** The height of the same label, in pixels, across both scales:
+
+| | text 100 % | text 150 % | text 200 % |
+| --- | --- | --- | --- |
+| interface 100 % | 14 | 20 | 27 |
+| interface 150 % | 21 | 30 | — |
+
+A note on the startup path: the rail stayed 236px on the first attempt because `ApplySettings` runs
+*before* `MainWindowViewModel` subscribes to the accessibility `Changed` event, so a stored scale reached
+the service but never the navigation bar. Anything driven off that event needs pushing from the apply
+too.
+
+### Keyboard reordering
+
+Dragging a widget was the only way to rearrange a page, which is a WCAG 2.1.1 failure on the mechanism
+every page is laid out with. `Ctrl+Shift+←/→` now moves whatever the keyboard is on.
+
+**It reuses the drag's own path rather than adding a second one.** `ReorderablePanel.TryMoveFocused`
+calls the same `BeginPreview` / `PreviewMove` / `CommitPreview` sequence a pointer drag does, so the
+order it produces, the identity it keys on and the `WidgetOrders` it persists are all the existing ones.
+Both panels that implement the seam get it, so it covers `WidgetBoard`'s widgets and `UniformFlowPanel`'s
+cards together.
+
+**Every reorderable item is a tab stop**, set by `ReorderablePanel` on the children it lays out rather
+than by each view. Most cards are a plain `Border` with no control inside, so before this a page was
+reachable only if one of its items happened to contain a button: Hardware, Storage and the Processes
+summary tiles were dead zones for Tab, and could not be reordered at all. Avalonia draws its own focus
+ring on the focused card, so the target is visible without a style of ours.
+
+Two things about that are worth knowing:
+
+- **`Focusable="True"` in the view does not work.** Setting it on the card's `Border`, with or without
+  `IsTabStop`, produced no tab stop; setting it from the panel on the children it actually lays out does.
+  The panel's children are the generated containers, not the template roots the view writes.
+- **UI Automation cannot see these stops.** A `Border` has no automation peer, so it never appears in
+  the UIA tree and `IsKeyboardFocusable` reports nothing — an audit through UIA says the page is still
+  unreachable when it is not. Measure this one by what a move persists, not by asking UIA where focus is.
+
+The gesture is answered in `MainWindow` rather than the view model, because it turns on which control has
+focus and only the window knows that. Focus lands on something *inside* a widget — a chevron, a button in
+its body — so the handler walks out to the nearest `ReorderablePanel` before asking it to move.
+
+**`Ctrl+Shift` rather than `Alt`+arrow**, which Processes already uses to sort and File Explorer to go up
+a folder. It is a `ShortcutCatalog` entry like every other gesture, so Help lists it and the Settings
+Keyboard card rebinds it.
+
+**A trap worth writing down, because it cost most of this phase.** Verifying it by driving the app with
+`keybd_event` showed the shortcut resolving to nothing at all, while `Ctrl+P` in the same run worked.
+Arrow keys are *extended* keys: synthesized without `KEYEVENTF_EXTENDEDKEY` they arrive as the numpad
+keys, and Windows strips the Shift off a numpad press. The feature was correct the whole time and the
+harness was wrong. Pass the flag (`0x0001` down, `0x0003` up) for any arrow, Home/End, Insert/Delete or
+Page Up/Down.
+
+**Verified through what it persists.** With the toggle on, one `Ctrl+Shift+→` from the Dashboard's CPU
+widget writes `dashboard.memory, dashboard.cpu, dashboard.system, dashboard.network` — the move
+committed. With the toggle off, the same keystroke writes nothing.
+
+### Accessible names
+
+**The controls were not unnamed — they were misnamed.** Measured through Windows UI Automation against
+the running app, 23 of the Dashboard's 27 interactive elements reported a .NET type name: every nav item
+announced "Avalonia.Controls.Border", the stat cards "DashDetective.Shared.Controls.StatCard". A screen
+reader read that aloud ten times for the navigation bar, which is worse than silence. An icon-only
+button has no text content, so Avalonia's automation peer falls back to the content object's
+`ToString()`.
+
+`HelpText` was already right, because Avalonia maps `ToolTip.Tip` onto it. So one style rule in
+`SharedStyles.axaml` points `AutomationProperties.Name` at the tooltip — forty attributes' worth of fix
+in four lines, and the name cannot drift from the tooltip. A local `AutomationProperties.Name` in markup
+still wins where a control needs to say more.
+
+Three places need to say more, and they are the ones a name has to disambiguate rather than describe:
+
+- **The Dashboard's stat cards** all shared the tooltip "Open in Performance", so six cards announced the
+  same thing. `DashboardCard.AccessibleName` leads with the heading and the reading instead.
+- **The Toolkit's row actions** repeated "Copy command" and "Pin to the top of the list" 31 times each.
+  They now name the command they act on.
+- **The widget fold chevron** announced its glyph, "▾". It takes the panel's title.
+
+**The banners are live regions.** The resource alert is `Assertive` — it reports a condition the user did
+not ask about — and the confirmation is `Polite`. Both are gated by **Announce updates** (default on),
+which is the one genuinely optional part: announcements can be chatty, whereas a *name* has no
+off-switch worth having.
+
+**What is still unnamed, measured across all nine tabs: 360 of 711 interactive elements.** The remainder
+have no tooltip for the rule to borrow, and **283 of them are the Processes table** — per-row expanders
+and checkboxes, where the fix is table semantics rather than a name per control. The others are Settings
+(45), Performance (10), File Explorer (9), Toolkit (9) and Network (4). Dashboard, Storage and Hardware
+are at zero.
+
+### The accent is per-theme
+
+Every accent scored about **2:1 on the light theme** — Blue 2.01, Green 2.03, Orange 2.32, Purple 2.40 —
+against a 4.5:1 bar for text. That matters because the accent *is* text in places: a stat card's figure,
+"18.9 / 31 GB". High contrast did not fix it, because that phase scoped the accent out.
+
+So `AccentPreset` now holds an `AccentShades` set per theme. The two are authored rather than derived
+because they answer opposite questions: on near-black the accent must be light, on white it must be dark
+enough to read. `ThemeService.SetAccent` picks by theme and `ApplyVariant` reinstalls on a theme change,
+the same way the color-vision tables do. `AccentContrastTests` pins all of it — accent-as-text on its
+background, and on-accent text against both the fill and the hover fill.
+
+Two things the visual check caught that the numbers did not:
+
+- **The pill toggle's thumb was `TextStrong`**, which only worked while the checked track was a light
+  tint. With a dark accent fill on the light theme it became black-on-dark-orange. It is `OnAccent` now,
+  which also fixes the dark theme, where a white thumb on a bright accent had been about 1.9:1.
+- **The Settings swatches advertised the wrong color.** They painted the dark set on both themes, so
+  picking "orange" on light produced a shade the swatch never showed. `AccentOption.Refresh` repaints
+  them for the theme in force.
+
+The accent's *identity* is still the dark hue: `AccentPreset.Color` feeds `ChartPalette.Derive`, so an
+accent rotates the chart palette by the same angle in either theme.
+
+**Still open: the accent does not follow a color-vision mode.** Measured against the mode palettes, a
+blue accent lands 6.7 ΔE from the GPU series under tritanopia and purple lands 10.2 from status Good
+under deuteranopia — close enough to be confusable where an accent fill and a status mark are read
+together. Fixing it means a CVD-safe accent set per mode and theme, verified the same way the other
+tables are.
+
+### Color-vision modes
+
+**Mutating the brush is the whole mechanism.** The five status colors are read by code, not by
+`{DynamicResource}` — `MainWindowViewModel`'s Live dot, `AdapterInfo`, `ConnectionRow`, `ProcessRow` and
+`StorageViewModel` each hold an `IBrush` from `SemanticBrushes`. `SolidColorBrush.Color` is a styled
+property, so re-pointing the shared instance repaints every one of them with no event to subscribe to
+and no service threaded through four view-models. The plan called for a `SemanticColor` identity, a
+`StatusBrushFor` seam and a `StatusChanged` event across five tabs; a probe showed none of it was needed.
+
+**The one string attached: a brush has UI-thread affinity.** `SolidColorBrush.Color` is a styled
+property, so setting it off the owning thread throws. The app only ever applies from the UI thread, but
+the test suite runs classes on whichever thread it likes and the first to touch a brush claims it — which
+is exactly how this surfaced, as four unrelated service tests passing alone and failing together.
+`SemanticBrushes.Apply` hops to the UI thread when it is not already on it.
+
+**The status brushes therefore have their own instances**, which is load-bearing rather than tidiness:
+they used to alias the fixed hues (`StatusGood` *was* `SemanticBrushes.Green`), and mutating an alias
+would drag every decorative use of that hue with it — the file-type glyphs, the hardware and toolkit
+icon tints. Those stay fixed on purpose: each is paired with a shape and a label, so hue is not the only
+channel there.
+
+**The palettes are per-theme, and that was forced by measurement.** A color has to clear 3:1 against the
+surface it is drawn on before its hue matters, and the colors that manage that on near-black are light
+while the ones that manage it on white are dark. One set for both leaves a lightness band too narrow for
+a dichromat to spread five categories across: the best such set separates by **11–16**, against a bar of
+20. Split by theme, dark reaches **35–50** and light **21.5** — which is also why the bar is 20 rather
+than the 25 first written down. That number is the light theme's measured ceiling, not a comfortable
+choice.
+
+**And the assignments are searched, not chosen.** Every hand-picked palette tried for this phase failed
+the simulation — warm-against-warm (`Warn`/`Bad`, `Gpu`/`Storage`) and cool-against-cool (`Good`/`Info`)
+collapse in ways that are invisible on trichromatic vision. What ships came out of a constrained search:
+Okabe-Ito hues, lightened or darkened per theme, with each role restricted to a family that reads
+correctly (nothing warm becomes "good", nothing green becomes "bad") and the grays kept muted so "off"
+is not the brightest mark on the page.
+
+**Red-green modes move "good" off green and onto blue**, because green beside red is the pair those
+deficiencies lose. Tritanopia keeps green and red, which it sees, and moves the middle step to amber
+instead.
+
+**A color-vision mode overrides the accent's chart palette.** `ChartPalette.Derive` rotates every hue by
+the accent's offset, and a rotation applied to a color-blind-safe set is no longer safe. The accent
+still drives the highlight; only the series defer.
+
+### What the color-vision test found
+
+`ColorVisionTests` simulates each deficiency (Viénot 1999) over every table and measures CIE76 ΔE. Four
+checks: every pair separates, download and upload separate on their shared axis, every color clears 3:1
+on its own theme, and — the one that keeps the feature honest — the **authored** palette is measured
+under each deficiency so the modes cannot quietly become pointless.
+
+That last check found something worth recording. Under deuteranopia the authored green "good" and red
+"bad" come out **1.7** apart: the same color, on the single pair a user most needs to distinguish.
+Tritanopia lands at 19.1, just under the bar. **Protanopia scrapes over at 20.9**, because protanopia
+darkens red enough that green and red separate by lightness where deuteranopia leaves them identical. It
+keeps a mode regardless — a 0.9 margin is inside the error of any simulation, and it shares
+deuteranopia's confusion axis — but the number is asserted so nobody has to guess whether it was
+measured or assumed.
+
+**What this does not reach:** the two banners. The resource alert is amber and the notice green through
+`{StaticResource}`, so neither follows a mode. Both carry an icon and a sentence, so color is not their
+only channel — but a future phase wanting them to follow would have to move them to `{DynamicResource}`
+first.
+
+### What the contrast test found
+
+`PaletteContrastTests` measures the text ramp against every surface it is drawn on, in all four
+variants, parsing the authored `Palette.axaml` rather than a copy of its numbers. `ContrastRatio`
+composites opacity over the surface first — read as plain white, every ramp entry would score 21:1 and
+the test would pass while proving nothing.
+
+High contrast clears **AAA (7:1)** for all body text in both variants, and lifts even `TextFaint` and
+`TextGhost` past AA. A fourth test pins that it is never *worse* than the plain variant on any pair, so
+a table that raised one entry and lowered another could not slip through.
+
+It also found two things in the **shipped** themes, which are recorded rather than changed:
+- **Dark**: `TextSubtle` misses AA on the three raised surfaces, at 4.36–4.48 against a 4.5 bar.
+- **Light**: `TextMuted` and `TextSubtle` miss AA on every surface. Dark text on a white card is a
+  smaller step than white text on a near-black one at the same opacity, so the ramp that clears AA in
+  dark falls short in light.
+
+Both lists are asserted **exactly**, so a new failure fails the build and so does fixing one of these —
+with a message saying so. They are not fixed here because the ramp's steps are 5% apart: lifting
+`TextSubtle` to clear AA puts it within 2% of `TextMuted` above it and the two stop being
+distinguishable. Rebalancing the ramp is a design decision, not a test fix, and high contrast is the
+answer offered today.
+
+**The window's minimum size scales with it.** At 200 % the same page needs twice the room, and a
+window draggable below that would clip rather than reflow — so `MainWindowViewModel` exposes
+`MinWindowWidth`/`MinWindowHeight` off the base 640×480 and re-raises them when the scale changes.
+
+**Decisions inside it that must not be undone:**
+- **`UiScale.Factor` clamps, and that is load-bearing.** `settings.json` is hand-editable; `0` would
+  collapse the window to nothing rather than degrade to something usable.
+- **`Nearest` snaps an unrecognized percentage onto the ladder**, because the segmented control reads
+  the service's value back — an unmatched number leaves no segment selected and no obvious way out.
+- **`SetScalePercent` re-applies an unchanged value but announces only a real change.** Startup has
+  to push the value through either way; raising `Changed` unconditionally would report a change on
+  every launch and persist for nothing.
+- **The interface-size row's two grid columns are both star.** It is the only row with five segments
+  and the only row its own setting narrows, so it is the only one that wraps — and a `WrapPanel` in
+  an `Auto` column is measured against infinite width, so it never wraps and overflows the card
+  instead. A first attempt with `Auto` did exactly that at 200 %.
 
 ## File Explorer
 

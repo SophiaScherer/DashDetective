@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:theming="using:DashDetective.Services.Theming">
     <!--
       Central colour palette for DashDetective. Every colour in the app is defined here, once.
 
@@ -184,6 +185,67 @@
             <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
             <!-- See the dark theme's note; a touch stronger, as dark-on-light reads fainter. -->
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.22"/>
+        </ResourceDictionary>
+
+        <!-- ===== HIGH CONTRAST (DARK) =====
+             Inherits the plain variant, so only what changes is authored. Surfaces collapse to one flat
+             black (a panel is told apart by its border) and the text ramp drops its opacity steps, since
+             an emphasis ladder built from translucency is what costs contrast. -->
+        <ResourceDictionary x:Key="{x:Static theming:AppVariants.HighContrastDark}">
+            <SolidColorBrush x:Key="AppBackground" Color="#000000"/>
+            <SolidColorBrush x:Key="SidebarBackground" Color="#000000"/>
+            <SolidColorBrush x:Key="PanelBackground" Color="#000000"/>
+            <SolidColorBrush x:Key="CardBackground" Color="#000000"/>
+            <SolidColorBrush x:Key="FieldBackground" Color="#000000"/>
+
+            <!-- Structure is carried by lines here, so they are opaque rather than a faint wash. -->
+            <SolidColorBrush x:Key="Hairline" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.65"/>
+            <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.75"/>
+            <!-- The one line that does NOT strengthen with the rest. The grid is a scale, not the
+                 subject, and at the others' weight it outshouts the trace drawn over it. -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#FFFFFF" Opacity="0.28"/>
+
+            <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.28"/>
+            <SolidColorBrush x:Key="HoverOverlayStrong" Color="#FFFFFF" Opacity="0.45"/>
+
+            <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF"/>
+            <!-- The one deliberate exception: ghosted completion sits beside what is being typed and has
+                 to read as a suggestion, not as input. Kept legible rather than equal. -->
+            <SolidColorBrush x:Key="TextGhost" Color="#FFFFFF" Opacity="0.55"/>
+        </ResourceDictionary>
+
+        <!-- ===== HIGH CONTRAST (LIGHT) ===== -->
+        <ResourceDictionary x:Key="{x:Static theming:AppVariants.HighContrastLight}">
+            <SolidColorBrush x:Key="AppBackground" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="SidebarBackground" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="PanelBackground" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="FieldBackground" Color="#FFFFFF"/>
+
+            <SolidColorBrush x:Key="Hairline" Color="#000000"/>
+            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.65"/>
+            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.75"/>
+            <!-- Lower than the dark table's: black on white reads heavier than white on black. -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.20"/>
+
+            <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.18"/>
+            <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.30"/>
+
+            <SolidColorBrush x:Key="TextStrong" Color="#000000"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#000000"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#000000"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#000000"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#000000"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#000000"/>
+            <SolidColorBrush x:Key="TextFaint" Color="#000000"/>
+            <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.55"/>
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -133,6 +134,9 @@ public class WidgetPanel : ContentControl, IWidgetIdentity {
             PseudoClasses.Set(":collapsed", IsCollapsed);
             if (!_applyingCollapse)
                 Collapse?.Set(WidgetId, IsCollapsed);
+        } else if (change.Property == TitleProperty) {
+            // A focusable control with no name reads as its own type name to a screen reader.
+            AutomationProperties.SetName(this, Title);
         }
     }
 

@@ -32,7 +32,7 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Border.healthPill TextBlock">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         </Style>
         <!-- Slim rounded usage bar: a faint track (theme-aware) with the fill tinted per card. -->
         <Style Selector="ProgressBar.usage">
@@ -44,11 +44,11 @@
         </Style>
         <!-- One Read/Write/Temp readout: a muted label followed by a fixed-colour, tabular-nums value. -->
         <Style Selector="TextBlock.metricLabel">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
         <Style Selector="TextBlock.metricValue">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         </Style>
         <!-- ===== Drive picker (Disk Activity header) ===== -->
         <!-- A ToggleButton + chevron naming the drive on show, opening a list of the others. Chrome is
@@ -71,7 +71,7 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
         <Style Selector="ToggleButton.drivePick TextBlock">
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeMedium}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
         <!-- One drive in the dropdown; the current one is marked rather than highlighted. -->
@@ -84,7 +84,7 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
         <Style Selector="Border.driveOption TextBlock">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
         <Style Selector="Border.driveOption.selected TextBlock">
@@ -114,11 +114,12 @@
                      view keeping a parallel list — the SettingsView.FindRow arrangement. -->
                 <Border Classes="panel revealFlash" Tag="{Binding DiskNumber}"
                         MinWidth="280" layout:WidgetBoard.MaxSlotWidth="420"
-                        layout:WidgetBoard.DragGrip="Item">
+                        layout:WidgetBoard.DragGrip="Item"
+                        AutomationProperties.Name="{Binding Name}">
                     <StackPanel Spacing="0">
                         <!-- Header: name + health pill. -->
                         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
-                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14"
+                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="{DynamicResource TextSizeTitle}"
                                        FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                             <Border Grid.Column="1" Classes="healthPill"
@@ -127,7 +128,7 @@
                             </Border>
                         </Grid>
                         <!-- Model subtitle. -->
-                        <TextBlock Text="{Binding Model}" FontSize="11.5" Margin="0,0,0,12"
+                        <TextBlock Text="{Binding Model}" FontSize="{DynamicResource TextSizeSmall}" Margin="0,0,0,12"
                                    Foreground="{DynamicResource TextSubtle}"
                                    TextTrimming="CharacterEllipsis"/>
                         <!-- Usage bar. -->
@@ -135,10 +136,10 @@
                                      Foreground="{Binding BarBrush}" Margin="0,0,0,7"/>
                         <!-- Used / free split. -->
                         <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
-                            <TextBlock Grid.Column="0" FontSize="12" Foreground="{DynamicResource TextSecondary}">
+                            <TextBlock Grid.Column="0" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSecondary}">
                                 <Run Text="{Binding Used}"/><Run Text=" used"/>
                             </TextBlock>
-                            <TextBlock Grid.Column="1" FontSize="12" HorizontalAlignment="Right"
+                            <TextBlock Grid.Column="1" FontSize="{DynamicResource TextSizeCompact}" HorizontalAlignment="Right"
                                        Foreground="{DynamicResource TextSecondary}">
                                 <Run Text="{Binding Free}"/><Run Text=" free"/>
                             </TextBlock>
@@ -194,19 +195,19 @@
                                     <Border BorderBrush="{DynamicResource RowLine}" BorderThickness="0,0,0,1"
                                             Padding="0,9">
                                         <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}">
-                                            <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="12.5"
+                                            <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="{DynamicResource TextSizeBody}"
                                                        FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12.5"
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="{DynamicResource TextSizeBody}"
                                                        Foreground="{DynamicResource TextPrimary}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="12.5"
+                                            <TextBlock Grid.Column="2" Text="{Binding FileSystem}" FontSize="{DynamicResource TextSizeBody}"
                                                        Foreground="{DynamicResource TextMuted}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding Type}" FontSize="12.5"
+                                            <TextBlock Grid.Column="3" Text="{Binding Type}" FontSize="{DynamicResource TextSizeBody}"
                                                        Foreground="{DynamicResource TextMuted}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Grid.Column="4" Text="{Binding Capacity}" FontSize="12.5"
+                                            <TextBlock Grid.Column="4" Text="{Binding Capacity}" FontSize="{DynamicResource TextSizeBody}"
                                                        Foreground="{DynamicResource TextSecondary}"/>
-                                            <TextBlock Grid.Column="5" Text="{Binding Free}" FontSize="12.5"
+                                            <TextBlock Grid.Column="5" Text="{Binding Free}" FontSize="{DynamicResource TextSizeBody}"
                                                        TextAlignment="Right"
                                                        Foreground="{DynamicResource TextSecondary}"/>
                                         </Grid>
@@ -250,31 +251,34 @@
                                        Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
                                        IsLightDismissEnabled="True"
                                        IsOpen="{Binding Page.DrivePickerOpen, Mode=TwoWay}">
-                                    <Border Background="{DynamicResource CardBackground}"
-                                            BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                            CornerRadius="8" Padding="6" MinWidth="200"
-                                            BoxShadow="{StaticResource ShadowPopup}">
-                                        <ItemsControl ItemsSource="{Binding Page.Drives}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:DriveCard">
-                                                    <Button Classes="bare" Command="{Binding SelectCommand}"
-                                                            HorizontalAlignment="Stretch"
-                                                            HorizontalContentAlignment="Stretch">
-                                                        <Border Classes="driveOption"
-                                                                Classes.selected="{Binding IsSelected}">
-                                                            <Grid ColumnDefinitions="*,Auto">
-                                                                <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                                           TextTrimming="CharacterEllipsis"/>
-                                                                <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
-                                                                           IsVisible="{Binding IsSelected}"
-                                                                           Foreground="{DynamicResource Accent}"/>
-                                                            </Grid>
-                                                        </Border>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Border>
+                                    <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                                    <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                                        <Border Background="{DynamicResource CardBackground}"
+                                                BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                                CornerRadius="8" Padding="6" MinWidth="200"
+                                                BoxShadow="{StaticResource ShadowPopup}">
+                                            <ItemsControl ItemsSource="{Binding Page.Drives}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:DriveCard">
+                                                        <Button Classes="bare" Command="{Binding SelectCommand}"
+                                                                HorizontalAlignment="Stretch"
+                                                                HorizontalContentAlignment="Stretch">
+                                                            <Border Classes="driveOption"
+                                                                    Classes.selected="{Binding IsSelected}">
+                                                                <Grid ColumnDefinitions="*,Auto">
+                                                                    <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
+                                                                               IsVisible="{Binding IsSelected}"
+                                                                               Foreground="{DynamicResource Accent}"/>
+                                                                </Grid>
+                                                            </Border>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Border>
+                                    </controls:ScaleHost>
                                 </Popup>
                             </Panel>
                         </StackPanel>

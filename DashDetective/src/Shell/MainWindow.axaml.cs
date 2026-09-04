@@ -1,8 +1,11 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
 using DashDetective.Shared;
+using DashDetective.Shared.Layout;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
 using DashDetective.Shell.TrayNotice;
@@ -36,8 +39,31 @@ public partial class MainWindow : Window {
             this,
             () => (DataContext as MainWindowViewModel)?.Shortcuts ?? Defaults,
             () => (DataContext as MainWindowViewModel)?.ActiveScope ?? ShortcutScope.Global,
-            id => (DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false);
+            id => TryMoveFocusedItem(id) ||
+                  ((DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false));
         Closed += (_, _) => _shortcuts.Dispose();
+    }
+
+    /// <summary>Moves the widget or card the keyboard is on. Handled here rather than in the view model
+    /// because it turns on which control has focus, which only the window knows.</summary>
+    private bool TryMoveFocusedItem(ShortcutId id) {
+        var delta = id switch {
+            ShortcutId.MoveItemBack => -1,
+            ShortcutId.MoveItemForward => 1,
+            _ => 0,
+        };
+
+        if (delta == 0 || DataContext is not MainWindowViewModel { KeyboardReordering: true })
+            return false;
+
+        // Walk out to the nearest reorderable panel: focus sits on a control inside a widget, and the
+        // innermost panel is the one that owns it.
+        var focused = FocusManager?.GetFocusedElement() as Visual;
+        for (var v = focused; v is not null; v = v.GetVisualParent())
+            if (v is ReorderablePanel panel && panel.TryMoveFocused(focused, delta))
+                return true;
+
+        return false;
     }
 
     // An expanded 236px rail leaves too little for the page on a narrow window, so the bar folds

@@ -13,6 +13,9 @@ internal static class Notices {
     /// <summary>Every page's widgets and cards are back in their declared order.</summary>
     public const string WidgetPlacementsReset = "Widget positions reset";
 
+    /// <summary>Every accessibility option is back the way it ships.</summary>
+    public const string AccessibilityRestored = "Accessibility options restored to defaults";
+
     /// <summary>Every shortcut is back on its shipped gesture.</summary>
     public const string ShortcutsRestored = "Keyboard shortcuts restored to defaults";
 

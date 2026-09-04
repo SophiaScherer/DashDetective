@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:nav="using:DashDetective.Shell.Navigation"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -195,7 +196,7 @@
         <!-- Right-click dock menu: one row per edge, the current one highlighted. Selection is declared
              after hover so an already-docked row keeps reading as selected while the pointer is on it. -->
         <Style Selector="TextBlock.dockMenuHeader">
-            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeMini}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
             <Setter Property="Margin" Value="8,4,8,2"/>
@@ -212,7 +213,7 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
         <Style Selector="Border.dockRow TextBlock">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -274,6 +275,14 @@
                 </Transitions>
             </Setter>
         </Style>
+
+        <!-- Declared here, not in SharedStyles: a local style outranks an app-level one whatever the
+             selector says, so the rule undoing these transitions has to sit beside them. -->
+        <Style Selector=":is(Window).reduceMotion Border.rail">
+            <Setter Property="Transitions">
+                <Transitions/>
+            </Setter>
+        </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
@@ -302,33 +311,36 @@
              control, so all three re-dock paths stay in sync. -->
         <Border.ContextFlyout>
             <Flyout Placement="Pointer">
-                <StackPanel Spacing="2" MinWidth="168" Margin="2">
-                    <TextBlock Classes="dockMenuHeader" Text="DOCK NAVIGATION"/>
-                    <ItemsControl ItemsSource="{Binding Positions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="nav:NavPositionOption">
-                                <Button Classes="pickTile" Command="{Binding SelectCommand}"
-                                        Margin="0" HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Stretch">
-                                    <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
-                                        <StackPanel Orientation="Horizontal" Spacing="9">
-                                            <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
-                                                <Panel Margin="3">
-                                                    <Rectangle Fill="{DynamicResource Accent}"
-                                                               Width="{Binding BarWidth}" Height="{Binding BarHeight}"
-                                                               HorizontalAlignment="{Binding BarHAlign}"
-                                                               VerticalAlignment="{Binding BarVAlign}"
-                                                               RadiusX="1" RadiusY="1"/>
-                                                </Panel>
-                                            </Border>
-                                            <TextBlock Text="{Binding Label}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                    <StackPanel Spacing="2" MinWidth="168" Margin="2">
+                        <TextBlock Classes="dockMenuHeader" Text="DOCK NAVIGATION"/>
+                        <ItemsControl ItemsSource="{Binding Positions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="nav:NavPositionOption">
+                                    <Button Classes="pickTile" Command="{Binding SelectCommand}"
+                                            Margin="0" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch">
+                                        <Border Classes="dockRow" Classes.selected="{Binding IsSelected}">
+                                            <StackPanel Orientation="Horizontal" Spacing="9">
+                                                <Border Classes="posTile" Classes.selected="{Binding IsSelected}">
+                                                    <Panel Margin="3">
+                                                        <Rectangle Fill="{DynamicResource Accent}"
+                                                                   Width="{Binding BarWidth}" Height="{Binding BarHeight}"
+                                                                   HorizontalAlignment="{Binding BarHAlign}"
+                                                                   VerticalAlignment="{Binding BarVAlign}"
+                                                                   RadiusX="1" RadiusY="1"/>
+                                                    </Panel>
+                                                </Border>
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </controls:ScaleHost>
             </Flyout>
         </Border.ContextFlyout>
 
@@ -358,8 +370,8 @@
                         </Viewbox>
                     </Border>
                     <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
-                        <TextBlock Text="DashDetective" FontSize="13.5" FontWeight="SemiBold"/>
-                        <TextBlock Text="System Information Suite" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="DashDetective" FontSize="{DynamicResource TextSizeSubhead}" FontWeight="SemiBold"/>
+                        <TextBlock Text="System Information Suite" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </StackPanel>
             </Panel>
@@ -386,7 +398,7 @@
                             </LinearGradientBrush>
                         </Border.Background>
                         <Panel>
-                            <TextBlock Text="{Binding UserInitials}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
+                            <TextBlock Text="{Binding UserInitials}" FontSize="{DynamicResource TextSizeBody}" FontWeight="SemiBold" Foreground="{DynamicResource OnAccent}"
                                        IsVisible="{Binding !HasUserPicture}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             <Image Source="{Binding UserPicture}" Stretch="UniformToFill"
@@ -404,8 +416,8 @@
 
                     <StackPanel Spacing="1" Margin="10,0" VerticalAlignment="Center"
                                 IsVisible="{Binding ShowFullFooter}">
-                        <TextBlock Text="{Binding UserName}" FontSize="12.5" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding UserRole}" FontSize="10.5" Foreground="{DynamicResource TextSubtle}"/>
+                        <TextBlock Text="{Binding UserName}" FontSize="{DynamicResource TextSizeBody}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding UserRole}" FontSize="{DynamicResource TextSizeMini}" Foreground="{DynamicResource TextSubtle}"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -423,8 +435,14 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="nav:NavItem">
+                            <!-- The tooltip is switched off while the label is on screen beside it:
+                                 it said nothing the item did not already say. Named outright rather
+                                 than through the tooltip, so the name survives either state. -->
                             <Button Classes="nav" Classes.selected="{Binding IsSelected}"
-                                    Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Label}">
+                                    Command="{Binding SelectCommand}"
+                                    AutomationProperties.Name="{Binding Label}"
+                                    ToolTip.Tip="{Binding Label}"
+                                    ToolTip.ServiceEnabled="{Binding !$parent[UserControl].DataContext.ShowLabels}">
                                 <Border Classes="navRow" CornerRadius="6">
                                     <Panel>
                                         <Rectangle Classes="navIndicator" Width="3" Height="18"
@@ -438,7 +456,7 @@
                                                   Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
                                                   StrokeJoin="Round" VerticalAlignment="Center"/>
                                             <TextBlock Classes="navLabel" Text="{Binding Label}"
-                                                       FontSize="13" VerticalAlignment="Center"/>
+                                                       FontSize="{DynamicResource TextSizeMedium}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Panel>
                                 </Border>

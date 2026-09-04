@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
@@ -55,6 +56,9 @@ public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> Stroke2Property =
         AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(Stroke2));
 
+    public static readonly StyledProperty<bool> PatternSecondSeriesProperty =
+        AvaloniaProperty.Register<Sparkline, bool>(nameof(PatternSecondSeries));
+
     public static readonly StyledProperty<bool> FillProperty =
         AvaloniaProperty.Register<Sparkline, bool>(nameof(Fill));
 
@@ -106,8 +110,10 @@ public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> AxisBrushProperty =
         AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(AxisBrush));
 
-    /// <summary>Axis and status text size. Smaller than the surrounding captions on purpose: the labels are
-    /// a scale to read the chart against, not part of the page's copy.</summary>
+    /// <summary>Axis and status text size, and the ladder key it follows. Smaller than the surrounding
+    /// captions on purpose: the labels are a scale to read the chart against, not part of the page's
+    /// copy. Read per draw rather than cached, so a text-scale change lands on the next frame.</summary>
+    private const string AxisSizeKey = "TextSizeMicro";
     private const double AxisFontSize = 10;
 
     private List<Point> _data = new();
@@ -163,6 +169,14 @@ public partial class Sparkline : UserControl {
     public IBrush? Stroke2 {
         get => GetValue(Stroke2Property);
         set => SetValue(Stroke2Property, value);
+    }
+
+    /// <summary>Draws the second series dashed, so a two-series chart is readable without telling the
+    /// colors apart. Only the second: one dashed line against one solid reads as two, where dashing both
+    /// would only make them harder to follow.</summary>
+    public bool PatternSecondSeries {
+        get => GetValue(PatternSecondSeriesProperty);
+        set => SetValue(PatternSecondSeriesProperty, value);
     }
 
     /// <summary>When true (fixed-range mode), draw a translucent gradient area beneath each line.</summary>
@@ -377,9 +391,9 @@ public partial class Sparkline : UserControl {
         }
 
         if (hasSeries1)
-            DrawLine(context, _data, Stroke!, plot, maxX, span);
+            DrawLine(context, _data, Stroke!, plot, maxX, span, dashed: false);
         if (hasSeries2)
-            DrawLine(context, _data2, Stroke2!, plot, maxX, span);
+            DrawLine(context, _data2, Stroke2!, plot, maxX, span, PatternSecondSeries);
     }
 
     /// <summary>The value labels ready to draw, each with where it sits down the axis (0 = top, 1 = foot).
@@ -508,7 +522,8 @@ public partial class Sparkline : UserControl {
         string.IsNullOrEmpty(value) || brush is null
             ? null
             : new FormattedText(value, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                                new Typeface(FontFamily), AxisFontSize, brush);
+                                new Typeface(FontFamily), this.TextSize(AxisSizeKey, AxisFontSize),
+                                brush);
 
     private static double TextWidth(FormattedText? text) => text?.Width ?? 0;
 
@@ -549,7 +564,7 @@ public partial class Sparkline : UserControl {
     }
 
     private void DrawLine(DrawingContext context, List<Point> data, IBrush stroke,
-        Rect plot, double maxX, double span) {
+        Rect plot, double maxX, double span, bool dashed) {
         var geometry = new StreamGeometry();
         using (var ctx = geometry.Open()) {
             var first = true;
@@ -566,8 +581,11 @@ public partial class Sparkline : UserControl {
         }
 
         var pen = new Pen(stroke, StrokeThickness) {
-            LineCap = PenLineCap.Round,
+            // Butt caps while dashed: a round cap adds half the stroke width to each end of every dash,
+            // which at this thickness closes the gaps back up and the line reads solid again.
+            LineCap = dashed ? PenLineCap.Flat : PenLineCap.Round,
             LineJoin = PenLineJoin.Round,
+            DashStyle = dashed ? new DashStyle([3, 2.5], 0) : null,
         };
         context.DrawGeometry(null, pen, geometry);
     }

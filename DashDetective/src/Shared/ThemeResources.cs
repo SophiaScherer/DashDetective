@@ -27,6 +27,13 @@ public static class ThemeResources {
             ? radius.TopLeft
             : fallback;
 
+    /// <summary>The type size for this key, so text drawn in code follows the text scale like the rest
+    /// of the app. Not theme-dependent — the ladder is one table — but asked for the same way.</summary>
+    public static double TextSize(this StyledElement element, string key, double fallback) =>
+        element.TryGetResource(key, element.ActualThemeVariant, out var found) && found is double size
+            ? size
+            : fallback;
+
     /// <summary>The themed shadow for this key, or none. No literal fallback, unlike
     /// <see cref="Brush"/>: a shadow is decorative, so a missing key drops it rather than
     /// reintroducing a hex the palette is supposed to own.</summary>

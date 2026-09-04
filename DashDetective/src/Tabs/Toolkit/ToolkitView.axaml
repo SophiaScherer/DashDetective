@@ -72,7 +72,7 @@
 
         <!-- Uppercase section label above each category card. -->
         <Style Selector="TextBlock.sectionHead">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
             <Setter Property="LetterSpacing" Value="0.4"/>
@@ -110,7 +110,7 @@
         <!-- Layered on the shared Button.bare; only the inline-text look is local. Call sites set
              Classes="bare linkAction". -->
         <Style Selector="Button.linkAction">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
         <Style Selector="Button.linkAction:pointerover">
@@ -121,14 +121,14 @@
         <!-- The form's five fields use the shared Border.field (src/Shared/Styles/SharedStyles.axaml),
              which is the same chrome the Network tab's ping/DNS targets draw. -->
         <Style Selector="TextBlock.fieldLabel">
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
         </Style>
         <!-- The app's first inline field error. A log stanza — how a refused ping answers — would be
              wrong here: nothing has run, so there is no transcript for it to belong to. Fixed orange
              rather than the accent, which is swappable and would sometimes read as approval. -->
         <Style Selector="TextBlock.formError">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="Foreground" Value="{StaticResource Orange}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
@@ -136,7 +136,7 @@
         <!-- Console text: one fixed pitch and one fixed colour set on the dark inset. -->
         <Style Selector="TextBlock.console">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
     </UserControl.Styles>
@@ -371,11 +371,11 @@
                                                                             VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding Command}"
                                                                                FontFamily="{StaticResource MonoFont}"
-                                                                               FontSize="13" FontWeight="SemiBold"
+                                                                               FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"
                                                                                Foreground="{DynamicResource TextStrong}"
                                                                                TextTrimming="CharacterEllipsis"/>
                                                                     <TextBlock Text="{Binding Description}"
-                                                                               FontSize="11.5"
+                                                                               FontSize="{DynamicResource TextSizeSmall}"
                                                                                Foreground="{DynamicResource TextSubtle}"
                                                                                TextTrimming="CharacterEllipsis"/>
                                                                 </StackPanel>
@@ -400,7 +400,7 @@
                                                                 <Border Grid.Column="3" CornerRadius="10"
                                                                         Padding="7,2" VerticalAlignment="Center"
                                                                         Background="{Binding BadgeBackground}">
-                                                                    <TextBlock Text="{Binding BadgeLabel}" FontSize="10"
+                                                                    <TextBlock Text="{Binding BadgeLabel}" FontSize="{DynamicResource TextSizeMicro}"
                                                                                Foreground="{Binding BadgeForeground}"/>
                                                                 </Border>
                                                             </Grid>
@@ -423,7 +423,7 @@
                                                                 IsVisible="{Binding Parameter,
                                                                     Converter={x:Static ObjectConverters.IsNotNull}}">
                                                             <TextBox Classes="flat" Margin="8,0"
-                                                                     FontSize="11.5"
+                                                                     FontSize="{DynamicResource TextSizeSmall}"
                                                                      FontFamily="{StaticResource MonoFont}"
                                                                      VerticalContentAlignment="Center"
                                                                      PlaceholderText="{Binding Parameter.Prompt}"
@@ -516,6 +516,7 @@
                                                              would mean a value converter — which this
                                                              codebase does without everywhere else. -->
                                                         <Button Grid.Column="6" Classes="rowAction"
+                                                                AutomationProperties.Name="{Binding Command, StringFormat='Pin {0} to the top of the list'}"
                                                                 ToolTip.Tip="Pin to the top of the list"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).TogglePinCommand}"
                                                                 CommandParameter="{Binding}">
@@ -541,6 +542,7 @@
                                                         <!-- Copy affordance. Placed with the row it
                                                              belongs to. -->
                                                         <Button Grid.Column="7" Classes="rowAction"
+                                                                AutomationProperties.Name="{Binding Command, StringFormat='Copy the {0} command'}"
                                                                 ToolTip.Tip="Copy command"
                                                                 Click="OnCopyClick">
                                                             <Path Width="13" Height="13" Stretch="Uniform"
@@ -565,11 +567,11 @@
                 <Border Classes="panel" VerticalAlignment="Top" Padding="16,40"
                         IsVisible="{Binding !HasCommands}">
                     <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <TextBlock Text="No commands to show" FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="No commands to show" FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock Text="Try a different search term or category."
-                                   FontSize="11.5" Foreground="{DynamicResource TextSubtle}"
+                                   FontSize="{DynamicResource TextSizeSmall}" Foreground="{DynamicResource TextSubtle}"
                                    TextAlignment="Center" TextWrapping="Wrap"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>

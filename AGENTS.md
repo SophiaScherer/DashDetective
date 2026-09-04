@@ -73,6 +73,48 @@ plus all four exports **confirm** through `NoticeService` (`src/Services/Notific
 banner below the resource alert's. Their decisions are in
 [docs/FEATURES.md](docs/FEATURES.md) under *Settings* and *Widget system*.
 
+An **accessibility pass** is under way, and it is the one piece of work that is NOT finished. Phase 1
+added the non-gating macOS CI leg; phase 2 added the Settings **Accessibility** card and the **interface
+size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `AccessibilityService`
+(`src/Services/Accessibility`); phase 4 added **high contrast** as a pair of `ThemeVariant`s
+(`AppVariants`) plus `PaletteContrastTests`, which measures the text ramp and records where the shipped
+themes miss AA; phase 5 added **color independence** — `Sparkline.PatternSecondSeries` dashes a two-series
+chart's second line and `ChartLegend.Pattern2` matches it. Its audit found **no other color-only signal
+in the app**: every status indicator already carries text beside its color, so do not "fix" one; phase 6
+added **color-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
+simulates each deficiency and measures the result.
+
+The **accent is per-theme** for the same reason the color-vision tables are: it is drawn as text, and
+every accent measured about 2:1 on white before the light shades existed. `AccentPreset.Color` stays the
+dark hue — that is the accent's identity, used to derive the chart palette, not something rendered.
+
+Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
+instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
+would recolor the file-type glyphs and icon tints too. And **a color palette is searched against the
+simulation, never chosen by eye**: every hand-picked assignment tried for that phase failed, in ways that
+are invisible on trichromatic vision. **Phase 3 (focus indicator) was reverted**: its premise was wrong —
+Avalonia's Fluent theme already draws a focus ring, and the styles written against template parts never
+matched. Phase 7 added **accessible names**: one style points a Button's
+`AutomationProperties.Name` at its tooltip, since an icon-only button otherwise announces its content's
+type name. **Verify names through UI Automation against the running app** — they cannot be seen on
+screen, and 360 of 711 interactive elements are still unnamed, 283 of them the Processes table. Phase 8 added **reduce motion**, and two selector
+rules with it: a bare type selector matches the EXACT type (`Window` never matches `MainWindow` — use
+`:is(Window)`), and a rule undoing a transition must sit in the file that declares it, since a local
+style outranks an app-level one. Phase 9 added **keyboard widget reordering**
+(`Ctrl+Shift+←/→`), which calls the drag's own Begin/Preview/Commit rather than a second mechanism. Its
+lesson is about the test harness, not the app: **synthesized arrow keys need `KEYEVENTF_EXTENDEDKEY`**,
+or Windows delivers a numpad press and eats the Shift — which looks exactly like a dead shortcut. A reorderable item is made a tab stop **by `ReorderablePanel`, on the children it lays out** — not by
+the view. `Focusable="True"` on a card's `Border` does nothing, and a `Border` has no automation peer, so
+a UIA audit will wrongly report such a page unreachable: verify keyboard reordering by what it persists.
+Phase 10 added **text scale**: every
+`FontSize` in the app now comes from the `TextSize*` ladder in Dimensions.axaml, which `ThemeService`
+rewrites — see the sweep exception in the styling rules. Two containers had to learn to grow with it (the
+toolbar row and the navigation rail); a fixed size holding scaled text is where this breaks next. Still
+to come: the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
+touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
+writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
+
 A **cross-page linking pass** is complete, in two halves. The Ping and DNS panels' fields each carry a
 link icon opening the typed host in the browser, over a new `IWebLinkOpener` seam (`src/Services/Links`) —
 **https only**, the rule `ToolkitRunner` already enforces, and the third place the app starts a process
@@ -468,6 +510,15 @@ It's constructed once in `MainWindowViewModel`, applied at startup, and handed t
 (Palette/SharedStyles, MainWindow, NavItem) — theming is cross-cutting, so it lives in `src/Services`,
 not a tab.
 
+**A key inside `ResourceDictionary.ThemeDictionaries` cannot be swapped by writing to
+`Application.Resources`.** The theme lookup wins and the write is silently ignored — no exception, no
+warning, nothing on screen. That is precisely why the accent and the chart series (top-level keys) are
+swapped that way and the surfaces and the text ramp are not: those need a **`ThemeVariant`**, which is
+what `AppVariants.HighContrastDark`/`HighContrastLight` are for. Each inherits from the plain variant it
+thickens, so a high-contrast dictionary authors only its differences. **Prove a resource mechanism with a
+garish probe color and a pixel sample before building on it** — this one was assumed in a plan, and the
+assumption was wrong.
+
 **An accent re-hues the graphs; it must never flatten them.** Selecting an accent used to set all six
 chart-series keys to that one colour, which erased the per-metric coding the charts depend on — worst on
 the Dashboard's Network Throughput chart, where download and upload share an axis and became one
@@ -577,6 +628,11 @@ Unit tests live in **`tests/DashDetective.Tests`** (xUnit, `net10.0`, referenced
 CI builds, format-checks, tests **and** collects coverage on `windows-latest` and `ubuntu-latest`, in
 Debug and Release — four legs, none of them guarded. `dotnet format` gates the test code on both, so keep
 usings alphabetical (`System` is **not** sorted first).
+
+**`macos-latest` runs the same steps in a separate, non-gating job** (`continue-on-error`). There are no
+macOS provider arms, so every `ForCurrentPlatform()` resolves to `Unsupported*` — it is a build-and-test
+signal only. **A red macOS leg is still a real finding**: it means a test assumed "not Windows ⇒ Linux",
+the one shape the other four legs cannot catch.
 
 **A green Windows run proves nothing about the Linux leg.** Reader-identity tests branch on the host, so
 the arm asserting Linux never executes locally. Before calling any work that touches a
@@ -727,6 +783,10 @@ temperature is the expected outcome, not a defect.
   site should not exist.** `Dimensions.axaml` shipped with eighteen keys and nine users; the nine
   spare ones were guesses at what would be wanted, which is the same aspirational cruft the rule
   exists to stop. Add a token when the second site asks for it, not before.
+  **The one authorized exception is the `TextSize*` ladder**, which was swept across every view at once
+  in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
+  left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
+  authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 - **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions
@@ -754,7 +814,7 @@ temperature is the expected outcome, not a defect.
 - The build sets `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild` and `AnalysisLevel=latest`, so a
   style or platform-compatibility issue fails the build.
 - CI runs `dotnet format --verify-no-changes` before building, then the suite with coverage, on
-  `windows-latest` and `ubuntu-latest` in Debug and Release.
+  `windows-latest` and `ubuntu-latest` in Debug and Release, plus `macos-latest` in a non-gating job.
 - Build and test with `--artifacts-path`: a running app or an IDE holding `bin/` causes MSB3027.
 
 ## Working Style

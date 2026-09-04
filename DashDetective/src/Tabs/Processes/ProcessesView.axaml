@@ -84,7 +84,7 @@
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).PidColumn}"
                                Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).StatusColumn}"
-                               Text="{Binding Status}" FontSize="11.5"
+                               Text="{Binding Status}" FontSize="{DynamicResource TextSizeSmall}"
                                Foreground="{Binding StatusBrush}"/>
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).CpuColumn}"
                                Classes="cpuCell"
@@ -157,7 +157,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
         </Style>
         <Style Selector="Button.checkBox TextBlock">
-            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeMicro}"/>
             <Setter Property="Foreground" Value="{DynamicResource OnAccent}"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -184,6 +184,16 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <!-- The one endlessly repeating animation in the app, so the one this setting most owes. A
+             single pass leaves the placeholder at its dim end and stops. -->
+        <Style Selector=":is(Window).reduceMotion Border.skeleton">
+            <Style.Animations>
+                <Animation Duration="0:0:1.3" IterationCount="1">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
         <Style Selector="Border.groupHead">
@@ -195,7 +205,7 @@
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
         <Style Selector="Border.groupHead TextBlock">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
@@ -204,7 +214,7 @@
              groupHead rule above: the glyph matches both selectors, and Avalonia settles that by
              declaration order rather than specificity — declared first, the caption's 11.5 would win. -->
         <Style Selector="TextBlock.groupChev">
-            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeNano}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
 
@@ -236,14 +246,14 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
         <Style Selector="Border.procRow TextBlock">
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <!-- The chevron glyph, sized DELIBERATELY BELOW the cell text. These must stay BELOW the rule above:
              the glyph matches both selectors, and Avalonia settles that by declaration order rather than
              specificity, so declared alongside Button.chev the 9 lost to the row's 12.5. -->
         <Style Selector="Button.chev TextBlock">
-            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeNano}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         </Style>
         <Style Selector="Button.chev:pointerover TextBlock">
@@ -277,7 +287,7 @@
 
         <!-- Summary-card value. -->
         <Style Selector="TextBlock.sumValue">
-            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeDisplayLarge}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
@@ -287,7 +297,7 @@
         <Style Selector="Button.endTask">
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="16,9"/>
-            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -374,23 +384,26 @@
                                Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                                IsLightDismissEnabled="False"
                                IsOpen="{Binding #OptionsButton.IsChecked, Mode=TwoWay}">
-                            <Border Background="{DynamicResource CardBackground}"
-                                    BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
-                                <StackPanel Spacing="10">
-                                    <!-- Both start off: folding a section or re-sorting is usually a
-                                         glance rather than a preference. -->
-                                    <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
-                                              IsChecked="{Binding RememberCollapsedGroups}"/>
-                                    <CheckBox Classes="optionCheck" Content="Remember sort order"
-                                              IsChecked="{Binding RememberSort}"/>
-                                    <Border Height="1" Background="{DynamicResource Hairline}"/>
-                                    <!-- The column order IS remembered by default, so this is the way back. -->
-                                    <Button Classes="action" Content="Reset column order"
-                                            HorizontalAlignment="Stretch"
-                                            Command="{Binding ResetColumnOrderCommand}"/>
-                                </StackPanel>
-                            </Border>
+                            <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+                            <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                                <Border Background="{DynamicResource CardBackground}"
+                                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12" BoxShadow="{StaticResource ShadowPopup}">
+                                    <StackPanel Spacing="10">
+                                        <!-- Both start off: folding a section or re-sorting is usually a
+                                             glance rather than a preference. -->
+                                        <CheckBox Classes="optionCheck" Content="Remember collapsed sections"
+                                                  IsChecked="{Binding RememberCollapsedGroups}"/>
+                                        <CheckBox Classes="optionCheck" Content="Remember sort order"
+                                                  IsChecked="{Binding RememberSort}"/>
+                                        <Border Height="1" Background="{DynamicResource Hairline}"/>
+                                        <!-- The column order IS remembered by default, so this is the way back. -->
+                                        <Button Classes="action" Content="Reset column order"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding ResetColumnOrderCommand}"/>
+                                    </StackPanel>
+                                </Border>
+                            </controls:ScaleHost>
                         </Popup>
                     </Panel>
 
@@ -583,9 +596,9 @@
                     BorderThickness="1" CornerRadius="10" Padding="22"
                     BoxShadow="{StaticResource ShadowModal}">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="End task" FontSize="15" FontWeight="SemiBold"
+                    <TextBlock Text="End task" FontSize="{DynamicResource TextSizeTitleLarge}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextStrong}"/>
-                    <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextWrapping="Wrap"
+                    <TextBlock Text="{Binding ConfirmText}" FontSize="{DynamicResource TextSizeBody}" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondary}"/>
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                         <Button Classes="action" Content="Cancel" Command="{Binding CancelEndTaskCommand}"/>

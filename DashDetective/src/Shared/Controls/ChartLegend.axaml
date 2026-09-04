@@ -8,14 +8,28 @@
     <StackPanel Orientation="Horizontal" Spacing="14">
         <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                     IsVisible="{Binding #Root.Label1, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
-                       Fill="{Binding #Root.Brush1}"/>
+            <!-- Two marks, one shown at a time. Patterned, the swatch becomes a segment of the line it
+                 names so the key carries the same distinction the chart does; a square could only ever
+                 repeat the color. -->
+            <Panel VerticalAlignment="Center">
+                <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2"
+                           IsVisible="{Binding !#Root.Pattern2}" Fill="{Binding #Root.Brush1}"/>
+                <Rectangle Width="14" Height="3" IsVisible="{Binding #Root.Pattern2}"
+                           Fill="{Binding #Root.Brush1}"/>
+            </Panel>
             <TextBlock Classes="legendLabel" Text="{Binding #Root.Label1}"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
                     IsVisible="{Binding #Root.Label2, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2" VerticalAlignment="Center"
-                       Fill="{Binding #Root.Brush2}"/>
+            <Panel VerticalAlignment="Center">
+                <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2"
+                           IsVisible="{Binding !#Root.Pattern2}" Fill="{Binding #Root.Brush2}"/>
+                <!-- The dash array is in multiples of StrokeThickness, so these are the chart's own
+                     3 / 2.5 at 1.6px expressed against 3px. -->
+                <Line StartPoint="0,1.5" EndPoint="14,1.5" StrokeThickness="3"
+                      StrokeDashArray="1.6,1.33" IsVisible="{Binding #Root.Pattern2}"
+                      Stroke="{Binding #Root.Brush2}"/>
+            </Panel>
             <TextBlock Classes="legendLabel" Text="{Binding #Root.Label2}"/>
         </StackPanel>
     </StackPanel>

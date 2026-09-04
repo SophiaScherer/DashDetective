@@ -18,6 +18,8 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
+            UiScale, TextScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
+            KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -42,6 +44,62 @@ public sealed class SettingCatalog {
     public SettingEntry ClockFormat { get; } = new(
         SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
         Keywords: "12 hour 24 hour am pm military clock time");
+
+    // ----- Accessibility -----
+
+    // "Interface size" rather than "text size": the whole window scales together, and promising only
+    // text would be the wrong promise. Text scaling on its own is a separate setting, not shipped yet.
+    public SettingEntry UiScale { get; } = new(
+        SettingId.UiScale, "Accessibility", "Interface size",
+        "Draw everything larger — text, controls and charts together",
+        Keywords: "scale zoom bigger larger text size font enlarge magnify dpi accessibility readable");
+
+    public SettingEntry TextScale { get; } = new(
+        SettingId.TextScale, "Accessibility", "Text size",
+        "Draw text larger without changing the size of the controls around it",
+        Keywords: "text size font scale bigger larger type readable accessibility low vision zoom");
+
+    // Says what it does rather than naming the mechanism: "high contrast" is the term people search
+    // for, but the description has to tell someone who has never used one what will change.
+    public SettingEntry HighContrast { get; } = new(
+        SettingId.HighContrast, "Accessibility", "High contrast",
+        "Flatten surfaces and drop faded text, keeping light or dark as chosen",
+        Keywords: "high contrast accessibility legible readable faded dim washed out bold clear");
+
+    // Named for what the user gets rather than for the mechanism: someone looking for this searches for
+    // color blindness, not for "dashed lines".
+    public SettingEntry DistinguishWithoutColor { get; } = new(
+        SettingId.DistinguishWithoutColor, "Accessibility", "Distinguish without color",
+        "Dash the second line on charts that draw two, so color is never the only difference",
+        Keywords: "colour color blind colorblind deuteranopia pattern dash dashed line chart distinguish legend");
+
+    // The description says what it swaps rather than naming the deficiencies twice — the control beside
+    // it already lists them.
+    public SettingEntry ColorVision { get; } = new(
+        SettingId.ColorVision, "Accessibility", "Color vision",
+        "Swap chart and status colors for a set chosen to stay distinct",
+        Keywords: "colour color blind colorblind vision deficiency deuteranopia protanopia tritanopia red green blue yellow palette");
+
+    public SettingEntry AnnounceUpdates { get; } = new(
+        SettingId.AnnounceUpdates, "Accessibility", "Announce updates",
+        "Let a screen reader read out alerts and confirmations as they appear",
+        Keywords: "screen reader narrator announce speak live region alert banner notification accessibility");
+
+    public SettingEntry ReduceMotion { get; } = new(
+        SettingId.ReduceMotion, "Accessibility", "Reduce motion",
+        "Switch off sliding, fading and the loading pulse",
+        Keywords: "motion animation transition fade slide pulse vestibular dizzy still static accessibility");
+
+    public SettingEntry KeyboardReordering { get; } = new(
+        SettingId.KeyboardReordering, "Accessibility", "Keyboard reordering",
+        "Move the focused widget or card with Ctrl+Shift and an arrow key",
+        Keywords: "keyboard reorder rearrange move widget card drag alternative arrow accessibility");
+
+    // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
+    public SettingEntry AccessibilityDefaults { get; } = new(
+        SettingId.AccessibilityDefaults, "Accessibility", "Accessibility defaults",
+        "Put every accessibility option back the way it ships",
+        Keywords: "accessibility reset restore default revert undo");
 
     // ----- Navigation -----
 
