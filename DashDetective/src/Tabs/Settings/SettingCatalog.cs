@@ -18,7 +18,8 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AccessibilityDefaults,
+            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates,
+            AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -73,6 +74,11 @@ public sealed class SettingCatalog {
         SettingId.ColorVision, "Accessibility", "Color vision",
         "Swap chart and status colors for a set chosen to stay distinct",
         Keywords: "colour color blind colorblind vision deficiency deuteranopia protanopia tritanopia red green blue yellow palette");
+
+    public SettingEntry AnnounceUpdates { get; } = new(
+        SettingId.AnnounceUpdates, "Accessibility", "Announce updates",
+        "Let a screen reader read out alerts and confirmations as they appear",
+        Keywords: "screen reader narrator announce speak live region alert banner notification accessibility");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(

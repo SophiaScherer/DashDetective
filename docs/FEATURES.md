@@ -421,6 +421,39 @@ one — so this phase reaches the charts and stops.
 the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
 line on white. Patterns help tell two series apart; they do not make either easier to see.
 
+### Accessible names
+
+**The controls were not unnamed — they were misnamed.** Measured through Windows UI Automation against
+the running app, 23 of the Dashboard's 27 interactive elements reported a .NET type name: every nav item
+announced "Avalonia.Controls.Border", the stat cards "DashDetective.Shared.Controls.StatCard". A screen
+reader read that aloud ten times for the navigation bar, which is worse than silence. An icon-only
+button has no text content, so Avalonia's automation peer falls back to the content object's
+`ToString()`.
+
+`HelpText` was already right, because Avalonia maps `ToolTip.Tip` onto it. So one style rule in
+`SharedStyles.axaml` points `AutomationProperties.Name` at the tooltip — forty attributes' worth of fix
+in four lines, and the name cannot drift from the tooltip. A local `AutomationProperties.Name` in markup
+still wins where a control needs to say more.
+
+Three places need to say more, and they are the ones a name has to disambiguate rather than describe:
+
+- **The Dashboard's stat cards** all shared the tooltip "Open in Performance", so six cards announced the
+  same thing. `DashboardCard.AccessibleName` leads with the heading and the reading instead.
+- **The Toolkit's row actions** repeated "Copy command" and "Pin to the top of the list" 31 times each.
+  They now name the command they act on.
+- **The widget fold chevron** announced its glyph, "▾". It takes the panel's title.
+
+**The banners are live regions.** The resource alert is `Assertive` — it reports a condition the user did
+not ask about — and the confirmation is `Polite`. Both are gated by **Announce updates** (default on),
+which is the one genuinely optional part: announcements can be chatty, whereas a *name* has no
+off-switch worth having.
+
+**What is still unnamed, measured across all nine tabs: 360 of 711 interactive elements.** The remainder
+have no tooltip for the rule to borrow, and **283 of them are the Processes table** — per-row expanders
+and checkboxes, where the fix is table semantics rather than a name per control. The others are Settings
+(45), Performance (10), File Explorer (9), Toolkit (9) and Network (4). Dashboard, Storage and Hardware
+are at zero.
+
 ### The accent is per-theme
 
 Every accent scored about **2:1 on the light theme** — Blue 2.01, Green 2.03, Orange 2.32, Purple 2.40 —

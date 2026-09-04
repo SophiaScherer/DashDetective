@@ -197,7 +197,11 @@ stays in its tab folder.
                                  below. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
                                  other lines: at that weight it outshouts the trace drawn over it)
-        SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
+        SharedStyles.axaml      (ACCESSIBLE NAMES: one rule points a Button's
+                                 AutomationProperties.Name at its tooltip, because an icon-only button
+                                 otherwise reports its content's type name — "Avalonia.Controls.Border"
+                                 for every nav item. A local Name in markup still wins.
+                                 Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,

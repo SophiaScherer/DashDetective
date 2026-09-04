@@ -33,6 +33,10 @@ internal sealed class AccessibilityService {
     /// <summary>The colour-vision mode. None by default: it changes chart and status colours.</summary>
     internal ColorVisionMode ColorVision { get; private set; }
 
+    /// <summary>Whether the two banners announce themselves to a screen reader. On by default: a
+    /// resource alert is the app's one unprompted warning, and silence would hide it.</summary>
+    internal bool AnnounceUpdates { get; private set; } = true;
+
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
 
@@ -42,6 +46,7 @@ internal sealed class AccessibilityService {
         SetHighContrast(settings.HighContrast);
         SetDistinguishWithoutColor(settings.DistinguishWithoutColor);
         SetColorVision(settings.ColorVision);
+        SetAnnounceUpdates(settings.AnnounceUpdates);
     }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
@@ -50,6 +55,7 @@ internal sealed class AccessibilityService {
         SetHighContrast(false);
         SetDistinguishWithoutColor(false);
         SetColorVision(ColorVisionMode.None);
+        SetAnnounceUpdates(true);
     }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
@@ -97,5 +103,14 @@ internal sealed class AccessibilityService {
 
         if (changed)
             Changed?.Invoke();
+    }
+
+    /// <summary>Turns banner announcements on or off. Nothing to apply — the shell reads this.</summary>
+    internal void SetAnnounceUpdates(bool enabled) {
+        if (enabled == AnnounceUpdates)
+            return;
+
+        AnnounceUpdates = enabled;
+        Changed?.Invoke();
     }
 }

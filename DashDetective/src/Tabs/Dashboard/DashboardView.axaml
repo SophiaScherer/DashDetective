@@ -54,6 +54,7 @@
                          rather than a tap handler, so it takes focus and answers Enter/Space too; the
                          cards' panel sets no DragGrip, so nothing here competes for the press. -->
                     <Button Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
+                            AutomationProperties.Name="{Binding AccessibleName}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                         <controls:StatCard Selectable="True"
                                            Classes.cpu="{Binding IsCpu}" Classes.mem="{Binding IsMemory}"

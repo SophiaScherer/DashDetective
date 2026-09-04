@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -136,6 +137,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// however the setting is left — hiding behind an icon that never appears would strand the app.</summary>
     public bool ShowInTray => _settings.ShowInTray && TrayIntegration.HidesOnClose;
 
+    /// <summary>How a screen reader treats the alert banner. Assertive because it reports a condition
+    /// the user has not asked about and may need to act on.</summary>
+    public AutomationLiveSetting AlertLiveSetting =>
+        _accessibility.AnnounceUpdates ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Off;
+
+    /// <summary>How a screen reader treats the confirmation banner. Polite: it reports something the user
+    /// just did, so it can wait for a pause.</summary>
+    public AutomationLiveSetting NoticeLiveSetting =>
+        _accessibility.AnnounceUpdates ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off;
+
     /// <summary>The window's smallest usable size, scaled with the interface. At 200% the same page
     /// needs twice the room, and a window draggable below that would clip its content rather than
     /// reflow it.</summary>
@@ -273,6 +284,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void OnAccessibilityChanged() {
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
+        OnPropertyChanged(nameof(AlertLiveSetting));
+        OnPropertyChanged(nameof(NoticeLiveSetting));
     }
 
     private void ApplySettings(AppSettings settings) {
@@ -379,6 +392,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         HighContrast = _accessibility.HighContrast,
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
         ColorVision = _accessibility.ColorVision,
+        AnnounceUpdates = _accessibility.AnnounceUpdates,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

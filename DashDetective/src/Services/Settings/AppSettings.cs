@@ -43,6 +43,9 @@ public sealed record AppSettings {
     /// default, which keeps the authored colours.</summary>
     public ColorVisionMode ColorVision { get; init; } = ColorVisionMode.None;
 
+    /// <summary>Let a screen reader announce the alert and confirmation banners as they appear.</summary>
+    public bool AnnounceUpdates { get; init; } = true;
+
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
 

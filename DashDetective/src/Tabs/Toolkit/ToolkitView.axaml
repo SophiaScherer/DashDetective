@@ -516,6 +516,7 @@
                                                              would mean a value converter — which this
                                                              codebase does without everywhere else. -->
                                                         <Button Grid.Column="6" Classes="rowAction"
+                                                                AutomationProperties.Name="{Binding Command, StringFormat='Pin {0} to the top of the list'}"
                                                                 ToolTip.Tip="Pin to the top of the list"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).TogglePinCommand}"
                                                                 CommandParameter="{Binding}">
@@ -541,6 +542,7 @@
                                                         <!-- Copy affordance. Placed with the row it
                                                              belongs to. -->
                                                         <Button Grid.Column="7" Classes="rowAction"
+                                                                AutomationProperties.Name="{Binding Command, StringFormat='Copy the {0} command'}"
                                                                 ToolTip.Tip="Copy command"
                                                                 Click="OnCopyClick">
                                                             <Path Width="13" Height="13" Stretch="Uniform"

@@ -83,6 +83,16 @@
         <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
     </Style>
 
+    <!-- ===== Accessible names =====
+         An icon-only button reports its CONTENT's type name to a screen reader — "Avalonia.Controls.Border"
+         for every nav item — so the tooltip becomes the name. One rule rather than forty attributes, and
+         the two cannot drift apart. A local AutomationProperties.Name in markup still wins where a control
+         needs to say more than its tooltip does. -->
+    <Style Selector="Button">
+        <Setter Property="AutomationProperties.Name"
+                Value="{Binding (ToolTip.Tip), RelativeSource={RelativeSource Self}}"/>
+    </Style>
+
     <!-- ===== Typography ===== -->
     <Style Selector="TextBlock.panelTitle">
         <Setter Property="FontSize" Value="13.5"/>

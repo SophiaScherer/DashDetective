@@ -122,6 +122,9 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Dash a chart's second series. Off by default.</summary>
     [ObservableProperty] private bool _distinguishWithoutColor;
 
+    /// <summary>Let a screen reader announce the banners. On by default.</summary>
+    [ObservableProperty] private bool _announceUpdates;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -459,6 +462,7 @@ public partial class SettingsViewModel : ViewModelBase {
 
         HighContrast = _accessibility.HighContrast;
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
+        AnnounceUpdates = _accessibility.AnnounceUpdates;
 
         foreach (var option in ColorVisionOptions)
             option.IsSelected = option.Value == _accessibility.ColorVision;
@@ -466,6 +470,12 @@ public partial class SettingsViewModel : ViewModelBase {
 
     private void SelectColorVision(ColorVisionOption option) {
         _accessibility.SetColorVision(option.Value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnAnnounceUpdatesChanged(bool value) {
+        _accessibility.SetAnnounceUpdates(value);
         if (!_initializing)
             Changed?.Invoke();
     }

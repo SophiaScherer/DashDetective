@@ -82,7 +82,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:ThemeOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -143,7 +144,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:ClockFormatOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -191,7 +193,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:UiScaleOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -235,7 +238,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:ColorVisionOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -257,6 +261,16 @@
                     </StackPanel>
                     <ToggleButton Grid.Column="1" Classes="toggle"
                                   IsChecked="{Binding DistinguishWithoutColor}"/>
+                </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AnnounceUpdates}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.AnnounceUpdates.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.AnnounceUpdates.Description}"/>
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding AnnounceUpdates}"/>
                 </Grid>
                 </Border>
 
@@ -297,7 +311,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="nav:NavPositionOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
@@ -354,7 +369,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:IntervalOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
                                         <Border Classes="seg" Classes.selected="{Binding IsSelected}">
                                             <TextBlock Text="{Binding Label}"/>
                                         </Border>
