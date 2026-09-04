@@ -377,6 +377,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ClockFormat = _settings.ClockFormat,
         UiScalePercent = _accessibility.ScalePercent,
         HighContrast = _accessibility.HighContrast,
+        DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

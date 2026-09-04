@@ -10,6 +10,7 @@ public enum SettingId {
     ClockFormat,
     UiScale,
     HighContrast,
+    DistinguishWithoutColor,
     AccessibilityDefaults,
     NavPosition,
     NavCollapse,

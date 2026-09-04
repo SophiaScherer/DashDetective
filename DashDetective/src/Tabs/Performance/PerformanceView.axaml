@@ -227,6 +227,7 @@
                                           IsVisible="{Binding SelectedResource.HasSecondSeries}"
                                           Label1="{Binding SelectedResource.LegendLabel1}"
                                           Brush1="{Binding SelectedResource.ValueBrush}"
+                                          Pattern2="{DynamicResource ChartPatterns}"
                                           Label2="{Binding SelectedResource.LegendLabel2}"
                                           Brush2="{Binding SelectedResource.ValueBrush2}"/>
 
@@ -239,6 +240,7 @@
                                         Points="{Binding SelectedResource.Points}"
                                         Stroke2="{Binding SelectedResource.ValueBrush2}"
                                         Points2="{Binding SelectedResource.Points2}"
+                                        PatternSecondSeries="{DynamicResource ChartPatterns}"
                                         AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
                                         AxisTimeLabels="{Binding ChartTimeLabels}"
                                         AxisYTitle="{Binding SelectedResource.AxisYTitle}"

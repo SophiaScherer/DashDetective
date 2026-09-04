@@ -75,4 +75,70 @@ public class AccessibilityServiceTests {
         Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
         Assert.Equal(1, raised);
     }
+    /// <summary>Both visible-change options ship off, so switching nothing leaves the app looking exactly
+    /// as it did before the accessibility work.</summary>
+    [Fact]
+    public void Ctor_ShipsWithTheVisibleChangesOff() {
+        var service = Create();
+
+        Assert.False(service.HighContrast);
+        Assert.False(service.DistinguishWithoutColor);
+    }
+
+    [Fact]
+    public void SetHighContrast_TogglesAndAnnouncesOnlyRealChanges() {
+        var service = Create();
+        var raised = 0;
+        service.Changed += () => raised++;
+
+        service.SetHighContrast(true);
+        service.SetHighContrast(true);
+
+        Assert.True(service.HighContrast);
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void SetDistinguishWithoutColor_TogglesAndAnnouncesOnlyRealChanges() {
+        var service = Create();
+        var raised = 0;
+        service.Changed += () => raised++;
+
+        service.SetDistinguishWithoutColor(true);
+        service.SetDistinguishWithoutColor(true);
+
+        Assert.True(service.DistinguishWithoutColor);
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void Apply_SeedsEveryOptionFromSettings() {
+        var service = Create();
+
+        service.Apply(AppSettings.Defaults with {
+            UiScalePercent = 150,
+            HighContrast = true,
+            DistinguishWithoutColor = true,
+        });
+
+        Assert.Equal(150, service.ScalePercent);
+        Assert.True(service.HighContrast);
+        Assert.True(service.DistinguishWithoutColor);
+    }
+
+    /// <summary>"Restore defaults" resets the WHOLE card, which is what lets a later option be covered by
+    /// it for free simply by becoming a property on this service.</summary>
+    [Fact]
+    public void RestoreDefaults_ResetsEveryOption() {
+        var service = Create();
+        service.SetScalePercent(200);
+        service.SetHighContrast(true);
+        service.SetDistinguishWithoutColor(true);
+
+        service.RestoreDefaults();
+
+        Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
+        Assert.False(service.HighContrast);
+        Assert.False(service.DistinguishWithoutColor);
+    }
 }

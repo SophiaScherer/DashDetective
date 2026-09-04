@@ -78,7 +78,9 @@ added the non-gating macOS CI leg; phase 2 added the Settings **Accessibility** 
 size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `AccessibilityService`
 (`src/Services/Accessibility`); phase 4 added **high contrast** as a pair of `ThemeVariant`s
 (`AppVariants`) plus `PaletteContrastTests`, which measures the text ramp and records where the shipped
-themes miss AA. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
+themes miss AA; phase 5 added **color independence** — `Sparkline.PatternSecondSeries` dashes a two-series
+chart's second line and `ChartLegend.Pattern2` matches it. Its audit found **no other colour-only signal
+in the app**: every status indicator already carries text beside its colour, so do not "fix" one. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
 theme already draws a focus ring, and the styles written against template parts never matched. Still to
 come, one phase each: color independence, color-vision modes, accessible names, reduce motion, keyboard
 widget reordering, text scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not

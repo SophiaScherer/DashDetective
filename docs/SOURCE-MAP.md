@@ -292,6 +292,12 @@ stays in its tab folder.
 
 ```
       /Controls
+        ChartLegend.axaml(.cs)         (a chart's key: up to two series, each a swatch beside its name.
+                                        Pattern2 swaps both swatches for line marks — solid and dashed —
+                                        mirroring Sparkline.PatternSecondSeries, so the key shows the
+                                        same distinction the chart makes rather than repeating the
+                                        colour. Its dash array is in multiples of StrokeThickness, which
+                                        is why the numbers differ from the chart's for the same rhythm)
         ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
                                         content is MEASURED at the reduced size and RENDERED enlarged, so
                                         text and chrome grow together and no view has to know its own font

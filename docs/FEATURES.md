@@ -330,6 +330,8 @@ search and revealable on its own row.
 - **High contrast** (toggle, default **off**). Flattens every surface to one flat black or white and
   drops the text ramp's opacity steps. A separate axis from Light/Dark, so it composes with whichever
   scheme is chosen rather than replacing it.
+- **Distinguish without color** (toggle, default **off**). Dashes the second series on a chart that
+  draws two, and turns the legend's swatches into matching line marks.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
   becoming a property on that service.
@@ -390,6 +392,32 @@ under `AppTheme.System` the service asks `PlatformSettings.GetColorValues()` whi
 actually showing and picks the matching high-contrast variant. That takes Avalonia's own automatic
 switch out of the picture, so the service subscribes to `ColorValuesChanged` to re-apply — without it
 the app would pick a variant once and stay on it when the OS flipped.
+
+### Color independence
+
+Two charts draw two series on one axis — the Dashboard's Network Throughput and the Performance detail
+chart — and both separated download from upload by hue alone. `Sparkline.PatternSecondSeries` dashes the
+second line, and `ChartLegend.Pattern2` turns both swatches into line marks, solid and dashed, so the key
+shows the same distinction the chart makes instead of repeating the color twice.
+
+**Decisions inside it that must not be undone:**
+- **Only the second series is dashed.** One dashed line against one solid reads as two; dashing both
+  would only make each harder to follow.
+- **The dashed pen uses flat caps.** A round cap adds half the stroke width to each end of every dash,
+  which at this thickness closes the gaps back up and the line reads solid again.
+- **The legend's dash array is in multiples of stroke thickness**, so its `1.6,1.33` at 3px is the
+  chart's own `3,2.5` at 1.6px. A legend that dashed at a different rhythm from the chart would be worse
+  than a plain swatch.
+
+**The audit found nothing else to fix.** Every other status indicator in the app already carries text
+beside its color: the Network adapter has a `StatusText` label beside its dot, a connection's state *is*
+text that happens to be colored, Processes has a Status column beside its dot, the Storage health pills
+are labelled, and the Live pill reads "Live" or "Paused". Color is a second channel there, never the only
+one — so this phase reaches the charts and stops.
+
+**What it does not reach**, and Phase 6 will: the chart series colors themselves. High contrast flattens
+the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
+line on white. Patterns help tell two series apart; they do not make either easier to see.
 
 ### What the contrast test found
 

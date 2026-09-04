@@ -26,6 +26,10 @@ internal sealed class AccessibilityService {
     /// <summary>Whether high contrast is in force. Off by default: it changes what the app looks like.</summary>
     internal bool HighContrast { get; private set; }
 
+    /// <summary>Whether a two-series chart dashes its second line. Off by default: it is a visible
+    /// change to every chart that draws two series.</summary>
+    internal bool DistinguishWithoutColor { get; private set; }
+
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
 
@@ -33,12 +37,14 @@ internal sealed class AccessibilityService {
     internal void Apply(AppSettings settings) {
         SetScalePercent(settings.UiScalePercent);
         SetHighContrast(settings.HighContrast);
+        SetDistinguishWithoutColor(settings.DistinguishWithoutColor);
     }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
     internal void RestoreDefaults() {
         SetScalePercent(UiScale.DefaultPercent);
         SetHighContrast(false);
+        SetDistinguishWithoutColor(false);
     }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
@@ -61,6 +67,17 @@ internal sealed class AccessibilityService {
 
         HighContrast = enabled;
         _theme.ApplyContrast(enabled);
+
+        if (changed)
+            Changed?.Invoke();
+    }
+
+    /// <summary>Turns chart patterns on or off, on the same terms as the two above.</summary>
+    internal void SetDistinguishWithoutColor(bool enabled) {
+        var changed = enabled != DistinguishWithoutColor;
+
+        DistinguishWithoutColor = enabled;
+        _theme.ApplyChartPatterns(enabled);
 
         if (changed)
             Changed?.Invoke();

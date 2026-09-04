@@ -55,6 +55,9 @@ public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> Stroke2Property =
         AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(Stroke2));
 
+    public static readonly StyledProperty<bool> PatternSecondSeriesProperty =
+        AvaloniaProperty.Register<Sparkline, bool>(nameof(PatternSecondSeries));
+
     public static readonly StyledProperty<bool> FillProperty =
         AvaloniaProperty.Register<Sparkline, bool>(nameof(Fill));
 
@@ -163,6 +166,14 @@ public partial class Sparkline : UserControl {
     public IBrush? Stroke2 {
         get => GetValue(Stroke2Property);
         set => SetValue(Stroke2Property, value);
+    }
+
+    /// <summary>Draws the second series dashed, so a two-series chart is readable without telling the
+    /// colours apart. Only the second: one dashed line against one solid reads as two, where dashing both
+    /// would only make them harder to follow.</summary>
+    public bool PatternSecondSeries {
+        get => GetValue(PatternSecondSeriesProperty);
+        set => SetValue(PatternSecondSeriesProperty, value);
     }
 
     /// <summary>When true (fixed-range mode), draw a translucent gradient area beneath each line.</summary>
@@ -377,9 +388,9 @@ public partial class Sparkline : UserControl {
         }
 
         if (hasSeries1)
-            DrawLine(context, _data, Stroke!, plot, maxX, span);
+            DrawLine(context, _data, Stroke!, plot, maxX, span, dashed: false);
         if (hasSeries2)
-            DrawLine(context, _data2, Stroke2!, plot, maxX, span);
+            DrawLine(context, _data2, Stroke2!, plot, maxX, span, PatternSecondSeries);
     }
 
     /// <summary>The value labels ready to draw, each with where it sits down the axis (0 = top, 1 = foot).
@@ -549,7 +560,7 @@ public partial class Sparkline : UserControl {
     }
 
     private void DrawLine(DrawingContext context, List<Point> data, IBrush stroke,
-        Rect plot, double maxX, double span) {
+        Rect plot, double maxX, double span, bool dashed) {
         var geometry = new StreamGeometry();
         using (var ctx = geometry.Open()) {
             var first = true;
@@ -566,8 +577,11 @@ public partial class Sparkline : UserControl {
         }
 
         var pen = new Pen(stroke, StrokeThickness) {
-            LineCap = PenLineCap.Round,
+            // Butt caps while dashed: a round cap adds half the stroke width to each end of every dash,
+            // which at this thickness closes the gaps back up and the line reads solid again.
+            LineCap = dashed ? PenLineCap.Flat : PenLineCap.Round,
             LineJoin = PenLineJoin.Round,
+            DashStyle = dashed ? new DashStyle([3, 2.5], 0) : null,
         };
         context.DrawGeometry(null, pen, geometry);
     }

@@ -18,7 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, HighContrast, AccessibilityDefaults,
+            UiScale, HighContrast, DistinguishWithoutColor, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -59,6 +59,13 @@ public sealed class SettingCatalog {
         SettingId.HighContrast, "Accessibility", "High contrast",
         "Flatten surfaces and drop faded text, keeping light or dark as chosen",
         Keywords: "high contrast accessibility legible readable faded dim washed out bold clear");
+
+    // Named for what the user gets rather than for the mechanism: someone looking for this searches for
+    // colour blindness, not for "dashed lines".
+    public SettingEntry DistinguishWithoutColor { get; } = new(
+        SettingId.DistinguishWithoutColor, "Accessibility", "Distinguish without color",
+        "Dash the second line on charts that draw two, so color is never the only difference",
+        Keywords: "colour color blind colorblind deuteranopia pattern dash dashed line chart distinguish legend");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(

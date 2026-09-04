@@ -35,6 +35,10 @@ public sealed record AppSettings {
     /// <see cref="Theme"/>, so it composes with light and dark rather than replacing either.</summary>
     public bool HighContrast { get; init; }
 
+    /// <summary>Dash a chart's second series, so download and upload on one axis are told apart by
+    /// pattern as well as by hue. Off by default: it changes every two-series chart.</summary>
+    public bool DistinguishWithoutColor { get; init; }
+
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
 

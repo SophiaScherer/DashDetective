@@ -213,6 +213,19 @@
                 </Grid>
                 </Border>
 
+                <Border Classes="settingRow revealFlash"
+                        Tag="{x:Static settings:SettingId.DistinguishWithoutColor}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.DistinguishWithoutColor.Name}"/>
+                        <TextBlock Classes="settingDesc"
+                                   Text="{Binding Catalog.DistinguishWithoutColor.Description}"/>
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Classes="toggle"
+                                  IsChecked="{Binding DistinguishWithoutColor}"/>
+                </Grid>
+                </Border>
+
                 <!-- Ungated, like the Layout card's reset: a button that vanishes when there is nothing
                      to undo is worse than one that does nothing. -->
                 <Border Classes="settingRow revealFlash"

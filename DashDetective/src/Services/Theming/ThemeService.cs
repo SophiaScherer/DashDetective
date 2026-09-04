@@ -75,6 +75,15 @@ public sealed class ThemeService {
     }
 
     /// <summary>
+    /// Turns chart patterns on or off. A top-level key, so it can be written straight into the
+    /// application's resources — unlike the surfaces, which need a variant.
+    /// </summary>
+    public void ApplyChartPatterns(bool enabled) {
+        if (Application.Current is { } app)
+            app.Resources["ChartPatterns"] = enabled;
+    }
+
+    /// <summary>
     /// Turns high contrast on or off. It is a separate axis from light/dark rather than a fourth
     /// <see cref="AppTheme"/>, so it composes with whichever scheme is chosen.
     ///

@@ -24,6 +24,9 @@ public partial class ChartLegend : UserControl {
     public static readonly StyledProperty<IBrush?> Brush2Property =
         AvaloniaProperty.Register<ChartLegend, IBrush?>(nameof(Brush2));
 
+    public static readonly StyledProperty<bool> Pattern2Property =
+        AvaloniaProperty.Register<ChartLegend, bool>(nameof(Pattern2));
+
     public ChartLegend() {
         InitializeComponent();
     }
@@ -50,5 +53,14 @@ public partial class ChartLegend : UserControl {
     public IBrush? Brush2 {
         get => GetValue(Brush2Property);
         set => SetValue(Brush2Property, value);
+    }
+
+    /// <summary>Whether the chart is drawing its second series dashed. Both swatches become line marks
+    /// when it is — solid and dashed — so the key shows the same distinction the chart makes rather than
+    /// repeating the colour twice. Mirrors <c>Sparkline.PatternSecondSeries</c>; a legend saying one thing
+    /// while the chart beside it does another would be worse than no legend.</summary>
+    public bool Pattern2 {
+        get => GetValue(Pattern2Property);
+        set => SetValue(Pattern2Property, value);
     }
 }

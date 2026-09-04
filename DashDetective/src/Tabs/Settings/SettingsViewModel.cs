@@ -118,6 +118,9 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. Off by default.</summary>
     [ObservableProperty] private bool _highContrast;
 
+    /// <summary>Dash a chart's second series. Off by default.</summary>
+    [ObservableProperty] private bool _distinguishWithoutColor;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -436,6 +439,13 @@ public partial class SettingsViewModel : ViewModelBase {
             option.IsSelected = option.Percent == _accessibility.ScalePercent;
 
         HighContrast = _accessibility.HighContrast;
+        DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
+    }
+
+    partial void OnDistinguishWithoutColorChanged(bool value) {
+        _accessibility.SetDistinguishWithoutColor(value);
+        if (!_initializing)
+            Changed?.Invoke();
     }
 
     partial void OnHighContrastChanged(bool value) {
