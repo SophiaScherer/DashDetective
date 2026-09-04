@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using System;
 
 namespace DashDetective.Services.Theming;
@@ -46,29 +48,94 @@ public sealed class ThemeService {
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
+    /// <summary>Whether high contrast is in force. Composes with light/dark rather than replacing them,
+    /// so "high contrast light" and "high contrast dark" both exist.</summary>
+    public bool HighContrast { get; private set; }
+
     /// <summary>Whether the app is actually rendering dark right now. Differs from
     /// <see cref="CurrentTheme"/> under <see cref="AppTheme.System"/>, where the variant comes from the
     /// OS — so a "flip the theme" action can tell which way to flip. Kept here because this service
-    /// owns the application's theme state; nothing else reads it either.</summary>
+    /// owns the application's theme state; nothing else reads it either. Counts the high-contrast dark
+    /// variant as dark, or the flip would go the wrong way while high contrast is on.</summary>
     public bool IsDarkVariantActive =>
-        Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+        Application.Current?.ActualThemeVariant is { } variant
+        && (variant == ThemeVariant.Dark || variant == AppVariants.HighContrastDark);
 
     /// <summary>Applies the current selections. Call once at startup after the app is built.</summary>
     public void ApplyDefaults() {
         ApplyTheme(CurrentTheme);
         ApplyDefaultAppearance();
+
     }
 
     /// <summary>Switches the light/dark/system colour scheme via the app's ThemeVariant.</summary>
     public void ApplyTheme(AppTheme theme) {
         CurrentTheme = theme;
-        if (Application.Current is { } app)
-            app.RequestedThemeVariant = theme switch {
+        ApplyVariant();
+    }
+
+    /// <summary>
+    /// Turns high contrast on or off. It is a separate axis from light/dark rather than a fourth
+    /// <see cref="AppTheme"/>, so it composes with whichever scheme is chosen.
+    ///
+    /// <b>It has to be a ThemeVariant.</b> The surfaces and the text ramp live in
+    /// <c>ResourceDictionary.ThemeDictionaries</c>, and a key declared there cannot be shadowed by
+    /// writing the same key into <c>Application.Resources</c> — the theme lookup wins and the write is
+    /// silently ignored, which is why the accent (a top-level key) can be swapped that way and these
+    /// cannot.
+    /// </summary>
+    public void ApplyContrast(bool enabled) {
+        HighContrast = enabled;
+        ApplyVariant();
+    }
+
+    /// <summary>Pushes the variant that the current theme and contrast selections imply.</summary>
+    private void ApplyVariant() {
+        if (Application.Current is not { } app)
+            return;
+
+        WatchOsTheme(app);
+        app.RequestedThemeVariant = Variant();
+    }
+
+    /// <summary>The variant for the current pair of selections.</summary>
+    private ThemeVariant Variant() {
+        if (!HighContrast)
+            return CurrentTheme switch {
                 AppTheme.Light => ThemeVariant.Light,
                 AppTheme.Dark => ThemeVariant.Dark,
                 _ => ThemeVariant.Default, // System: follow the OS setting.
             };
+
+        // High contrast has no "follow the OS" variant of its own, so System is resolved to whichever of
+        // light or dark the OS is actually showing.
+        var dark = CurrentTheme switch {
+            AppTheme.Light => false,
+            AppTheme.Dark => true,
+            _ => OsPrefersDark(app: Application.Current),
+        };
+
+        return dark ? AppVariants.HighContrastDark : AppVariants.HighContrastLight;
     }
+
+    private static bool OsPrefersDark(Application? app) =>
+        app?.PlatformSettings?.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
+
+    /// <summary>Follows the OS scheme while high contrast is on under "System". Without this the app
+    /// would pick a high-contrast variant once and stay on it when the OS flipped, because resolving
+    /// System ourselves is what took Avalonia's own automatic switch out of the picture.</summary>
+    private void WatchOsTheme(Application app) {
+        if (_watchingOs || app.PlatformSettings is not { } settings)
+            return;
+
+        _watchingOs = true;
+        settings.ColorValuesChanged += (_, _) => {
+            if (HighContrast && CurrentTheme == AppTheme.System)
+                Dispatcher.UIThread.Post(ApplyVariant);
+        };
+    }
+
+    private bool _watchingOs;
 
     /// <summary>
     /// Restores the default look: blue highlight and distinct per-graph colours.

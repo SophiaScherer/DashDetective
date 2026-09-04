@@ -23,14 +23,23 @@ internal sealed class AccessibilityService {
     /// <summary>The same value as a transform factor, for <c>ScaleHost</c> and the window minimum.</summary>
     internal double ScaleFactor => UiScale.Factor(ScalePercent);
 
+    /// <summary>Whether high contrast is in force. Off by default: it changes what the app looks like.</summary>
+    internal bool HighContrast { get; private set; }
+
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
 
     /// <summary>Applies the persisted state, at startup and before the Settings page is built.</summary>
-    internal void Apply(AppSettings settings) => SetScalePercent(settings.UiScalePercent);
+    internal void Apply(AppSettings settings) {
+        SetScalePercent(settings.UiScalePercent);
+        SetHighContrast(settings.HighContrast);
+    }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
-    internal void RestoreDefaults() => SetScalePercent(UiScale.DefaultPercent);
+    internal void RestoreDefaults() {
+        SetScalePercent(UiScale.DefaultPercent);
+        SetHighContrast(false);
+    }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
     /// value through whether or not it differs — but only a real change is announced.</summary>
@@ -40,6 +49,18 @@ internal sealed class AccessibilityService {
 
         ScalePercent = next;
         _theme.ApplyUiScale(ScaleFactor, UiScale.PopupFontSize(ScalePercent));
+
+        if (changed)
+            Changed?.Invoke();
+    }
+
+    /// <summary>Turns high contrast on or off. Re-applies unconditionally and announces only a real
+    /// change, for the same reason <see cref="SetScalePercent"/> does.</summary>
+    internal void SetHighContrast(bool enabled) {
+        var changed = enabled != HighContrast;
+
+        HighContrast = enabled;
+        _theme.ApplyContrast(enabled);
 
         if (changed)
             Changed?.Invoke();

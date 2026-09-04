@@ -115,6 +115,9 @@ public partial class SettingsViewModel : ViewModelBase {
     /// only reading in the app that costs a process launch.</summary>
     [ObservableProperty] private bool _nvidiaGpuMetrics;
 
+    /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. Off by default.</summary>
+    [ObservableProperty] private bool _highContrast;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -187,10 +190,10 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var option in ClockFormatOptions)
             option.IsSelected = option.Value == settings.ClockFormat;
 
-        // Likewise the scale: read it back off the accessibility service, which has already clamped a
-        // hand-edited value onto the ladder, rather than off the raw setting.
-        ReflectUiScale();
-        _accessibility.Changed += ReflectUiScale;
+        // Likewise the accessibility options: read them back off the service, which has already clamped a
+        // hand-edited scale onto the ladder, rather than off the raw settings.
+        ReflectAccessibility();
+        _accessibility.Changed += ReflectAccessibility;
 
         // A usage threshold under 1% would fire constantly and 100 is a real (if rare) ceiling, so the
         // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
@@ -424,12 +427,21 @@ public partial class SettingsViewModel : ViewModelBase {
             Changed?.Invoke();
     }
 
-    /// <summary>Points the segmented control at whatever the service currently holds. Driven by the
-    /// service's event rather than by the click, so a selection and a "Restore defaults" move it the
-    /// same way and cannot disagree.</summary>
-    private void ReflectUiScale() {
+    /// <summary>Points the card's controls at whatever the service currently holds. Driven by the
+    /// service's event rather than by the click, so an edit and a "Restore defaults" move them the same
+    /// way and cannot disagree. Writing the toggle back through its own property is safe rather than
+    /// circular: the service re-applies an unchanged value silently, so the round trip stops there.</summary>
+    private void ReflectAccessibility() {
         foreach (var option in UiScaleOptions)
             option.IsSelected = option.Percent == _accessibility.ScalePercent;
+
+        HighContrast = _accessibility.HighContrast;
+    }
+
+    partial void OnHighContrastChanged(bool value) {
+        _accessibility.SetHighContrast(value);
+        if (!_initializing)
+            Changed?.Invoke();
     }
 
     private void SelectClockFormat(ClockFormatOption option) {

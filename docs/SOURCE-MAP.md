@@ -191,8 +191,12 @@ stays in its tab folder.
 ```
       /Styles
         Palette.axaml           (colour brushes; merged in App.axaml. Light/Dark live in
-                                 ResourceDictionary.ThemeDictionaries; accent + chart-series keys
-                                 sit top-level and are swapped at runtime — see Theming below)
+                                 ResourceDictionary.ThemeDictionaries, alongside a high-contrast
+                                 dictionary for each keyed by {x:Static theming:AppVariants...}; accent +
+                                 chart-series keys sit top-level and are swapped at runtime — see Theming
+                                 below. The high-contrast tables author only their DIFFERENCES and inherit
+                                 the rest. Their chart grid deliberately does NOT strengthen with the
+                                 other lines: at that weight it outshouts the trace drawn over it)
         SharedStyles.axaml      (reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable…)
@@ -465,12 +469,24 @@ stays in its tab folder.
 
 ```
       /Theming
-        ThemeService.cs         (single seam that applies theme + accent to Application at runtime. Also
+        ThemeService.cs         (single seam that applies theme + accent + CONTRAST to Application at
+                                 runtime. ApplyContrast picks a ThemeVariant rather than writing keys, for
+                                 the reason in AppVariants below; under "System" it resolves which scheme
+                                 the OS is showing via PlatformSettings and re-applies on
+                                 ColorValuesChanged, since resolving System itself is what takes
+                                 Avalonia's automatic switch out of the picture. Also
                                  the brush seam for a page that assigns colours in code rather than through
                                  {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
+        AppVariants.cs          (the app's own ThemeVariants: HighContrastDark / HighContrastLight, each
+                                 INHERITING from the plain variant it thickens so only the differences
+                                 need authoring. High contrast has to be a variant because a key inside
+                                 ResourceDictionary.ThemeDictionaries CANNOT be shadowed by writing the
+                                 same key into Application.Resources — the theme lookup wins and the write
+                                 is silently ignored. That is why the accent and chart series, which are
+                                 top-level keys, can be swapped that way and the surfaces cannot)
         AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
         ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
                                  accent, plus the ChartSeries enum and the ChartSeriesColors record.

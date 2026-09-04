@@ -18,7 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, AccessibilityDefaults,
+            UiScale, HighContrast, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -52,6 +52,13 @@ public sealed class SettingCatalog {
         SettingId.UiScale, "Accessibility", "Interface size",
         "Draw everything larger — text, controls and charts together",
         Keywords: "scale zoom bigger larger text size font enlarge magnify dpi accessibility readable");
+
+    // Says what it does rather than naming the mechanism: "high contrast" is the term people search
+    // for, but the description has to tell someone who has never used one what will change.
+    public SettingEntry HighContrast { get; } = new(
+        SettingId.HighContrast, "Accessibility", "High contrast",
+        "Flatten surfaces and drop faded text, keeping light or dark as chosen",
+        Keywords: "high contrast accessibility legible readable faded dim washed out bold clear");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(

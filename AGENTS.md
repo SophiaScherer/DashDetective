@@ -76,9 +76,12 @@ banner below the resource alert's. Their decisions are in
 An **accessibility pass** is under way, and it is the one piece of work that is NOT finished. Phase 1
 added the non-gating macOS CI leg; phase 2 added the Settings **Accessibility** card and the **interface
 size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `AccessibilityService`
-(`src/Services/Accessibility`). Still to come, one phase each: focus indicator, high contrast, color
-independence, color-vision modes, accessible names, reduce motion, keyboard widget reordering, text
-scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+(`src/Services/Accessibility`); phase 4 added **high contrast** as a pair of `ThemeVariant`s
+(`AppVariants`) plus `PaletteContrastTests`, which measures the text ramp and records where the shipped
+themes miss AA. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
+theme already draws a focus ring, and the styles written against template parts never matched. Still to
+come, one phase each: color independence, color-vision modes, accessible names, reduce motion, keyboard
+widget reordering, text scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
@@ -477,6 +480,15 @@ It's constructed once in `MainWindowViewModel`, applied at startup, and handed t
 `PerformanceViewModel`. Note this feature deliberately touched shared styles + the shell
 (Palette/SharedStyles, MainWindow, NavItem) — theming is cross-cutting, so it lives in `src/Services`,
 not a tab.
+
+**A key inside `ResourceDictionary.ThemeDictionaries` cannot be swapped by writing to
+`Application.Resources`.** The theme lookup wins and the write is silently ignored — no exception, no
+warning, nothing on screen. That is precisely why the accent and the chart series (top-level keys) are
+swapped that way and the surfaces and the text ramp are not: those need a **`ThemeVariant`**, which is
+what `AppVariants.HighContrastDark`/`HighContrastLight` are for. Each inherits from the plain variant it
+thickens, so a high-contrast dictionary authors only its differences. **Prove a resource mechanism with a
+garish probe colour and a pixel sample before building on it** — this one was assumed in a plan, and the
+assumption was wrong.
 
 **An accent re-hues the graphs; it must never flatten them.** Selecting an accent used to set all six
 chart-series keys to that one colour, which erased the per-metric coding the charts depend on — worst on

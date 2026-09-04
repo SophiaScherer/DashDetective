@@ -327,6 +327,9 @@ search and revealable on its own row.
 
 - **Interface size** (100 / 125 / 150 / 175 / 200 %, default 100). Everything grows together — text,
   controls, charts and icons.
+- **High contrast** (toggle, default **off**). Flattens every surface to one flat black or white and
+  drops the text ramp's opacity steps. A separate axis from Light/Dark, so it composes with whichever
+  scheme is chosen rather than replacing it.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
   becoming a property on that service.
@@ -355,6 +358,61 @@ the width on the popup instead left the dropdown narrower than the box at every 
 `Application.Current`**; `AccessibilityService` owns the state and computes the values but touches
 the application not at all. `UiScale.BasePopupFontSize` is a C# mirror of the authored default, as
 `SemanticBrushes` mirrors `Palette.axaml`, and a test pins the two together.
+
+### High contrast
+
+**It has to be a `ThemeVariant`, and that is the whole design.** `AppVariants` (`src/Services/Theming`)
+declares `HighContrastDark` and `HighContrastLight`, each inheriting from the plain variant it thickens,
+and `Palette.axaml` gains a theme dictionary for each. Only the differences are authored — anything a
+high-contrast dictionary does not override falls back to Dark or Light.
+
+**A key declared inside `ResourceDictionary.ThemeDictionaries` cannot be shadowed by writing the same
+key into `Application.Resources`.** The theme lookup wins and the write is silently ignored — no
+exception, no warning, no visible change. That is the difference between the accent and the chart series
+(top-level keys, swapped at runtime exactly that way) and the surfaces and text ramp (theme-dictionary
+keys, which need a variant). This was measured, not assumed: a probe that set `AppBackground` to magenta
+through `Application.Resources` left the app untouched, and the same colour reached through a custom
+variant changed it.
+
+**What changes, and what deliberately does not:**
+- Surfaces collapse to one flat black or white, so a panel is told apart by its border rather than by a
+  few percent of lightness, and lines become opaque to carry that structure.
+- The text ramp loses its opacity steps — an emphasis ladder built from translucency is exactly what
+  costs contrast. Hierarchy survives as weight and size, which the type styles already carry.
+- **The chart grid does not strengthen with the rest.** At the other lines' weight it outshouts the
+  trace drawn over it, which defeats the chart; the grid is a scale, not the subject. It sits lower in
+  the light table than the dark one, because black on white reads heavier than white on black.
+- `TextGhost` stays translucent, at 55%. It is the completion suggestion sitting beside what is being
+  typed and has to read as a suggestion rather than as input.
+
+**"System" is resolved rather than followed.** High contrast has no follow-the-OS variant of its own, so
+under `AppTheme.System` the service asks `PlatformSettings.GetColorValues()` which scheme the OS is
+actually showing and picks the matching high-contrast variant. That takes Avalonia's own automatic
+switch out of the picture, so the service subscribes to `ColorValuesChanged` to re-apply — without it
+the app would pick a variant once and stay on it when the OS flipped.
+
+### What the contrast test found
+
+`PaletteContrastTests` measures the text ramp against every surface it is drawn on, in all four
+variants, parsing the authored `Palette.axaml` rather than a copy of its numbers. `ContrastRatio`
+composites opacity over the surface first — read as plain white, every ramp entry would score 21:1 and
+the test would pass while proving nothing.
+
+High contrast clears **AAA (7:1)** for all body text in both variants, and lifts even `TextFaint` and
+`TextGhost` past AA. A fourth test pins that it is never *worse* than the plain variant on any pair, so
+a table that raised one entry and lowered another could not slip through.
+
+It also found two things in the **shipped** themes, which are recorded rather than changed:
+- **Dark**: `TextSubtle` misses AA on the three raised surfaces, at 4.36–4.48 against a 4.5 bar.
+- **Light**: `TextMuted` and `TextSubtle` miss AA on every surface. Dark text on a white card is a
+  smaller step than white text on a near-black one at the same opacity, so the ramp that clears AA in
+  dark falls short in light.
+
+Both lists are asserted **exactly**, so a new failure fails the build and so does fixing one of these —
+with a message saying so. They are not fixed here because the ramp's steps are 5% apart: lifting
+`TextSubtle` to clear AA puts it within 2% of `TextMuted` above it and the two stop being
+distinguishable. Rebalancing the ramp is a design decision, not a test fix, and high contrast is the
+answer offered today.
 
 **The window's minimum size scales with it.** At 200 % the same page needs twice the room, and a
 window draggable below that would clip rather than reflow — so `MainWindowViewModel` exposes
