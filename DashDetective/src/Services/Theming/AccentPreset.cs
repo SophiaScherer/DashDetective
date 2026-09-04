@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace DashDetective.Services.Theming;
 
 /// <summary>
-/// One accent's shades for a single theme: the fill, its pointer-over step, the colour of text drawn on
+/// One accent's shades for a single theme: the fill, its pointer-over step, the color of text drawn on
 /// it, and the brand gradient's bottom stop.
 /// </summary>
 public sealed record AccentShades(Color Fill, Color Hover, Color OnAccent, Color Deep);

@@ -334,6 +334,8 @@ search and revealable on its own row.
   draws two, and turns the legend's swatches into matching line marks.
 - **Color vision** (Off / Deuter. / Protan. / Tritan., default **Off**). Swaps the chart series and the
   status colors for a set searched and verified against a simulation of that deficiency.
+- **Reduce motion** (toggle, default **off**). Switches off the sliding and fading transitions and stops
+  the loading pulse repeating.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
   becoming a property on that service.
@@ -375,7 +377,7 @@ key into `Application.Resources`.** The theme lookup wins and the write is silen
 exception, no warning, no visible change. That is the difference between the accent and the chart series
 (top-level keys, swapped at runtime exactly that way) and the surfaces and text ramp (theme-dictionary
 keys, which need a variant). This was measured, not assumed: a probe that set `AppBackground` to magenta
-through `Application.Resources` left the app untouched, and the same colour reached through a custom
+through `Application.Resources` left the app untouched, and the same color reached through a custom
 variant changed it.
 
 **What changes, and what deliberately does not:**
@@ -414,12 +416,37 @@ shows the same distinction the chart makes instead of repeating the color twice.
 **The audit found nothing else to fix.** Every other status indicator in the app already carries text
 beside its color: the Network adapter has a `StatusText` label beside its dot, a connection's state *is*
 text that happens to be colored, Processes has a Status column beside its dot, the Storage health pills
-are labelled, and the Live pill reads "Live" or "Paused". Color is a second channel there, never the only
+are labeled, and the Live pill reads "Live" or "Paused". Color is a second channel there, never the only
 one — so this phase reaches the charts and stops.
 
 **What it does not reach**, and Phase 6 will: the chart series colors themselves. High contrast flattens
 the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
 line on white. Patterns help tell two series apart; they do not make either easier to see.
+
+### Reduce motion
+
+The setting puts a `reduceMotion` class on the window and the motion rules select through it. Two things
+about that selector are easy to get wrong, and both were measured rather than assumed:
+
+- **`Window` does not match `MainWindow`.** A bare type selector matches the exact type, so the rule has
+  to read `:is(Window).reduceMotion`. The first version silently matched nothing.
+- **A rule has to sit beside the transitions it undoes.** A local `UserControl.Styles` rule outranks an
+  app-level one whatever the selector says, so the navigation bar's rule lives in `NavigationView.axaml`
+  and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
+  is undone from `SharedStyles.axaml`.
+
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+the Processes loading pulse — the app's only endlessly repeating animation, which drops from
+`IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+**Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
+the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against
+**70px and 70px** with reduce motion on.
+
+A note on probing this one: the first attempt set a magenta `Background` on the rail to prove the
+selector reached, saw no change, and looked like a failure. The rail sets `Background` as a local value
+in markup, and a local value beats any style setter — so the probe could never have shown anything. Pick
+a property the target has no local value for, or measure the real effect.
 
 ### Accessible names
 
@@ -463,7 +490,7 @@ against a 4.5:1 bar for text. That matters because the accent *is* text in place
 So `AccentPreset` now holds an `AccentShades` set per theme. The two are authored rather than derived
 because they answer opposite questions: on near-black the accent must be light, on white it must be dark
 enough to read. `ThemeService.SetAccent` picks by theme and `ApplyVariant` reinstalls on a theme change,
-the same way the colour-vision tables do. `AccentContrastTests` pins all of it — accent-as-text on its
+the same way the color-vision tables do. `AccentContrastTests` pins all of it — accent-as-text on its
 background, and on-accent text against both the fill and the hover fill.
 
 Two things the visual check caught that the numbers did not:
@@ -471,14 +498,14 @@ Two things the visual check caught that the numbers did not:
 - **The pill toggle's thumb was `TextStrong`**, which only worked while the checked track was a light
   tint. With a dark accent fill on the light theme it became black-on-dark-orange. It is `OnAccent` now,
   which also fixes the dark theme, where a white thumb on a bright accent had been about 1.9:1.
-- **The Settings swatches advertised the wrong colour.** They painted the dark set on both themes, so
+- **The Settings swatches advertised the wrong color.** They painted the dark set on both themes, so
   picking "orange" on light produced a shade the swatch never showed. `AccentOption.Refresh` repaints
   them for the theme in force.
 
 The accent's *identity* is still the dark hue: `AccentPreset.Color` feeds `ChartPalette.Derive`, so an
 accent rotates the chart palette by the same angle in either theme.
 
-**Still open: the accent does not follow a colour-vision mode.** Measured against the mode palettes, a
+**Still open: the accent does not follow a color-vision mode.** Measured against the mode palettes, a
 blue accent lands 6.7 ΔE from the GPU series under tritanopia and purple lands 10.2 from status Good
 under deuteranopia — close enough to be confusable where an accent fill and a status mark are read
 together. Fixing it means a CVD-safe accent set per mode and theme, verified the same way the other
@@ -517,7 +544,7 @@ choice.
 the simulation — warm-against-warm (`Warn`/`Bad`, `Gpu`/`Storage`) and cool-against-cool (`Good`/`Info`)
 collapse in ways that are invisible on trichromatic vision. What ships came out of a constrained search:
 Okabe-Ito hues, lightened or darkened per theme, with each role restricted to a family that reads
-correctly (nothing warm becomes "good", nothing green becomes "bad") and the greys kept muted so "off"
+correctly (nothing warm becomes "good", nothing green becomes "bad") and the grays kept muted so "off"
 is not the brightest mark on the page.
 
 **Red-green modes move "good" off green and onto blue**, because green beside red is the pair those
@@ -525,7 +552,7 @@ deficiencies lose. Tritanopia keeps green and red, which it sees, and moves the 
 instead.
 
 **A color-vision mode overrides the accent's chart palette.** `ChartPalette.Derive` rotates every hue by
-the accent's offset, and a rotation applied to a colour-blind-safe set is no longer safe. The accent
+the accent's offset, and a rotation applied to a color-blind-safe set is no longer safe. The accent
 still drives the highlight; only the series defer.
 
 ### What the color-vision test found

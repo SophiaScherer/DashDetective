@@ -274,6 +274,16 @@
                 </Grid>
                 </Border>
 
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ReduceMotion}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.ReduceMotion.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.ReduceMotion.Description}"/>
+                    </StackPanel>
+                    <ToggleButton Grid.Column="1" Classes="toggle" IsChecked="{Binding ReduceMotion}"/>
+                </Grid>
+                </Border>
+
                 <!-- Ungated, like the Layout card's reset: a button that vanishes when there is nothing
                      to undo is worse than one that does nothing. -->
                 <Border Classes="settingRow revealFlash"

@@ -79,27 +79,29 @@ size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `Accessibility
 (`src/Services/Accessibility`); phase 4 added **high contrast** as a pair of `ThemeVariant`s
 (`AppVariants`) plus `PaletteContrastTests`, which measures the text ramp and records where the shipped
 themes miss AA; phase 5 added **color independence** — `Sparkline.PatternSecondSeries` dashes a two-series
-chart's second line and `ChartLegend.Pattern2` matches it. Its audit found **no other colour-only signal
-in the app**: every status indicator already carries text beside its colour, so do not "fix" one; phase 6
-added **colour-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
+chart's second line and `ChartLegend.Pattern2` matches it. Its audit found **no other color-only signal
+in the app**: every status indicator already carries text beside its color, so do not "fix" one; phase 6
+added **color-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
 simulates each deficiency and measures the result.
 
-The **accent is per-theme** for the same reason the colour-vision tables are: it is drawn as text, and
+The **accent is per-theme** for the same reason the color-vision tables are: it is drawn as text, and
 every accent measured about 2:1 on white before the light shades existed. `AccentPreset.Color` stays the
 dark hue — that is the accent's identity, used to derive the chart palette, not something rendered.
 
 Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
 instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
-would recolour the file-type glyphs and icon tints too. And **a colour palette is searched against the
+would recolor the file-type glyphs and icon tints too. And **a color palette is searched against the
 simulation, never chosen by eye**: every hand-picked assignment tried for that phase failed, in ways that
 are invisible on trichromatic vision. **Phase 3 (focus indicator) was reverted**: its premise was wrong —
 Avalonia's Fluent theme already draws a focus ring, and the styles written against template parts never
 matched. Phase 7 added **accessible names**: one style points a Button's
 `AutomationProperties.Name` at its tooltip, since an icon-only button otherwise announces its content's
 type name. **Verify names through UI Automation against the running app** — they cannot be seen on
-screen, and 360 of 711 interactive elements are still unnamed, 283 of them the Processes table. Still to
-come, one phase each: reduce motion, keyboard widget reordering, text scale — plus the Processes table's
-names and making the accent follow a colour-vision mode, neither of which is done. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+screen, and 360 of 711 interactive elements are still unnamed, 283 of them the Processes table. Phase 8 added **reduce motion**, and two selector
+rules with it: a bare type selector matches the EXACT type (`Window` never matches `MainWindow` — use
+`:is(Window)`), and a rule undoing a transition must sit in the file that declares it, since a local
+style outranks an app-level one. Still to come, one phase each: keyboard widget reordering and text
+scale — plus the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
@@ -505,7 +507,7 @@ warning, nothing on screen. That is precisely why the accent and the chart serie
 swapped that way and the surfaces and the text ramp are not: those need a **`ThemeVariant`**, which is
 what `AppVariants.HighContrastDark`/`HighContrastLight` are for. Each inherits from the plain variant it
 thickens, so a high-contrast dictionary authors only its differences. **Prove a resource mechanism with a
-garish probe colour and a pixel sample before building on it** — this one was assumed in a plan, and the
+garish probe color and a pixel sample before building on it** — this one was assumed in a plan, and the
 assumption was wrong.
 
 **An accent re-hues the graphs; it must never flatten them.** Selecting an accent used to set all six

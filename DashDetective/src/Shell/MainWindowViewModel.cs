@@ -137,6 +137,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// however the setting is left — hiding behind an icon that never appears would strand the app.</summary>
     public bool ShowInTray => _settings.ShowInTray && TrayIntegration.HidesOnClose;
 
+    /// <summary>Whether animated transitions are suppressed. The window carries this as a style class,
+    /// which is what the motion rules select through.</summary>
+    public bool ReduceMotion => _accessibility.ReduceMotion;
+
     /// <summary>How a screen reader treats the alert banner. Assertive because it reports a condition
     /// the user has not asked about and may need to act on.</summary>
     public AutomationLiveSetting AlertLiveSetting =>
@@ -284,6 +288,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void OnAccessibilityChanged() {
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
+        OnPropertyChanged(nameof(ReduceMotion));
         OnPropertyChanged(nameof(AlertLiveSetting));
         OnPropertyChanged(nameof(NoticeLiveSetting));
     }
@@ -393,6 +398,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
         ColorVision = _accessibility.ColorVision,
         AnnounceUpdates = _accessibility.AnnounceUpdates,
+        ReduceMotion = _accessibility.ReduceMotion,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

@@ -82,6 +82,12 @@
     <Style Selector="Border.revealFlash.highlighted">
         <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
     </Style>
+    <!-- Reduce motion. The tint still appears and still clears; only the fade between goes. -->
+    <Style Selector=":is(Window).reduceMotion Border.revealFlash">
+        <Setter Property="Transitions">
+            <Transitions/>
+        </Setter>
+    </Style>
 
     <!-- ===== Accessible names =====
          An icon-only button reports its CONTENT's type name to a screen reader — "Avalonia.Controls.Border"

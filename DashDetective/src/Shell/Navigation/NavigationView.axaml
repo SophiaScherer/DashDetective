@@ -275,6 +275,14 @@
                 </Transitions>
             </Setter>
         </Style>
+
+        <!-- Declared here, not in SharedStyles: a local style outranks an app-level one whatever the
+             selector says, so the rule undoing these transitions has to sit beside them. -->
+        <Style Selector=":is(Window).reduceMotion Border.rail">
+            <Setter Property="Transitions">
+                <Transitions/>
+            </Setter>
+        </Style>
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->

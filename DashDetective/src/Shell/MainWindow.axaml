@@ -14,6 +14,7 @@
         Title="DashDetective"
         Width="1180" Height="760"
         MinWidth="{Binding MinWindowWidth}" MinHeight="{Binding MinWindowHeight}"
+        Classes.reduceMotion="{Binding ReduceMotion}"
         Background="{DynamicResource AppBackground}"
         TransparencyLevelHint="None"
         SizeChanged="OnShellSizeChanged">

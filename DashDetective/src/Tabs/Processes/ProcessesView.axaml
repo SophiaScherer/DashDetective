@@ -184,6 +184,16 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <!-- The one endlessly repeating animation in the app, so the one this setting most owes. A
+             single pass leaves the placeholder at its dim end and stops. -->
+        <Style Selector=":is(Window).reduceMotion Border.skeleton">
+            <Style.Animations>
+                <Animation Duration="0:0:1.3" IterationCount="1">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.45"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
 
         <!-- Group section header (e.g. "Apps · 6"). -->
         <Style Selector="Border.groupHead">

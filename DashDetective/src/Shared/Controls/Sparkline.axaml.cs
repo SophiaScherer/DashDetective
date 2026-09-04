@@ -169,7 +169,7 @@ public partial class Sparkline : UserControl {
     }
 
     /// <summary>Draws the second series dashed, so a two-series chart is readable without telling the
-    /// colours apart. Only the second: one dashed line against one solid reads as two, where dashing both
+    /// colors apart. Only the second: one dashed line against one solid reads as two, where dashing both
     /// would only make them harder to follow.</summary>
     public bool PatternSecondSeries {
         get => GetValue(PatternSecondSeriesProperty);

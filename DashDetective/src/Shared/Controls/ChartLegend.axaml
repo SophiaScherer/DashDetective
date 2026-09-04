@@ -10,7 +10,7 @@
                     IsVisible="{Binding #Root.Label1, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <!-- Two marks, one shown at a time. Patterned, the swatch becomes a segment of the line it
                  names so the key carries the same distinction the chart does; a square could only ever
-                 repeat the colour. -->
+                 repeat the color. -->
             <Panel VerticalAlignment="Center">
                 <Rectangle Width="8" Height="8" RadiusX="2" RadiusY="2"
                            IsVisible="{Binding !#Root.Pattern2}" Fill="{Binding #Root.Brush1}"/>

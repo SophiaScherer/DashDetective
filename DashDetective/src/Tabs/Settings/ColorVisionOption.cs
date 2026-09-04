@@ -7,7 +7,7 @@ using System.Windows.Input;
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// A selectable entry in the colour-vision segmented control. Mirrors <see cref="ThemeOption"/>: an
+/// A selectable entry in the color-vision segmented control. Mirrors <see cref="ThemeOption"/>: an
 /// observable <see cref="IsSelected"/> flag plus a command that reports the click back to the owning
 /// view-model.
 /// </summary>

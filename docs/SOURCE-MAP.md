@@ -197,7 +197,11 @@ stays in its tab folder.
                                  below. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
                                  other lines: at that weight it outshouts the trace drawn over it)
-        SharedStyles.axaml      (ACCESSIBLE NAMES: one rule points a Button's
+        SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it
+                                 is declared here; the nav bar's and the Processes pulse's live in their
+                                 own files, since a local style outranks an app-level one. The selector
+                                 is :is(Window) — a bare "Window" matches the exact type, not MainWindow.
+                                 ACCESSIBLE NAMES: one rule points a Button's
                                  AutomationProperties.Name at its tooltip, because an icon-only button
                                  otherwise reports its content's type name — "Avalonia.Controls.Border"
                                  for every nav item. A local Name in markup still wins.
@@ -300,7 +304,7 @@ stays in its tab folder.
                                         Pattern2 swaps both swatches for line marks — solid and dashed —
                                         mirroring Sparkline.PatternSecondSeries, so the key shows the
                                         same distinction the chart makes rather than repeating the
-                                        colour. Its dash array is in multiples of StrokeThickness, which
+                                        color. Its dash array is in multiples of StrokeThickness, which
                                         is why the numbers differ from the chart's for the same rhythm)
         ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
                                         content is MEASURED at the reduced size and RENDERED enlarged, so
@@ -495,17 +499,17 @@ stays in its tab folder.
                                  read as text — every accent scored ~2:1 on white before this. Color
                                  stays the dark hue, since that is the accent's identity for
                                  ChartPalette.Derive and nothing renders it directly)
-        ColorVision.cs          (the colour-blind-safe tables: status and chart series, per MODE and per
-                                 THEME. Per-theme is not a nicety — a colour must clear 3:1 on its
+        ColorVision.cs          (the color-blind-safe tables: status and chart series, per MODE and per
+                                 THEME. Per-theme is not a nicety — a color must clear 3:1 on its
                                  background before its hue matters, and one set doing that on both
                                  near-black and white leaves too narrow a lightness band to separate five
                                  categories (measured: 11-16, against a bar of 20). The hues are
                                  Okabe-Ito and the assignments were SEARCHED against a dichromacy
                                  simulation; every hand-picked attempt failed. Its hex literals are why it
                                  is in PaletteOwnershipTests' allowed list)
-        SemanticBrushes.cs      (the fixed semantic colours as brushes, for code that cannot reach
+        SemanticBrushes.cs      (the fixed semantic colors as brushes, for code that cannot reach
                                  {StaticResource}. The STATUS brushes are mutable and each is its OWN
-                                 instance: Apply() re-points them for a colour-vision mode, and because
+                                 instance: Apply() re-points them for a color-vision mode, and because
                                  SolidColorBrush.Color is a styled property every consumer repaints with
                                  no event and no service threaded through it. Aliasing them back onto the
                                  fixed hues beside them — which is how they started — would drag the

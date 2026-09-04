@@ -52,7 +52,7 @@ public static class SemanticBrushes {
     public static IBrush RedSoft { get; } = new SolidColorBrush(RedColor, SoftAlpha);
 
     // ----- Status: what a colour means, rather than which hue it is -----
-    // Each is its OWN brush, not an alias of the fixed hue above: a colour-vision mode mutates these, and
+    // Each is its OWN brush, not an alias of the fixed hue above: a color-vision mode mutates these, and
     // an alias would drag the file-type glyphs and icon tints along too.
 
     /// <summary>Healthy, running, connected, live.</summary>
@@ -76,7 +76,7 @@ public static class SemanticBrushes {
     /// <summary>The soft fill paired with <see cref="StatusWarn"/>.</summary>
     public static SolidColorBrush StatusWarnSoft { get; } = new(YellowColor, SoftAlpha);
 
-    /// <summary>Re-points the status brushes for a colour-vision mode; mutating them repaints every
+    /// <summary>Re-points the status brushes for a color-vision mode; mutating them repaints every
     /// consumer with no event. The hop is because <c>Color</c> is a styled property with UI-thread
     /// affinity — the app is always on it, xUnit is not.</summary>
     public static void Apply(SemanticColors colors) {

@@ -6,11 +6,11 @@ using Xunit;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Pins that every accent is legible in both themes. The app draws real values in accent-coloured text —
+/// Pins that every accent is legible in both themes. The app draws real values in accent-colored text —
 /// a stat card's figure, "18.9 / 31 GB" — so the accent is body text, not decoration.
 /// </summary>
 public class AccentContrastTests {
-    /// <summary>The surface an accent-coloured figure is drawn on in each theme.</summary>
+    /// <summary>The surface an accent-colored figure is drawn on in each theme.</summary>
     private static (int R, int G, int B) Surface(bool dark) => dark ? (20, 20, 20) : (255, 255, 255);
 
     public static TheoryData<string, bool> Cases() {
@@ -24,7 +24,7 @@ public class AccentContrastTests {
     private static AccentPreset Preset(string name) =>
         AccentPreset.All.First(a => a.Name == name);
 
-    /// <summary>Accent-coloured text on the page background. This is the one that failed before the light
+    /// <summary>Accent-colored text on the page background. This is the one that failed before the light
     /// shades existed: every accent scored about 2:1 on white.</summary>
     [Theory]
     [MemberData(nameof(Cases))]
@@ -58,7 +58,7 @@ public class AccentContrastTests {
             $"{name}'s on-accent text reads at {ratio:F2}:1 on its hover fill ({(dark ? "dark" : "light")}).");
     }
 
-    /// <summary>Each accent stays its own choice: two presets rendering the same colour would make the
+    /// <summary>Each accent stays its own choice: two presets rendering the same color would make the
     /// picker offer a duplicate.</summary>
     [Theory]
     [InlineData(true)]

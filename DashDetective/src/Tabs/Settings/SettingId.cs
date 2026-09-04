@@ -13,6 +13,7 @@ public enum SettingId {
     DistinguishWithoutColor,
     ColorVision,
     AnnounceUpdates,
+    ReduceMotion,
     AccessibilityDefaults,
     NavPosition,
     NavCollapse,

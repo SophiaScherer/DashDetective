@@ -39,12 +39,15 @@ public sealed record AppSettings {
     /// pattern as well as by hue. Off by default: it changes every two-series chart.</summary>
     public bool DistinguishWithoutColor { get; init; }
 
-    /// <summary>Which colour-vision deficiency the chart and status palettes are chosen for. None by
-    /// default, which keeps the authored colours.</summary>
+    /// <summary>Which color-vision deficiency the chart and status palettes are chosen for. None by
+    /// default, which keeps the authored colors.</summary>
     public ColorVisionMode ColorVision { get; init; } = ColorVisionMode.None;
 
     /// <summary>Let a screen reader announce the alert and confirmation banners as they appear.</summary>
     public bool AnnounceUpdates { get; init; } = true;
+
+    /// <summary>Suppress animated transitions and the loading pulse. Off by default.</summary>
+    public bool ReduceMotion { get; init; }
 
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }

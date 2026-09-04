@@ -30,12 +30,15 @@ internal sealed class AccessibilityService {
     /// change to every chart that draws two series.</summary>
     internal bool DistinguishWithoutColor { get; private set; }
 
-    /// <summary>The colour-vision mode. None by default: it changes chart and status colours.</summary>
+    /// <summary>The color-vision mode. None by default: it changes chart and status colors.</summary>
     internal ColorVisionMode ColorVision { get; private set; }
 
     /// <summary>Whether the two banners announce themselves to a screen reader. On by default: a
     /// resource alert is the app's one unprompted warning, and silence would hide it.</summary>
     internal bool AnnounceUpdates { get; private set; } = true;
+
+    /// <summary>Whether animated transitions are suppressed. Off by default: unchanged appearance.</summary>
+    internal bool ReduceMotion { get; private set; }
 
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
@@ -47,6 +50,7 @@ internal sealed class AccessibilityService {
         SetDistinguishWithoutColor(settings.DistinguishWithoutColor);
         SetColorVision(settings.ColorVision);
         SetAnnounceUpdates(settings.AnnounceUpdates);
+        SetReduceMotion(settings.ReduceMotion);
     }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
@@ -56,6 +60,7 @@ internal sealed class AccessibilityService {
         SetDistinguishWithoutColor(false);
         SetColorVision(ColorVisionMode.None);
         SetAnnounceUpdates(true);
+        SetReduceMotion(false);
     }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
@@ -94,7 +99,7 @@ internal sealed class AccessibilityService {
             Changed?.Invoke();
     }
 
-    /// <summary>Selects a colour-vision mode, on the same terms as the options above.</summary>
+    /// <summary>Selects a color-vision mode, on the same terms as the options above.</summary>
     internal void SetColorVision(ColorVisionMode mode) {
         var changed = mode != ColorVision;
 
@@ -111,6 +116,16 @@ internal sealed class AccessibilityService {
             return;
 
         AnnounceUpdates = enabled;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Suppresses animated transitions. Nothing to apply — the shell puts a class on the window
+    /// and the styles select through it.</summary>
+    internal void SetReduceMotion(bool enabled) {
+        if (enabled == ReduceMotion)
+            return;
+
+        ReduceMotion = enabled;
         Changed?.Invoke();
     }
 }

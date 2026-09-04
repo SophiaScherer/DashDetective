@@ -2,7 +2,7 @@ using Avalonia.Media;
 
 namespace DashDetective.Services.Theming;
 
-/// <summary>The colour-vision deficiency the palettes are chosen for, from Settings → Accessibility.</summary>
+/// <summary>The color-vision deficiency the palettes are chosen for, from Settings → Accessibility.</summary>
 public enum ColorVisionMode {
     /// <summary>The authored palettes.</summary>
     None,
@@ -17,11 +17,11 @@ public enum ColorVisionMode {
     Tritanopia,
 }
 
-/// <summary>The five status colours as a set, so a mode swaps them together.</summary>
+/// <summary>The five status colors as a set, so a mode swaps them together.</summary>
 public sealed record SemanticColors(Color Good, Color Warn, Color Bad, Color Info, Color Idle);
 
 /// <summary>
-/// The colour-blind-safe palettes, per mode and per theme. Okabe-Ito hues, searched against a dichromacy
+/// The color-blind-safe palettes, per mode and per theme. Okabe-Ito hues, searched against a dichromacy
 /// simulation rather than chosen by eye — see ColorVisionTests, which fails if any pair collapses.
 /// Red-green modes move "good" off green, since green beside red is the pair they lose.
 /// </summary>
@@ -69,7 +69,7 @@ public static class ColorVision {
         Threads: Color.Parse("#003F62"));
 
     /// <summary>The status set for a mode on a theme. <see cref="ColorVisionMode.None"/> keeps the
-    /// authored colours, which is what makes the setting genuinely switchable off.</summary>
+    /// authored colors, which is what makes the setting genuinely switchable off.</summary>
     public static SemanticColors Status(ColorVisionMode mode, bool dark) => mode switch {
         ColorVisionMode.Deuteranopia or ColorVisionMode.Protanopia => dark ? DarkRedGreen : LightRedGreen,
         ColorVisionMode.Tritanopia => dark ? DarkTritan : LightTritan,
@@ -85,7 +85,7 @@ public static class ColorVision {
         _ => null,
     };
 
-    /// <summary>The app's own status colours, which every mode is measured against.</summary>
+    /// <summary>The app's own status colors, which every mode is measured against.</summary>
     public static SemanticColors Authored { get; } = new(
         Good: SemanticBrushes.GreenColor, Warn: SemanticBrushes.YellowColor,
         Bad: SemanticBrushes.RedColor, Info: SemanticBrushes.BlueColor,

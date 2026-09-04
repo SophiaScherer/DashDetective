@@ -48,7 +48,7 @@ public sealed class ThemeService {
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
-    /// <summary>The colour-vision mode in force. Anything but None overrides the accent's chart palette;
+    /// <summary>The color-vision mode in force. Anything but None overrides the accent's chart palette;
     /// the accent still drives the highlight.</summary>
     public ColorVisionMode ColorVision { get; private set; }
 
@@ -100,7 +100,7 @@ public sealed class ThemeService {
         WatchOsTheme(app);
         app.RequestedThemeVariant = Variant();
 
-        // The accent shades and the colour-vision tables are both per-theme, so a theme change
+        // The accent shades and the color-vision tables are both per-theme, so a theme change
         // reinstalls them.
         SetAccent(CurrentAccent ?? AccentPreset.Default);
         if (ColorVision != ColorVisionMode.None)
@@ -148,7 +148,7 @@ public sealed class ThemeService {
         SetChartSeries(SeriesForCurrentSelections());
     }
 
-    /// <summary>Applies a colour-vision mode: status brushes re-pointed, charts on its series palette
+    /// <summary>Applies a color-vision mode: status brushes re-pointed, charts on its series palette
     /// instead of the accent-derived one.</summary>
     public void ApplyColorVision(ColorVisionMode mode) {
         ColorVision = mode;
@@ -156,13 +156,13 @@ public sealed class ThemeService {
     }
 
     /// <summary>Installs the tables for the current mode and theme. Re-run on a theme change: the safe
-    /// colours differ by background, so one set cannot serve both.</summary>
+    /// colors differ by background, so one set cannot serve both.</summary>
     private void ApplyVisionPalettes() {
         SemanticBrushes.Apply(Theming.ColorVision.Status(ColorVision, IsDarkIntended()));
         SetChartSeries(SeriesForCurrentSelections());
     }
 
-    /// <summary>The series palette the current selections imply. A colour-vision mode beats the accent:
+    /// <summary>The series palette the current selections imply. A color-vision mode beats the accent:
     /// rotating a safe palette by the accent's hue offset would undo what makes it safe.</summary>
     private ChartSeriesColors SeriesForCurrentSelections() =>
         Theming.ColorVision.Series(ColorVision, IsDarkIntended())
@@ -203,7 +203,7 @@ public sealed class ThemeService {
     }
 
     /// <summary>Swaps the accent brushes, taking the shades for the theme being rendered. Every
-    /// accent-coloured element binds these keys with {DynamicResource}, so the change is global.</summary>
+    /// accent-colored element binds these keys with {DynamicResource}, so the change is global.</summary>
     private void SetAccent(AccentPreset accent) {
         if (Application.Current is not { } app)
             return;

@@ -56,7 +56,7 @@ public partial class ChartLegend : UserControl {
     }
 
     /// <summary>Whether the chart dashes its second series. Both swatches become line marks — solid and
-    /// dashed — so the key shows the distinction rather than repeating the colour. Mirrors
+    /// dashed — so the key shows the distinction rather than repeating the color. Mirrors
     /// <c>Sparkline.PatternSecondSeries</c>.</summary>
     public bool Pattern2 {
         get => GetValue(Pattern2Property);

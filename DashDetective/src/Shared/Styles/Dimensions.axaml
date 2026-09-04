@@ -30,7 +30,7 @@
 
     <!-- ===== Runtime-swapped values (rewritten by ThemeService) =====
          The only keys here that change while the app runs, so the only ones needing {DynamicResource}.
-         ChartPatterns is not a dimension; it sits here because Palette.axaml is colour only and a third
+         ChartPatterns is not a dimension; it sits here because Palette.axaml is color only and a third
          file for one bool would be worse. -->
     <sys:Double x:Key="UiScale">1</sys:Double>
     <sys:Double x:Key="PopupFontSize">12.5</sys:Double>

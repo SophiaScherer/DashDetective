@@ -125,6 +125,9 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Let a screen reader announce the banners. On by default.</summary>
     [ObservableProperty] private bool _announceUpdates;
 
+    /// <summary>Suppress animated transitions. Off by default.</summary>
+    [ObservableProperty] private bool _reduceMotion;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -176,7 +179,7 @@ public partial class SettingsViewModel : ViewModelBase {
         foreach (var percent in UiScale.Percents)
             UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
 
-        // Named for the deficiency rather than for the colours it swaps, because that is what someone
+        // Named for the deficiency rather than for the colors it swaps, because that is what someone
         // looking for this already knows the name of.
         ColorVisionOptions = new ObservableCollection<ColorVisionOption> {
             new("Off", ColorVisionMode.None, SelectColorVision),
@@ -463,6 +466,7 @@ public partial class SettingsViewModel : ViewModelBase {
         HighContrast = _accessibility.HighContrast;
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
         AnnounceUpdates = _accessibility.AnnounceUpdates;
+        ReduceMotion = _accessibility.ReduceMotion;
 
         foreach (var option in ColorVisionOptions)
             option.IsSelected = option.Value == _accessibility.ColorVision;
@@ -470,6 +474,12 @@ public partial class SettingsViewModel : ViewModelBase {
 
     private void SelectColorVision(ColorVisionOption option) {
         _accessibility.SetColorVision(option.Value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnReduceMotionChanged(bool value) {
+        _accessibility.SetReduceMotion(value);
         if (!_initializing)
             Changed?.Invoke();
     }

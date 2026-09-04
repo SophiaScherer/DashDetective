@@ -18,7 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates,
+            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
             AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
@@ -62,7 +62,7 @@ public sealed class SettingCatalog {
         Keywords: "high contrast accessibility legible readable faded dim washed out bold clear");
 
     // Named for what the user gets rather than for the mechanism: someone looking for this searches for
-    // colour blindness, not for "dashed lines".
+    // color blindness, not for "dashed lines".
     public SettingEntry DistinguishWithoutColor { get; } = new(
         SettingId.DistinguishWithoutColor, "Accessibility", "Distinguish without color",
         "Dash the second line on charts that draw two, so color is never the only difference",
@@ -79,6 +79,11 @@ public sealed class SettingCatalog {
         SettingId.AnnounceUpdates, "Accessibility", "Announce updates",
         "Let a screen reader read out alerts and confirmations as they appear",
         Keywords: "screen reader narrator announce speak live region alert banner notification accessibility");
+
+    public SettingEntry ReduceMotion { get; } = new(
+        SettingId.ReduceMotion, "Accessibility", "Reduce motion",
+        "Switch off sliding, fading and the loading pulse",
+        Keywords: "motion animation transition fade slide pulse vestibular dizzy still static accessibility");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(

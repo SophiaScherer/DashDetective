@@ -68,7 +68,7 @@ public class ColorVisionTests {
             $"below the {ColorVisionSimulator.MinimumSeparation} minimum.");
     }
 
-    /// <summary>A colour has to be visible before its hue matters. This is what forced per-theme tables:
+    /// <summary>A color has to be visible before its hue matters. This is what forced per-theme tables:
     /// one set cannot clear 3:1 on both backgrounds and still spread five categories apart.</summary>
     [Theory]
     [MemberData(nameof(Cases))]
@@ -112,12 +112,12 @@ public class ColorVisionTests {
             .Min(p => ColorVisionSimulator.SeparationUnder(p.A.Color, p.B.Color, kind));
 
         Assert.True(worst >= atLeast && worst < lessThan,
-            $"The authored status colours now score {worst:F1} under {kind}, outside the measured " +
+            $"The authored status colors now score {worst:F1} under {kind}, outside the measured " +
             $"[{atLeast}, {lessThan}) this phase was built on. The modes were chosen against those " +
             "numbers, so a change here is a reason to revisit them.");
     }
 
-    /// <summary>None keeps the authored colours on both themes, which is what makes the setting genuinely
+    /// <summary>None keeps the authored colors on both themes, which is what makes the setting genuinely
     /// switchable off.</summary>
     [Theory]
     [InlineData(true)]

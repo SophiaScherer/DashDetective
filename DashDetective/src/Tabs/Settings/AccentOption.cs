@@ -20,7 +20,7 @@ public partial class AccentOption : ObservableObject {
     }
 
     /// <summary>Repaints the swatch for the theme in force. The two themes render an accent at different
-    /// lightnesses, so a fixed swatch would advertise a colour the app does not draw.</summary>
+    /// lightnesses, so a fixed swatch would advertise a color the app does not draw.</summary>
     public void Refresh(bool dark) =>
         Swatch = Preset is null ? null : new SolidColorBrush(Preset.For(dark).Fill);
 
