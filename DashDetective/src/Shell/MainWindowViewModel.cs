@@ -289,6 +289,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
     private void OnAccessibilityChanged() {
+        SyncNavTextScale();
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
         OnPropertyChanged(nameof(ReduceMotion));
@@ -296,11 +297,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(NoticeLiveSetting));
     }
 
+    /// <summary>Sizes the navigation bar against the text scale. Called from both the startup apply and
+    /// the change event, because settings are applied before that event is subscribed to.</summary>
+    private void SyncNavTextScale() =>
+        Nav.SetTextScale(TextScale.Factor(_accessibility.TextScalePercent));
+
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
         _theme.ApplyTheme(settings.Theme);
         _accessibility.Apply(settings);
+        SyncNavTextScale();
         var accent = FindAccent(settings.AccentName);
         if (accent is { } preset)
             _theme.ApplyAccent(preset);
@@ -397,6 +404,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,
         UiScalePercent = _accessibility.ScalePercent,
+        TextScalePercent = _accessibility.TextScalePercent,
         HighContrast = _accessibility.HighContrast,
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
         ColorVision = _accessibility.ColorVision,

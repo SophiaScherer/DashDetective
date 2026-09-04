@@ -18,7 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
+            UiScale, TextScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
             KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
@@ -53,6 +53,11 @@ public sealed class SettingCatalog {
         SettingId.UiScale, "Accessibility", "Interface size",
         "Draw everything larger — text, controls and charts together",
         Keywords: "scale zoom bigger larger text size font enlarge magnify dpi accessibility readable");
+
+    public SettingEntry TextScale { get; } = new(
+        SettingId.TextScale, "Accessibility", "Text size",
+        "Draw text larger without changing the size of the controls around it",
+        Keywords: "text size font scale bigger larger type readable accessibility low vision zoom");
 
     // Says what it does rather than naming the mechanism: "high contrast" is the term people search
     // for, but the description has to tell someone who has never used one what will change.

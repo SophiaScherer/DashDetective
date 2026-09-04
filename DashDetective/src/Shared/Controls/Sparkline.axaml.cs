@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using DashDetective.Shared;
 using DashDetective.Shared.Charts;
 using System;
 using System.Collections.Generic;
@@ -109,8 +110,10 @@ public partial class Sparkline : UserControl {
     public static readonly StyledProperty<IBrush?> AxisBrushProperty =
         AvaloniaProperty.Register<Sparkline, IBrush?>(nameof(AxisBrush));
 
-    /// <summary>Axis and status text size. Smaller than the surrounding captions on purpose: the labels are
-    /// a scale to read the chart against, not part of the page's copy.</summary>
+    /// <summary>Axis and status text size, and the ladder key it follows. Smaller than the surrounding
+    /// captions on purpose: the labels are a scale to read the chart against, not part of the page's
+    /// copy. Read per draw rather than cached, so a text-scale change lands on the next frame.</summary>
+    private const string AxisSizeKey = "TextSizeMicro";
     private const double AxisFontSize = 10;
 
     private List<Point> _data = new();
@@ -519,7 +522,8 @@ public partial class Sparkline : UserControl {
         string.IsNullOrEmpty(value) || brush is null
             ? null
             : new FormattedText(value, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                                new Typeface(FontFamily), AxisFontSize, brush);
+                                new Typeface(FontFamily), this.TextSize(AxisSizeKey, AxisFontSize),
+                                brush);
 
     private static double TextWidth(FormattedText? text) => text?.Width ?? 0;
 

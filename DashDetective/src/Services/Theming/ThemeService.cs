@@ -4,6 +4,7 @@ using Avalonia.Platform;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using System;
+using System.Collections.Generic;
 
 namespace DashDetective.Services.Theming;
 
@@ -200,6 +201,17 @@ public sealed class ThemeService {
 
         app.Resources["UiScale"] = scale;
         app.Resources["PopupFontSize"] = popupFontSize;
+    }
+
+    /// <summary>Installs the type ladder. Takes the sizes already scaled, like
+    /// <see cref="ApplyUiScale"/>, so the arithmetic stays in <c>Services/Accessibility</c> and this
+    /// remains the application's single writer.</summary>
+    public void ApplyTextScale(IReadOnlyDictionary<string, double> sizes) {
+        if (Application.Current is not { } app)
+            return;
+
+        foreach (var (key, size) in sizes)
+            app.Resources[key] = size;
     }
 
     /// <summary>Swaps the accent brushes, taking the shades for the theme being rendered. Every

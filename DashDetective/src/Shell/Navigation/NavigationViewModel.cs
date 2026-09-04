@@ -58,6 +58,9 @@ public partial class NavigationViewModel : ViewModelBase {
     // resize — that way an explicit toggle sticks until the window crosses back.
     private bool _belowAutoCollapseWidth;
 
+    // The text scale the bar is sized against. 1 until the accessibility state is applied.
+    private double _textScale = 1;
+
     /// <summary>Reports the shell's width so the rail can fold itself away on a narrow window.</summary>
     public void SetShellWidth(double width) {
         if (!double.IsFinite(width) || width <= 0)
@@ -212,7 +215,19 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236);
+        _textScale * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
+
+    /// <summary>Grows the bar with the text scale. The rail is the one surface sized in pixels that has
+    /// to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped both.
+    /// </summary>
+    public void SetTextScale(double factor) {
+        if (!double.IsFinite(factor) || factor <= 0 || factor == _textScale)
+            return;
+
+        _textScale = factor;
+        OnPropertyChanged(nameof(RailWidth));
+        OnPropertyChanged(nameof(RailHeight));
+    }
 
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>

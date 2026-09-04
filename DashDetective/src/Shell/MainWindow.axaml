@@ -72,19 +72,20 @@
             <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}"/>
 
             <!-- ================= MAIN ================= -->
-            <Grid RowDefinitions="54,Auto,*">
+            <Grid RowDefinitions="Auto,Auto,*">
 
-                <!-- Toolbar -->
-                <Border Grid.Row="0" Background="{DynamicResource SidebarBackground}"
+                <!-- Toolbar. Auto with a minimum rather than a fixed 54: the title and subtitle
+                     inside it follow the text scale, and a fixed row clipped the subtitle. -->
+                <Border Grid.Row="0" MinHeight="54" Background="{DynamicResource SidebarBackground}"
                         BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*" Margin="18,0">
 
                         <!-- Trimmed rather than pushed off: at the window's minimum the subtitle no
                              longer fits beside the search field. -->
                         <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="15" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="{DynamicResource TextSizeTitleLarge}" FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="11"
+                            <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
                                        Foreground="{DynamicResource TextSubtle}"
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
@@ -98,7 +99,7 @@
                                     ToolTip.Tip="Pause or resume live updates (Ctrl+P)">
                                 <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                                     <Ellipse Width="8" Height="8" Fill="{Binding LiveDotBrush}"/>
-                                    <TextBlock Text="{Binding LiveLabel}" FontSize="12"
+                                    <TextBlock Text="{Binding LiveLabel}" FontSize="{DynamicResource TextSizeCompact}"
                                                Foreground="{DynamicResource TextTertiary}"
                                                VerticalAlignment="Center"/>
                                 </StackPanel>
@@ -118,7 +119,7 @@
                                  reserves constant space and never reflows the toolbar. Sized for the
                                  wider 12-hour string ("11:59:59 PM"), so switching clock format does not
                                  shift the toolbar either. -->
-                            <TextBlock Text="{Binding Clock}" FontSize="12" Foreground="{DynamicResource TextTertiary}"
+                            <TextBlock Text="{Binding Clock}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextTertiary}"
                                        VerticalAlignment="Center" Width="76" TextAlignment="Center"/>
                             </StackPanel>
 
@@ -150,7 +151,7 @@
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
-                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
                             <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
                                     ToolTip.Tip="Dismiss" Command="{Binding DismissAlertCommand}">
@@ -175,7 +176,7 @@
                                   StrokeLineCap="Round" StrokeJoin="Round" Data="M2,8.5 L6.5,13 L14,4"/>
                             <!-- The tooltip carries what the trim drops: an export names a path, and a
                                  deep one is exactly the case where the user needs to read all of it. -->
-                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5"
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding NoticeText}"
                                        TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding NoticeText}"/>
                             <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"

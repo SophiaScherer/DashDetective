@@ -31,6 +31,10 @@ public sealed record AppSettings {
     /// together, so this is one setting rather than a font size the views would each have to honour.</summary>
     public int UiScalePercent { get; init; } = 100;
 
+    /// <summary>How much larger to draw text alone, as a percentage. Separate from the interface size
+    /// because growing type is often all that is wanted, and it multiplies with it.</summary>
+    public int TextScalePercent { get; init; } = 100;
+
     /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. A separate axis from
     /// <see cref="Theme"/>, so it composes with light and dark rather than replacing either.</summary>
     public bool HighContrast { get; init; }

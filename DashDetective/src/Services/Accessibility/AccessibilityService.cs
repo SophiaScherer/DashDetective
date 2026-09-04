@@ -23,6 +23,10 @@ internal sealed class AccessibilityService {
     /// <summary>The same value as a transform factor, for <c>ScaleHost</c> and the window minimum.</summary>
     internal double ScaleFactor => UiScale.Factor(ScalePercent);
 
+    /// <summary>The chosen text scale, always one of <see cref="TextScale.Percents"/>. Independent of
+    /// the interface size: type can grow without the chrome around it.</summary>
+    internal int TextScalePercent { get; private set; } = TextScale.DefaultPercent;
+
     /// <summary>Whether high contrast is in force. Off by default: it changes what the app looks like.</summary>
     internal bool HighContrast { get; private set; }
 
@@ -50,6 +54,7 @@ internal sealed class AccessibilityService {
     /// <summary>Applies the persisted state, at startup and before the Settings page is built.</summary>
     internal void Apply(AppSettings settings) {
         SetScalePercent(settings.UiScalePercent);
+        SetTextScalePercent(settings.TextScalePercent);
         SetHighContrast(settings.HighContrast);
         SetDistinguishWithoutColor(settings.DistinguishWithoutColor);
         SetColorVision(settings.ColorVision);
@@ -61,6 +66,7 @@ internal sealed class AccessibilityService {
     /// <summary>Puts every option on the card back to what it ships as.</summary>
     internal void RestoreDefaults() {
         SetScalePercent(UiScale.DefaultPercent);
+        SetTextScalePercent(TextScale.DefaultPercent);
         SetHighContrast(false);
         SetDistinguishWithoutColor(false);
         SetColorVision(ColorVisionMode.None);
@@ -76,11 +82,31 @@ internal sealed class AccessibilityService {
         var changed = next != ScalePercent;
 
         ScalePercent = next;
-        _theme.ApplyUiScale(ScaleFactor, UiScale.PopupFontSize(ScalePercent));
+        _theme.ApplyUiScale(ScaleFactor, PopupFontSize);
 
         if (changed)
             Changed?.Invoke();
     }
+
+    /// <summary>Selects a text scale, on the same re-apply rule as <see cref="SetScalePercent"/>. It also
+    /// re-pushes the popup size, which is the one surface carrying both scales.</summary>
+    internal void SetTextScalePercent(int percent) {
+        var next = TextScale.Nearest(percent);
+        var changed = next != TextScalePercent;
+
+        TextScalePercent = next;
+        _theme.ApplyTextScale(TextScale.Sizes(TextScalePercent));
+        _theme.ApplyUiScale(ScaleFactor, PopupFontSize);
+
+        if (changed)
+            Changed?.Invoke();
+    }
+
+    /// <summary>The tooltip and context-menu type size. Those two sit outside every <c>ScaleHost</c>, so
+    /// unlike the rest of the app they have to carry the interface scale and the text scale themselves.
+    /// </summary>
+    private double PopupFontSize =>
+        UiScale.PopupFontSize(ScalePercent) * TextScale.Factor(TextScalePercent);
 
     /// <summary>Turns high contrast on or off. Re-applies unconditionally and announces only a real
     /// change, for the same reason <see cref="SetScalePercent"/> does.</summary>

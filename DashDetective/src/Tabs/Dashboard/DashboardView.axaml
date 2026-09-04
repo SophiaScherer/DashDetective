@@ -73,7 +73,7 @@
             <controls:WidgetPanel WidgetId="dashboard.cpu" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="CPU Utilization" Subtitle="{Binding CpuChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding CpuPercentText}" FontSize="12" Foreground="{DynamicResource ChartCpu}"/>
+                    <TextBlock Text="{Binding CpuPercentText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartCpu}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <!-- The body opens this device in Performance; the header keeps its drag and fold. -->
                 <Button Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
@@ -88,7 +88,7 @@
             <controls:WidgetPanel WidgetId="dashboard.memory" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="Memory Utilization" Subtitle="{Binding MemoryChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="12" Foreground="{DynamicResource ChartMemory}"/>
+                    <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartMemory}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <Button Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
                         ToolTip.Tip="Open Memory in Performance">
@@ -127,22 +127,22 @@
             <controls:WidgetPanel WidgetId="dashboard.network" MinWidth="300"
                                   layout:WidgetBoard.MaxSlotWidth="700" Title="Network Throughput">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding NetworkAdapterName}" FontSize="11" Foreground="{DynamicResource TextSubtle}"/>
+                    <TextBlock Text="{Binding NetworkAdapterName}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="16">
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↓ Download" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="↓ Download" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding NetworkDownText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetDown}"/>
-                                <TextBlock Text="{Binding NetworkDownUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkDownText}" FontSize="{DynamicResource TextSizeDisplay}" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetDown}"/>
+                                <TextBlock Text="{Binding NetworkDownUnit}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Spacing="1">
-                            <TextBlock Text="↑ Upload" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                            <TextBlock Text="↑ Upload" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextMuted}"/>
                             <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding NetworkUpText}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetUp}"/>
-                                <TextBlock Text="{Binding NetworkUpUnit}" FontSize="11" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+                                <TextBlock Text="{Binding NetworkUpText}" FontSize="{DynamicResource TextSizeDisplay}" FontWeight="SemiBold" Foreground="{DynamicResource ChartNetUp}"/>
+                                <TextBlock Text="{Binding NetworkUpUnit}" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>

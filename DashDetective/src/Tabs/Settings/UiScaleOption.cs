@@ -6,7 +6,8 @@ using System.Windows.Input;
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// A selectable entry in the interface-size segmented control (100% … 200%). Mirrors
+/// A selectable entry in a scale segmented control (100% … 200%) — the interface size and the text
+/// size both use it, since a percent segment is the same control either way. Mirrors
 /// <see cref="ThemeOption"/>: an observable <see cref="IsSelected"/> flag plus a command that reports
 /// the click back to the owning view-model.
 /// </summary>

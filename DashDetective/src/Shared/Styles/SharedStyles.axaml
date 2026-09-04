@@ -101,25 +101,25 @@
 
     <!-- ===== Typography ===== -->
     <Style Selector="TextBlock.panelTitle">
-        <Setter Property="FontSize" Value="13.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSubhead}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
     <Style Selector="TextBlock.cardLabel">
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardValue">
-        <Setter Property="FontSize" Value="26"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeHero}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
     </Style>
     <Style Selector="TextBlock.cardUnit">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.cardSub">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
@@ -128,11 +128,11 @@
          read at one size; Processes' 22pt summary figure is a genuinely different scale and stays local
          to that tab until a second one wants it. -->
     <Style Selector="TextBlock.tileLabel">
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="TextBlock.tileValue">
-        <Setter Property="FontSize" Value="16.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeHeadingLarge}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
     </Style>
@@ -140,7 +140,7 @@
     <!-- Chart key entry (used by the ChartLegend widget). Matches cardSub, so a legend reads as part of
          the chart's caption line rather than as another readout. -->
     <Style Selector="TextBlock.legendLabel">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
     </Style>
 
@@ -150,7 +150,7 @@
          TextSubtle vs TextMuted) while rendering the same thing, so the header row now reads the same
          on every tab. -->
     <Style Selector="TextBlock.colHead">
-        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
@@ -158,7 +158,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="TextBlock.sortArrow">
-        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeMicro}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
     </Style>
@@ -170,11 +170,11 @@
         <Setter Property="Padding" Value="0,7"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoKey">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
     </Style>
     <Style Selector="Border.infoRow TextBlock.infoVal">
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -206,7 +206,7 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         <Setter Property="VerticalAlignment" Value="Top"/>
@@ -241,7 +241,7 @@
          its row and group selection. -->
     <Style Selector="CheckBox.optionCheck">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
@@ -273,7 +273,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="12,7"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
@@ -345,7 +345,7 @@
         <Setter Property="Background" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="Border.seg TextBlock">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
     </Style>
     <Style Selector="Border.seg.selected TextBlock">
@@ -382,7 +382,7 @@
     <Style Selector="Button.action">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
         <Setter Property="Padding" Value="16,9"/>
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -408,7 +408,7 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="6,2"/>
         <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
-        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
         <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -444,7 +444,7 @@
     <Style Selector="Border.field TextBox">
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="9,0"/>
     </Style>

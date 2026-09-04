@@ -111,10 +111,10 @@
                     <Panel>
                         <!-- Exactly one of these three shows at a time (see the view model): a blank card
                              while the filesystem answers would read as "nothing found". -->
-                        <TextBlock Text="Searching…" Margin="10,12" FontSize="12.5"
+                        <TextBlock Text="Searching…" Margin="10,12" FontSize="{DynamicResource TextSizeBody}"
                                    Foreground="{DynamicResource TextSubtle}"
                                    IsVisible="{Binding ShowSearching}"/>
-                        <TextBlock Text="No matches" Margin="10,12" FontSize="12.5"
+                        <TextBlock Text="No matches" Margin="10,12" FontSize="{DynamicResource TextSizeBody}"
                                    Foreground="{DynamicResource TextSubtle}"
                                    IsVisible="{Binding ShowNoResults}"/>
 
@@ -132,16 +132,16 @@
                                                   VerticalAlignment="Center" Data="{Binding Icon}"
                                                   IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                                             <StackPanel Grid.Column="1" Margin="10,0" Spacing="1">
-                                                <TextBlock Text="{Binding Title}" FontSize="12.5"
+                                                <TextBlock Text="{Binding Title}" FontSize="{DynamicResource TextSizeBody}"
                                                            TextTrimming="CharacterEllipsis"
                                                            Foreground="{DynamicResource TextPrimary}"/>
-                                                <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
                                                            TextTrimming="CharacterEllipsis"
                                                            Foreground="{DynamicResource TextSubtle}"
                                                            IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                             </StackPanel>
                                             <Border Grid.Column="2" Classes="resultTag">
-                                                <TextBlock Text="{Binding CategoryLabel}" FontSize="10"
+                                                <TextBlock Text="{Binding CategoryLabel}" FontSize="{DynamicResource TextSizeMicro}"
                                                            Foreground="{DynamicResource TextMuted}"/>
                                             </Border>
                                         </Grid>

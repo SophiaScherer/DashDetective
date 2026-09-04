@@ -121,7 +121,7 @@
         <!-- 12.5, not the Processes table's 9: that one is read against a 12.5 row, this against a
              13.5 SemiBold panel title, where anything under about 12 reads as a dot rather than a
              chevron. -->
-        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
         <Setter Property="Text" Value="&#x25BE;"/>
     </Style>

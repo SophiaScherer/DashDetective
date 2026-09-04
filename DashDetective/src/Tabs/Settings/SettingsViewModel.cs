@@ -42,6 +42,8 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<AccentOption> AccentOptions { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
+
+    public ObservableCollection<UiScaleOption> TextScaleOptions { get; }
     public ObservableCollection<ColorVisionOption> ColorVisionOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
@@ -181,6 +183,10 @@ public partial class SettingsViewModel : ViewModelBase {
         UiScaleOptions = [];
         foreach (var percent in UiScale.Percents)
             UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
+
+        TextScaleOptions = [];
+        foreach (var percent in TextScale.Percents)
+            TextScaleOptions.Add(new UiScaleOption(percent, SelectTextScale));
 
         // Named for the deficiency rather than for the colors it swaps, because that is what someone
         // looking for this already knows the name of.
@@ -458,6 +464,12 @@ public partial class SettingsViewModel : ViewModelBase {
             Changed?.Invoke();
     }
 
+    private void SelectTextScale(UiScaleOption option) {
+        _accessibility.SetTextScalePercent(option.Percent);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
     /// <summary>Points the card's controls at whatever the service currently holds. Driven by the
     /// service's event rather than by the click, so an edit and a "Restore defaults" move them the same
     /// way and cannot disagree. Writing the toggle back through its own property is safe rather than
@@ -465,6 +477,9 @@ public partial class SettingsViewModel : ViewModelBase {
     private void ReflectAccessibility() {
         foreach (var option in UiScaleOptions)
             option.IsSelected = option.Percent == _accessibility.ScalePercent;
+
+        foreach (var option in TextScaleOptions)
+            option.IsSelected = option.Percent == _accessibility.TextScalePercent;
 
         HighContrast = _accessibility.HighContrast;
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;

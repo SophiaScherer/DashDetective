@@ -35,4 +35,23 @@
     <sys:Double x:Key="UiScale">1</sys:Double>
     <sys:Double x:Key="PopupFontSize">12.5</sys:Double>
     <sys:Boolean x:Key="ChartPatterns">False</sys:Boolean>
+
+    <!-- The type ladder, smallest to largest. Every FontSize in the app comes from here, so text scale
+         is one rewrite of these keys. Values mirror TextScale.BaseSizes; a test pins them together. -->
+    <sys:Double x:Key="TextSizeNano">9</sys:Double>
+    <sys:Double x:Key="TextSizeMicro">10</sys:Double>
+    <sys:Double x:Key="TextSizeMini">10.5</sys:Double>
+    <sys:Double x:Key="TextSizeCaption">11</sys:Double>
+    <sys:Double x:Key="TextSizeSmall">11.5</sys:Double>
+    <sys:Double x:Key="TextSizeCompact">12</sys:Double>
+    <sys:Double x:Key="TextSizeBody">12.5</sys:Double>
+    <sys:Double x:Key="TextSizeMedium">13</sys:Double>
+    <sys:Double x:Key="TextSizeSubhead">13.5</sys:Double>
+    <sys:Double x:Key="TextSizeTitle">14</sys:Double>
+    <sys:Double x:Key="TextSizeTitleLarge">15</sys:Double>
+    <sys:Double x:Key="TextSizeHeading">16</sys:Double>
+    <sys:Double x:Key="TextSizeHeadingLarge">16.5</sys:Double>
+    <sys:Double x:Key="TextSizeDisplay">18</sys:Double>
+    <sys:Double x:Key="TextSizeDisplayLarge">22</sys:Double>
+    <sys:Double x:Key="TextSizeHero">26</sys:Double>
 </ResourceDictionary>

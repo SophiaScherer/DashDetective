@@ -120,9 +120,11 @@ public class AccessibilityServiceTests {
             HighContrast = true,
             DistinguishWithoutColor = true,
             KeyboardReordering = false,
+            TextScalePercent = 125,
         });
 
         Assert.Equal(150, service.ScalePercent);
+        Assert.Equal(125, service.TextScalePercent);
         Assert.True(service.HighContrast);
         Assert.True(service.DistinguishWithoutColor);
         Assert.False(service.KeyboardReordering);
@@ -137,10 +139,12 @@ public class AccessibilityServiceTests {
         service.SetHighContrast(true);
         service.SetDistinguishWithoutColor(true);
         service.SetKeyboardReordering(false);
+        service.SetTextScalePercent(200);
 
         service.RestoreDefaults();
 
         Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
+        Assert.Equal(TextScale.DefaultPercent, service.TextScalePercent);
         Assert.False(service.HighContrast);
         Assert.False(service.DistinguishWithoutColor);
 

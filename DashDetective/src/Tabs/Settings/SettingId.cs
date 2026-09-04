@@ -9,6 +9,7 @@ public enum SettingId {
     Accent,
     ClockFormat,
     UiScale,
+    TextScale,
     HighContrast,
     DistinguishWithoutColor,
     ColorVision,

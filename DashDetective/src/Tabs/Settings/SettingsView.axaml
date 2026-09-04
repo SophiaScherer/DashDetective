@@ -19,11 +19,11 @@
              window narrows, and an untrimmed TextBlock overflows its column instead of clipping to it —
              the description drew straight under the segmented control at the window's minimum. -->
         <Style Selector="TextBlock.settingName">
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeMedium}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style Selector="TextBlock.settingDesc">
-            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSubtle}"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
@@ -186,6 +186,40 @@
                          where the Theme and Clock format strips above it do. -->
                     <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
                         <ItemsControl ItemsSource="{Binding UiScaleOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:UiScaleOption">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding Label}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+                </Border>
+
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.TextScale}">
+                <!-- Same five-segment shape as the interface size above, and narrowed by the same two
+                     scales, so it takes the same star columns rather than the fixed strip. -->
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.TextScale.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.TextScale.Description}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
+                        <ItemsControl ItemsSource="{Binding TextScaleOptions}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
@@ -609,7 +643,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="settings:ShortcutRowGroup">
                                     <StackPanel Spacing="8">
-                                        <TextBlock Text="{Binding Title}" FontSize="11.5" FontWeight="SemiBold"
+                                        <TextBlock Text="{Binding Title}" FontSize="{DynamicResource TextSizeSmall}" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextSubtle}"/>
                                         <ItemsControl ItemsSource="{Binding Rows}">
                                             <ItemsControl.ItemsPanel>
@@ -686,7 +720,7 @@
             </StackPanel>
         </controls:WidgetPanel>
 
-        <TextBlock HorizontalAlignment="Center" FontSize="11.5" Foreground="{DynamicResource TextFaint}"
+        <TextBlock HorizontalAlignment="Center" FontSize="{DynamicResource TextSizeSmall}" Foreground="{DynamicResource TextFaint}"
                    Text="{Binding VersionText}"/>
     </StackPanel>
 </UserControl>

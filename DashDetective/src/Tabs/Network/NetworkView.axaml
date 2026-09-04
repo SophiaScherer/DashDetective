@@ -32,7 +32,7 @@
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Height" Value="32"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
@@ -81,7 +81,7 @@
             <Setter Property="Height" Value="30"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -123,15 +123,15 @@
                                             <Ellipse Grid.Column="0" Width="9" Height="9" VerticalAlignment="Center"
                                                      Fill="{Binding DotBrush}"/>
                                             <StackPanel Grid.Column="1" Margin="11,0,8,0" Spacing="1">
-                                                <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium"
+                                                <TextBlock Text="{Binding Name}" FontSize="{DynamicResource TextSizeBody}" FontWeight="Medium"
                                                            Foreground="{DynamicResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Description}" FontSize="11"
+                                                <TextBlock Text="{Binding Description}" FontSize="{DynamicResource TextSizeCaption}"
                                                            Foreground="{DynamicResource TextSubtle}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
-                                                <TextBlock Text="{Binding StatusText}" FontSize="11.5" TextAlignment="Right"
+                                                <TextBlock Text="{Binding StatusText}" FontSize="{DynamicResource TextSizeSmall}" TextAlignment="Right"
                                                            Foreground="{Binding StatusBrush}"/>
-                                                <TextBlock Text="{Binding SpeedText}" FontSize="11" TextAlignment="Right"
+                                                <TextBlock Text="{Binding SpeedText}" FontSize="{DynamicResource TextSizeCaption}" TextAlignment="Right"
                                                            Foreground="{DynamicResource TextSubtle}"/>
                                             </StackPanel>
                                         </Grid>
@@ -164,17 +164,17 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="18">
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                                <TextBlock Text="↓" FontSize="12" Foreground="{DynamicResource ChartNetDown}"/>
-                                <TextBlock Text="{Binding DownText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="{Binding DownUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="↓" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetDown}"/>
+                                <TextBlock Text="{Binding DownText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock Text="{Binding DownUnit}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                                <TextBlock Text="↑" FontSize="12" Foreground="{DynamicResource ChartNetUp}"/>
-                                <TextBlock Text="{Binding UpText}" FontSize="12" Foreground="{DynamicResource TextMuted}"/>
-                                <TextBlock Text="{Binding UpUnit}" FontSize="12" Foreground="{DynamicResource TextSubtle}"/>
+                                <TextBlock Text="↑" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetUp}"/>
+                                <TextBlock Text="{Binding UpText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock Text="{Binding UpUnit}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="11"
+                        <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="{DynamicResource TextSizeCaption}"
                                    VerticalAlignment="Bottom" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
                     <TextBlock Classes="cardSub" Text="{Binding ThroughputChartCaption}"/>
@@ -209,7 +209,7 @@
                                   layout:WidgetBoard.MaxSlotWidth="900"
                                   WidgetId="network.connections" Title="Active Connections">
                 <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Text="{Binding ConnectionsSummary}" FontSize="11"
+                    <TextBlock Text="{Binding ConnectionsSummary}" FontSize="{DynamicResource TextSizeCaption}"
                                Foreground="{DynamicResource TextSubtle}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="10">
@@ -229,15 +229,15 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
                                     <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="{StaticResource TableRowHeight}">
-                                        <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="12"
+                                        <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="{DynamicResource TextSizeCompact}"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="11.5"
+                                        <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="{DynamicResource TextSizeSmall}"
                                                    FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSubtle}"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="11.5"
+                                        <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="{DynamicResource TextSizeSmall}"
                                                    VerticalAlignment="Center" Foreground="{Binding StateBrush}"/>
-                                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="11.5"
+                                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="{DynamicResource TextSizeSmall}"
                                                    VerticalAlignment="Center" TextAlignment="Right"
                                                    Foreground="{DynamicResource TextMuted}"/>
                                     </Grid>
