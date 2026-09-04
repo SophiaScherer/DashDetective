@@ -30,6 +30,9 @@ internal sealed class AccessibilityService {
     /// change to every chart that draws two series.</summary>
     internal bool DistinguishWithoutColor { get; private set; }
 
+    /// <summary>The colour-vision mode. None by default: it changes chart and status colours.</summary>
+    internal ColorVisionMode ColorVision { get; private set; }
+
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
 
@@ -38,6 +41,7 @@ internal sealed class AccessibilityService {
         SetScalePercent(settings.UiScalePercent);
         SetHighContrast(settings.HighContrast);
         SetDistinguishWithoutColor(settings.DistinguishWithoutColor);
+        SetColorVision(settings.ColorVision);
     }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
@@ -45,6 +49,7 @@ internal sealed class AccessibilityService {
         SetScalePercent(UiScale.DefaultPercent);
         SetHighContrast(false);
         SetDistinguishWithoutColor(false);
+        SetColorVision(ColorVisionMode.None);
     }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
@@ -78,6 +83,17 @@ internal sealed class AccessibilityService {
 
         DistinguishWithoutColor = enabled;
         _theme.ApplyChartPatterns(enabled);
+
+        if (changed)
+            Changed?.Invoke();
+    }
+
+    /// <summary>Selects a colour-vision mode, on the same terms as the options above.</summary>
+    internal void SetColorVision(ColorVisionMode mode) {
+        var changed = mode != ColorVision;
+
+        ColorVision = mode;
+        _theme.ApplyColorVision(mode);
 
         if (changed)
             Changed?.Invoke();

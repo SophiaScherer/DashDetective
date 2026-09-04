@@ -48,6 +48,11 @@ public sealed class ThemeService {
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
 
+    /// <summary>The colour-vision mode in force. While it is not
+    /// <see cref="ColorVisionMode.None"/> it OVERRIDES the accent's chart palette: a hue rotation applied
+    /// to a colour-blind-safe set is no longer colour-blind safe. The accent still drives the highlight.</summary>
+    public ColorVisionMode ColorVision { get; private set; }
+
     /// <summary>Whether high contrast is in force. Composes with light/dark rather than replacing them,
     /// so "high contrast light" and "high contrast dark" both exist.</summary>
     public bool HighContrast { get; private set; }
@@ -105,6 +110,10 @@ public sealed class ThemeService {
 
         WatchOsTheme(app);
         app.RequestedThemeVariant = Variant();
+
+        // The colour-vision tables are per-theme, so a theme change has to reinstall them.
+        if (ColorVision != ColorVisionMode.None)
+            ApplyVisionPalettes();
     }
 
     /// <summary>The variant for the current pair of selections.</summary>
@@ -118,13 +127,7 @@ public sealed class ThemeService {
 
         // High contrast has no "follow the OS" variant of its own, so System is resolved to whichever of
         // light or dark the OS is actually showing.
-        var dark = CurrentTheme switch {
-            AppTheme.Light => false,
-            AppTheme.Dark => true,
-            _ => OsPrefersDark(app: Application.Current),
-        };
-
-        return dark ? AppVariants.HighContrastDark : AppVariants.HighContrastLight;
+        return IsDarkIntended() ? AppVariants.HighContrastDark : AppVariants.HighContrastLight;
     }
 
     private static bool OsPrefersDark(Application? app) =>
@@ -152,8 +155,41 @@ public sealed class ThemeService {
     public void ApplyDefaultAppearance() {
         CurrentAccent = null;
         SetAccent(AccentPreset.Default);
-        SetChartSeries(ChartPalette.Default);
+        SetChartSeries(SeriesForCurrentSelections());
     }
+
+    /// <summary>
+    /// Applies a colour-vision mode: the status brushes are re-pointed at its set, and the charts take
+    /// its series palette in place of the accent-derived one.
+    /// </summary>
+    public void ApplyColorVision(ColorVisionMode mode) {
+        ColorVision = mode;
+        ApplyVisionPalettes();
+    }
+
+    /// <summary>Installs the tables for the current mode AND the current theme. Called again whenever the
+    /// theme changes, because the safe colours differ by background: what clears 3:1 on near-black is
+    /// light, what clears it on white is dark, and one set cannot be both.</summary>
+    private void ApplyVisionPalettes() {
+        SemanticBrushes.Apply(Theming.ColorVision.Status(ColorVision, IsDarkIntended()));
+        SetChartSeries(SeriesForCurrentSelections());
+    }
+
+    /// <summary>The series palette the current pair of selections implies. A colour-vision mode wins over
+    /// the accent, because rotating a safe palette by the accent's hue offset would undo exactly what
+    /// makes it safe.</summary>
+    private ChartSeriesColors SeriesForCurrentSelections() =>
+        Theming.ColorVision.Series(ColorVision, IsDarkIntended())
+        ?? (CurrentAccent is { } accent ? ChartPalette.Derive(accent.Color) : ChartPalette.Default);
+
+    /// <summary>Whether the variant about to be applied is a dark one. Read from the SELECTION rather
+    /// than from <c>ActualThemeVariant</c>, which has not caught up yet at the moment the palettes are
+    /// installed.</summary>
+    private bool IsDarkIntended() => CurrentTheme switch {
+        AppTheme.Light => false,
+        AppTheme.Dark => true,
+        _ => OsPrefersDark(Application.Current),
+    };
 
     /// <summary>
     /// Applies a single accent: the highlight becomes <paramref name="accent"/> and the graphs take the
@@ -162,7 +198,7 @@ public sealed class ThemeService {
     public void ApplyAccent(AccentPreset accent) {
         CurrentAccent = accent;
         SetAccent(accent);
-        SetChartSeries(ChartPalette.Derive(accent.Color));
+        SetChartSeries(SeriesForCurrentSelections());
     }
 
     /// <summary>

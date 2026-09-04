@@ -42,6 +42,7 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<AccentOption> AccentOptions { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
+    public ObservableCollection<ColorVisionOption> ColorVisionOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
     // ----- Alerts: one row per watched resource, plus how long a breach must last -----
@@ -171,6 +172,15 @@ public partial class SettingsViewModel : ViewModelBase {
         UiScaleOptions = [];
         foreach (var percent in UiScale.Percents)
             UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
+
+        // Named for the deficiency rather than for the colours it swaps, because that is what someone
+        // looking for this already knows the name of.
+        ColorVisionOptions = new ObservableCollection<ColorVisionOption> {
+            new("Off", ColorVisionMode.None, SelectColorVision),
+            new("Deuter.", ColorVisionMode.Deuteranopia, SelectColorVision),
+            new("Protan.", ColorVisionMode.Protanopia, SelectColorVision),
+            new("Tritan.", ColorVisionMode.Tritanopia, SelectColorVision),
+        };
 
         IntervalOptions = new ObservableCollection<IntervalOption> {
             new("0.5s", 0.5, SelectInterval),
@@ -440,6 +450,15 @@ public partial class SettingsViewModel : ViewModelBase {
 
         HighContrast = _accessibility.HighContrast;
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
+
+        foreach (var option in ColorVisionOptions)
+            option.IsSelected = option.Value == _accessibility.ColorVision;
+    }
+
+    private void SelectColorVision(ColorVisionOption option) {
+        _accessibility.SetColorVision(option.Value);
+        if (!_initializing)
+            Changed?.Invoke();
     }
 
     partial void OnDistinguishWithoutColorChanged(bool value) {

@@ -378,6 +378,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         UiScalePercent = _accessibility.ScalePercent,
         HighContrast = _accessibility.HighContrast,
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor,
+        ColorVision = _accessibility.ColorVision,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

@@ -25,6 +25,10 @@ public class PaletteOwnershipTests {
         "src/Services/Theming/ChartPalette.cs",
         "src/Services/Theming/SemanticBrushes.cs",
         "src/Services/Theming/AccentPreset.cs",
+        // The colour-blind-safe tables. Their hues cannot come from Palette.axaml: they are chosen by
+        // SEARCH against a dichromacy simulation, per theme and per deficiency, and the tests that verify
+        // them read this file. See ColorVisionTests.
+        "src/Services/Theming/ColorVision.cs",
         // The HTML report is a standalone document rendered by a browser, not app UI. It has no access
         // to the palette at all, and it must not: an exported file that only looked right inside
         // DashDetective would be the bug. Its colours are the document's, not the theme's.

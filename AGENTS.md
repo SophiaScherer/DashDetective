@@ -80,7 +80,15 @@ size** setting over a new `ScaleHost` (`src/Shared/Controls`) and `Accessibility
 (`AppVariants`) plus `PaletteContrastTests`, which measures the text ramp and records where the shipped
 themes miss AA; phase 5 added **color independence** — `Sparkline.PatternSecondSeries` dashes a two-series
 chart's second line and `ChartLegend.Pattern2` matches it. Its audit found **no other colour-only signal
-in the app**: every status indicator already carries text beside its colour, so do not "fix" one. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
+in the app**: every status indicator already carries text beside its colour, so do not "fix" one; phase 6
+added **colour-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
+simulates each deficiency and measures the result.
+
+Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
+instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
+would recolour the file-type glyphs and icon tints too. And **a colour palette is searched against the
+simulation, never chosen by eye**: every hand-picked assignment tried for that phase failed, in ways that
+are invisible on trichromatic vision. **Phase 3 (focus indicator) was reverted**: its premise was wrong — Avalonia's Fluent
 theme already draws a focus ring, and the styles written against template parts never matched. Still to
 come, one phase each: color independence, color-vision modes, accessible names, reduce motion, keyboard
 widget reordering, text scale. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not

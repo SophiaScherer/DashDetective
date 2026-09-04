@@ -11,6 +11,7 @@ public enum SettingId {
     UiScale,
     HighContrast,
     DistinguishWithoutColor,
+    ColorVision,
     AccessibilityDefaults,
     NavPosition,
     NavCollapse,

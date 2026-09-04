@@ -486,6 +486,21 @@ stays in its tab folder.
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
+        ColorVision.cs          (the colour-blind-safe tables: status and chart series, per MODE and per
+                                 THEME. Per-theme is not a nicety — a colour must clear 3:1 on its
+                                 background before its hue matters, and one set doing that on both
+                                 near-black and white leaves too narrow a lightness band to separate five
+                                 categories (measured: 11-16, against a bar of 20). The hues are
+                                 Okabe-Ito and the assignments were SEARCHED against a dichromacy
+                                 simulation; every hand-picked attempt failed. Its hex literals are why it
+                                 is in PaletteOwnershipTests' allowed list)
+        SemanticBrushes.cs      (the fixed semantic colours as brushes, for code that cannot reach
+                                 {StaticResource}. The STATUS brushes are mutable and each is its OWN
+                                 instance: Apply() re-points them for a colour-vision mode, and because
+                                 SolidColorBrush.Color is a styled property every consumer repaints with
+                                 no event and no service threaded through it. Aliasing them back onto the
+                                 fixed hues beside them — which is how they started — would drag the
+                                 file-type glyphs and the icon tints along with them)
         AppVariants.cs          (the app's own ThemeVariants: HighContrastDark / HighContrastLight, each
                                  INHERITING from the plain variant it thickens so only the differences
                                  need authoring. High contrast has to be a variant because a key inside

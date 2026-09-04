@@ -332,6 +332,8 @@ search and revealable on its own row.
   scheme is chosen rather than replacing it.
 - **Distinguish without color** (toggle, default **off**). Dashes the second series on a chart that
   draws two, and turns the legend's swatches into matching line marks.
+- **Color vision** (Off / Deuter. / Protan. / Tritan., default **Off**). Swaps the chart series and the
+  status colors for a set searched and verified against a simulation of that deficiency.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
   becoming a property on that service.
@@ -418,6 +420,70 @@ one — so this phase reaches the charts and stops.
 **What it does not reach**, and Phase 6 will: the chart series colors themselves. High contrast flattens
 the surfaces but leaves the pastel traces as they are, so a light-themed chart still draws a pale blue
 line on white. Patterns help tell two series apart; they do not make either easier to see.
+
+### Color-vision modes
+
+**Mutating the brush is the whole mechanism.** The five status colors are read by code, not by
+`{DynamicResource}` — `MainWindowViewModel`'s Live dot, `AdapterInfo`, `ConnectionRow`, `ProcessRow` and
+`StorageViewModel` each hold an `IBrush` from `SemanticBrushes`. `SolidColorBrush.Color` is a styled
+property, so re-pointing the shared instance repaints every one of them with no event to subscribe to
+and no service threaded through four view-models. The plan called for a `SemanticColor` identity, a
+`StatusBrushFor` seam and a `StatusChanged` event across five tabs; a probe showed none of it was needed.
+
+**The one string attached: a brush has UI-thread affinity.** `SolidColorBrush.Color` is a styled
+property, so setting it off the owning thread throws. The app only ever applies from the UI thread, but
+the test suite runs classes on whichever thread it likes and the first to touch a brush claims it — which
+is exactly how this surfaced, as four unrelated service tests passing alone and failing together.
+`SemanticBrushes.Apply` hops to the UI thread when it is not already on it.
+
+**The status brushes therefore have their own instances**, which is load-bearing rather than tidiness:
+they used to alias the fixed hues (`StatusGood` *was* `SemanticBrushes.Green`), and mutating an alias
+would drag every decorative use of that hue with it — the file-type glyphs, the hardware and toolkit
+icon tints. Those stay fixed on purpose: each is paired with a shape and a label, so hue is not the only
+channel there.
+
+**The palettes are per-theme, and that was forced by measurement.** A color has to clear 3:1 against the
+surface it is drawn on before its hue matters, and the colors that manage that on near-black are light
+while the ones that manage it on white are dark. One set for both leaves a lightness band too narrow for
+a dichromat to spread five categories across: the best such set separates by **11–16**, against a bar of
+20. Split by theme, dark reaches **35–50** and light **21.5** — which is also why the bar is 20 rather
+than the 25 first written down. That number is the light theme's measured ceiling, not a comfortable
+choice.
+
+**And the assignments are searched, not chosen.** Every hand-picked palette tried for this phase failed
+the simulation — warm-against-warm (`Warn`/`Bad`, `Gpu`/`Storage`) and cool-against-cool (`Good`/`Info`)
+collapse in ways that are invisible on trichromatic vision. What ships came out of a constrained search:
+Okabe-Ito hues, lightened or darkened per theme, with each role restricted to a family that reads
+correctly (nothing warm becomes "good", nothing green becomes "bad") and the greys kept muted so "off"
+is not the brightest mark on the page.
+
+**Red-green modes move "good" off green and onto blue**, because green beside red is the pair those
+deficiencies lose. Tritanopia keeps green and red, which it sees, and moves the middle step to amber
+instead.
+
+**A color-vision mode overrides the accent's chart palette.** `ChartPalette.Derive` rotates every hue by
+the accent's offset, and a rotation applied to a colour-blind-safe set is no longer safe. The accent
+still drives the highlight; only the series defer.
+
+### What the color-vision test found
+
+`ColorVisionTests` simulates each deficiency (Viénot 1999) over every table and measures CIE76 ΔE. Four
+checks: every pair separates, download and upload separate on their shared axis, every color clears 3:1
+on its own theme, and — the one that keeps the feature honest — the **authored** palette is measured
+under each deficiency so the modes cannot quietly become pointless.
+
+That last check found something worth recording. Under deuteranopia the authored green "good" and red
+"bad" come out **1.7** apart: the same color, on the single pair a user most needs to distinguish.
+Tritanopia lands at 19.1, just under the bar. **Protanopia scrapes over at 20.9**, because protanopia
+darkens red enough that green and red separate by lightness where deuteranopia leaves them identical. It
+keeps a mode regardless — a 0.9 margin is inside the error of any simulation, and it shares
+deuteranopia's confusion axis — but the number is asserted so nobody has to guess whether it was
+measured or assumed.
+
+**What this does not reach:** the two banners. The resource alert is amber and the notice green through
+`{StaticResource}`, so neither follows a mode. Both carry an icon and a sentence, so color is not their
+only channel — but a future phase wanting them to follow would have to move them to `{DynamicResource}`
+first.
 
 ### What the contrast test found
 

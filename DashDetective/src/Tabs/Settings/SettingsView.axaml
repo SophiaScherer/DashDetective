@@ -213,6 +213,40 @@
                 </Grid>
                 </Border>
 
+                <!-- Four segments, so this row wraps for the same reason the interface-size row above
+                     it does: both grid columns are star, and an Auto column would measure the strip
+                     against infinity and overflow the card instead of wrapping. -->
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ColorVision}">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="2" Margin="0,0,16,0">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.ColorVision.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.ColorVision.Description}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
+                        <ItemsControl ItemsSource="{Binding ColorVisionOptions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:ColorVisionOption">
+                                    <Button Classes="bare" Command="{Binding SelectCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+                </Border>
+
                 <Border Classes="settingRow revealFlash"
                         Tag="{x:Static settings:SettingId.DistinguishWithoutColor}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">

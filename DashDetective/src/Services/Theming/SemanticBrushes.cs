@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace DashDetective.Services.Theming;
 
@@ -51,25 +52,56 @@ public static class SemanticBrushes {
     public static IBrush RedSoft { get; } = new SolidColorBrush(RedColor, SoftAlpha);
 
     // ----- Status: what a colour means, rather than which hue it is -----
+    //
+    // Each of these is its OWN SolidColorBrush rather than an alias of the fixed hue above, and that is
+    // load-bearing: a colour-vision mode re-points them by mutating the instance, and an alias would drag
+    // every decorative use of the same hue with it — the file-type glyphs, the hardware and toolkit icon
+    // tints. Mutating rather than replacing is what lets the five consumers keep holding the brush and
+    // repaint anyway, with no event to subscribe to and no service to thread through them.
 
     /// <summary>Healthy, running, connected, live.</summary>
-    public static IBrush StatusGood { get; } = Green;
+    public static SolidColorBrush StatusGood { get; } = new(GreenColor);
 
     /// <summary>Degraded, suspended, transitional — not an error.</summary>
-    public static IBrush StatusWarn { get; } = Yellow;
+    public static SolidColorBrush StatusWarn { get; } = new(YellowColor);
 
     /// <summary>Failed or destructive.</summary>
-    public static IBrush StatusBad { get; } = Red;
+    public static SolidColorBrush StatusBad { get; } = new(RedColor);
 
     /// <summary>Informational, or a live-but-not-physical thing (a virtual adapter).</summary>
-    public static IBrush StatusInfo { get; } = Blue;
+    public static SolidColorBrush StatusInfo { get; } = new(BlueColor);
 
     /// <summary>Off, paused, disconnected, unknown.</summary>
-    public static IBrush StatusIdle { get; } = Neutral;
+    public static SolidColorBrush StatusIdle { get; } = new(NeutralColor);
 
     /// <summary>The soft fill paired with <see cref="StatusGood"/>.</summary>
-    public static IBrush StatusGoodSoft { get; } = GreenSoft;
+    public static SolidColorBrush StatusGoodSoft { get; } = new(GreenColor, SoftAlpha);
 
     /// <summary>The soft fill paired with <see cref="StatusWarn"/>.</summary>
-    public static IBrush StatusWarnSoft { get; } = YellowSoft;
+    public static SolidColorBrush StatusWarnSoft { get; } = new(YellowColor, SoftAlpha);
+
+    /// <summary>
+    /// Re-points the status brushes at a colour-vision mode's set. Only these seven move: the fixed hues
+    /// above stay put, because a file-type glyph or an icon tint is decoration paired with a shape and a
+    /// label, not a signal carried by colour alone.
+    ///
+    /// <b>A brush has UI-thread affinity</b> — <c>SolidColorBrush.Color</c> is a styled property, and
+    /// setting one off the owning thread throws. The app only ever calls this from the UI thread; the
+    /// hop exists for tests, where xUnit runs classes on whichever thread it likes and the first one to
+    /// touch a brush claims it for the rest of the run.
+    /// </summary>
+    public static void Apply(SemanticColors colors) {
+        if (!Dispatcher.UIThread.CheckAccess()) {
+            Dispatcher.UIThread.Post(() => Apply(colors));
+            return;
+        }
+
+        StatusGood.Color = colors.Good;
+        StatusWarn.Color = colors.Warn;
+        StatusBad.Color = colors.Bad;
+        StatusInfo.Color = colors.Info;
+        StatusIdle.Color = colors.Idle;
+        StatusGoodSoft.Color = colors.Good;
+        StatusWarnSoft.Color = colors.Warn;
+    }
 }

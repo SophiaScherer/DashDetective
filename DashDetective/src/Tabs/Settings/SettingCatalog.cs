@@ -18,7 +18,7 @@ public sealed class SettingCatalog {
     private SettingCatalog() {
         All = [
             Theme, Accent, ClockFormat,
-            UiScale, HighContrast, DistinguishWithoutColor, AccessibilityDefaults,
+            UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -66,6 +66,13 @@ public sealed class SettingCatalog {
         SettingId.DistinguishWithoutColor, "Accessibility", "Distinguish without color",
         "Dash the second line on charts that draw two, so color is never the only difference",
         Keywords: "colour color blind colorblind deuteranopia pattern dash dashed line chart distinguish legend");
+
+    // The description says what it swaps rather than naming the deficiencies twice — the control beside
+    // it already lists them.
+    public SettingEntry ColorVision { get; } = new(
+        SettingId.ColorVision, "Accessibility", "Color vision",
+        "Swap chart and status colors for a set chosen to stay distinct",
+        Keywords: "colour color blind colorblind vision deficiency deuteranopia protanopia tritanopia red green blue yellow palette");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(
