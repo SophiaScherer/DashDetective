@@ -40,6 +40,10 @@ internal sealed class AccessibilityService {
     /// <summary>Whether animated transitions are suppressed. Off by default: unchanged appearance.</summary>
     internal bool ReduceMotion { get; private set; }
 
+    /// <summary>Whether the keyboard can reorder widgets. On by default: an unused gesture costs
+    /// nothing, and dragging is otherwise the only way to rearrange a page.</summary>
+    internal bool KeyboardReordering { get; private set; } = true;
+
     /// <summary>Raised when an option actually changes, so the shell can resize and persist.</summary>
     internal event Action? Changed;
 
@@ -51,6 +55,7 @@ internal sealed class AccessibilityService {
         SetColorVision(settings.ColorVision);
         SetAnnounceUpdates(settings.AnnounceUpdates);
         SetReduceMotion(settings.ReduceMotion);
+        SetKeyboardReordering(settings.KeyboardReordering);
     }
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
@@ -61,6 +66,7 @@ internal sealed class AccessibilityService {
         SetColorVision(ColorVisionMode.None);
         SetAnnounceUpdates(true);
         SetReduceMotion(false);
+        SetKeyboardReordering(true);
     }
 
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
@@ -126,6 +132,16 @@ internal sealed class AccessibilityService {
             return;
 
         ReduceMotion = enabled;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Allows or refuses the keyboard reorder gesture. Nothing to apply — the shell reads this
+    /// before acting on the shortcut.</summary>
+    internal void SetKeyboardReordering(bool enabled) {
+        if (enabled == KeyboardReordering)
+            return;
+
+        KeyboardReordering = enabled;
         Changed?.Invoke();
     }
 }

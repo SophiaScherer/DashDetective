@@ -245,7 +245,9 @@ stays in its tab folder.
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed)
-        ReorderablePanel.cs     (the half of reordering both panels share: the saved order and its
+        ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
+                                 a drag does, so both persist through one path
+                                 the half of reordering both panels share: the saved order and its
                                  re-entrancy guard, the previewed order, the children on screen and
                                  where their slots were arranged. A base class rather than a helper
                                  each panel forwards to — the forwarding would have been most of what

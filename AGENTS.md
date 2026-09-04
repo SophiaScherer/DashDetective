@@ -100,8 +100,11 @@ type name. **Verify names through UI Automation against the running app** — th
 screen, and 360 of 711 interactive elements are still unnamed, 283 of them the Processes table. Phase 8 added **reduce motion**, and two selector
 rules with it: a bare type selector matches the EXACT type (`Window` never matches `MainWindow` — use
 `:is(Window)`), and a rule undoing a transition must sit in the file that declares it, since a local
-style outranks an app-level one. Still to come, one phase each: keyboard widget reordering and text
-scale — plus the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
+style outranks an app-level one. Phase 9 added **keyboard widget reordering**
+(`Ctrl+Shift+←/→`), which calls the drag's own Begin/Preview/Commit rather than a second mechanism. Its
+lesson is about the test harness, not the app: **synthesized arrow keys need `KEYEVENTF_EXTENDEDKEY`**,
+or Windows delivers a numpad press and eats the Shift — which looks exactly like a dead shortcut. Still
+to come: text scale, plus the Processes table's names and making the accent follow a color-vision mode. **Every option on that card is switchable off** — that is the rule the pass is built on, so do not
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.

@@ -336,6 +336,8 @@ search and revealable on its own row.
   status colors for a set searched and verified against a simulation of that deficiency.
 - **Reduce motion** (toggle, default **off**). Switches off the sliding and fading transitions and stops
   the loading pulse repeating.
+- **Keyboard reordering** (toggle, default **on**). `Ctrl+Shift+←/→` moves the widget or card the
+  keyboard is on. On by default because an unused gesture costs nothing.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
   becoming a property on that service.
@@ -447,6 +449,36 @@ A note on probing this one: the first attempt set a magenta `Background` on the 
 selector reached, saw no change, and looked like a failure. The rail sets `Background` as a local value
 in markup, and a local value beats any style setter — so the probe could never have shown anything. Pick
 a property the target has no local value for, or measure the real effect.
+
+### Keyboard reordering
+
+Dragging a widget was the only way to rearrange a page, which is a WCAG 2.1.1 failure on the mechanism
+every page is laid out with. `Ctrl+Shift+←/→` now moves whatever the keyboard is on.
+
+**It reuses the drag's own path rather than adding a second one.** `ReorderablePanel.TryMoveFocused`
+calls the same `BeginPreview` / `PreviewMove` / `CommitPreview` sequence a pointer drag does, so the
+order it produces, the identity it keys on and the `WidgetOrders` it persists are all the existing ones.
+Both panels that implement the seam get it, so it covers `WidgetBoard`'s widgets and `UniformFlowPanel`'s
+cards together.
+
+The gesture is answered in `MainWindow` rather than the view model, because it turns on which control has
+focus and only the window knows that. Focus lands on something *inside* a widget — a chevron, a button in
+its body — so the handler walks out to the nearest `ReorderablePanel` before asking it to move.
+
+**`Ctrl+Shift` rather than `Alt`+arrow**, which Processes already uses to sort and File Explorer to go up
+a folder. It is a `ShortcutCatalog` entry like every other gesture, so Help lists it and the Settings
+Keyboard card rebinds it.
+
+**A trap worth writing down, because it cost most of this phase.** Verifying it by driving the app with
+`keybd_event` showed the shortcut resolving to nothing at all, while `Ctrl+P` in the same run worked.
+Arrow keys are *extended* keys: synthesized without `KEYEVENTF_EXTENDEDKEY` they arrive as the numpad
+keys, and Windows strips the Shift off a numpad press. The feature was correct the whole time and the
+harness was wrong. Pass the flag (`0x0001` down, `0x0003` up) for any arrow, Home/End, Insert/Delete or
+Page Up/Down.
+
+**Verified through what it persists.** With the toggle on, one `Ctrl+Shift+→` from the Dashboard's CPU
+widget writes `dashboard.memory, dashboard.cpu, dashboard.system, dashboard.network` — the move
+committed. With the toggle off, the same keystroke writes nothing.
 
 ### Accessible names
 

@@ -59,6 +59,12 @@ public enum ShortcutId {
     PreviousPage,
     NextPage,
 
+    /// <summary>Moves the widget or card the keyboard is on one slot earlier.</summary>
+    MoveItemBack,
+
+    /// <summary>Moves it one slot later.</summary>
+    MoveItemForward,
+
     // ----- Appearance -----
     ToggleTheme,
 }

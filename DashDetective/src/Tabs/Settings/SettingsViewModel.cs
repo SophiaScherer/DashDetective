@@ -128,6 +128,9 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>Suppress animated transitions. Off by default.</summary>
     [ObservableProperty] private bool _reduceMotion;
 
+    /// <summary>Let the keyboard move widgets and cards. On by default.</summary>
+    [ObservableProperty] private bool _keyboardReordering;
+
     /// <summary>The footer product string, e.g. "DashDetective v0.1.0 · © 2026" — the name and version
     /// come from <see cref="AppInfo"/> (the real assembly metadata), not a hard-coded literal.</summary>
     public string VersionText => $"{AppInfo.Name} v{AppInfo.Version} · © 2026";
@@ -467,6 +470,7 @@ public partial class SettingsViewModel : ViewModelBase {
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
         AnnounceUpdates = _accessibility.AnnounceUpdates;
         ReduceMotion = _accessibility.ReduceMotion;
+        KeyboardReordering = _accessibility.KeyboardReordering;
 
         foreach (var option in ColorVisionOptions)
             option.IsSelected = option.Value == _accessibility.ColorVision;
@@ -474,6 +478,12 @@ public partial class SettingsViewModel : ViewModelBase {
 
     private void SelectColorVision(ColorVisionOption option) {
         _accessibility.SetColorVision(option.Value);
+        if (!_initializing)
+            Changed?.Invoke();
+    }
+
+    partial void OnKeyboardReorderingChanged(bool value) {
+        _accessibility.SetKeyboardReordering(value);
         if (!_initializing)
             Changed?.Invoke();
     }

@@ -143,6 +143,16 @@ public static class ShortcutCatalog {
         // offers a resolved id to the current page, so one id serves both. Text-guarded like that one.
         new(ShortcutId.FocusFilter, [new KeyGesture(Key.OemQuestion)],
             "/", "Focus the command filter", ShortcutScope.Toolkit, AllowInTextInput: false),
+
+        // ----- Layout -----
+        // Ctrl+Shift rather than Alt+arrow, which Processes uses to sort and File Explorer to go up.
+        new(ShortcutId.MoveItemBack,
+            [new KeyGesture(Key.Left, KeyModifiers.Control | KeyModifiers.Shift)],
+            "Ctrl+Shift+←", "Move the focused widget or card one slot earlier", ShortcutScope.Global),
+
+        new(ShortcutId.MoveItemForward,
+            [new KeyGesture(Key.Right, KeyModifiers.Control | KeyModifiers.Shift)],
+            "Ctrl+Shift+→", "Move it one slot later", ShortcutScope.Global),
     ];
 
     /// <summary>The default bindings grouped as the Help modal renders them. Generated from

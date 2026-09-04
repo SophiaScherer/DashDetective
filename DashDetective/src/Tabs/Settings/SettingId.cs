@@ -14,6 +14,7 @@ public enum SettingId {
     ColorVision,
     AnnounceUpdates,
     ReduceMotion,
+    KeyboardReordering,
     AccessibilityDefaults,
     NavPosition,
     NavCollapse,

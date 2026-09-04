@@ -49,6 +49,9 @@ public sealed record AppSettings {
     /// <summary>Suppress animated transitions and the loading pulse. Off by default.</summary>
     public bool ReduceMotion { get; init; }
 
+    /// <summary>Let the keyboard move widgets and cards. On by default.</summary>
+    public bool KeyboardReordering { get; init; } = true;
+
     public NavOrientation NavOrientation { get; init; } = NavOrientation.Left;
     public bool NavCollapsed { get; init; }
 

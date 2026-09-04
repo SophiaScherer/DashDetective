@@ -137,6 +137,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// however the setting is left — hiding behind an icon that never appears would strand the app.</summary>
     public bool ShowInTray => _settings.ShowInTray && TrayIntegration.HidesOnClose;
 
+    /// <summary>Whether the keyboard reorder gesture is allowed. Read by the window, which owns focus.</summary>
+    public bool KeyboardReordering => _accessibility.KeyboardReordering;
+
     /// <summary>Whether animated transitions are suppressed. The window carries this as a style class,
     /// which is what the motion rules select through.</summary>
     public bool ReduceMotion => _accessibility.ReduceMotion;
@@ -399,6 +402,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ColorVision = _accessibility.ColorVision,
         AnnounceUpdates = _accessibility.AnnounceUpdates,
         ReduceMotion = _accessibility.ReduceMotion,
+        KeyboardReordering = _accessibility.KeyboardReordering,
         RefreshIntervalSeconds = _settings.SelectedIntervalSeconds,
         ShowHiddenFiles = _fileExplorer.ShowHidden,
         PinnedCommands = _toolkit.EncodePins(),

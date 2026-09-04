@@ -19,7 +19,7 @@ public sealed class SettingCatalog {
         All = [
             Theme, Accent, ClockFormat,
             UiScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
-            AccessibilityDefaults,
+            KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
             RefreshInterval, ResourceAlerts, NvidiaGpuMetrics, ShowInTray, LaunchAtStartup,
             AlertCpu, AlertMemory, AlertGpu, AlertDiskActivity, AlertLowDiskFree, AlertSustain,
@@ -84,6 +84,11 @@ public sealed class SettingCatalog {
         SettingId.ReduceMotion, "Accessibility", "Reduce motion",
         "Switch off sliding, fading and the loading pulse",
         Keywords: "motion animation transition fade slide pulse vestibular dizzy still static accessibility");
+
+    public SettingEntry KeyboardReordering { get; } = new(
+        SettingId.KeyboardReordering, "Accessibility", "Keyboard reordering",
+        "Move the focused widget or card with Ctrl+Shift and an arrow key",
+        Keywords: "keyboard reorder rearrange move widget card drag alternative arrow accessibility");
 
     // One entry for the card, like Shortcuts and WidgetPlacements: the reset is the whole card.
     public SettingEntry AccessibilityDefaults { get; } = new(

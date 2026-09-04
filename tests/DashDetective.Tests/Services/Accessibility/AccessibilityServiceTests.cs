@@ -119,11 +119,13 @@ public class AccessibilityServiceTests {
             UiScalePercent = 150,
             HighContrast = true,
             DistinguishWithoutColor = true,
+            KeyboardReordering = false,
         });
 
         Assert.Equal(150, service.ScalePercent);
         Assert.True(service.HighContrast);
         Assert.True(service.DistinguishWithoutColor);
+        Assert.False(service.KeyboardReordering);
     }
 
     /// <summary>"Restore defaults" resets the WHOLE card, which is what lets a later option be covered by
@@ -134,11 +136,15 @@ public class AccessibilityServiceTests {
         service.SetScalePercent(200);
         service.SetHighContrast(true);
         service.SetDistinguishWithoutColor(true);
+        service.SetKeyboardReordering(false);
 
         service.RestoreDefaults();
 
         Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
         Assert.False(service.HighContrast);
         Assert.False(service.DistinguishWithoutColor);
+
+        // The one option that defaults ON, so a reset that only cleared flags would miss it.
+        Assert.True(service.KeyboardReordering);
     }
 }

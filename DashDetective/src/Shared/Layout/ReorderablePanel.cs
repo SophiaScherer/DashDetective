@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Data;
+using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -78,6 +79,37 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
     public bool PreviewMove(Control item, int target) =>
         _childOrder.Move(Children.IndexOf(item), target, IsChildVisible);
+
+    /// <summary>Moves the item the keyboard is on by one slot, reporting whether it went anywhere.
+    /// Drag and keyboard share Begin/Preview/Commit, so both persist through one path.</summary>
+    public bool TryMoveFocused(Visual? focused, int delta) {
+        if (!Reorderable || focused is null)
+            return false;
+
+        var index = IndexOfContaining(focused);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= _visible.Count)
+            return false;
+
+        BeginPreview();
+        if (!PreviewMove(_visible[index], target))
+            return false;
+
+        CommitPreview();
+        InvalidateMeasure();
+        return true;
+    }
+
+    /// <summary>Which shown item contains the focus, or -1. Focus lands on something inside a widget —
+    /// a fold chevron, a button in its body — never on the panel's own child.</summary>
+    private int IndexOfContaining(Visual focused) {
+        for (var v = focused; v is not null; v = v.GetVisualParent()) {
+            var i = _visible.IndexOf((v as Control)!);
+            if (i >= 0)
+                return i;
+        }
+        return -1;
+    }
 
     public void CommitPreview() {
         var ids = _childOrder.Commit(DeclaredIds());
