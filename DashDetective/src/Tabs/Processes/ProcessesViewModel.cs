@@ -977,12 +977,37 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (!HasSelection)
             return;
 
-        ConfirmText = SelectionCount == 1
-            ? $"End “{NameOf(_selectedPids.First())}”? Any unsaved work in this process will be lost."
-            : $"End these {SelectionCount.ToString(CultureInfo.InvariantCulture)} processes? " +
-              "Any unsaved work in them will be lost.";
+        ConfirmText = DescribeEndTask(EndScope());
         ConfirmVisible = true;
     }
+
+    /// <summary>Everything End task would end: the selection, plus the hidden children of any collapsed
+    /// group in it. Re-derived at each use, since a poll can retire a PID between the two.</summary>
+    private IReadOnlyList<int> EndScope() =>
+        ProcessEndScope.Resolve(_lastRoots, _selectedPids, _expandedPids);
+
+    /// <summary>The confirmation prompt. It counts the resolved processes, not the selected rows — a
+    /// collapsed group is one row standing for many, and the prompt must not promise fewer than it
+    /// ends.</summary>
+    private string DescribeEndTask(IReadOnlyList<int> pids) {
+        var rows = SelectionCount;
+        var total = pids.Count;
+        const string Loss = " Any unsaved work in them will be lost.";
+
+        if (total <= 1)
+            return $"End “{NameOf(pids.Count == 1 ? pids[0] : _selectedPids.First())}”? " +
+                   "Any unsaved work in this process will be lost.";
+        if (rows == 1)
+            return $"End “{NameOf(pids[0])}” and the {Count(total - 1)} processes grouped " +
+                   "under it?" + Loss;
+        if (total == rows)
+            return $"End these {Count(total)} processes?" + Loss;
+
+        return $"End these {Count(rows)} selected items and the {Count(total - rows)} processes they " +
+               "group?" + Loss;
+    }
+
+    private static string Count(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>A process's name for a message. Visible rows first, falling back to the snapshot — a
     /// selected process the filter is hiding still has to be nameable.</summary>
@@ -1014,7 +1039,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (_selectedPids.Count == 0)
             return;
 
-        var pids = new List<int>(_selectedPids);
+        var pids = EndScope();
         var failed = new List<int>();
         foreach (var pid in pids)
             if (_terminator.Request(pid) != ProcessEndOutcome.Ended)

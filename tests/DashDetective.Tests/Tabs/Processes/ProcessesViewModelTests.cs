@@ -732,6 +732,107 @@ public class ProcessesViewModelTests {
         Assert.True(viewModel.WindowsCollapsed);
     }
 
+    // ----- End task: collapsed groups -----
+
+    /// <summary>An Edge-shaped group (700 with helpers 701 and 702) beside two flat processes, so a
+    /// collapsed row really does stand for more than itself.</summary>
+    private static (ProcessesViewModel ViewModel, FakeProcessTerminator Terminator) EndableGroup() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(700, 0, "browser.exe", ProcessCategory.App),
+            Proc(701, 700, "browser.exe", ProcessCategory.App),
+            Proc(702, 700, "browser.exe", ProcessCategory.App),
+            Proc(800, 0, "editor.exe", ProcessCategory.App),
+            Proc(900, 0, "helper.exe", ProcessCategory.Background),
+        ]);
+        var terminator = new FakeProcessTerminator();
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop(), terminator), terminator);
+    }
+
+    /// <summary>The bug: the row shows the whole group's aggregate, so ending it must end the whole
+    /// group. It used to end the root alone and leave the helpers running.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_CollapsedGroup_EndsEveryProcessUnderIt() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([700, 701, 702], terminator.Ended.OrderBy(pid => pid));
+    }
+
+    /// <summary>An expanded group's children are rows of their own, so the parent stands only for
+    /// itself.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_ExpandedGroup_EndsOnlyTheRowsPicked() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.ToggleExpand(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([700], terminator.Ended);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_CollapsedGroup_DropsTheChildRowsToo() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.ToggleExpand(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 700));
+        viewModel.ToggleExpand(Row(viewModel, 700));
+
+        viewModel.ConfirmEndTaskCommand.Execute(null);
+
+        Assert.Equal([700, 701, 702], terminator.Ended.OrderBy(pid => pid));
+        Assert.DoesNotContain(viewModel.Apps, row => row.Pid is 700 or 701 or 702);
+        Assert.Contains(viewModel.Apps, row => row.Pid == 800);
+    }
+
+    /// <summary>One row, many processes — the prompt has to say so, or it promises to end one thing and
+    /// ends three.</summary>
+    [Fact]
+    public async Task RequestEndTask_CollapsedGroup_CountsWhatItWillActuallyEnd() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Contains("browser.exe", viewModel.ConfirmText);
+        Assert.Contains("2 processes grouped under it", viewModel.ConfirmText);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_GroupAndAFlatRow_SeparatesTheRowsFromWhatTheyGroup() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 800), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Contains("2 selected items and the 2 processes they group", viewModel.ConfirmText);
+    }
+
+    /// <summary>Two childless rows still read as a plain count, unchanged by the tree walk.</summary>
+    [Fact]
+    public async Task RequestEndTask_FlatRowsOnly_ReadsAsAPlainCount() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 800));
+        viewModel.SelectRow(Row(viewModel, 900), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Equal("End these 2 processes? Any unsaved work in them will be lost.", viewModel.ConfirmText);
+    }
+
     /// <summary>Records what End task asked to kill, and answers with whatever outcome it is told to.
     /// A PID left out of <see cref="Outcomes"/> ends and exits cleanly.</summary>
     private sealed class FakeProcessTerminator : IProcessTerminator {
