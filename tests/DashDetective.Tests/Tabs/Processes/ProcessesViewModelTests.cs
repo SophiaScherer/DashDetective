@@ -464,7 +464,7 @@ public class ProcessesViewModelTests {
         viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
 
         viewModel.RequestEndTaskCommand.Execute(null);
-        viewModel.ConfirmEndTaskCommand.Execute(null);
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
 
         Assert.Equal([100, 300], terminator.Ended.OrderBy(pid => pid));
         Assert.Empty(viewModel.SelectedPids);
@@ -479,31 +479,31 @@ public class ProcessesViewModelTests {
     public async Task ConfirmEndTask_OneRefusal_StillEndsTheOthersAndCountsIt() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(300);
+        terminator.Outcomes[300] = ProcessEndOutcome.Denied;
         viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
         viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
 
-        viewModel.ConfirmEndTaskCommand.Execute(null);
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
 
         Assert.Equal([100, 200, 300], terminator.Ended.OrderBy(pid => pid));
         // The refusal keeps its row and its place in the selection; the other two are gone.
         Assert.Equal([300], viewModel.SelectedPids);
         // One failure is named rather than counted — the name is what tells the user which it was.
-        Assert.Equal("Couldn't end helper.exe", viewModel.ActionMessage);
+        Assert.Equal("Couldn't end helper.exe — it needs administrator rights", viewModel.ActionMessage);
     }
 
     [Fact]
     public async Task ConfirmEndTask_SeveralRefusals_CountsThemAgainstWhatWasAsked() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(100);
-        terminator.Refuse.Add(300);
+        terminator.Outcomes[100] = ProcessEndOutcome.Denied;
+        terminator.Outcomes[300] = ProcessEndOutcome.Denied;
         // browser.exe sorts first, so this range is every row on screen.
         viewModel.SelectRange(200, 400);
 
-        viewModel.ConfirmEndTaskCommand.Execute(null);
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
 
-        Assert.Equal("Couldn't end 2 of 4 processes", viewModel.ActionMessage);
+        Assert.Equal("Couldn't end 2 of 4 processes — 2 need administrator rights", viewModel.ActionMessage);
         Assert.Equal([100, 300], viewModel.SelectedPids.OrderBy(pid => pid));
     }
 
@@ -511,12 +511,12 @@ public class ProcessesViewModelTests {
     public async Task ConfirmEndTask_SingleRefusal_NamesTheProcess() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(100);
+        terminator.Outcomes[100] = ProcessEndOutcome.Denied;
         viewModel.SelectRow(Row(viewModel, 100));
 
-        viewModel.ConfirmEndTaskCommand.Execute(null);
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
 
-        Assert.Equal("Couldn't end editor.exe", viewModel.ActionMessage);
+        Assert.Equal("Couldn't end editor.exe — it needs administrator rights", viewModel.ActionMessage);
     }
 
     /// <summary>The selection outlives the filter, so what it holds is what gets ended — including a
@@ -528,7 +528,7 @@ public class ProcessesViewModelTests {
         viewModel.SelectRow(Row(viewModel, 100));
         viewModel.FilterText = "helper";
 
-        viewModel.ConfirmEndTaskCommand.Execute(null);
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
 
         Assert.Equal([100], terminator.Ended);
     }
@@ -732,15 +732,208 @@ public class ProcessesViewModelTests {
         Assert.True(viewModel.WindowsCollapsed);
     }
 
-    /// <summary>Records what End task asked to kill, and refuses whatever it is told to.</summary>
+    // ----- End task: confirming the kill took -----
+
+    /// <summary>The same fixture as <see cref="Endable"/>, over a batch whose waits cost nothing, so a
+    /// process that never exits is reported without spending the real budget.</summary>
+    private static (ProcessesViewModel ViewModel, FakeProcessTerminator Terminator,
+                    ControllableSnapshotProvider Provider) Verifying() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(100, 0, "editor.exe", ProcessCategory.App),
+            Proc(300, 0, "helper.exe", ProcessCategory.Background),
+        ]);
+        var terminator = new FakeProcessTerminator();
+        var batch = new ProcessEndBatch(
+            terminator, TimeSpan.FromMilliseconds(200), (_, _) => Task.CompletedTask);
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop(), terminator, batch),
+                terminator, provider);
+    }
+
+    /// <summary>The bug behind "it looked like it worked": a process that accepts the kill and then does
+    /// not go used to lose its row anyway, and the next poll put it back.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_ProcessNeverExits_KeepsItsRowAndItsSelection() {
+        var (viewModel, terminator, _) = Verifying();
+        await viewModel.LoadAsync();
+        terminator.Lingering.Add(100);
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Contains(viewModel.Apps, row => row.Pid == 100);
+        Assert.DoesNotContain(viewModel.Background, row => row.Pid == 300);
+        Assert.Equal([100], viewModel.SelectedPids);
+        Assert.Equal("Couldn't end editor.exe — it didn't respond", viewModel.ActionMessage);
+    }
+
+    /// <summary>An already-exited process is a removed row and nothing said about it — it used to read
+    /// as a failure the user could do nothing about.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_ProcessAlreadyGone_DropsTheRowWithoutComplaining() {
+        var (viewModel, terminator, _) = Verifying();
+        await viewModel.LoadAsync();
+        terminator.Outcomes[100] = ProcessEndOutcome.AlreadyGone;
+        viewModel.SelectRow(Row(viewModel, 100));
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.DoesNotContain(viewModel.Apps, row => row.Pid == 100);
+        Assert.Equal("", viewModel.ActionMessage);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_MixedFailures_NamesEachReason() {
+        var (viewModel, terminator, _) = Verifying();
+        await viewModel.LoadAsync();
+        terminator.Outcomes[100] = ProcessEndOutcome.Denied;
+        terminator.Lingering.Add(300);
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Equal("Couldn't end 2 of 2 processes — 1 needs administrator rights, 1 didn't respond",
+                     viewModel.ActionMessage);
+    }
+
+    /// <summary>A poll can retire a PID while the overlay is up, so the scope is re-derived on confirm
+    /// rather than carried over from the prompt.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_AfterAPollDropsAProcess_EndsOnlyWhatIsLeft() {
+        var (viewModel, terminator, provider) = Verifying();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        provider.Processes = [Proc(300, 0, "helper.exe", ProcessCategory.Background)];
+        await viewModel.LoadAsync();
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Equal([300], terminator.Ended);
+    }
+
+    // ----- End task: collapsed groups -----
+
+    /// <summary>An Edge-shaped group (700 with helpers 701 and 702) beside two flat processes, so a
+    /// collapsed row really does stand for more than itself.</summary>
+    private static (ProcessesViewModel ViewModel, FakeProcessTerminator Terminator) EndableGroup() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(700, 0, "browser.exe", ProcessCategory.App),
+            Proc(701, 700, "browser.exe", ProcessCategory.App),
+            Proc(702, 700, "browser.exe", ProcessCategory.App),
+            Proc(800, 0, "editor.exe", ProcessCategory.App),
+            Proc(900, 0, "helper.exe", ProcessCategory.Background),
+        ]);
+        var terminator = new FakeProcessTerminator();
+
+        return (new ProcessesViewModel(metrics, provider, new FakeProcessInterop(), terminator), terminator);
+    }
+
+    /// <summary>The bug: the row shows the whole group's aggregate, so ending it must end the whole
+    /// group. It used to end the root alone and leave the helpers running.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_CollapsedGroup_EndsEveryProcessUnderIt() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Equal([700, 701, 702], terminator.Ended.OrderBy(pid => pid));
+    }
+
+    /// <summary>An expanded group's children are rows of their own, so the parent stands only for
+    /// itself.</summary>
+    [Fact]
+    public async Task ConfirmEndTask_ExpandedGroup_EndsOnlyTheRowsPicked() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.ToggleExpand(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Equal([700], terminator.Ended);
+    }
+
+    [Fact]
+    public async Task ConfirmEndTask_CollapsedGroup_DropsTheChildRowsToo() {
+        var (viewModel, terminator) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.ToggleExpand(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 700));
+        viewModel.ToggleExpand(Row(viewModel, 700));
+
+        await viewModel.ConfirmEndTaskCommand.ExecuteAsync(null);
+
+        Assert.Equal([700, 701, 702], terminator.Ended.OrderBy(pid => pid));
+        Assert.DoesNotContain(viewModel.Apps, row => row.Pid is 700 or 701 or 702);
+        Assert.Contains(viewModel.Apps, row => row.Pid == 800);
+    }
+
+    /// <summary>One row, many processes — the prompt has to say so, or it promises to end one thing and
+    /// ends three.</summary>
+    [Fact]
+    public async Task RequestEndTask_CollapsedGroup_CountsWhatItWillActuallyEnd() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Contains("browser.exe", viewModel.ConfirmText);
+        Assert.Contains("2 processes grouped under it", viewModel.ConfirmText);
+    }
+
+    [Fact]
+    public async Task RequestEndTask_GroupAndAFlatRow_SeparatesTheRowsFromWhatTheyGroup() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 700));
+        viewModel.SelectRow(Row(viewModel, 800), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Contains("2 selected items and the 2 processes they group", viewModel.ConfirmText);
+    }
+
+    /// <summary>Two childless rows still read as a plain count, unchanged by the tree walk.</summary>
+    [Fact]
+    public async Task RequestEndTask_FlatRowsOnly_ReadsAsAPlainCount() {
+        var (viewModel, _) = EndableGroup();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 800));
+        viewModel.SelectRow(Row(viewModel, 900), extend: true, range: false);
+
+        viewModel.RequestEndTaskCommand.Execute(null);
+
+        Assert.Equal("End these 2 processes? Any unsaved work in them will be lost.", viewModel.ConfirmText);
+    }
+
+    /// <summary>Records what End task asked to kill, and answers with whatever outcome it is told to.
+    /// A PID left out of <see cref="Outcomes"/> ends and exits cleanly.</summary>
     private sealed class FakeProcessTerminator : IProcessTerminator {
         public List<int> Ended { get; } = [];
-        public HashSet<int> Refuse { get; } = [];
+        public Dictionary<int, ProcessEndOutcome> Outcomes { get; } = [];
 
-        public bool TryEnd(int pid) {
+        /// <summary>PIDs that accept the kill but never actually exit, for the bounded wait.</summary>
+        public HashSet<int> Lingering { get; } = [];
+
+        public ProcessEndOutcome Request(int pid) {
             Ended.Add(pid);
-            return !Refuse.Contains(pid);
+            return Outcomes.TryGetValue(pid, out var outcome) ? outcome : ProcessEndOutcome.Ended;
         }
+
+        public bool HasExited(int pid) => !Lingering.Contains(pid);
     }
 
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
