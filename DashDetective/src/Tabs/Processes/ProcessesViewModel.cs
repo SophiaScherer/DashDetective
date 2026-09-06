@@ -46,7 +46,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     private readonly SystemMetricsService _service;
     private readonly IProcessSnapshotProvider _snapshots;
     private readonly IProcessInterop _interop;
-    private readonly IProcessTerminator _terminator;
+    private readonly ProcessEndBatch _endBatch;
     private readonly MetricSubscriptions _subscriptions;
     private readonly SamplingGate _gate;
 
@@ -446,10 +446,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Test seam: the same page over explicit providers. The public ctor resolves the real ones,
     /// so the shell still builds this exactly as before.</summary>
     internal ProcessesViewModel(SystemMetricsService service, IProcessSnapshotProvider snapshots,
-                                IProcessInterop interop, IProcessTerminator? terminator = null) {
+                                IProcessInterop interop, IProcessTerminator? terminator = null,
+                                ProcessEndBatch? endBatch = null) {
         _snapshots = snapshots;
         _interop = interop;
-        _terminator = terminator ?? new ProcessTerminator();
+        _endBatch = endBatch ?? new ProcessEndBatch(terminator ?? new ProcessTerminator());
 
         _service = service;
         NameSort = new SortColumn<ProcessSortKey>(ProcessSortKey.Name, OnSort);
@@ -1027,43 +1028,81 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     [RelayCommand]
     private void CancelEndTask() => ConfirmVisible = false;
 
-    /// <summary>Confirms the End task: terminates every selected process and drops the rows immediately
-    /// (the next poll keeps things consistent). One protected or already-exited process does not stop
-    /// the rest — they are counted and reported together.
+    /// <summary>Confirms the End task: ends everything the selection stands for, waits for the kills to
+    /// take, and drops only the rows whose process is confirmed gone. One protected or unresponsive
+    /// process does not stop the rest — they are counted by reason and reported together, and each keeps
+    /// its row and its place in the selection so a survivor is visible rather than silently dropped.
     ///
-    /// It works over the selected PIDs rather than the visible rows, because the selection survives the
-    /// filter: a process the user picked and then filtered out of sight is still one they asked to end.</summary>
-    [RelayCommand]
-    private void ConfirmEndTask() {
+    /// The scope is re-derived here rather than reused from the prompt: a poll can retire a PID while the
+    /// overlay is up. It works over PIDs rather than visible rows, because the selection survives the
+    /// filter — a process the user picked and then filtered out of sight is still one they asked to end.
+    ///
+    /// Async and non-reentrant: the kills and the wait are off the UI thread, and the generated command
+    /// reports CanExecute false while it runs, which disables the button for free.</summary>
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private async Task ConfirmEndTask() {
         ConfirmVisible = false;
-        if (_selectedPids.Count == 0)
+        var pids = EndScope();
+        if (pids.Count == 0)
             return;
 
-        var pids = EndScope();
-        var failed = new List<int>();
+        // Named before anything is ended, since a killed process is nameable from neither the rows nor
+        // the next snapshot.
+        var names = new Dictionary<int, string>(pids.Count);
         foreach (var pid in pids)
-            if (_terminator.Request(pid) != ProcessEndOutcome.Ended)
-                failed.Add(pid);
+            names[pid] = NameOf(pid);
 
-        // Named before the rows go, since the row is where the name comes from.
-        ActionMessage = failed.Count switch {
-            0 => "",
-            1 => $"Couldn't end {NameOf(failed[0])}",
-            _ => $"Couldn't end {failed.Count.ToString(CultureInfo.InvariantCulture)} of " +
-                 $"{pids.Count.ToString(CultureInfo.InvariantCulture)} processes",
-        };
+        var token = _gate.Token;
+        ProcessEndReport report;
+        try {
+            report = await Task.Run(() => _endBatch.EndAsync(pids, token), token).ConfigureAwait(true);
+        } catch when (token.IsCancellationRequested) {
+            // Left the page mid-batch. The kills still stand; there is just no longer a list to update.
+            return;
+        }
 
-        var stillThere = new HashSet<int>(failed);
-        foreach (var pid in pids) {
-            if (stillThere.Contains(pid))
-                continue;
+        ActionMessage = DescribeFailures(report.Failures, pids.Count, names);
 
+        foreach (var pid in report.Exited) {
             _selectedPids.Remove(pid);
             RemoveRow(pid);
         }
 
-        SelectedRow = null;
+        if (_selectedPids.Count == 0)
+            SelectedRow = null;
         ApplySelection();
+    }
+
+    /// <summary>The message for what would not end. Says why, not just how many — "needs administrator
+    /// rights" is actionable and "didn't respond" is not, and they used to read identically.</summary>
+    private static string DescribeFailures(
+        IReadOnlyList<ProcessEndFailure> failures, int attempted, Dictionary<int, string> names) {
+        if (failures.Count == 0)
+            return "";
+
+        int denied = 0, unresponsive = 0;
+        foreach (var failure in failures) {
+            if (failure.Reason == ProcessEndOutcome.Denied)
+                denied++;
+            else
+                unresponsive++;
+        }
+
+        if (failures.Count == 1) {
+            var name = names.TryGetValue(failures[0].Pid, out var known) ? known : Count(failures[0].Pid);
+            return denied == 1
+                ? $"Couldn't end {name} — it needs administrator rights"
+                : $"Couldn't end {name} — it didn't respond";
+        }
+
+        var reasons = new List<string>(2);
+        if (denied > 0)
+            reasons.Add($"{Count(denied)} need{(denied == 1 ? "s" : "")} administrator rights");
+        if (unresponsive > 0)
+            reasons.Add($"{Count(unresponsive)} didn't respond");
+
+        return $"Couldn't end {Count(failures.Count)} of {Count(attempted)} processes — " +
+               string.Join(", ", reasons);
     }
 
     /// <summary>Drops a PID's row from whichever group holds it.</summary>
@@ -1086,7 +1125,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     public bool HandleShortcut(ShortcutId id) {
         if (ConfirmVisible) {
             switch (id) {
-                case ShortcutId.Activate: ConfirmEndTask(); return true;
+                case ShortcutId.Activate: ConfirmEndTaskCommand.Execute(null); return true;
                 case ShortcutId.Escape: CancelEndTask(); return true;
                 default: return true;
             }
