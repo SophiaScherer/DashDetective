@@ -479,7 +479,7 @@ public class ProcessesViewModelTests {
     public async Task ConfirmEndTask_OneRefusal_StillEndsTheOthersAndCountsIt() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(300);
+        terminator.Outcomes[300] = ProcessEndOutcome.Denied;
         viewModel.SetGroupSelected(ProcessCategory.App, selected: true);
         viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
 
@@ -496,8 +496,8 @@ public class ProcessesViewModelTests {
     public async Task ConfirmEndTask_SeveralRefusals_CountsThemAgainstWhatWasAsked() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(100);
-        terminator.Refuse.Add(300);
+        terminator.Outcomes[100] = ProcessEndOutcome.Denied;
+        terminator.Outcomes[300] = ProcessEndOutcome.Denied;
         // browser.exe sorts first, so this range is every row on screen.
         viewModel.SelectRange(200, 400);
 
@@ -511,7 +511,7 @@ public class ProcessesViewModelTests {
     public async Task ConfirmEndTask_SingleRefusal_NamesTheProcess() {
         var (viewModel, terminator) = Endable();
         await viewModel.LoadAsync();
-        terminator.Refuse.Add(100);
+        terminator.Outcomes[100] = ProcessEndOutcome.Denied;
         viewModel.SelectRow(Row(viewModel, 100));
 
         viewModel.ConfirmEndTaskCommand.Execute(null);
@@ -732,15 +732,21 @@ public class ProcessesViewModelTests {
         Assert.True(viewModel.WindowsCollapsed);
     }
 
-    /// <summary>Records what End task asked to kill, and refuses whatever it is told to.</summary>
+    /// <summary>Records what End task asked to kill, and answers with whatever outcome it is told to.
+    /// A PID left out of <see cref="Outcomes"/> ends and exits cleanly.</summary>
     private sealed class FakeProcessTerminator : IProcessTerminator {
         public List<int> Ended { get; } = [];
-        public HashSet<int> Refuse { get; } = [];
+        public Dictionary<int, ProcessEndOutcome> Outcomes { get; } = [];
 
-        public bool TryEnd(int pid) {
+        /// <summary>PIDs that accept the kill but never actually exit, for the bounded wait.</summary>
+        public HashSet<int> Lingering { get; } = [];
+
+        public ProcessEndOutcome Request(int pid) {
             Ended.Add(pid);
-            return !Refuse.Contains(pid);
+            return Outcomes.TryGetValue(pid, out var outcome) ? outcome : ProcessEndOutcome.Ended;
         }
+
+        public bool HasExited(int pid) => !Lingering.Contains(pid);
     }
 
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {

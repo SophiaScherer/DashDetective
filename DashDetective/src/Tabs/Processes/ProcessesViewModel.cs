@@ -1017,7 +1017,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         var pids = new List<int>(_selectedPids);
         var failed = new List<int>();
         foreach (var pid in pids)
-            if (!_terminator.TryEnd(pid))
+            if (_terminator.Request(pid) != ProcessEndOutcome.Ended)
                 failed.Add(pid);
 
         // Named before the rows go, since the row is where the name comes from.
