@@ -998,11 +998,29 @@ behind it that must not be quietly undone:
   constraining it clipped the box into a lozenge with no tick rather than scaling it. Do not "simplify"
   them back to a `CheckBox`. (`CheckBox.optionCheck` is still the right control in the options popup,
   where the row height does not matter.)
-- **End task ends the whole selection**, carries on past a protected or already-exited process, and
-  names a single failure while counting several. It works over the selected **PIDs**, not the visible
-  rows, for the same reason the pruning does. The kill sits behind `IProcessTerminator` purely so it is
-  testable — it used to be a bare `Process.Kill()` no test could reach without killing something on the
-  machine running the suite.
+- **End task ends what the selected rows stand for, not the PIDs they carry.** A collapsed row shows its
+  whole subtree's aggregate CPU and memory but carries only the root's PID, so ending the selection alone
+  killed the root and left a multi-process app's helpers running — and because the row was dropped
+  optimistically, it looked like it had worked until the next poll re-listed the orphans. `ProcessEndScope`
+  resolves the selection against the tree, taking descendants **only for a collapsed node**: an expanded
+  one's children are rows of their own, which the user selects or does not. The confirmation prompt counts
+  the resolved processes, so it cannot promise one and end twenty-seven. This is deliberately **not**
+  `Kill(entireProcessTree: true)` — nesting here needs a matching image name, so the OS tree is not this
+  tree, and that call would end processes the row never claimed and give one boolean for all of them.
+- **A kill is confirmed, not assumed.** `Process.Kill` only *requests* termination, so `ProcessEndBatch`
+  issues every kill first and then watches the survivors against **one budget shared by the whole batch**
+  (waiting per process would cost thirty budgets for thirty rows). Anything still alive at the deadline is
+  a failure and **keeps its row and its place in the selection** — a survivor has to be visible, which is
+  the whole point. Only confirmed exits are removed.
+- **A failure says why.** `ProcessEndOutcome` separates denied (needs elevation — actionable) from
+  unresponsive (not), and an already-exited process is a removed row with nothing said about it rather
+  than a failure the user can do nothing about. The message stays the page-local orange `ActionMessage`,
+  **not** `NoticeService`: that banner is green, success-only and expires after five seconds.
+- End task works over **PIDs**, not the visible rows, for the same reason the pruning does, and the scope
+  is re-derived on confirm because a poll can retire a PID while the overlay is up. The command is async
+  and non-reentrant, so the kills and the wait leave the UI thread and the button disables itself while it
+  runs. The kill sits behind `IProcessTerminator` purely so it is testable — it used to be a bare
+  `Process.Kill()` no test could reach without killing something on the machine running the suite.
 - **The actions live on the table's filter row**, not the summary strip, beside the rows they act on and
   next to a selection count. Rows also carry a context menu (End task / Properties / Expand-collapse /
   Copy PID) **declared once and shared**, never per row — a per-row `MenuFlyout` would build a few
