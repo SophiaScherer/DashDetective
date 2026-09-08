@@ -24,6 +24,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Help](#help)
 - [Storage](#storage)
 - [Page lifecycle](#page-lifecycle)
+- [Wheel scrolling](#wheel-scrolling)
 - [Widget system](#widget-system)
 - [Multi-GPU](#multi-gpu)
 - [Repo-hygiene / portfolio pass](#repo-hygiene--portfolio-pass)
@@ -1431,6 +1432,40 @@ hardware/inventory loads). Measured on the development machine: ~3 % of one core
 own 1 Hz clock timer, which is not gated.
 
 Closing the window also **says so once** — see `/Shell/TrayNotice` in *Folder Structure*.
+
+## Wheel scrolling
+
+*Shipped — branch `fixScrollLength`, 2026-09.*
+
+**A wheel notch moves what the OS asks for, not Avalonia's fixed 50 px.** `ScrollContentPresenter`
+hardcodes its step (`isLogical ? scrollable.ScrollSize.Height : 50`) and offers no property for it, so
+every surface moved 50 px per notch whatever Windows was set to — against Explorer's 88 px on the same
+machine and the same wheel, a little over half, which is what "scrolling doesn't scroll far enough" was.
+`WheelStep` turns the OS's lines-per-notch setting into a distance and `WheelScrolling` applies it,
+attached to every `ScrollViewer` by the app-level style in `SharedStyles.axaml` so the scrollers inside
+`ListBox`, `TreeView` and `WidgetTable` templates follow it as well as the ones views author. At the
+default 3 lines a notch now moves 90 px — measured on the page host, the virtualized Processes list and a
+nested panel list alike.
+
+Three decisions inside it:
+
+- **It extends the toolkit's scroll rather than replacing it.** The presenter's handler is a class handler
+  on a descendant, so it always runs first and cannot be preempted. Recording the offset as the event
+  tunnels down and finishing the movement from there on the way back up leaves scroll chaining, the choice
+  of which nested surface acts, and the clamping to the toolkit. **A surface the toolkit did not move is
+  left alone** — that is what an inner list at its end looks like, and stepping it anyway would break the
+  hand-off. Verified: the Network Adapters list steps 90 px to its end, then the page takes over at 90 px.
+- **A line is 30 px, not a line of text.** It is the app's table row, and about what Explorer steps by
+  (measured 29 px), so a notch here covers what a notch covers there. A text line would have landed at
+  ~56 px and left the complaint standing.
+- **The OS's edge values are honored, not filtered out.** `-1` is "one screen at a time" and moves a
+  viewport less one line of overlap; `0` is "do not scroll" and moves nothing. Any other negative reads as
+  an unreadable setting and takes the default 3 — a frozen wheel is the one outcome that looks like a
+  broken app.
+
+The setting is read per notch behind `IWheelScrollLines`, not cached: the Mouse control panel can change it
+under a running app. Linux keeps the value in each desktop environment's own store, so there is nothing
+single to read and no Linux arm — it takes `Unsupported*` and the default.
 
 ## Widget system
 
