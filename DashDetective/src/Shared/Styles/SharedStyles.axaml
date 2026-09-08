@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DashDetective.Shared.Controls">
     <!--
       Reusable styling for DashDetective. Applied app-wide via a class name
       (e.g. <Border Classes="panel"/>). Tabs and widgets share these so the look
@@ -490,7 +491,10 @@
          a right gutter (row/header padding) that the bar sits in; flush lists add that padding locally
          (see the Network Adapters/Connections rows) rather than via the ScrollViewer, which would also
          shift a sticky header out of alignment with its rows. -->
+    <!-- And the wheel steps by what the OS asks for: Avalonia's own step is a fixed 50 px, about half
+         what the rest of the desktop moves. -->
     <Style Selector="ScrollViewer">
         <Setter Property="AllowAutoHide" Value="False"/>
+        <Setter Property="controls:WheelScrolling.FollowsSystem" Value="True"/>
     </Style>
 </Styles>

@@ -787,6 +787,9 @@ temperature is the expected outcome, not a defect.
   in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
   left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
   authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
+- **Wheel behavior is app-level.** `WheelScrolling` is attached to every `ScrollViewer` by the
+  shared style, so a view that handles `PointerWheelChanged` itself takes that surface back out
+  of the OS's scroll setting.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 - **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions

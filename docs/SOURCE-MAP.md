@@ -28,6 +28,7 @@ stays in its tab folder.
 - [`src/Services/Accessibility`](#srcservicesaccessibility)
 - [`src/Services/Notifications`](#srcservicesnotifications)
 - [`src/Services/Links`](#srcserviceslinks)
+- [`src/Services/Input`](#srcservicesinput)
 - [`src/Services/Platform`](#srcservicesplatform)
 - [`src/Services/SystemMetrics`](#srcservicessystemmetrics)
 - [`src/Services/Network`](#srcservicesnetwork)
@@ -337,6 +338,18 @@ stays in its tab folder.
                                         board's visible children and change what a drop index means.
                                         WidgetTable is a table's chrome: header above a scrolling body,
                                         one gutter for both. Columns and sorting stay at the call site)
+        WheelScrolling.cs, WheelStep.cs
+                                       (the wheel step, attached to every ScrollViewer by the app-level
+                                        style in SharedStyles. Avalonia's own step is a HARDCODED 50 px
+                                        with no property to change it — a little over half what the rest
+                                        of the desktop moves. WheelStep turns the OS's lines-per-notch
+                                        setting into a distance; WheelScrolling applies it. It EXTENDS the
+                                        toolkit's scroll rather than replacing it: the presenter's handler
+                                        is a class handler on a descendant and always runs first, so
+                                        chaining, which nested surface acts, and the clamping stay the
+                                        toolkit's. A surface the toolkit did NOT move is left alone —
+                                        that is what an inner list at its end looks like, and stepping it
+                                        anyway would break the hand-off to the page)
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
@@ -589,6 +602,21 @@ stays in its tab folder.
                                  become an arbitrary launch. Soft-fails through Log.Warn — a service logs,
                                  a view model does not. The Action<string> ctor is the test seam, so the
                                  guard is provable without a browser existing)
+```
+
+## `src/Services/Input`
+
+```
+    /Input
+      IWheelScrollLines.cs           (seam: how far the OS asks one wheel notch to scroll. -1 is its
+                                      "one screen at a time", 0 its "do not scroll", null "cannot tell" —
+                                      the three cases WheelStep reads)
+      WindowsWheelScrollLines.cs     (SPI_GETWHEELSCROLLLINES, read per notch rather than cached: the
+                                      Mouse control panel can change it under a running app and the call
+                                      costs nothing. The annotation is on the CONSTRUCTOR so Interpret
+                                      stays covered on the Linux leg. Unsupported* sits at the bottom of
+                                      the file — Linux keeps this in each desktop environment's own
+                                      store, so there is nothing single to read and no Linux arm to write)
 ```
 
 ## `src/Services/Platform`
@@ -1666,8 +1694,31 @@ stays in its tab folder.
                                                          Encoding is EnumListCodec's; only Resolve, which
                                                          forces the pinned column leftmost, is local)
                                 ProcessSortState.cs     (codec for the remembered sort column+direction)
-                                IProcessTerminator.cs   (seam: ends a process. Exists so End task is
-                                                         testable — see ProcessTerminator.cs beside it)
+                                IProcessTerminator.cs   (seam: ends a process and reports whether it
+                                                         exited. Exists so End task is testable — see
+                                                         ProcessTerminator.cs beside it. NOT a platform
+                                                         seam: it is managed and touches no annotated
+                                                         platform API, so no Windows*/Unsupported* split
+                                                         and no [SupportedOSPlatform])
+                                ProcessEndOutcome.cs    (enum: Ended / AlreadyGone / Denied / Failed. A
+                                                         bool conflated "already gone" with "access
+                                                         denied", which are opposite things to tell the
+                                                         user — only one of them is actionable)
+                                ProcessEndScope.cs      (resolves a selection to the processes it stands
+                                                         for. A collapsed row shows its subtree's
+                                                         aggregate but carries only the root PID, so
+                                                         ending the selection alone left an app's helpers
+                                                         running. Descendants ONLY for a collapsed node.
+                                                         NOT Kill(entireProcessTree: true) — nesting here
+                                                         needs a matching image name, so the OS tree is
+                                                         not this tree and that call would end processes
+                                                         the row never claimed)
+                                ProcessEndBatch.cs      (issues every kill, then waits for the survivors
+                                                         against ONE budget shared by the batch — per
+                                                         process it would cost thirty budgets for thirty
+                                                         rows. Process.Kill only requests termination, so
+                                                         a row used to go on the request alone and come
+                                                         back on the next poll)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.
