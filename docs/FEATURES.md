@@ -573,35 +573,62 @@ and checkboxes, where the fix is table semantics rather than a name per control.
 (45), Performance (10), File Explorer (9), Toolkit (9) and Network (4). Dashboard, Storage and Hardware
 are at zero.
 
-### The accent is per-theme
+### The accent is one colour, and a ladder
 
-Every accent scored about **2:1 on the light theme** — Blue 2.01, Green 2.03, Orange 2.32, Purple 2.40 —
+Every accent scored about **2:1 on the light theme** {EM} Blue 2.01, Green 2.03, Orange 2.32, Purple 2.40 {EM}
 against a 4.5:1 bar for text. That matters because the accent *is* text in places: a stat card's figure,
-"18.9 / 31 GB". High contrast did not fix it, because that phase scoped the accent out.
+"18.9 / 31 GB". The first fix gave `AccentPreset` a hand-authored `AccentShades` set per theme, and that
+turned out to be two bugs stacked.
 
-So `AccentPreset` now holds an `AccentShades` set per theme. The two are authored rather than derived
-because they answer opposite questions: on near-black the accent must be light, on white it must be dark
-enough to read. `ThemeService.SetAccent` picks by theme and `ApplyVariant` reinstalls on a theme change,
-the same way the color-vision tables do. `AccentContrastTests` pins all of it — accent-as-text on its
-background, and on-accent text against both the fill and the hover fill.
+**The first: the two sets were authored independently and drifted.** Measured in CIE L\*, the light set
+had been built by a rule and was uniform across the four accents (fill spread **0.5**, hover 1.7, deep
+6.5); the dark set was picked from the comp and was not (fill **5.8**, hover 4.7, deep **12.5**). Purple
+and Orange sat visibly darker than Blue and Green, so each accent moved a different distance when the
+theme flipped. Hue and saturation drifted with it: Green's deep stop turned **19.0 degrees**, and Blue,
+Purple and Orange each lost 33-48 points of saturation.
 
-Two things the visual check caught that the numbers did not:
+`AccentTone` replaces both sets with one rule: **an accent is one authored identity colour, which is its
+fill, and every other shade is that identity re-lightened to a target CIE L\* from one ladder shared by
+all four.** Hue and saturation cannot vary. The rungs are Blue's own measured lightness, so the default
+accent reproduces byte-identically and `ChartPalette.Default.Cpu`, `AccentPreset.Color` and the Settings
+"Default" swatch are all untouched.
 
-- **The pill toggle's thumb was `TextStrong`**, which only worked while the checked track was a light
-  tint. With a dark accent fill on the light theme it became black-on-dark-orange. It is `OnAccent` now,
-  which also fixes the dark theme, where a white thumb on a bright accent had been about 1.9:1.
-- **The Settings swatches advertised the wrong color.** They painted the dark set on both themes, so
-  picking "orange" on light produced a shade the swatch never showed. `AccentOption.Refresh` repaints
-  them for the theme in force.
+**The second, which only a visual check found: uniform variation is not the same as no variation.** Each
+accent still dropped 26 L\* between themes, so it still read as a different colour {EM} most obviously on the
+app logo and the navigation highlight. The cause was that one `Accent` brush did two jobs. As a graphic
+(logo gradient, highlight bar, selected borders, buttons, toggles, the picker swatches) it should not move
+at all; as text on the page it has to darken. The text requirement was dragging the whole brand
+appearance dark in light mode.
 
-The accent's *identity* is still the dark hue: `AccentPreset.Color` feeds `ChartPalette.Derive`, so an
-accent rotates the chart palette by the same angle in either theme.
+So the two roles are split. `Accent`, `AccentHover`, `OnAccent`, `AccentSoft`, `AccentColor` and
+`AccentDeep` are **theme-invariant**; a new `AccentText`/`AccentTextHover` pair carries the places the
+accent is a `Foreground` and is the only accent shade a theme changes. **`Accent` is not a text brush** {EM}
+that is the rule to keep, and the ten Foreground call sites are the whole of the other side.
 
-**Still open: the accent does not follow a color-vision mode.** Measured against the mode palettes, a
-blue accent lands 6.7 ΔE from the GPU series under tritanopia and purple lands 10.2 from status Good
-under deuteranopia — close enough to be confusable where an accent fill and a status mark are read
-together. Fixing it means a CVD-safe accent set per mode and theme, verified the same way the other
-tables are.
+Two things fell out of the split. `AccentOption.Refresh` and `SettingsViewModel.RefreshAccentSwatches`
+are **gone**: a swatch no longer depends on the theme, so it is painted once in the constructor. And the
+earlier note that the swatches "advertised the wrong color" no longer applies, because there is only one
+colour to advertise.
+
+**The cost, recorded rather than fixed.** An accent fill or border on a white surface reads **2.0:1**,
+under WCAG's 3:1 for a graphic that carries meaning {EM} the navigation highlight bar and the
+selected-widget border. `AccentContrastTests` asserts it as a band, so raising it is a deliberate change
+rather than a silent one. It cannot be fixed by choosing a better colour: **no colour clears 4.5:1
+against both a near-black and a white page**, since the feasible luminance ranges do not overlap
+(L\* [52.6, 49.9] is empty). A single colour *can* clear 3:1 on both, over L\* [41.4, 61.7] {EM} that is the
+option if the graphic bar is later judged to outrank keeping today's brightness, and it would mean
+darkening the accent in dark mode too, plus moving on-accent text to white and darkening on hover instead
+of lightening.
+
+**Also still open: the accent does not follow a color-vision mode.** Measured against the mode palettes, a
+blue accent lands 6.7 dE from the GPU series under tritanopia and purple lands 10.2 from status Good under
+deuteranopia {EM} close enough to be confusable where an accent fill and a status mark are read together.
+Fixing it means a CVD-safe accent set per mode, verified the same way the other tables are.
+
+One thing the earlier visual check caught that the numbers did not, and which still holds: **the pill
+toggle's thumb was `TextStrong`**, which only worked while the checked track was a light tint. It is
+`OnAccent` now, which also fixes the dark theme, where a white thumb on a bright accent had been about
+1.9:1.
 
 ### Color-vision modes
 

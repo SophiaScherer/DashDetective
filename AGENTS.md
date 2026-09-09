@@ -84,9 +84,19 @@ in the app**: every status indicator already carries text beside its color, so d
 added **color-vision modes** (`ColorVision`, per mode AND per theme) plus `ColorVisionTests`, which
 simulates each deficiency and measures the result.
 
-The **accent is per-theme** for the same reason the color-vision tables are: it is drawn as text, and
-every accent measured about 2:1 on white before the light shades existed. `AccentPreset.Color` stays the
-dark hue — that is the accent's identity, used to derive the chart palette, not something rendered.
+An **accent is one identity colour plus a shared lightness ladder** (`AccentTone`), and the graphic
+shades — logo, highlight bar, borders, buttons, swatches — are the **same in both themes**: a brand colour
+that changed with the theme did not read as the same accent. Only `AccentText`/`AccentTextHover` follow the
+theme, because the identity measures about 2:1 on white against a 4.5:1 bar. **`Accent` is therefore not a
+text brush** — a Foreground takes `AccentText`; everything else takes `Accent`. Hue and saturation never
+vary; only lightness does, to a stated CIE L\* rung. `AccentPreset.Color` stays the identity, used to derive
+the chart palette.
+
+**A recorded cost, not an oversight:** an accent fill or border on a white surface reads 2.0:1, under
+WCAG's 3:1 for a graphic that carries meaning (the nav highlight bar, the selected-widget border).
+`AccentContrastTests` asserts it as a band so raising it is deliberate. No single colour can clear 4.5:1
+against both a near-black and a white page — the feasible luminance ranges do not overlap — which is why
+the text pair exists at all.
 
 Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
 instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
@@ -498,7 +508,8 @@ Manager, not just "looks plausible".
 **Theming (runtime light/dark + accent).** Colours live in `Palette.axaml` in three groups:
 *theme-variant* keys (surfaces, lines, text ramp, hover overlays) sit in
 `ResourceDictionary.ThemeDictionaries` under `Dark`/`Light` and flip with the app's `ThemeVariant`;
-the *accent set* (`Accent`, `AccentHover`, `OnAccent`, `AccentSoft`, `AccentColor`/`AccentDeep`) and the
+the *accent set* (`Accent`, `AccentHover`, `OnAccent`, `AccentSoft`, `AccentColor`/`AccentDeep`, plus the
+per-theme `AccentText`/`AccentTextHover`) and the
 per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStorage`, `ChartNetDown`,
 `ChartNetUp`) sit top-level and are **swapped at runtime**. **Rule:** any key that can change at runtime
 must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours

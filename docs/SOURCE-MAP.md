@@ -195,7 +195,10 @@ stays in its tab folder.
                                  ResourceDictionary.ThemeDictionaries, alongside a high-contrast
                                  dictionary for each keyed by {x:Static theming:AppVariants...}; accent +
                                  chart-series keys sit top-level and are swapped at runtime — see Theming
-                                 below. The high-contrast tables author only their DIFFERENCES and inherit
+                                 below. The authored accent values are Blue's, for the frame before
+                                 ThemeService runs, and AccentIdentityTests pins them against AccentTone.
+                                 Accent is NOT a text brush: a Foreground takes AccentText, the one accent
+                                 key that follows the theme. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
                                  other lines: at that weight it outshouts the trace drawn over it)
         SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it
@@ -514,11 +517,17 @@ stays in its tab folder.
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys)
         AppTheme.cs             (enum: System / Light / Dark)
-        AccentPreset.cs         (the four accents, each with an AccentShades set PER THEME. Authored, not
-                                 derived: on near-black an accent must be light, on white dark enough to
-                                 read as text — every accent scored ~2:1 on white before this. Color
-                                 stays the dark hue, since that is the accent's identity for
-                                 ChartPalette.Derive and nothing renders it directly)
+        AccentPreset.cs         (the four accents, each ONE identity colour. Its graphic AccentShades are
+                                 the same in both themes; only Text(dark) differs, and only because the
+                                 identity reads 2.01:1 on white against a 4.5:1 bar. Color stays the
+                                 identity, since that is what ChartPalette.Derive anchors on)
+        AccentTone.cs           (the rule those shades follow, stated once: hue and saturation never vary,
+                                 lightness targets a CIE L* rung from one ladder shared by all four
+                                 accents. The rungs are Blue's own measured lightness, so the default
+                                 accent reproduces byte-identically. WithLightness snaps when asked for a
+                                 colour's own lightness — the HSL round-trip is lossy by an 8-bit step, and
+                                 half an L* is finer than a channel can express. Pure colour maths over
+                                 Avalonia.Media value types, so it is unit-testable like ChartPalette)
         ColorVision.cs          (the color-blind-safe tables: status and chart series, per MODE and per
                                  THEME. Per-theme is not a nicety — a color must clear 3:1 on its
                                  background before its hue matters, and one set doing that on both
@@ -541,7 +550,8 @@ stays in its tab folder.
                                  same key into Application.Resources — the theme lookup wins and the write
                                  is silently ignored. That is why the accent and chart series, which are
                                  top-level keys, can be swapped that way and the surfaces cannot)
-        AccentPreset.cs         (record: one accent's Color/Hover/OnAccent/Deep; .All = the four)
+        AccentPreset.cs         (record: one accent's Identity, its graphic Shades and its per-theme
+                                 Text pair; .All = the four)
         ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
                                  accent, plus the ChartSeries enum and the ChartSeriesColors record.
                                  An accent ROTATES the palette rather than flattening it: the accent is the
