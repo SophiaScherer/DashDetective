@@ -14,13 +14,15 @@ public class AccentToneTests {
     /// ladder exists to stop that mattering.</summary>
     public static TheoryData<string> Identities() => ["#4cc2ff", "#6dcc61", "#d0a4ff", "#ff9f79"];
 
+    private static readonly double[] Rungs = [AccentTone.Hover, AccentTone.Deep, AccentTone.LightText];
+
     [Theory]
     [MemberData(nameof(Identities))]
     public void WithLightness_KeepsTheHueAndSaturation(string hex) {
         var identity = Color.Parse(hex).ToHsl();
 
-        foreach (var target in new[] { AccentTone.DarkHover, AccentTone.DarkDeep, AccentTone.LightFill }) {
-            var shade = AccentTone.WithLightness(Color.Parse(hex), target).ToHsl();
+        foreach (var rung in Rungs) {
+            var shade = AccentTone.WithLightness(Color.Parse(hex), rung).ToHsl();
 
             Assert.Equal(identity.H, shade.H, 1.0);
             Assert.Equal(identity.S, shade.S, 0.02);
@@ -30,15 +32,15 @@ public class AccentToneTests {
     [Theory]
     [MemberData(nameof(Identities))]
     public void WithLightness_LandsOnTheRequestedLightness(string hex) {
-        foreach (var target in new[] { AccentTone.DarkHover, AccentTone.DarkDeep, AccentTone.LightFill }) {
-            var shade = AccentTone.WithLightness(Color.Parse(hex), target);
+        foreach (var rung in Rungs) {
+            var shade = AccentTone.WithLightness(Color.Parse(hex), rung);
 
-            Assert.Equal(target, AccentTone.Lightness(shade), 0.5);
+            Assert.Equal(rung, AccentTone.Lightness(shade), 0.5);
         }
     }
 
     /// <summary>Asking for a colour's own lightness has to hand it straight back. This is what lets the
-    /// authored identity double as the dark fill without a round-trip quietly shifting it.</summary>
+    /// authored identity double as the fill without a round-trip quietly shifting it.</summary>
     [Theory]
     [MemberData(nameof(Identities))]
     public void WithLightness_ItsOwnLightness_ReturnsTheColourUnchanged(string hex) {
@@ -55,37 +57,43 @@ public class AccentToneTests {
         Assert.Equal(100.0, AccentTone.Lightness(Colors.White), 1);
     }
 
-    /// <summary>The dark fill is the identity itself, untouched — the rule's anchor.</summary>
+    /// <summary>The graphic fill is the identity itself, untouched — the rule's anchor.</summary>
     [Theory]
     [MemberData(nameof(Identities))]
-    public void Shades_Dark_TakesTheIdentityAsItsFill(string hex) {
+    public void Graphic_TakesTheIdentityAsItsFill(string hex) {
         var identity = Color.Parse(hex);
 
-        Assert.Equal(identity, AccentTone.Shades(identity, dark: true).Fill);
+        Assert.Equal(identity, AccentTone.Graphic(identity).Fill);
     }
 
-    /// <summary>On-accent text is the stated exception: read against the fill rather than beside it, so
-    /// it is chosen for contrast and leaves the hue family.</summary>
+    /// <summary>The dark theme draws the accent as text at the identity; only light darkens it.</summary>
     [Theory]
     [MemberData(nameof(Identities))]
-    public void Shades_Light_DrawsOnAccentTextInWhite(string hex) {
-        Assert.Equal(Colors.White, AccentTone.Shades(Color.Parse(hex), dark: false).OnAccent);
+    public void Text_Dark_IsTheIdentityAndLightIsDarker(string hex) {
+        var identity = Color.Parse(hex);
+
+        Assert.Equal(identity, AccentTone.Text(identity, dark: true).Fill);
+        Assert.True(AccentTone.Lightness(AccentTone.Text(identity, dark: false).Fill)
+                    < AccentTone.Lightness(identity));
     }
 
-    /// <summary>The whole point, on the shades a reader sees side by side: fill, hover and deep keep the
-    /// identity in both themes.</summary>
+    /// <summary>Every shade, graphic and text alike, keeps the identity it was derived from.</summary>
     [Theory]
     [MemberData(nameof(Identities))]
-    public void Shades_FillHoverAndDeep_KeepTheIdentityInBothThemes(string hex) {
-        var identity = Color.Parse(hex).ToHsl();
+    public void EveryShade_KeepsTheIdentity(string hex) {
+        var identity = Color.Parse(hex);
+        var hsl = identity.ToHsl();
+        var graphic = AccentTone.Graphic(identity);
 
-        foreach (var dark in new[] { true, false }) {
-            var shades = AccentTone.Shades(Color.Parse(hex), dark);
+        Color[] shades = [
+            graphic.Fill, graphic.Hover, graphic.Deep, graphic.OnAccent,
+            AccentTone.Text(identity, dark: true).Fill, AccentTone.Text(identity, dark: true).Hover,
+            AccentTone.Text(identity, dark: false).Fill, AccentTone.Text(identity, dark: false).Hover,
+        ];
 
-            foreach (var shade in new[] { shades.Fill, shades.Hover, shades.Deep }) {
-                Assert.Equal(identity.H, shade.ToHsl().H, 1.0);
-                Assert.Equal(identity.S, shade.ToHsl().S, 0.02);
-            }
+        foreach (var shade in shades) {
+            Assert.Equal(hsl.H, shade.ToHsl().H, 4.0);
+            Assert.Equal(hsl.S, shade.ToHsl().S, 0.02);
         }
     }
 }

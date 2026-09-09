@@ -5,47 +5,46 @@ namespace DashDetective.Services.Theming;
 
 /// <summary>
 /// The rule every accent shade follows: an accent is one authored identity colour, which <i>is</i> its
-/// dark fill, and every other shade is that identity re-lightened to a target CIE L*. Hue and saturation
-/// never change, so an accent cannot shift identity between themes.
+/// fill, and every other shade is that identity re-lightened to a target CIE L*. Hue and saturation never
+/// change, and the graphic shades do not change with the theme either.
 ///
-/// The rungs are Blue's measured lightness, so the default accent reproduces exactly. Pure colour maths
-/// over <c>Avalonia.Media</c> value types, so it is unit-testable like <see cref="ChartPalette"/>.
+/// The accent drawn as <b>text</b> is the one exception, darkened by the light theme because the identity
+/// reads 2.01:1 on white against a 4.5:1 bar. Pure colour maths over <c>Avalonia.Media</c> value types, so
+/// it is unit-testable like <see cref="ChartPalette"/>.
 /// </summary>
 internal static class AccentTone {
     // ----- The ladder: one set of rungs, shared by every accent -----
 
     /// <summary>Every authored identity sits on this rung; <c>AccentIdentityTests</c> fails if one drifts
     /// off it.</summary>
-    internal const double DarkFill = 74.4;
+    internal const double Fill = 74.4;
 
-    internal const double DarkHover = 79.1;
+    internal const double Hover = 79.1;
 
-    internal const double DarkDeep = 52.3;
-
-    /// <summary>Dark's on-accent text. Outside the hue family — see <see cref="OnAccent"/>.</summary>
-    internal const double DarkOnAccent = 14.0;
-
-    internal const double LightFill = 48.0;
-
-    internal const double LightHover = 42.2;
-
-    internal const double LightDeep = 30.5;
-
-    /// <summary>One accent's four shades for the theme being rendered.</summary>
-    internal static AccentShades Shades(Color identity, bool dark) => dark
-        ? new AccentShades(identity,
-                           WithLightness(identity, DarkHover),
-                           OnAccent(identity, dark: true),
-                           WithLightness(identity, DarkDeep))
-        : new AccentShades(WithLightness(identity, LightFill),
-                           WithLightness(identity, LightHover),
-                           OnAccent(identity, dark: false),
-                           WithLightness(identity, LightDeep));
+    internal const double Deep = 52.3;
 
     /// <summary>Text drawn <i>on</i> the fill: read against it rather than beside it, so it is chosen for
     /// contrast rather than identity.</summary>
-    internal static Color OnAccent(Color identity, bool dark) =>
-        dark ? WithLightness(identity, DarkOnAccent) : Colors.White;
+    internal const double OnAccent = 14.0;
+
+    /// <summary>The accent as text on a light page — the one rung a theme changes.</summary>
+    internal const double LightText = 48.0;
+
+    internal const double LightTextHover = 42.2;
+
+    /// <summary>The graphic shades: logo, highlight bar, borders, buttons, swatches. One set for both
+    /// themes — a brand colour that changed with the theme would not read as the same accent.</summary>
+    internal static AccentShades Graphic(Color identity) =>
+        new(identity,
+            WithLightness(identity, Hover),
+            WithLightness(identity, OnAccent),
+            WithLightness(identity, Deep));
+
+    /// <summary>The accent as text on the page background, for the theme being rendered.</summary>
+    internal static AccentTextShades Text(Color identity, bool dark) => dark
+        ? new AccentTextShades(identity, WithLightness(identity, Hover))
+        : new AccentTextShades(WithLightness(identity, LightText),
+                               WithLightness(identity, LightTextHover));
 
     /// <summary><paramref name="identity"/> at <paramref name="target"/> CIE L*, keeping its hue,
     /// saturation and alpha. Bisected because L* has no closed form through the sRGB transfer curve.</summary>
