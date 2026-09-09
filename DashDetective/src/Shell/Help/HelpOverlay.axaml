@@ -139,7 +139,7 @@
                                                 Margin="-6,-3" Padding="6,3" CornerRadius="5">
                                             <Grid ColumnDefinitions="Auto,*">
                                                 <TextBlock Grid.Column="0" Text="•" FontSize="{DynamicResource TextSizeBody}"
-                                                           Foreground="{DynamicResource Accent}"/>
+                                                           Foreground="{DynamicResource AccentText}"/>
                                                 <TextBlock Grid.Column="1" Margin="9,0,0,0" Text="{Binding Body}"
                                                            FontSize="{DynamicResource TextSizeBody}" LineHeight="19" TextWrapping="Wrap"
                                                            Foreground="{DynamicResource TextSecondary}"/>

@@ -196,7 +196,7 @@
                                             Padding="0,9">
                                         <Grid layout:GridColumns.Definitions="{StaticResource PartitionColumns}">
                                             <TextBlock Grid.Column="0" Text="{Binding Vol}" FontSize="{DynamicResource TextSizeBody}"
-                                                       FontWeight="SemiBold" Foreground="{DynamicResource Accent}"/>
+                                                       FontWeight="SemiBold" Foreground="{DynamicResource AccentText}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="{DynamicResource TextSizeBody}"
                                                        Foreground="{DynamicResource TextPrimary}"
                                                        TextTrimming="CharacterEllipsis"/>
@@ -270,7 +270,7 @@
                                                                                TextTrimming="CharacterEllipsis"/>
                                                                     <TextBlock Grid.Column="1" Text="✓" Margin="8,0,0,0"
                                                                                IsVisible="{Binding IsSelected}"
-                                                                               Foreground="{DynamicResource Accent}"/>
+                                                                               Foreground="{DynamicResource AccentText}"/>
                                                                 </Grid>
                                                             </Border>
                                                         </Button>

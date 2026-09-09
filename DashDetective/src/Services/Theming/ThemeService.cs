@@ -101,7 +101,7 @@ public sealed class ThemeService {
         WatchOsTheme(app);
         app.RequestedThemeVariant = Variant();
 
-        // The accent shades and the color-vision tables are both per-theme, so a theme change
+        // The accent's text pair and the color-vision tables are both per-theme, so a theme change
         // reinstalls them.
         SetAccent(CurrentAccent ?? AccentPreset.Default);
         if (ColorVision != ColorVisionMode.None)
@@ -214,13 +214,15 @@ public sealed class ThemeService {
             app.Resources[key] = size;
     }
 
-    /// <summary>Swaps the accent brushes, taking the shades for the theme being rendered. Every
-    /// accent-colored element binds these keys with {DynamicResource}, so the change is global.</summary>
+    /// <summary>Swaps the accent brushes. The graphic shades are the same in both themes; only the text
+    /// pair follows the one being rendered. Every accent-colored element binds these keys with
+    /// {DynamicResource}, so the change is global.</summary>
     private void SetAccent(AccentPreset accent) {
         if (Application.Current is not { } app)
             return;
 
-        var shades = accent.For(IsDarkIntended());
+        var shades = accent.Shades;
+        var text = accent.Text(IsDarkIntended());
         var res = app.Resources;
         res["Accent"] = new SolidColorBrush(shades.Fill);
         res["AccentHover"] = new SolidColorBrush(shades.Hover);
@@ -228,6 +230,8 @@ public sealed class ThemeService {
         res["AccentSoft"] = new SolidColorBrush(shades.Fill, 0.12); // faint fill (e.g. sidebar highlight)
         res["AccentColor"] = shades.Fill;                           // brand-gradient top stop
         res["AccentDeep"] = shades.Deep;                            // brand-gradient bottom stop
+        res["AccentText"] = new SolidColorBrush(text.Fill);         // the accent drawn as page text
+        res["AccentTextHover"] = new SolidColorBrush(text.Hover);
     }
 
     /// <summary>Sets the per-graph chart brushes the dashboard binds to via {DynamicResource ...}, then

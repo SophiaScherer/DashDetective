@@ -83,16 +83,23 @@
          what makes a modal modal — it swallows pointer input bound for the window behind it. -->
     <SolidColorBrush x:Key="ScrimBackground" Color="{StaticResource ShadeColor}" Opacity="0.55"/>
 
-    <!-- ===== Theme-invariant: accent set (swapped at runtime by ThemeService) ===== -->
+    <!-- ===== Theme-invariant: accent set (swapped at runtime by ThemeService) =====
+         Blue's shades, as AccentTone derives them, for the frame before ThemeService runs.
+         AccentIdentityTests pins them against it. The graphic shades below are the same in both themes;
+         only AccentText follows the theme, and these are its dark values. -->
     <SolidColorBrush x:Key="Accent" Color="{StaticResource BlueColor}"/>
-    <SolidColorBrush x:Key="AccentHover" Color="#66d0ff"/>
-    <SolidColorBrush x:Key="OnAccent" Color="#06263a"/>
+    <SolidColorBrush x:Key="AccentHover" Color="#71ceff"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#00273a"/>
+    <!-- The accent drawn as page text. The one accent shade a theme darkens: the identity reads 2.01:1
+         on white, against a 4.5:1 bar for text. -->
+    <SolidColorBrush x:Key="AccentText" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="AccentTextHover" Color="#71ceff"/>
     <!-- 12%, not the 16% of the soft fills above: this one sits behind body text, where a stronger
          fill costs contrast. -->
     <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource BlueColor}" Opacity="0.12"/>
     <!-- Colours (not brushes) for the brand-logo gradient stops. -->
     <Color x:Key="AccentColor">#4cc2ff</Color>
-    <Color x:Key="AccentDeep">#2a7fd4</Color>
+    <Color x:Key="AccentDeep">#0084c7</Color>
 
     <!-- ===== Theme-invariant: chart series (swapped at runtime by ThemeService) =====
          Each dashboard graph binds to one of these. In the "Default" look they hold the distinct

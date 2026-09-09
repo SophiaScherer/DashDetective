@@ -164,7 +164,7 @@
         </Style>
         <!-- "Some" is a dash on the soft fill, so it never reads as a tick. -->
         <Style Selector="Button.checkBox.some TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
         </Style>
 
         <!-- A placeholder bar. The pulse is what makes the block read as "still coming" rather than as
