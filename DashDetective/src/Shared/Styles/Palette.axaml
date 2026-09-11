@@ -192,10 +192,15 @@
             <SolidColorBrush x:Key="CardBackground" Color="#ffffff"/>
             <SolidColorBrush x:Key="FieldBackground" Color="#eceef1"/>
 
-            <!-- Lines & tracks -->
-            <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.10"/>
-            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.08"/>
-            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.20"/>
+            <!-- Lines & tracks. The separators are lifted above their dark counterparts rather than to
+                 WCAG's 3:1: they repeat what the surfaces and spacing already say, and at 3:1 a card edge
+                 reads as a rule. PaletteLineTests pins both the floor and the ceiling. -->
+            <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.18"/>
+            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.14"/>
+            <!-- The toggle's off track, and the one line token that carries state rather than structure:
+                 it is how an off switch is told from an on one, so it is held to WCAG's 3:1. The
+                 separators below are not — see PaletteLineTests. -->
+            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.423"/>
             <!-- Faint lattice drawn behind the larger utilization charts (dark's white 5.5% mirrored to a matching faint black). -->
             <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.08"/>
 

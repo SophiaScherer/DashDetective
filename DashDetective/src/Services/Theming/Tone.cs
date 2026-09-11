@@ -22,11 +22,25 @@ internal static class Tone {
     /// </summary>
     internal const double LightText = 48.0;
 
+    /// <summary>
+    /// Where a colour is drawn as a <b>graphic</b> on a light page — a chart trace, a legend swatch. The
+    /// bar is WCAG's 3:1 for a graphic that carries meaning rather than the 4.5:1 text needs, and at this
+    /// rung any hue reads 3.07:1 on white. A trace held to the text rung would be a heavy line under a
+    /// figure it is meant to sit beneath.
+    /// </summary>
+    internal const double LightGraphic = 61.0;
+
     /// <summary>A colour as light-theme text: darkened to <see cref="LightText"/>, but never lightened to
     /// it. The colour-vision tables were searched against a light background and already sit at or below
     /// the rung; lifting one back up would undo the separation the search bought.</summary>
-    internal static Color TextOnLight(Color color) =>
-        Lightness(color) > LightText ? WithLightness(color, LightText) : color;
+    internal static Color TextOnLight(Color color) => NoLighterThan(color, LightText);
+
+    /// <summary>A colour as a light-theme graphic, on the same darken-only rule.</summary>
+    internal static Color GraphicOnLight(Color color) => NoLighterThan(color, LightGraphic);
+
+    /// <summary>The colour at <paramref name="rung"/>, or itself if it is already at least that dark.</summary>
+    private static Color NoLighterThan(Color color, double rung) =>
+        Lightness(color) > rung ? WithLightness(color, rung) : color;
 
     /// <summary><paramref name="color"/>'s CIE L*. HSL lightness will not do: at one HSL value a
     /// saturated blue and a muted green read as different weights.</summary>

@@ -48,6 +48,7 @@ public sealed class ThemeService {
     /// <c>AccentText</c>: a trace keeps the authored colour, a figure drawn in it has to be readable.</summary>
     public IBrush TextBrushFor(ChartSeries series) => _seriesTextBrushes[(int)series];
 
+    // Seeded with the authored palette — the dark look — for the frame before the first apply.
     private IBrush[] _seriesBrushes = BuildSeriesBrushes(ChartPalette.Default);
 
     private IBrush[] _seriesTextBrushes = BuildSeriesBrushes(ChartPalette.Default);
@@ -265,20 +266,22 @@ public sealed class ThemeService {
     /// announces them for the pages that hold brushes instead of resource references.</summary>
     private void SetChartSeries(ChartSeriesColors series) {
         CurrentSeries = series;
-        _seriesBrushes = BuildSeriesBrushes(series);
+
+        var trace = TraceSeriesFor(series);
+        _seriesBrushes = BuildSeriesBrushes(trace);
 
         var text = TextSeriesFor(series);
         _seriesTextBrushes = BuildSeriesBrushes(text);
 
         if (Application.Current is { } app) {
             var res = app.Resources;
-            res["ChartCpu"] = new SolidColorBrush(series.Cpu);
-            res["ChartMemory"] = new SolidColorBrush(series.Memory);
-            res["ChartGpu"] = new SolidColorBrush(series.Gpu);
-            res["ChartStorage"] = new SolidColorBrush(series.Storage);
-            res["ChartNetDown"] = new SolidColorBrush(series.NetDown);
-            res["ChartNetUp"] = new SolidColorBrush(series.NetUp);
-            res["ChartThreads"] = new SolidColorBrush(series.Threads);
+            res["ChartCpu"] = new SolidColorBrush(trace.Cpu);
+            res["ChartMemory"] = new SolidColorBrush(trace.Memory);
+            res["ChartGpu"] = new SolidColorBrush(trace.Gpu);
+            res["ChartStorage"] = new SolidColorBrush(trace.Storage);
+            res["ChartNetDown"] = new SolidColorBrush(trace.NetDown);
+            res["ChartNetUp"] = new SolidColorBrush(trace.NetUp);
+            res["ChartThreads"] = new SolidColorBrush(trace.Threads);
 
             res["ChartCpuText"] = new SolidColorBrush(text.Cpu);
             res["ChartMemoryText"] = new SolidColorBrush(text.Memory);
@@ -292,6 +295,11 @@ public sealed class ThemeService {
         // Raised even with no Application (headless tests): the palette itself has still changed.
         SeriesChanged?.Invoke(series);
     }
+
+    /// <summary>The series as the chart draws them for the theme being rendered. Same rule as the text
+    /// shades, one rung lighter: a trace is a graphic, so the bar is 3:1 rather than 4.5:1.</summary>
+    private ChartSeriesColors TraceSeriesFor(ChartSeriesColors series) =>
+        IsDarkIntended() || ColorVision != ColorVisionMode.None ? series : ChartPalette.TraceShades(series);
 
     /// <summary>The series as text for the theme being rendered. Dark draws the authored colour; light
     /// darkens it to the readable rung — <b>except</b> under a color-vision mode, whose light table was
