@@ -76,12 +76,34 @@ public static class SemanticBrushes {
     /// <summary>The soft fill paired with <see cref="StatusWarn"/>.</summary>
     public static SolidColorBrush StatusWarnSoft { get; } = new(YellowColor, SoftAlpha);
 
-    /// <summary>Re-points the status brushes for a color-vision mode; mutating them repaints every
-    /// consumer with no event. The hop is because <c>Color</c> is a styled property with UI-thread
-    /// affinity — the app is always on it, xUnit is not.</summary>
-    public static void Apply(SemanticColors colors) {
+    // ----- Status, drawn as text rather than as a mark -----
+    // The authored hues are for a near-black page: warn reads 1.47:1 on white, good 2.03:1, against a
+    // 4.5:1 bar. A dot beside a label is a mark and keeps the hue; the label itself takes these. Same
+    // split as Accent / AccentText and ChartCpu / ChartCpuText.
+
+    /// <summary>The text counterpart of <see cref="StatusGood"/>.</summary>
+    public static SolidColorBrush StatusGoodText { get; } = new(GreenColor);
+
+    /// <summary>The text counterpart of <see cref="StatusWarn"/>.</summary>
+    public static SolidColorBrush StatusWarnText { get; } = new(YellowColor);
+
+    /// <summary>The text counterpart of <see cref="StatusBad"/>.</summary>
+    public static SolidColorBrush StatusBadText { get; } = new(RedColor);
+
+    /// <summary>The text counterpart of <see cref="StatusInfo"/>.</summary>
+    public static SolidColorBrush StatusInfoText { get; } = new(BlueColor);
+
+    /// <summary>The text counterpart of <see cref="StatusIdle"/>.</summary>
+    public static SolidColorBrush StatusIdleText { get; } = new(NeutralColor);
+
+    /// <summary>Re-points the status brushes for a color-vision mode and theme; mutating them repaints
+    /// every consumer with no event. <paramref name="text"/> is the same set as the theme draws it as
+    /// text, which differs from <paramref name="colors"/> only on the light theme. The hop is because
+    /// <c>Color</c> is a styled property with UI-thread affinity — the app is always on it, xUnit is
+    /// not.</summary>
+    public static void Apply(SemanticColors colors, SemanticColors text) {
         if (!Dispatcher.UIThread.CheckAccess()) {
-            Dispatcher.UIThread.Post(() => Apply(colors));
+            Dispatcher.UIThread.Post(() => Apply(colors, text));
             return;
         }
 
@@ -92,5 +114,11 @@ public static class SemanticBrushes {
         StatusIdle.Color = colors.Idle;
         StatusGoodSoft.Color = colors.Good;
         StatusWarnSoft.Color = colors.Warn;
+
+        StatusGoodText.Color = text.Good;
+        StatusWarnText.Color = text.Warn;
+        StatusBadText.Color = text.Bad;
+        StatusInfoText.Color = text.Info;
+        StatusIdleText.Color = text.Idle;
     }
 }

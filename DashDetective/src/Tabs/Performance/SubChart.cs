@@ -20,7 +20,8 @@ public partial class SubChart : ObservableObject {
     /// <summary>Caption shown above the mini chart, e.g. "CPU 0" or "Video Decode".</summary>
     public string Label { get; }
 
-    /// <summary>Line colour, matching the parent resource's <see cref="ResourceRow.ValueBrush"/>. Observable
+    /// <summary>Line colour, matching the parent resource's <see cref="ResourceRow.TraceBrush"/> — a
+    /// trace, not a figure, so it takes the authored series colour rather than the text shade. Observable
     /// for the same reason that one is: the palette follows the accent.</summary>
     [ObservableProperty] private IBrush _stroke = Brushes.Transparent;
 

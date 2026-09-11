@@ -114,9 +114,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
     // Fixed semantic brushes (theme/accent-independent), from the shared palette. The health colours
     // pair a hue with its soft tint for the pill fill.
-    private static readonly IBrush HealthyFg = SemanticBrushes.StatusGood;
+    private static readonly IBrush HealthyFg = SemanticBrushes.StatusGoodText;
     private static readonly IBrush HealthyBg = SemanticBrushes.StatusGoodSoft;
-    private static readonly IBrush CautionFg = SemanticBrushes.StatusWarn;
+    private static readonly IBrush CautionFg = SemanticBrushes.StatusWarnText;
     private static readonly IBrush CautionBg = SemanticBrushes.StatusWarnSoft;
     private static readonly IBrush BarBlue = SemanticBrushes.Blue;
     private static readonly IBrush BarGreen = SemanticBrushes.Green;

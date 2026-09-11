@@ -114,6 +114,21 @@
          re-hues with them. Pink keeps it clear of GPU's green. -->
     <SolidColorBrush x:Key="ChartThreads" Color="{StaticResource PinkColor}"/>
 
+    <!-- The same series drawn as TEXT — the Dashboard's percentages, the Processes summary figures,
+         Network's rates, Storage's readouts. Authored for a near-black page, a series colour reads about
+         2:1 on white, so the light theme darkens it to Tone.LightText; these are the dark values, for the
+         frame before ThemeService runs. Accent / AccentText, applied to the graphs. -->
+    <SolidColorBrush x:Key="ChartCpuText" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartMemoryText" Color="{StaticResource PurpleColor}"/>
+    <SolidColorBrush x:Key="ChartGpuText" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="ChartStorageText" Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="ChartNetDownText" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartNetUpText" Color="{StaticResource OrangeColor}"/>
+    <SolidColorBrush x:Key="ChartThreadsText" Color="{StaticResource PinkColor}"/>
+    <!-- Warn drawn as a sentence rather than as a mark. Swapped with the series, since it follows a
+         color-vision mode too. -->
+    <SolidColorBrush x:Key="StatusWarnText" Color="{StaticResource YellowColor}"/>
+
     <!-- ===== Theme-invariant: console surface =====
          The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
          output and execution log. Two features draw it, so it lives here rather than being declared
@@ -149,6 +164,12 @@
             <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.07"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#FFFFFF" Opacity="0.12"/>
 
+            <!-- The fixed hues drawn as text. Dark draws them at their authored lightness; only the
+                 light theme darkens them. -->
+            <SolidColorBrush x:Key="BlueText" Color="{StaticResource BlueColor}"/>
+            <SolidColorBrush x:Key="OrangeText" Color="{StaticResource OrangeColor}"/>
+            <SolidColorBrush x:Key="GreenText" Color="{StaticResource GreenColor}"/>
+
             <!-- Text (decreasing emphasis) -->
             <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" Opacity="0.90"/>
@@ -181,6 +202,13 @@
             <!-- Hover overlays -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.09"/>
+
+            <!-- The fixed hues drawn as text: Storage's read / write / temp readouts and the Processes
+                 action message. Darkened to Tone.LightText, the rung any hue reads 4.82:1 on white at.
+                 The hues themselves are unchanged — a glyph tint or a status mark still takes them. -->
+            <SolidColorBrush x:Key="BlueText" Color="#0078B6"/>
+            <SolidColorBrush x:Key="OrangeText" Color="#D23B00"/>
+            <SolidColorBrush x:Key="GreenText" Color="#35812A"/>
 
             <!-- Text (decreasing emphasis). Spaced on CIE L*, not on opacity: equal alpha steps are not
                  equal perceptual steps, and the ramp that came from them left TextMuted at 3.86:1 and

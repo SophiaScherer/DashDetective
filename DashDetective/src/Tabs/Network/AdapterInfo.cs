@@ -30,6 +30,9 @@ public sealed record AdapterInfo(
         _ => DisconnectedDot,
     };
 
-    /// <summary>Status text colour: greened for a live adapter, muted for a down one. Also fixed.</summary>
-    public IBrush StatusBrush => Kind == AdapterKind.Disconnected ? DisconnectedDot : ConnectedDot;
+    /// <summary>Status text colour: greened for a live adapter, muted for a down one. The text shades,
+    /// not the dot's — the authored hues read about 2:1 on a white page.</summary>
+    public IBrush StatusBrush => Kind == AdapterKind.Disconnected
+        ? SemanticBrushes.StatusIdleText
+        : SemanticBrushes.StatusGoodText;
 }

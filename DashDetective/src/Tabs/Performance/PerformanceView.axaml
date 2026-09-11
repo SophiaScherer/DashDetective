@@ -226,19 +226,19 @@
                     <controls:ChartLegend HorizontalAlignment="Right"
                                           IsVisible="{Binding SelectedResource.HasSecondSeries}"
                                           Label1="{Binding SelectedResource.LegendLabel1}"
-                                          Brush1="{Binding SelectedResource.ValueBrush}"
+                                          Brush1="{Binding SelectedResource.TraceBrush}"
                                           Pattern2="{DynamicResource ChartPatterns}"
                                           Label2="{Binding SelectedResource.LegendLabel2}"
-                                          Brush2="{Binding SelectedResource.ValueBrush2}"/>
+                                          Brush2="{Binding SelectedResource.TraceBrush2}"/>
 
                     <!-- Overall: one fixed-axis area chart tinted in the resource's colour, plus an optional
                          second series on the same axis (the adapter row's upload beside its download). -->
                     <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
                                         YMin="0" YMax="100"
                                         IsVisible="{Binding !SelectedResource.IsDetailed}"
-                                        Stroke="{Binding SelectedResource.ValueBrush}"
+                                        Stroke="{Binding SelectedResource.TraceBrush}"
                                         Points="{Binding SelectedResource.Points}"
-                                        Stroke2="{Binding SelectedResource.ValueBrush2}"
+                                        Stroke2="{Binding SelectedResource.TraceBrush2}"
                                         Points2="{Binding SelectedResource.Points2}"
                                         PatternSecondSeries="{DynamicResource ChartPatterns}"
                                         AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"

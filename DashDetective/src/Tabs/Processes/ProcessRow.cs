@@ -29,6 +29,7 @@ public partial class ProcessRow : ObservableObject {
         _name = info.Name;
         _status = info.Status;
         _statusBrush = BrushFor(info.Status);
+        _statusTextBrush = TextBrushFor(info.Status);
         _cpuText = FormatCpu(info.CpuPercent);
         _cpuHigh = info.CpuPercent > 10;
         _cpuMed = info.CpuPercent is > 5 and <= 10;
@@ -50,6 +51,9 @@ public partial class ProcessRow : ObservableObject {
 
     [ObservableProperty] private string _status;
     [ObservableProperty] private IBrush _statusBrush;
+
+    /// <summary>The Status column's colour — the same status, drawn as text rather than as the dot.</summary>
+    [ObservableProperty] private IBrush _statusTextBrush;
     [ObservableProperty] private string _cpuText;
     [ObservableProperty] private bool _cpuHigh;
     [ObservableProperty] private bool _cpuMed;
@@ -91,6 +95,7 @@ public partial class ProcessRow : ObservableObject {
         Name = info.Name;
         Status = info.Status;
         StatusBrush = BrushFor(info.Status);
+        StatusTextBrush = TextBrushFor(info.Status);
         CpuText = FormatCpu(info.CpuPercent);
         CpuHigh = info.CpuPercent > 10;
         CpuMed = info.CpuPercent is > 5 and <= 10;
@@ -121,4 +126,9 @@ public partial class ProcessRow : ObservableObject {
 
     private static IBrush BrushFor(string status) =>
         status == "Running" ? RunningBrush : WarnBrush;
+
+    /// <summary>The same status as text. The dot is a mark and keeps the hue; the Status column is read,
+    /// so on a light page it takes the darker shade.</summary>
+    private static IBrush TextBrushFor(string status) =>
+        status == "Running" ? SemanticBrushes.StatusGoodText : SemanticBrushes.StatusWarnText;
 }

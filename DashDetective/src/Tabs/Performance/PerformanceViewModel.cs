@@ -788,21 +788,25 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyPalette(_networkRow);
 
         foreach (var core in _cpuCores)
-            core.Chart.Stroke = _cpuRow.ValueBrush;
+            core.Chart.Stroke = _cpuRow.TraceBrush;
         foreach (var disk in _disks)
             ApplyPalette(disk.Row);
         foreach (var gpu in _gpus) {
             ApplyPalette(gpu.Row);
             foreach (var engine in gpu.Engines)
-                engine.Chart.Stroke = gpu.Row.ValueBrush;
+                engine.Chart.Stroke = gpu.Row.TraceBrush;
         }
     }
 
-    /// <summary>One row's tints, from its fixed series identity. The brushes are cached per series by
-    /// <see cref="ThemeService"/>, so re-applying an unchanged palette raises nothing.</summary>
+    /// <summary>One row's tints, from its fixed series identity. The value brushes are the series as text
+    /// and the trace brushes the series as the chart draws it — the same split as Accent / AccentText.
+    /// Both are cached per series by <see cref="ThemeService"/>, so re-applying an unchanged palette
+    /// raises nothing.</summary>
     private void ApplyPalette(ResourceRow row) {
-        row.ValueBrush = _theme.BrushFor(row.Series);
-        row.ValueBrush2 = row.Series2 is { } second ? _theme.BrushFor(second) : null;
+        row.ValueBrush = _theme.TextBrushFor(row.Series);
+        row.ValueBrush2 = row.Series2 is { } second ? _theme.TextBrushFor(second) : null;
+        row.TraceBrush = _theme.BrushFor(row.Series);
+        row.TraceBrush2 = row.Series2 is { } trace ? _theme.BrushFor(trace) : null;
     }
 
     private void OnSeriesChanged(ChartSeriesColors series) => ApplyPalette();
@@ -854,7 +858,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         var count = Math.Min(samples.Count, MaxLogicalProcessorCharts);
         for (var i = 0; i < count; i++) {
             var core = new CoreChart {
-                Instance = samples[i].Instance, Chart = new SubChart($"CPU {i}", _cpuRow.ValueBrush),
+                Instance = samples[i].Instance, Chart = new SubChart($"CPU {i}", _cpuRow.TraceBrush),
                 History = new MetricHistory(WindowSeconds),
             };
             _cpuCores.Add(core);
@@ -938,7 +942,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             if (gpu.EnginesByBase.ContainsKey(key))
                 continue;
             var chart = new EngineChart {
-                Key = key, Chart = new SubChart(FormatEngineLabel(key), gpu.Row.ValueBrush),
+                Key = key, Chart = new SubChart(FormatEngineLabel(key), gpu.Row.TraceBrush),
                 History = new MetricHistory(WindowSeconds),
             };
             gpu.Engines.Add(chart);

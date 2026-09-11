@@ -149,17 +149,17 @@
                             <StackPanel Grid.Column="0" Orientation="Horizontal">
                                 <TextBlock Classes="metricLabel" Text="Read "/>
                                 <TextBlock Classes="metricValue" Text="{Binding Read}"
-                                           Foreground="{StaticResource Blue}"/>
+                                           Foreground="{DynamicResource BlueText}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Classes="metricLabel" Text="Write "/>
                                 <TextBlock Classes="metricValue" Text="{Binding Write}"
-                                           Foreground="{StaticResource Orange}"/>
+                                           Foreground="{DynamicResource OrangeText}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <TextBlock Classes="metricLabel" Text="Temp "/>
                                 <TextBlock Classes="metricValue" Text="{Binding Temp}"
-                                           Foreground="{StaticResource Green}"/>
+                                           Foreground="{DynamicResource GreenText}"/>
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -294,7 +294,7 @@
                             <StackPanel Grid.Column="0" Spacing="2">
                                 <TextBlock Classes="tileLabel" Text="Active time"/>
                                 <TextBlock Classes="tileValue" Text="{Binding Page.DiskActive}"
-                                           Foreground="{DynamicResource ChartStorage}"/>
+                                           Foreground="{DynamicResource ChartStorageText}"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Center">
                                 <TextBlock Classes="tileLabel" Text="Avg response"/>

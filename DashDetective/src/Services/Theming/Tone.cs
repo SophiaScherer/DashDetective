@@ -15,6 +15,19 @@ namespace DashDetective.Services.Theming;
 /// backend.
 /// </summary>
 internal static class Tone {
+    /// <summary>
+    /// Where a colour is drawn as text on a light page. Contrast against white depends only on luminance,
+    /// and L* is a function of luminance, so <b>any</b> hue at this rung reads 4.82:1 on white — one
+    /// number serves the accent, the chart series and the semantic hues alike.
+    /// </summary>
+    internal const double LightText = 48.0;
+
+    /// <summary>A colour as light-theme text: darkened to <see cref="LightText"/>, but never lightened to
+    /// it. The colour-vision tables were searched against a light background and already sit at or below
+    /// the rung; lifting one back up would undo the separation the search bought.</summary>
+    internal static Color TextOnLight(Color color) =>
+        Lightness(color) > LightText ? WithLightness(color, LightText) : color;
+
     /// <summary><paramref name="color"/>'s CIE L*. HSL lightness will not do: at one HSL value a
     /// saturated blue and a muted green read as different weights.</summary>
     internal static double Lightness(Color color) {

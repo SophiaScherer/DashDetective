@@ -129,7 +129,7 @@
              rather than the accent, which is swappable and would sometimes read as approval. -->
         <Style Selector="TextBlock.formError">
             <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
-            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OrangeText}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 

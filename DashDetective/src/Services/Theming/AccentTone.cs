@@ -26,9 +26,8 @@ internal static class AccentTone {
     /// contrast rather than identity.</summary>
     internal const double OnAccent = 14.0;
 
-    /// <summary>The accent as text on a light page — the one rung a theme changes.</summary>
-    internal const double LightText = 48.0;
-
+    /// <summary>The step below <see cref="Tone.LightText"/>, which is where the accent's light text sits.
+    /// Only the accent has a pointer-over state, so only this half of the pair is accent-specific.</summary>
     internal const double LightTextHover = 42.2;
 
     /// <summary>The graphic shades: logo, highlight bar, borders, buttons, swatches. One set for both
@@ -42,6 +41,6 @@ internal static class AccentTone {
     /// <summary>The accent as text on the page background, for the theme being rendered.</summary>
     internal static AccentTextShades Text(Color identity, bool dark) => dark
         ? new AccentTextShades(identity, Tone.WithLightness(identity, Hover))
-        : new AccentTextShades(Tone.WithLightness(identity, LightText),
+        : new AccentTextShades(Tone.WithLightness(identity, Tone.LightText),
                                Tone.WithLightness(identity, LightTextHover));
 }

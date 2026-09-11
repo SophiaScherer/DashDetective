@@ -12,10 +12,10 @@ namespace DashDetective.Tabs.Network;
 /// State colours are fixed (not themed), matching the comp and the app's other status indicators.
 /// </summary>
 public partial class ConnectionRow : ObservableObject {
-    private static readonly IBrush EstablishedBrush = SemanticBrushes.StatusGood;
-    private static readonly IBrush ListeningBrush = SemanticBrushes.StatusInfo;
-    private static readonly IBrush TimeWaitBrush = SemanticBrushes.StatusWarn;
-    private static readonly IBrush OtherBrush = SemanticBrushes.StatusIdle;
+    private static readonly IBrush EstablishedBrush = SemanticBrushes.StatusGoodText;
+    private static readonly IBrush ListeningBrush = SemanticBrushes.StatusInfoText;
+    private static readonly IBrush TimeWaitBrush = SemanticBrushes.StatusWarnText;
+    private static readonly IBrush OtherBrush = SemanticBrushes.StatusIdleText;
 
     public ConnectionRow(ConnectionInfo info) {
         Key = info.Key;

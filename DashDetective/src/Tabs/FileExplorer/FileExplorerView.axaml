@@ -154,7 +154,7 @@
              transient failures (Processes' ActionMessage, the Toolkit form's field error). -->
         <Style Selector="TextBlock.pathError">
             <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
-            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OrangeText}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
