@@ -182,13 +182,17 @@
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.09"/>
 
-            <!-- Text (decreasing emphasis) -->
-            <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.95"/>
-            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.88"/>
-            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.70"/>
-            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.60"/>
-            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.50"/>
-            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.45"/>
+            <!-- Text (decreasing emphasis). Spaced on CIE L*, not on opacity: equal alpha steps are not
+                 equal perceptual steps, and the ramp that came from them left TextMuted at 3.86:1 and
+                 TextSubtle at 3.26:1 against a 4.5:1 bar with no room above to lift them into. These six
+                 sit 8.8 L* apart, which clears AA on every light surface and still reads as six steps.
+                 PaletteRampTests pins both halves of that. Dark keeps its own authored ramp. -->
+            <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.948"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.873"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.802"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.724"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.642"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.559"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
             <!-- See the dark theme's note; a touch stronger, as dark-on-light reads fainter. -->
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.22"/>

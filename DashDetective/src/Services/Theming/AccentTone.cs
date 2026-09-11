@@ -1,5 +1,4 @@
 using Avalonia.Media;
-using System;
 
 namespace DashDetective.Services.Theming;
 
@@ -9,8 +8,8 @@ namespace DashDetective.Services.Theming;
 /// change, and the graphic shades do not change with the theme either.
 ///
 /// The accent drawn as <b>text</b> is the one exception, darkened by the light theme because the identity
-/// reads 2.01:1 on white against a 4.5:1 bar. Pure colour maths over <c>Avalonia.Media</c> value types, so
-/// it is unit-testable like <see cref="ChartPalette"/>.
+/// reads 2.01:1 on white against a 4.5:1 bar. The lightness maths itself lives on <see cref="Tone"/>,
+/// which the text ramp and the chart series share; what is accent-specific is the rungs below.
 /// </summary>
 internal static class AccentTone {
     // ----- The ladder: one set of rungs, shared by every accent -----
@@ -36,56 +35,13 @@ internal static class AccentTone {
     /// themes — a brand colour that changed with the theme would not read as the same accent.</summary>
     internal static AccentShades Graphic(Color identity) =>
         new(identity,
-            WithLightness(identity, Hover),
-            WithLightness(identity, OnAccent),
-            WithLightness(identity, Deep));
+            Tone.WithLightness(identity, Hover),
+            Tone.WithLightness(identity, OnAccent),
+            Tone.WithLightness(identity, Deep));
 
     /// <summary>The accent as text on the page background, for the theme being rendered.</summary>
     internal static AccentTextShades Text(Color identity, bool dark) => dark
-        ? new AccentTextShades(identity, WithLightness(identity, Hover))
-        : new AccentTextShades(WithLightness(identity, LightText),
-                               WithLightness(identity, LightTextHover));
-
-    /// <summary><paramref name="identity"/> at <paramref name="target"/> CIE L*, keeping its hue,
-    /// saturation and alpha. Bisected because L* has no closed form through the sRGB transfer curve.</summary>
-    internal static Color WithLightness(Color identity, double target) {
-        // The HSL round-trip is lossy by an 8-bit step, and half an L* is finer than a channel can
-        // express, so a colour asked for its own lightness is handed straight back.
-        if (Math.Abs(Lightness(identity) - target) < 0.5)
-            return identity;
-
-        var hsl = identity.ToHsl();
-        double low = 0, high = 1;
-
-        // 24 halvings take the interval well below one 8-bit step.
-        for (var i = 0; i < 24; i++) {
-            var mid = (low + high) / 2;
-            if (Lightness(At(hsl, mid)) < target)
-                low = mid;
-            else
-                high = mid;
-        }
-
-        return At(hsl, (low + high) / 2);
-    }
-
-    /// <summary><paramref name="color"/>'s CIE L*. HSL lightness will not do: at one HSL value a
-    /// saturated blue and a muted green read as different weights.</summary>
-    internal static double Lightness(Color color) {
-        var y = Luminance(color);
-        return y > 0.008856 ? 116 * Math.Cbrt(y) - 16 : 903.3 * y;
-    }
-
-    /// <summary>An HSL colour at a different lightness, back as RGB.</summary>
-    private static Color At(HslColor hsl, double lightness) =>
-        HslColor.FromAhsl(hsl.A, hsl.H, hsl.S, lightness).ToRgb();
-
-    /// <summary>WCAG relative luminance, matching what the contrast tests measure.</summary>
-    private static double Luminance(Color c) =>
-        0.2126 * Linearise(c.R) + 0.7152 * Linearise(c.G) + 0.0722 * Linearise(c.B);
-
-    private static double Linearise(byte channel) {
-        var v = channel / 255.0;
-        return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
-    }
+        ? new AccentTextShades(identity, Tone.WithLightness(identity, Hover))
+        : new AccentTextShades(Tone.WithLightness(identity, LightText),
+                               Tone.WithLightness(identity, LightTextHover));
 }

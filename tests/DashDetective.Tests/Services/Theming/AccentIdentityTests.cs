@@ -24,7 +24,7 @@ public class AccentIdentityTests {
     [Theory]
     [MemberData(nameof(Accents))]
     public void EveryIdentity_SitsOnTheLaddersFillRung(string name) {
-        Assert.Equal(AccentTone.Fill, AccentTone.Lightness(Preset(name).Identity), 0.5);
+        Assert.Equal(AccentTone.Fill, Tone.Lightness(Preset(name).Identity), 0.5);
     }
 
     /// <summary>What the bug asked for: the logo, the navigation highlight and the picker swatch are the
@@ -71,7 +71,7 @@ public class AccentIdentityTests {
         };
 
         foreach (var (role, pick) in roles) {
-            var levels = AccentPreset.All.Select(a => AccentTone.Lightness(pick(a))).ToList();
+            var levels = AccentPreset.All.Select(a => Tone.Lightness(pick(a))).ToList();
 
             Assert.True(levels.Max() - levels.Min() < 0.5,
                 $"The {role} rung spans {levels.Max() - levels.Min():F1} L* across the four accents.");
