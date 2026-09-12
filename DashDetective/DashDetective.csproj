@@ -35,7 +35,7 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2"/>
         <!-- Queries the Windows Search index (the Search.CollatorDSO OLE DB provider) for universal
              search's file results. Version-aligned with System.Management above. -->
-        <PackageReference Include="System.Data.OleDb" Version="10.0.11"/>
-        <PackageReference Include="System.Management" Version="10.0.11"/>
+        <PackageReference Include="System.Data.OleDb" Version="10.0.12"/>
+        <PackageReference Include="System.Management" Version="10.0.12"/>
     </ItemGroup>
 </Project>
