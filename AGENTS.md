@@ -534,7 +534,7 @@ Manager, not just "looks plausible".
 
 ### Theming
 
-**Theming (runtime light/dark + accent).** Colours live in `Palette.axaml` in three groups:
+**Theming (runtime light/dark + accent + graph colors).** Colours live in `Palette.axaml` in three groups:
 *theme-variant* keys (surfaces, lines, text ramp, hover overlays) sit in
 `ResourceDictionary.ThemeDictionaries` under `Dark`/`Light` and flip with the app's `ThemeVariant`;
 the *accent set* (`Accent`, `AccentHover`, `OnAccent`, `AccentSoft`, `AccentColor`/`AccentDeep`, plus the
@@ -544,8 +544,8 @@ per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStor
 must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours
 `Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeResourceBindingTests` fails the build on a
 theme-dictionary key bound statically — how the console insets stayed dark in light mode. `ThemeService` (`src/Services/Theming`) is the
-**only** code that writes to `Application.Current` — `ApplyTheme` sets the variant; `ApplyAccent` swaps
-the accent and installs the palette derived from it; `ApplyDefaultAppearance` restores the authored one.
+**only** code that writes to `Application.Current` — `ApplyTheme` sets the variant (and installs the accent,
+pinned to blue until a free accent ships); `ApplyGraphColors` installs the chart series only.
 It's constructed once in `MainWindowViewModel`, applied at startup, and handed to `SettingsViewModel` and
 `PerformanceViewModel`. Note this feature deliberately touched shared styles + the shell
 (Palette/SharedStyles, MainWindow, NavItem) — theming is cross-cutting, so it lives in `src/Services`,
@@ -560,19 +560,22 @@ thickens, so a high-contrast dictionary authors only its differences. **Prove a 
 garish probe color and a pixel sample before building on it** — this one was assumed in a plan, and the
 assumption was wrong.
 
-**An accent re-hues the graphs; it must never flatten them.** Selecting an accent used to set all six
-chart-series keys to that one colour, which erased the per-metric coding the charts depend on — worst on
-the Dashboard's Network Throughput chart, where download and upload share an axis and became one
-indistinguishable line. `ChartPalette.Derive` now rotates the whole authored palette instead: the accent
-becomes the CPU (and net-down) series, and every other series keeps its own saturation and lightness while
-its hue turns by the accent's offset from the default blue. The authored spacing between hues therefore
-survives whatever accent is chosen, and `Derive(AccentPreset.Default.Color)` reproduces `ChartPalette
-.Default` exactly, so the blue swatch and the "Default" swatch agree. **`ChartPalette` is the single
+**Graph colors and the accent are independent.** Graph colors (`GraphColors`, Settings → Appearance) touch
+chart series only, and the accent never touches a chart — an accent that recolored the graphs was the
+confusion being fixed. Keep it that way in both directions.
+
+**Graph colors re-hue the graphs; they must never flatten them.** Setting all six chart-series keys to one
+colour erased the per-metric coding the charts depend on — worst on the Dashboard's Network Throughput
+chart, where download and upload share an axis and became one indistinguishable line. `ChartPalette.Derive`
+rotates the whole authored palette instead: the chosen hue becomes the CPU (and net-down) series, and every
+other series keeps its own saturation and lightness while its hue turns by the same offset from the default
+blue. The authored spacing between hues therefore survives any choice, and the Blue choice reproduces
+`ChartPalette.Default` exactly, so the blue swatch and the "Default" swatch agree. **`ChartPalette` is the single
 source of these colours** — do not parse a series hex anywhere else. The Performance tab used to, giving
 the app two contradictory answers to "what colour is CPU"; its `ResourceRow`s now carry a `ChartSeries`
 identity and resolve the brush through `ThemeService.BrushFor`, re-applying on `SeriesChanged`. Status
 colours are a different thing and stay fixed: Storage's health pills, its usage bars and File Explorer's
-type glyphs must not follow an accent — "Healthy" is green whatever the user picked.
+type glyphs must not follow the accent or graph colors — "Healthy" is green whatever the user picked.
 
 ### Charting
 

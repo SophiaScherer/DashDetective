@@ -204,12 +204,17 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
 ## Settings
 
 **Fully live**.
-- **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Accent color**
+- **Appearance.** The **Theme** segmented control (Dark / Light / System) and the **Graph colors**
   swatches are data-bound to `SettingsViewModel` and applied at runtime through a single
-  `ThemeService` (see *Theming* below). The accent row's **first** swatch is a "Default"
-  (multi-colour) option — a 2×2 four-colour square that restores the authored look (each dashboard
-  graph its own colour, highlight blue); the four single-colour swatches recolour the highlight and
-  hand the graphs a palette **derived** from that accent, each metric keeping a hue of its own.
+  `ThemeService` (see *Theming* below). The Graph colors row's **first** swatch is a "Default"
+  (multi-colour) option — a 2×2 four-colour square that restores the authored per-series palette; the
+  four single-hue swatches hand the graphs a palette **derived** from that hue, each metric keeping a hue
+  of its own. **Charts only, on purpose:** the row was "Accent color" and recoloured the highlights too,
+  which made it a theme rather than an accent. It no longer touches buttons, selection, navigation or the
+  logo, and the accent stays blue until a separate accent setting exists. The name avoids clashing with
+  **Theme**, and the search keywords leave out "accent" for that future row. A settings file saved under
+  the old `AccentName` key carries over: `AppSettings.EffectiveGraphColorsName` falls back to it, and the
+  next save writes `GraphColorsName` only, so choosing Default later cannot resurrect the old choice.
   The **Clock format** segments (24-hour / 12-hour) are a `ClockFormatOption` on the `ThemeOption`
   pattern. The shell pushes the choice to the two places that show a wall-clock time — the toolbar
   clock and the Toolkit Execution Log — through `TimeOfDayFormatter` (`src/Shared`), the same way it
@@ -312,7 +317,7 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   stay free of any knowledge of what a widget is, and both store **ids, never indices**.
   `TrayNoticeShown` rides along but is **not a preference** and has no Settings row: it is the record
   that the app has disclosed, once, that closing the window does not stop it.
-  Theme, accent and the navigation choices **persist** through this rather than lasting a session.
+  Theme, graph colors and the navigation choices **persist** through this rather than lasting a session.
   **`Load` merges the file over `AppSettings.Defaults` key by key, and that merge is what makes the
   "soft-fail to defaults" above true for a property the file predates.** The source generator treats
   a record's `init` properties as constructor parameters and fills absent slots with `default(T)`, so
@@ -670,9 +675,9 @@ is not the brightest mark on the page.
 deficiencies lose. Tritanopia keeps green and red, which it sees, and moves the middle step to amber
 instead.
 
-**A color-vision mode overrides the accent's chart palette.** `ChartPalette.Derive` rotates every hue by
-the accent's offset, and a rotation applied to a color-blind-safe set is no longer safe. The accent
-still drives the highlight; only the series defer.
+**A color-vision mode overrides the graph colors.** `ChartPalette.Derive` rotates every hue by the chosen
+hue's offset, and a rotation applied to a color-blind-safe set is no longer safe. Switching the mode off
+returns the series to the graph colors choice.
 
 ### What the color-vision test found
 
