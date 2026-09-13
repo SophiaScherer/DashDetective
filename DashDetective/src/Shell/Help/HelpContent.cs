@@ -71,9 +71,9 @@ public static class HelpContent {
         new("tip.shortcuts", null,
             "Any keyboard shortcut can be rebound in Settings under Keyboard, and Restore default shortcuts puts them all back."),
         new("tip.theme", null,
-            "Ctrl+Shift+T flips between the light and dark theme; Settings also has a system option and a choice of accent colors."),
+            "Ctrl+Shift+T flips between the light and dark theme; Settings also has a system option and a choice of graph colors."),
         new("tip.persistence", null,
-            "Your choices are remembered between sessions — theme, accent, clock format, refresh interval, navigation position, alert thresholds and any shortcuts you rebound."),
+            "Your choices are remembered between sessions — theme, graph colors, clock format, refresh interval, navigation position, alert thresholds and any shortcuts you rebound."),
         new("tip.keyboard", null,
             "Most of the app can be driven from the keyboard — Ctrl and a number jump to a page by position, and the full list is under Shortcuts."),
     ];

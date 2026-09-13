@@ -17,7 +17,7 @@ public sealed class SettingCatalog {
 
     private SettingCatalog() {
         All = [
-            Theme, Accent, ClockFormat,
+            Theme, GraphColors, ClockFormat,
             UiScale, TextScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
             KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
@@ -37,9 +37,10 @@ public sealed class SettingCatalog {
         SettingId.Theme, "Appearance", "Theme", "Choose the application color scheme",
         Keywords: "dark mode light mode system colour color appearance");
 
-    public SettingEntry Accent { get; } = new(
-        SettingId.Accent, "Appearance", "Accent color", "Applied to charts and highlights",
-        Keywords: "accent colour highlight chart swatch");
+    // No "accent" keyword: that word belongs to the accent setting, not to the charts.
+    public SettingEntry GraphColors { get; } = new(
+        SettingId.GraphColors, "Appearance", "Graph colors", "Colors used for chart lines and figures",
+        Keywords: "graph colors colours chart series palette swatch");
 
     public SettingEntry ClockFormat { get; } = new(
         SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",

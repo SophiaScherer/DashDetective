@@ -50,11 +50,25 @@ public class SettingSearchProviderTests {
 
     [Fact]
     public async Task QueryAsync_RanksTheLabelAboveTheDescription() {
-        // "colour"/"color" appears in the Theme description and in the Accent label + keywords.
-        var results = await Query("accent color");
+        // "default" starts a word in the Accessibility defaults label and in the GPU alert description;
+        // scored description-first, the GPU alert would win.
+        var results = await Query("default");
         var ordered = results.OrderByDescending(r => r.Score).ToList();
 
-        Assert.Equal("Accent color", ordered[0].Title);
+        Assert.Equal("Accessibility defaults", ordered[0].Title);
+    }
+
+    [Fact]
+    public async Task QueryAsync_FindsGraphColorsByItsLabel() {
+        Assert.Equal("Graph colors", (await Best("graph colors")).Title);
+    }
+
+    /// <summary>Guard: "accent" is kept free for the planned accent setting, so Graph colors must not match it.</summary>
+    [Fact]
+    public async Task QueryAsync_Accent_DoesNotFindGraphColors() {
+        var results = await Query("accent");
+
+        Assert.DoesNotContain(results, r => r.Title == "Graph colors");
     }
 
     [Fact]

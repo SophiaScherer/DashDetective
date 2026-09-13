@@ -46,7 +46,7 @@
         <!-- The chrome-less button wrapper that makes a whole segment / swatch clickable is the shared
              Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
 
-        <!-- Accent swatch + its selection ring. ClipToBounds so the four-colour legend of the
+        <!-- Graph colors swatch + its selection ring. ClipToBounds so the four-colour legend of the
              default option is clipped to the rounded corners. -->
         <Style Selector="Border.swatch">
             <Setter Property="Width" Value="24"/>
@@ -95,11 +95,11 @@
                 </Grid>
                 </Border>
 
-                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Accent}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.GraphColors}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="{Binding Catalog.Accent.Name}"/>
-                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.Accent.Description}"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.GraphColors.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.GraphColors.Description}"/>
                     </StackPanel>
                     <ItemsControl Grid.Column="1" ItemsSource="{Binding GraphColorsOptions}">
                         <ItemsControl.ItemsPanel>
