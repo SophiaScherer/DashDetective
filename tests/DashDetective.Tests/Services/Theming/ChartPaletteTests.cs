@@ -7,35 +7,26 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.Theming;
 
-/// <summary>Covers <see cref="ChartPalette"/>: an accent must re-hue the graphs, never flatten them.
-/// Painting all six series the accent's colour is what made download and upload one indistinguishable
+/// <summary>Covers <see cref="ChartPalette"/>: a Graph colors hue must re-hue the graphs, never flatten
+/// them. Painting all six series one colour is what made download and upload one indistinguishable
 /// line on the throughput chart, so the distinctness assertions below are the regression this pins.</summary>
 public class ChartPaletteTests {
-    /// <summary>The blue accent and the "Default" swatch have to agree, or picking blue would visibly
-    /// differ from the look the app starts in.</summary>
     [Fact]
-    public void Derive_DefaultAccent_ReproducesTheAuthoredPalette() {
-        var derived = ChartPalette.Derive(AccentPreset.Default.Color);
+    public void Derive_CpuAndNetDown_AreTheHueItself() {
+        foreach (var colors in GraphColors.All) {
+            var palette = ChartPalette.Derive(colors.Hue);
 
-        Assert.Equal(ChartPalette.Default, derived);
-    }
-
-    [Fact]
-    public void Derive_CpuAndNetDown_AreTheAccentItself() {
-        foreach (var accent in AccentPreset.All) {
-            var palette = ChartPalette.Derive(accent.Color);
-
-            Assert.Equal(accent.Color, palette.Cpu);
-            Assert.Equal(accent.Color, palette.NetDown);
+            Assert.Equal(colors.Hue, palette.Cpu);
+            Assert.Equal(colors.Hue, palette.NetDown);
         }
     }
 
-    /// <summary>The point of the whole exercise: whichever accent is picked, the metrics stay
+    /// <summary>The point of the whole exercise: whichever hue is picked, the metrics stay
     /// distinguishable from one another.</summary>
     [Fact]
-    public void Derive_EveryAccent_KeepsTheMetricsOnDistinctHues() {
-        foreach (var accent in AccentPreset.All) {
-            var hues = Hues(ChartPalette.Derive(accent.Color));
+    public void Derive_EveryGraphColors_KeepsTheMetricsOnDistinctHues() {
+        foreach (var colors in GraphColors.All) {
+            var hues = Hues(ChartPalette.Derive(colors.Hue));
 
             Assert.Equal(hues.Count, hues.Distinct().Count());
         }
@@ -47,16 +38,16 @@ public class ChartPaletteTests {
     public void Derive_PreservesTheGapsBetweenTheAuthoredHues() {
         var reference = Gaps(ChartPalette.Default);
 
-        foreach (var accent in AccentPreset.All)
-            Assert.Equal(reference, Gaps(ChartPalette.Derive(accent.Color)), Comparer());
+        foreach (var colors in GraphColors.All)
+            Assert.Equal(reference, Gaps(ChartPalette.Derive(colors.Hue)), Comparer());
     }
 
     /// <summary>Saturation and lightness are what keep a series legible on both themes, so only the hue
     /// may turn.</summary>
     [Fact]
     public void Derive_LeavesSaturationAndLightnessAlone() {
-        foreach (var accent in AccentPreset.All) {
-            var palette = ChartPalette.Derive(accent.Color);
+        foreach (var colors in GraphColors.All) {
+            var palette = ChartPalette.Derive(colors.Hue);
 
             AssertSameSaturationAndLightness(ChartPalette.Default.Memory, palette.Memory);
             AssertSameSaturationAndLightness(ChartPalette.Default.Gpu, palette.Gpu);
@@ -95,7 +86,7 @@ public class ChartPaletteTests {
     }
 
     /// <summary>A turn that carries a hue past 360° has to wrap rather than land outside the wheel — the
-    /// orange accent turns the palette far enough to do exactly that.</summary>
+    /// orange hue turns the palette far enough to do exactly that.</summary>
     [Fact]
     public void Derive_WrapsHuesPastTheEndOfTheWheel() {
         var palette = ChartPalette.Derive(Color.Parse("#ff8a5c"));

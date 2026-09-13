@@ -37,16 +37,15 @@ public sealed record ChartSeriesColors(
 }
 
 /// <summary>
-/// The one source of truth for chart series colours, for both the default look and every accent.
+/// The one source of truth for chart series colours, for the Default palette and every Graph colors hue.
 ///
-/// Selecting an accent used to paint all six series the accent's colour, which erased the per-metric
-/// coding the charts depend on — most visibly on the two-series throughput chart, where download and
-/// upload became one indistinguishable line. Instead an accent now yields a <b>rotated</b> palette:
-/// the accent is the CPU (and net-down) series, and every other series keeps its own saturation and
-/// lightness while its hue turns by the same angle the accent turned from the default blue. The
-/// authored spacing between the hues is therefore preserved whatever the accent, and
-/// <c>Derive(AccentPreset.Default.Color)</c> reproduces <see cref="Default"/> exactly, so the blue
-/// accent and the "Default" swatch agree.
+/// Painting all six series one colour erased the per-metric coding the charts depend on — most visibly on
+/// the two-series throughput chart, where download and upload became one indistinguishable line. A hue
+/// instead yields a <b>rotated</b> palette: the hue is the CPU (and net-down) series, and every other
+/// series keeps its own saturation and lightness while its hue turns by the same angle from the default
+/// blue. The authored spacing between the hues is therefore preserved, and the Blue
+/// <see cref="GraphColors"/> choice reproduces <see cref="Default"/> exactly, so it agrees with the
+/// "Default" swatch.
 ///
 /// Pure colour maths over <c>Avalonia.Media</c> value types — no render backend, so it is unit-testable.
 /// </summary>
@@ -63,16 +62,16 @@ public static class ChartPalette {
         // its own thing rather than as a second GPU or memory figure.
         Threads: Color.Parse("#ff7ac6"));
 
-    /// <summary>The palette for <paramref name="accent"/>: the accent itself for CPU and net-down, and
-    /// every other series' default hue turned by the accent's offset from the default blue.</summary>
-    public static ChartSeriesColors Derive(Color accent) {
-        var turn = accent.ToHsl().H - Default.Cpu.ToHsl().H;
+    /// <summary>The palette for <paramref name="hue"/>: the hue itself for CPU and net-down, and every
+    /// other series' default hue turned by its offset from the default blue.</summary>
+    public static ChartSeriesColors Derive(Color hue) {
+        var turn = hue.ToHsl().H - Default.Cpu.ToHsl().H;
         return new ChartSeriesColors(
-            Cpu: accent,
+            Cpu: hue,
             Memory: Rotate(Default.Memory, turn),
             Gpu: Rotate(Default.Gpu, turn),
             Storage: Rotate(Default.Storage, turn),
-            NetDown: accent,
+            NetDown: hue,
             NetUp: Rotate(Default.NetUp, turn),
             Threads: Rotate(Default.Threads, turn));
     }

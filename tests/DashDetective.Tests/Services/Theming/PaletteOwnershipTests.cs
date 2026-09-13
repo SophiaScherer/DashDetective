@@ -24,6 +24,7 @@ public class PaletteOwnershipTests {
         "src/Services/Theming/ChartPalette.cs",
         "src/Services/Theming/SemanticBrushes.cs",
         "src/Services/Theming/AccentPreset.cs",
+        "src/Services/Theming/GraphColors.cs",
         // The color-blind-safe tables. Their hues cannot come from Palette.axaml: they are chosen by
         // SEARCH against a dichromacy simulation, per theme and per deficiency, and the tests that verify
         // them read this file. See ColorVisionTests.

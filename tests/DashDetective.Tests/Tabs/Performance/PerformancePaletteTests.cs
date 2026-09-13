@@ -11,9 +11,9 @@ namespace DashDetective.Tests.Tabs.Performance;
 
 /// <summary>
 /// Covers the Performance rail's colours. The tab used to parse its own hex literals, so the app held two
-/// answers to "what colour is CPU" — one that followed the accent (the Dashboard's ChartCpu key) and one
-/// that never did. These pin the single answer: every row resolves through <see cref="ChartPalette"/>, and
-/// re-resolves when the accent moves it.
+/// answers to "what colour is CPU" — one that followed the graph colors (the Dashboard's ChartCpu key) and
+/// one that never did. These pin the single answer: every row resolves through <see cref="ChartPalette"/>,
+/// and re-resolves when the graph colors move it.
 /// </summary>
 public class PerformancePaletteTests {
     private static (PerformanceViewModel ViewModel, ThemeService Theme) Page() {
@@ -43,13 +43,13 @@ public class PerformancePaletteTests {
     }
 
     [Fact]
-    public void ApplyAccent_RetintsEveryRow() {
+    public void ApplyGraphColors_RetintsEveryRow() {
         var (viewModel, theme) = Page();
-        var accent = AccentPreset.All.First(a => a.Name == "Orange");
+        var colors = GraphColors.All.First(c => c.Name == "Orange");
 
-        theme.ApplyAccent(accent);
+        theme.ApplyGraphColors(colors);
 
-        var expected = ChartPalette.Derive(accent.Color);
+        var expected = ChartPalette.Derive(colors.Hue);
         Assert.Equal(expected.Cpu, ColorOf(Row(viewModel, ChartSeries.Cpu).ValueBrush));
         Assert.Equal(expected.Memory, ColorOf(Row(viewModel, ChartSeries.Memory).ValueBrush));
     }
@@ -57,11 +57,11 @@ public class PerformancePaletteTests {
     /// <summary>The two-series row is the one the old behaviour ruined: receive and send share an axis, so
     /// one colour for both left them indistinguishable.</summary>
     [Fact]
-    public void ApplyAccent_LeavesTheNetworkRowsTwoSeriesOnDifferentColours() {
+    public void ApplyGraphColors_LeavesTheNetworkRowsTwoSeriesOnDifferentColours() {
         var (viewModel, theme) = Page();
 
-        foreach (var accent in AccentPreset.All) {
-            theme.ApplyAccent(accent);
+        foreach (var colors in GraphColors.All) {
+            theme.ApplyGraphColors(colors);
 
             var row = Row(viewModel, ChartSeries.NetDown);
             Assert.NotEqual(ColorOf(row.ValueBrush), ColorOf(row.ValueBrush2));
@@ -69,11 +69,11 @@ public class PerformancePaletteTests {
     }
 
     [Fact]
-    public void ApplyDefaultAppearance_RestoresTheAuthoredPalette() {
+    public void ApplyGraphColors_Null_RestoresTheAuthoredPalette() {
         var (viewModel, theme) = Page();
-        theme.ApplyAccent(AccentPreset.All.First(a => a.Name == "Green"));
+        theme.ApplyGraphColors(GraphColors.All.First(c => c.Name == "Green"));
 
-        theme.ApplyDefaultAppearance();
+        theme.ApplyGraphColors(null);
 
         Assert.Equal(ChartPalette.Default.Cpu, ColorOf(Row(viewModel, ChartSeries.Cpu).ValueBrush));
         Assert.Equal(ChartPalette.Default.Memory, ColorOf(Row(viewModel, ChartSeries.Memory).ValueBrush));
@@ -87,7 +87,7 @@ public class PerformancePaletteTests {
         var before = Row(viewModel, ChartSeries.Cpu).ValueBrush;
 
         viewModel.Dispose();
-        theme.ApplyAccent(AccentPreset.All.First(a => a.Name == "Purple"));
+        theme.ApplyGraphColors(GraphColors.All.First(c => c.Name == "Purple"));
 
         Assert.Same(before, Row(viewModel, ChartSeries.Cpu).ValueBrush);
     }
