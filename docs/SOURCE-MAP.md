@@ -209,8 +209,12 @@ stays in its tab folder.
                                  rungs into. TrackOff carries a STATE so it clears 3:1, and ThumbOff moves
                                  with it: a dark track under the old near-black knob passed every contrast
                                  check while reading as a filled dot. Hairline/RowLine sit at a stated
-                                 floor BELOW 3:1 on purpose and ChartGrid is untouched; PaletteLineTests
-                                 pins the floor and the ceiling both. The high-contrast tables author only their DIFFERENCES and inherit
+                                 floor BELOW 3:1 on purpose and ChartGrid a step lighter than both;
+                                 PaletteLineTests pins the floor, the ceiling and the order. The light
+                                 ramp is authored DARKER than contrast alone asks for — small antialiased
+                                 text renders about twice as light as its token — and ChartAxisText gives
+                                 axis labels, the smallest text in the app, their own rung on light while
+                                 the other three variants keep exactly what TextSubtle drew. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
                                  other lines: at that weight it outshouts the trace drawn over it)
         SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it

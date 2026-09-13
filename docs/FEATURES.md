@@ -722,8 +722,8 @@ Three families were wrong for three different reasons, and the fix is one rule i
 **The ramp was spaced on the wrong scale.** It was authored as equal *opacity* steps, and equal alpha is
 not equal perceptual weight: `TextMuted` sat at 3.86:1 and `TextSubtle` at 3.26:1, with `TextTertiary`
 already at 0.60 and AA needing 0.545 — two rungs to fit in a five-point band. That is why the earlier
-note called rebalancing a design decision rather than a test fix. Respaced on **CIE L\***, 8.8 apart, all
-six rungs clear AA with room to tell them apart. `PaletteRampTests` pins the spacing, the pairwise
+note called rebalancing a design decision rather than a test fix. Respaced on **CIE L\***, now about 6.5 apart,
+all six rungs clear AA with room to tell them apart. `PaletteRampTests` pins the spacing, the pairwise
 separation and the direction, so a later nudge cannot quietly re-flatten it.
 
 **A colour was doing two jobs.** A chart series or a status hue is authored for a near-black page — warn
@@ -755,12 +755,21 @@ bought, and light's measured margin is only 21.5 against a bar of 20.
 
 **The lines split three ways by what they carry.** `TrackOff` is the one that encodes a *state* — it is how
 an off toggle is told from an on one — so it goes to 3:1. The chart traces carry the content, so they do
-too. `Hairline` and `RowLine` were lifted to a stated floor (1.52:1 and 1.37:1) but deliberately **not** to
-3:1: they repeat what the surfaces and the spacing already say, and at 3:1 a card edge reads as a rule
-rather than a hairline. `ChartGrid` is left alone entirely, for the reason the high-contrast tables leave
-it alone — it is a scale, and at the other lines' weight it outshouts the trace drawn over it.
-`PaletteLineTests` pins both ends of that, so lifting a separator further is a decision somebody makes on
-purpose.
+too. `Hairline` and `RowLine` were lifted to a stated floor (both 1.52:1) but deliberately **not** to 3:1:
+they repeat what the surfaces and the spacing already say, and at 3:1 a card edge reads as a rule rather
+than a hairline. `ChartGrid` rose to 1.46:1 so the lattice is visible on a white card, but stays a step
+lighter than the dividers, for the reason the high-contrast tables hold it back — it is a scale, and at
+the other lines' weight it outshouts the trace drawn over it. `PaletteLineTests` pins the floor, the
+ceiling and that ordering, so lifting a line further is a decision somebody makes on purpose.
+
+**The first pass measured right and still looked wrong.** Every rung cleared AA, yet supporting text read
+as washed out. Sampling the rendered pixels explained it: small antialiased text renders roughly **twice as
+light as its nominal colour** — `TextSubtle` at `#707070` averaged `#B5` of ink, and chart axis labels
+never reached their nominal colour at all. A second pass respaced the ramp darker (`TextSubtle` `#545454`,
+`TextMuted` `#454545`) and gave axis text its own `ChartAxisText` key a rung heavier on light, since at
+`TextSizeMicro` it is the smallest text in the app. The active nav item did not move, so the hierarchy held.
+What colour cannot fix is the remaining lightness from glyph thinness; a Medium weight on the descriptive
+styles measured a further ~15% darker, but it changes both themes and text widths, so it is not applied.
 
 **What the numbers could not have told us.** Darkening `TrackOff` far enough to be found on a white page
 left the off toggle's near-black `TextStrong` knob reading as a *filled* dot rather than an off one — both

@@ -101,6 +101,16 @@ public class PaletteLineTests {
         Assert.True(worst >= SeparatorFloor, $"{key} reads {worst:F2}:1, under {SeparatorFloor}:1.");
     }
 
+    /// <summary>The grid is a scale, not the subject: it may step up so it is visible on white, but it must
+    /// stay lighter than the dividers, or it starts competing with the trace drawn over it.</summary>
+    [Fact]
+    public void Light_ChartGrid_StaysUnderTheDividers() {
+        var grid = Surfaces.Min(surface => Ratio("Light", "ChartGrid", surface));
+        var rows = Surfaces.Min(surface => Ratio("Light", "RowLine", surface));
+
+        Assert.True(grid < rows, $"ChartGrid ({grid:F2}:1) is no lighter than RowLine ({rows:F2}:1).");
+    }
+
     /// <summary>Light is not the weaker theme for a structural line. If a future change makes it so, that
     /// is the regression this item was raised about.</summary>
     [Theory]

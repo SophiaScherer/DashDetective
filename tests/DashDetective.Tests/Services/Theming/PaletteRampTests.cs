@@ -32,7 +32,7 @@ public class PaletteRampTests {
     public void Light_RampStepsAreEvenlySpacedInLightness() {
         var steps = Steps("Light");
 
-        Assert.All(steps, step => Assert.InRange(step, 8.0, 9.6));
+        Assert.All(steps, step => Assert.InRange(step, 6.0, 7.0));
     }
 
     /// <summary>Evenness is the design; separation is the requirement. Asserted separately so a future
@@ -67,6 +67,32 @@ public class PaletteRampTests {
             : weights.Zip(weights.Skip(1), (a, b) => b < a);
 
         Assert.All(descending, Assert.True);
+    }
+
+    /// <summary>Chart axis text is the smallest text in the app, so on light it sits a rung heavier than
+    /// the descriptive text it would otherwise match; the eye reads 10px at a given colour as lighter.</summary>
+    [Fact]
+    public void Light_AxisText_IsDarkerThanDescriptiveText() {
+        var axis = Weight("Light", "ChartAxisText");
+        var subtle = Weight("Light", "TextSubtle");
+
+        Assert.True(axis < subtle, $"Axis text ({axis:F1} L*) is not darker than TextSubtle ({subtle:F1} L*).");
+    }
+
+    /// <summary>The axis token exists to give light its own value. The other variants must draw exactly
+    /// what the axis drew before it existed, which was TextSubtle.</summary>
+    [Theory]
+    [InlineData("Dark")]
+    [InlineData("HighContrastDark")]
+    [InlineData("HighContrastLight")]
+    public void AxisText_MatchesTextSubtle_OutsideTheLightTheme(string variant) {
+        Assert.Equal(PaletteFile.Resolve(variant, "TextSubtle"), PaletteFile.Resolve(variant, "ChartAxisText"));
+    }
+
+    private static double Weight(string variant, string key) {
+        var brush = PaletteFile.Resolve(variant, key);
+        var color = Color.FromRgb((byte)brush.Color.R, (byte)brush.Color.G, (byte)brush.Color.B);
+        return Tone.CompositedLightness(color, brush.Opacity, Surface(variant));
     }
 
     /// <summary>Each rung's composited CIE L*, brightest-emphasis first.</summary>

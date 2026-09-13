@@ -284,7 +284,7 @@ public partial class Sparkline : UserControl {
         set => SetValue(StatusTextProperty, value);
     }
 
-    /// <summary>Axis and status text colour. Falls back to the themed <c>TextSubtle</c> resource.</summary>
+    /// <summary>Axis and status text colour. Falls back to the themed <c>ChartAxisText</c> resource.</summary>
     public IBrush? AxisBrush {
         get => GetValue(AxisBrushProperty);
         set => SetValue(AxisBrushProperty, value);
@@ -335,7 +335,7 @@ public partial class Sparkline : UserControl {
             return;
 
         // Axis text is measured before anything is drawn: what it needs decides how much room the plot has.
-        var brush = AxisBrush ?? ResolveResource("TextSubtle");
+        var brush = AxisBrush ?? ResolveResource("ChartAxisText");
         var values = MeasureValueLabels(brush);
         var times = MeasureTimeLabels(brush);
         var yTitle = Label(AxisYTitle, brush);

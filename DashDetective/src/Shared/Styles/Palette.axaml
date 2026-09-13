@@ -182,6 +182,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF" Opacity="0.62"/>
             <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF" Opacity="0.50"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF" Opacity="0.45"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#FFFFFF" Opacity="0.45"/>
             <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF" Opacity="0.35"/>
             <!-- Ghosted completion text. Fainter than TextFaint on purpose: it sits directly beside
                  what the user is typing, so it has to read as a suggestion rather than as input. -->
@@ -201,14 +202,15 @@
                  WCAG's 3:1: they repeat what the surfaces and spacing already say, and at 3:1 a card edge
                  reads as a rule. PaletteLineTests pins both the floor and the ceiling. -->
             <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.18"/>
-            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.14"/>
+            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.18"/>
             <!-- The toggle's off track, and the one line token that carries state rather than structure:
                  it is how an off switch is told from an on one, so it is held to WCAG's 3:1. The
                  separators below are not — see PaletteLineTests. -->
             <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.46"/>
             <SolidColorBrush x:Key="ThumbOff" Color="#FFFFFF"/>
-            <!-- Faint lattice drawn behind the larger utilization charts (dark's white 5.5% mirrored to a matching faint black). -->
-            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.08"/>
+            <!-- The chart lattice. A step lighter than the dividers so it stays under the trace drawn
+                 over it; at 8% it had all but vanished on a white card. -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.165"/>
 
             <!-- Hover overlays -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
@@ -224,17 +226,18 @@
             <SolidColorBrush x:Key="YellowGraphic" Color="#BE8B00"/>
             <SolidColorBrush x:Key="GreenGraphic" Color="#44A836"/>
 
-            <!-- Text (decreasing emphasis). Spaced on CIE L*, not on opacity: equal alpha steps are not
-                 equal perceptual steps, and the ramp that came from them left TextMuted at 3.86:1 and
-                 TextSubtle at 3.26:1 against a 4.5:1 bar with no room above to lift them into. These six
-                 sit 8.8 L* apart, which clears AA on every light surface and still reads as six steps.
-                 PaletteRampTests pins both halves of that. Dark keeps its own authored ramp. -->
+            <!-- Text (decreasing emphasis), spaced on CIE L* about 6.5 apart. Authored darker than contrast
+                 alone asks for: small antialiased text renders roughly twice as light as its nominal
+                 colour, so a rung that measured 4.7:1 still read as washed out. Dark keeps its own ramp. -->
             <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.948"/>
-            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.873"/>
-            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.802"/>
-            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.724"/>
-            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.642"/>
-            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.559"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.893"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.842"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.787"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.728"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.669"/>
+            <!-- Chart axis text. At TextSizeMicro it is the smallest text in the app and renders lightest,
+                 so light draws it at the Tertiary rung; the other three variants keep what they drew. -->
+            <SolidColorBrush x:Key="ChartAxisText" Color="#000000" Opacity="0.787"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
             <!-- See the dark theme's note; a touch stronger, as dark-on-light reads fainter. -->
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.22"/>
@@ -269,6 +272,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF"/>
             <!-- The one deliberate exception: ghosted completion sits beside what is being typed and has
                  to read as a suggestion, not as input. Kept legible rather than equal. -->
@@ -299,6 +303,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#000000"/>
             <SolidColorBrush x:Key="TextMuted" Color="#000000"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#000000"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#000000"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000"/>
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.55"/>
         </ResourceDictionary>
