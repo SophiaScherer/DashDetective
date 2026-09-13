@@ -176,6 +176,7 @@ public sealed class ThemeService {
         _status = Theming.ColorVision.Status(ColorVision, IsDarkIntended());
         var text = TextStatusFor(_status);
         SemanticBrushes.Apply(_status, text);
+        SemanticBrushes.ApplyHues(IsDarkIntended());
 
         if (Application.Current is { } app)
             app.Resources["StatusWarnText"] = new SolidColorBrush(text.Warn);

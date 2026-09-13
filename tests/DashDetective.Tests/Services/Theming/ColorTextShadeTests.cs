@@ -119,6 +119,44 @@ public class ColorTextShadeTests {
         Assert.Equal((expected.R, expected.G, expected.B), authored.Color);
     }
 
+    /// <summary>The banner marks are marks, not words, so they are authored on the graphic rung. Pinned
+    /// the same way the text hues are: the palette and the ladder must agree about one colour.</summary>
+    [Theory]
+    [InlineData("YellowGraphic", "#ffcf4d")]
+    [InlineData("GreenGraphic", "#6ccb5f")]
+    public void LightDictionary_GraphicHues_AreTheRulesOutput(string key, string identity) {
+        var authored = PaletteFile.Resolve("Light", key);
+        var expected = Tone.GraphicOnLight(Color.Parse(identity));
+
+        Assert.Equal((expected.R, expected.G, expected.B), authored.Color);
+    }
+
+    /// <summary>Every fixed-hue shade the catalogues hand out has to clear its own bar once the theme has
+    /// been applied. These are the ones a light page renders: the Toolkit kind labels and its glyphs, the
+    /// Storage usage bar, the two shell banner marks.</summary>
+    [Fact]
+    public void FixedHueShades_MeetTheirOwnBarOnWhite() {
+        var failures = new List<string>();
+
+        foreach (var (name, identity) in new[] {
+            ("Blue", "#4cc2ff"), ("Purple", "#c58fff"), ("Green", "#6ccb5f"),
+            ("Yellow", "#ffcf4d"), ("Orange", "#ff8a5c"),
+        }) {
+            var text = Tone.TextOnLight(Color.Parse(identity));
+            var graphic = Tone.GraphicOnLight(Color.Parse(identity));
+
+            var asText = ContrastRatio.Of((text.R, text.G, text.B), 1.0, White);
+            var asMark = ContrastRatio.Of((graphic.R, graphic.G, graphic.B), 1.0, White);
+
+            if (asText < ContrastRatio.AA)
+                failures.Add($"{name} as text: {asText:F2}:1");
+            if (asMark < 3.0)
+                failures.Add($"{name} as a mark: {asMark:F2}:1");
+        }
+
+        Assert.True(failures.Count == 0, string.Join(", ", failures));
+    }
+
     /// <summary>The dark theme draws the hues at their authored lightness, so the pair only differs where
     /// it has to.</summary>
     [Theory]

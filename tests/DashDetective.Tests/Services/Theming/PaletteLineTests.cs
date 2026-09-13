@@ -35,6 +35,32 @@ public class PaletteLineTests {
         Assert.True(worst >= NonText, $"The off track reads {worst:F2}:1, under {NonText}:1.");
     }
 
+    /// <summary>The knob is what says which way the switch is thrown, so it answers to the bar against the
+    /// track it sits on. This is the pair that has to move together: darkening the track far enough to be
+    /// found on a white page left the old near-black knob reading as a filled dot rather than an off one,
+    /// which is the same trap the checked state fell into once before.</summary>
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    [InlineData("HighContrastLight")]
+    [InlineData("HighContrastDark")]
+    public void TheOffKnob_ReadsAgainstItsOwnTrack(string variant) {
+        var track = PaletteFile.Resolve(variant, "TrackOff");
+        var thumb = PaletteFile.Resolve(variant, "ThumbOff");
+
+        // The track is itself translucent, so weigh the knob against the track as composited on a card.
+        var card = PaletteFile.Resolve(variant, "CardBackground").Color;
+        var onCard = Composite(track.Color, track.Opacity, card);
+        var ratio = ContrastRatio.Of(thumb.Color, thumb.Opacity, onCard);
+
+        Assert.True(ratio >= NonText, $"{variant}: the knob reads {ratio:F2}:1 on its track.");
+    }
+
+    private static (int R, int G, int B) Composite((int R, int G, int B) fore, double alpha, (int R, int G, int B) back) =>
+        ((int)Math.Round(fore.R * alpha + back.R * (1 - alpha)),
+         (int)Math.Round(fore.G * alpha + back.G * (1 - alpha)),
+         (int)Math.Round(fore.B * alpha + back.B * (1 - alpha)));
+
     /// <summary>
     /// The separators and the chart lattice stay below the non-text bar, deliberately and in both themes.
     /// Each is structure a reader already has by other means — panels are separated by their own surfaces

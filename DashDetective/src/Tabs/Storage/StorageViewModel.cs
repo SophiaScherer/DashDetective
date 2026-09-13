@@ -118,9 +118,9 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private static readonly IBrush HealthyBg = SemanticBrushes.StatusGoodSoft;
     private static readonly IBrush CautionFg = SemanticBrushes.StatusWarnText;
     private static readonly IBrush CautionBg = SemanticBrushes.StatusWarnSoft;
-    private static readonly IBrush BarBlue = SemanticBrushes.Blue;
-    private static readonly IBrush BarGreen = SemanticBrushes.Green;
-    private static readonly IBrush BarAmber = SemanticBrushes.Yellow;
+    private static readonly IBrush BarBlue = SemanticBrushes.BlueGraphic;
+    private static readonly IBrush BarGreen = SemanticBrushes.GreenGraphic;
+    private static readonly IBrush BarAmber = SemanticBrushes.YellowGraphic;
 
     /// <summary>The drive summary cards shown in the top row (one per physical disk). Composed from
     /// <see cref="PhysicalDiskProvider"/> + <see cref="VolumeProvider"/> at startup and rebuilt on Refresh;

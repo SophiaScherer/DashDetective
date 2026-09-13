@@ -150,7 +150,7 @@
                             Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                                  Fill="{StaticResource Yellow}" Data="M8,1 L15,14 H1 Z"/>
+                                  Fill="{DynamicResource YellowGraphic}" Data="M8,1 L15,14 H1 Z"/>
                             <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
                             <Button Grid.Column="2" Classes="toolIcon" Width="26" Height="26"
@@ -172,7 +172,7 @@
                             Background="{StaticResource GreenSoft}" BorderBrush="{StaticResource GreenLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                             <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
-                                  Stroke="{StaticResource Green}" StrokeThickness="2"
+                                  Stroke="{DynamicResource GreenGraphic}" StrokeThickness="2"
                                   StrokeLineCap="Round" StrokeJoin="Round" Data="M2,8.5 L6.5,13 L14,4"/>
                             <!-- The tooltip carries what the trim drops: an export names a path, and a
                                  deep one is exactly the case where the user needs to read all of it. -->

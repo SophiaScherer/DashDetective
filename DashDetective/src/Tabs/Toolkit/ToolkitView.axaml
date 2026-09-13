@@ -401,7 +401,7 @@
                                                                         Padding="7,2" VerticalAlignment="Center"
                                                                         Background="{Binding BadgeBackground}">
                                                                     <TextBlock Text="{Binding BadgeLabel}" FontSize="{DynamicResource TextSizeMicro}"
-                                                                               Foreground="{Binding BadgeForeground}"/>
+                                                                               Foreground="{Binding BadgeLabelForeground}"/>
                                                                 </Border>
                                                             </Grid>
                                                         </Button>

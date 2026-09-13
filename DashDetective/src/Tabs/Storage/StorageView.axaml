@@ -14,10 +14,10 @@
          Disk Activity card (bottom row). Surfaces/typography come from src/Shared/Styles; the Disk Activity
          chart reuses the shared Sparkline. The page scrolls as a whole like the Dashboard/Network (not
          self-scrolling). Panels are added per phase. -->
-    <!-- The Read/Write/Temp value tints are the palette's fixed Blue/Orange/Green, referenced directly
-         rather than re-declared here under local names. They must be the FIXED keys, not ChartCpu /
-         ChartNetUp / ChartGpu — those hold the same hex today but ThemeService overwrites them when the
-         user picks a single accent, which would collapse the three tints into one. -->
+    <!-- The Read/Write/Temp value tints take the fixed hues' TEXT shades (BlueText / OrangeText /
+         GreenText), not ChartCpu / ChartNetUp / ChartGpu — those hold the same hex today but ThemeService
+         overwrites them when the user picks a single accent, which would collapse the three tints into
+         one. The *Text half is what a theme darkens; the hue itself is unchanged. -->
     <UserControl.Resources>
         <!-- The Partitions table's columns, declared once and applied to both the header row and the
              row template through GridColumns.Definitions, so the two cannot drift apart. -->
