@@ -309,6 +309,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _accessibility.Apply(settings);
         SyncNavTextScale();
         _theme.ApplyGraphColors(GraphColors.Find(settings.EffectiveGraphColorsName));
+        _theme.ApplyAccent(AccentPreset.FromHex(settings.AccentColor));
 
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
@@ -385,6 +386,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private AppSettings CaptureCurrent() => new() {
         Theme = _theme.CurrentTheme,
         GraphColorsName = _theme.CurrentGraphColors?.Name,
+        AccentColor = _theme.CurrentAccent == AccentPreset.Default ? null : _theme.CurrentAccent.Hex,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,

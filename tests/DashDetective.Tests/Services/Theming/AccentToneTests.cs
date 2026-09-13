@@ -34,6 +34,60 @@ public class AccentToneTests {
                     < Tone.Lightness(identity));
     }
 
+    /// <summary>Generalising the rule for a custom accent must not move a preset: each still takes the
+    /// ladder's rungs exactly.</summary>
+    [Theory]
+    [MemberData(nameof(Identities))]
+    public void Preset_TakesTheLaddersRungsExactly(string hex) {
+        var identity = Color.Parse(hex);
+
+        Assert.Equal(new AccentShades(identity,
+                                      Tone.WithLightness(identity, AccentTone.Hover),
+                                      Tone.WithLightness(identity, AccentTone.OnAccent),
+                                      Tone.WithLightness(identity, AccentTone.Deep)),
+                     AccentTone.Graphic(identity));
+        Assert.Equal(new AccentTextShades(identity, Tone.WithLightness(identity, AccentTone.Hover)),
+                     AccentTone.Text(identity, dark: true));
+        Assert.Equal(new AccentTextShades(Tone.WithLightness(identity, Tone.LightText),
+                                          Tone.WithLightness(identity, AccentTone.LightTextHover)),
+                     AccentTone.Text(identity, dark: false));
+    }
+
+    /// <summary>A dark fill cannot carry dark text, so its label turns light and hover darkens away from it.</summary>
+    [Fact]
+    public void Graphic_DarkIdentity_TurnsTheLabelLightAndDarkensOnHover() {
+        var identity = Color.Parse("#1a3a8a");
+        var shades = AccentTone.Graphic(identity);
+
+        Assert.True(Tone.Lightness(shades.OnAccent) > Tone.Lightness(identity));
+        Assert.True(Tone.Lightness(shades.Hover) < Tone.Lightness(identity));
+    }
+
+    /// <summary>Near black, the deep stop turns lighter rather than vanishing.</summary>
+    [Fact]
+    public void Graphic_NearBlackIdentity_KeepsAVisibleGradient() {
+        var identity = Color.Parse("#101018");
+        var shades = AccentTone.Graphic(identity);
+
+        Assert.True(Tone.Lightness(shades.Deep) - Tone.Lightness(identity) > 15);
+    }
+
+    /// <summary>At black and white a hover step would clamp back onto the fill; it has to stay visible.</summary>
+    [Theory]
+    [InlineData("#000000")]
+    [InlineData("#000010")]
+    [InlineData("#ffffff")]
+    public void Hover_AtEitherEnd_StillDiffersFromTheFill(string hex) {
+        var identity = Color.Parse(hex);
+        var graphic = AccentTone.Graphic(identity);
+
+        Assert.NotEqual(graphic.Fill, graphic.Hover);
+        foreach (var dark in new[] { true, false }) {
+            var text = AccentTone.Text(identity, dark);
+            Assert.NotEqual(text.Fill, text.Hover);
+        }
+    }
+
     /// <summary>Every shade, graphic and text alike, keeps the identity it was derived from.</summary>
     [Theory]
     [MemberData(nameof(Identities))]

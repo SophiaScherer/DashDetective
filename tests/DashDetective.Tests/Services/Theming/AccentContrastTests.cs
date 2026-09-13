@@ -92,5 +92,48 @@ public class AccentContrastTests {
         Assert.InRange(ratio, 1.95, 2.10);
     }
 
+    /// <summary>A grid across the whole RGB cube plus a fine gray ramp, which holds the black/white
+    /// crossover where on-accent text is hardest to place.</summary>
+    public static TheoryData<string> AnyColor() {
+        var data = new TheoryData<string>();
+        byte[] steps = [0, 51, 102, 153, 204, 255];
+        foreach (var r in steps)
+            foreach (var g in steps)
+                foreach (var b in steps)
+                    data.Add($"#{r:x2}{g:x2}{b:x2}");
+        for (var v = 0; v <= 255; v += 5)
+            data.Add($"#{v:x2}{v:x2}{v:x2}");
+        return data;
+    }
+
+    /// <summary>The label on a button or selected segment stays readable whatever colour is picked.</summary>
+    [Theory]
+    [MemberData(nameof(AnyColor))]
+    public void AnyPick_TextOnAccent_MeetsAaOnFillAndHover(string hex) {
+        var shades = AccentPreset.FromHex(hex).Shades;
+
+        Assert.True(ContrastRatio.Of(Rgb(shades.OnAccent), 1.0, Rgb(shades.Fill)) >= ContrastRatio.AA,
+                    $"{hex}: on-accent text on its fill.");
+        Assert.True(ContrastRatio.Of(Rgb(shades.OnAccent), 1.0, Rgb(shades.Hover)) >= ContrastRatio.AA,
+                    $"{hex}: on-accent text on its hover fill.");
+    }
+
+    /// <summary>Accent text is corrected per theme: on white for light, as the preset checks above measure
+    /// it, and on every dark surface for dark.</summary>
+    [Theory]
+    [MemberData(nameof(AnyColor))]
+    public void AnyPick_AccentText_MeetsAaOnItsTheme(string hex) {
+        var accent = AccentPreset.FromHex(hex);
+
+        foreach (var shade in new[] { accent.Text(dark: false).Fill, accent.Text(dark: false).Hover })
+            Assert.True(ContrastRatio.Of(Rgb(shade), 1.0, Surface(dark: false)) >= ContrastRatio.AA,
+                        $"{hex}: light text {shade}.");
+
+        foreach (var surface in AccentGuard.DarkSurfaces)
+            foreach (var shade in new[] { accent.Text(dark: true).Fill, accent.Text(dark: true).Hover })
+                Assert.True(ContrastRatio.Of(Rgb(shade), 1.0, Rgb(surface)) >= ContrastRatio.AA,
+                            $"{hex}: dark text {shade} on {surface}.");
+    }
+
     private static (int R, int G, int B) Rgb(Avalonia.Media.Color c) => (c.R, c.G, c.B);
 }

@@ -68,6 +68,38 @@ public class ThemeServiceTests {
     }
 
     [Fact]
+    public void Accent_DefaultsToBlue() {
+        Assert.Same(AccentPreset.Default, new ThemeService().CurrentAccent);
+    }
+
+    /// <summary>The split AB#83 made: an accent never recolors a chart.</summary>
+    [Fact]
+    public void ApplyAccent_LeavesTheSeriesAlone() {
+        var theme = new ThemeService();
+        theme.ApplyGraphColors(Named("Green"));
+        var raised = false;
+        theme.SeriesChanged += _ => raised = true;
+        var custom = AccentPreset.FromHex("#1a3a8a");
+
+        theme.ApplyAccent(custom);
+
+        Assert.Same(custom, theme.CurrentAccent);
+        Assert.Equal(Named("Green").Series, theme.CurrentSeries);
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void ApplyGraphColors_LeavesTheAccentAlone() {
+        var theme = new ThemeService();
+        var custom = AccentPreset.FromHex("#1a3a8a");
+        theme.ApplyAccent(custom);
+
+        theme.ApplyGraphColors(Named("Orange"));
+
+        Assert.Same(custom, theme.CurrentAccent);
+    }
+
+    [Fact]
     public void ColorVisionOff_ReturnsToTheGraphColors() {
         var theme = new ThemeService();
         theme.ApplyGraphColors(Named("Green"));

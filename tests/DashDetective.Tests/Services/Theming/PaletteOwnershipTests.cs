@@ -25,6 +25,8 @@ public class PaletteOwnershipTests {
         "src/Services/Theming/SemanticBrushes.cs",
         "src/Services/Theming/AccentPreset.cs",
         "src/Services/Theming/GraphColors.cs",
+        // Mirrors the page surfaces an accent fill is checked against; AccentGuardTests pins them.
+        "src/Services/Theming/AccentGuard.cs",
         // The color-blind-safe tables. Their hues cannot come from Palette.axaml: they are chosen by
         // SEARCH against a dichromacy simulation, per theme and per deficiency, and the tests that verify
         // them read this file. See ColorVisionTests.

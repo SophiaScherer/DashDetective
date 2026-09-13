@@ -36,6 +36,7 @@ public sealed class SettingsStoreTests : IDisposable {
         var settings = AppSettings.Defaults with {
             Theme = AppTheme.Light,
             GraphColorsName = "Teal",
+            AccentColor = "#1a3a8a",
             ClockFormat = ClockFormat.TwelveHour,
             AlertCpuEnabled = true,
             AlertMemoryEnabled = false,
@@ -111,6 +112,26 @@ public sealed class SettingsStoreTests : IDisposable {
 
         Assert.Null(loaded.GraphColorsName);
         Assert.Equal("Green", loaded.EffectiveGraphColorsName);
+    }
+
+    /// <summary>The old key named graph colors, so it must not be read back as an accent.</summary>
+    [Fact]
+    public void Load_FileWithOnlyTheLegacyAccentName_LeavesTheAccentDefault() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "AccentName": "Green" }
+            """);
+
+        Assert.Null(new SettingsStore(_path).Load().AccentColor);
+    }
+
+    [Fact]
+    public void SavedFile_WritesTheAccentAsHex() {
+        using (var store = new SettingsStore(_path)) {
+            store.Save(AppSettings.Defaults with { AccentColor = "#1a3a8a" });
+            store.Flush();
+        }
+
+        Assert.Contains("\"AccentColor\": \"#1a3a8a\"", File.ReadAllText(_path));
     }
 
     [Fact]
