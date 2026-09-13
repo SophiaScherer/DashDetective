@@ -52,7 +52,7 @@
             </Grid>
             <!-- LineHeight is fixed rather than left to the font, so the capacity arithmetic is
                  exact and reads the same on both platforms. -->
-            <Border x:Name="ConsoleBox" Background="{StaticResource ConsoleBg}" CornerRadius="6"
+            <Border x:Name="ConsoleBox" Background="{DynamicResource ConsoleBg}" CornerRadius="6"
                     Padding="10" ClipToBounds="True" SizeChanged="OnConsoleBoxSizeChanged">
                 <!-- Top-aligned: output grows down from the first line with the summary under it, so an
                      idle console reads the same as it did before the box started filling the widget. -->
