@@ -799,6 +799,20 @@ window draggable below that would clip rather than reflow — so `MainWindowView
   an `Auto` column is measured against infinite width, so it never wraps and overflows the card
   instead. A first attempt with `Auto` did exactly that at 200 %.
 
+### Console insets
+
+The Network ping/DNS output and the Toolkit execution log used to stay dark in every theme: the
+`Console*` brushes were top-level and bound with `{StaticResource}`, so nothing could flip them. They now
+live in the theme dictionaries and every call site binds them dynamically.
+
+- **Dark keeps its old values.** Light draws a `FieldBackground` gray inset, matching the target field
+  above it.
+- **The light hues sit at 42 L\*, not `Tone.LightText`.** That rung is measured on white and reads 4.18:1
+  on the gray inset, so the console's shades are measured against the inset itself.
+- **High contrast holds console text to AAA**, like its body text; `PaletteConsoleTests` pins every bar.
+- **A theme-dictionary key is never `{StaticResource}`.** It resolves once and ignores a theme switch.
+  `ThemeResourceBindingTests` fails on any such binding in any view.
+
 ## File Explorer
 
 **Live and functional** (built in phases). A **read-only** three-pane
@@ -1006,8 +1020,8 @@ share it, and a new marker interface **`ILiveSamplingPage`** (`src/Shared`) lets
 pill pause/resume every sampling page — `MainWindowViewModel.ToggleLive` now routes through it over
 `Nav.NavItems` (Dashboard + Network) instead of calling the Dashboard directly. Toolbar **Refresh**
 routes through the existing `IRefreshablePage` (re-samples throughput, re-reads adapters/connections,
-re-pings, re-resolves DNS). The ping/DNS console insets use a **fixed dark surface + fixed text
-colours** (kept dark in both themes so the green/blue console text stays readable). **Deferred:**
+re-pings, re-resolves DNS). The ping/DNS console insets **follow the theme** through the per-theme
+`Console*` brushes — see *Console insets* under *Accessibility*. **Deferred:**
 IPv6 connections (the OWNER_PID tables use different 16-byte-address structs).
 
 ## Processes
