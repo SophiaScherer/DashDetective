@@ -198,7 +198,23 @@ stays in its tab folder.
                                  below. The authored accent values are Blue's, for the frame before
                                  ThemeService runs, and AccentIdentityTests pins them against AccentTone.
                                  Accent is NOT a text brush: a Foreground takes AccentText, the one accent
-                                 key that follows the theme. The high-contrast tables author only their DIFFERENCES and inherit
+                                 key that follows the theme — and the same is true of every other colour
+                                 that draws both a mark and a word: Chart*Text, Status*Text and
+                                 BlueText/OrangeText/GreenText are the text halves and
+                                 YellowGraphic/GreenGraphic the mark halves, authored per theme while the
+                                 16% tint keeps the authored hue. SemanticBrushes mirrors both sets for
+                                 the catalogues that hand a brush straight to a view. The LIGHT text ramp is spaced
+                                 on CIE L*, not on opacity — equal alpha steps are not equal perceptual
+                                 steps, and the ramp built from them had nowhere to lift its bottom two
+                                 rungs into. TrackOff carries a STATE so it clears 3:1, and ThumbOff moves
+                                 with it: a dark track under the old near-black knob passed every contrast
+                                 check while reading as a filled dot. Hairline/RowLine sit at a stated
+                                 floor BELOW 3:1 on purpose and ChartGrid a step lighter than both;
+                                 PaletteLineTests pins the floor, the ceiling and the order. The light
+                                 ramp is authored DARKER than contrast alone asks for — small antialiased
+                                 text renders about twice as light as its token — and ChartAxisText gives
+                                 axis labels, the smallest text in the app, their own rung on light while
+                                 the other three variants keep exactly what TextSubtle drew. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
                                  other lines: at that weight it outshouts the trace drawn over it)
         SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it
@@ -524,9 +540,20 @@ stays in its tab folder.
         AccentTone.cs           (the rule those shades follow, stated once: hue and saturation never vary,
                                  lightness targets a CIE L* rung from one ladder shared by all four
                                  accents. The rungs are Blue's own measured lightness, so the default
-                                 accent reproduces byte-identically. WithLightness snaps when asked for a
-                                 colour's own lightness — the HSL round-trip is lossy by an 8-bit step, and
-                                 half an L* is finer than a channel can express. Pure colour maths over
+                                 accent reproduces byte-identically. Only the RUNGS live here now; the
+                                 maths moved to Tone.cs once the ramp and the series wanted it too)
+        Tone.cs                 (the lightness maths itself: Lightness, WithLightness, CompositedLightness,
+                                 and the two shared rungs — LightText 48 L* for anything read, LightGraphic
+                                 61 L* for a trace. Contrast on white depends only on luminance and L* is a
+                                 function of luminance, so ONE number serves every hue at a rung. Both
+                                 helpers DARKEN ONLY: a colour already below the rung is handed back
+                                 untouched, which is what keeps ColorVision's searched tables out of reach
+                                 — re-lightening one would undo its separation, and light's margin is 21.5
+                                 against a bar of 20. WithLightness snaps when asked for a colour's own
+                                 lightness: the HSL round-trip is lossy by an 8-bit step, and half an L* is
+                                 finer than a channel can express. CompositedLightness weighs a ramp rung,
+                                 which is an opacity over a surface rather than a colour — read as the
+                                 brush's own colour every rung would weigh the same. Pure colour maths over
                                  Avalonia.Media value types, so it is unit-testable like ChartPalette)
         ColorVision.cs          (the color-blind-safe tables: status and chart series, per MODE and per
                                  THEME. Per-theme is not a nicety — a color must clear 3:1 on its
@@ -542,7 +569,12 @@ stays in its tab folder.
                                  SolidColorBrush.Color is a styled property every consumer repaints with
                                  no event and no service threaded through it. Aliasing them back onto the
                                  fixed hues beside them — which is how they started — would drag the
-                                 file-type glyphs and the icon tints along with them)
+                                 file-type glyphs and the icon tints along with them. Status*Text and the
+                                 fixed hues' *Text / *Graphic pairs are mutable for the same reason, but
+                                 move on the THEME rather than on a color-vision mode: ApplyHues() takes
+                                 only the theme, since a fixed hue is paired with a shape and a label and
+                                 so does not follow a mode. The plain hues and the *Soft tints stay
+                                 authored — a 16% tint needs neither rung)
         AppVariants.cs          (the app's own ThemeVariants: HighContrastDark / HighContrastLight, each
                                  INHERITING from the plain variant it thickens so only the differences
                                  need authoring. High contrast has to be a variant because a key inside

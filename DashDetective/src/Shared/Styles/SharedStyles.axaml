@@ -364,7 +364,7 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Border x:Name="Track" Background="{DynamicResource TrackOff}" CornerRadius="11">
-                    <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="{DynamicResource TextStrong}"
+                    <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="{DynamicResource ThumbOff}"
                              HorizontalAlignment="Left" Margin="3,0,0,0"/>
                 </Border>
             </ControlTemplate>

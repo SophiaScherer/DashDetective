@@ -80,5 +80,9 @@ public sealed partial class ToolkitEntry : ObservableObject {
     public string BadgeLabel => ToolkitCatalog.LabelFor(Kind);
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);
     public IBrush BadgeForeground => ToolkitIcons.ForegroundFor(Kind);
+
+    /// <summary>The kind label's colour. Split from <see cref="BadgeForeground"/> because one is a glyph
+    /// and the other a word, and they answer to different contrast bars.</summary>
+    public IBrush BadgeLabelForeground => ToolkitIcons.LabelForegroundFor(Kind);
     public IBrush BadgeBackground => ToolkitIcons.BackgroundFor(Kind);
 }

@@ -1,10 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using Xunit;
 
 namespace DashDetective.Tests.Services.Theming;
@@ -92,30 +88,16 @@ public class PaletteContrastTests {
         Assert.Equal(known, failing);
     }
 
-    /// <summary>Light misses AA more widely: dark text on white is a smaller step than white on
-    /// near-black at the same opacity. Asserted exactly, so a new failure fails the build and so does
-    /// fixing one of these.</summary>
+    /// <summary>Light clears AA outright. It did not before the ramp was respaced on CIE L*:
+    /// <c>TextMuted</c> and <c>TextSubtle</c> missed on every surface, and the equal-opacity ramp left no
+    /// room above them to lift into. Dark keeps its own ramp and its own recorded miss.</summary>
     [Fact]
-    public void Light_RecordsExactlyWhichBodyPairsMissAa() {
-        var failing = Measure("Light", BodyText, ContrastRatio.AA)
-            .Select(f => f.Split(':')[0])
-            .OrderBy(f => f, StringComparer.Ordinal)
-            .ToArray();
+    public void Light_EveryBodyTextOnEverySurface_MeetsAa() {
+        var failures = Measure("Light", BodyText, ContrastRatio.AA);
 
-        string[] known = [
-            "TextMuted on AppBackground",
-            "TextMuted on CardBackground",
-            "TextMuted on FieldBackground",
-            "TextMuted on PanelBackground",
-            "TextMuted on SidebarBackground",
-            "TextSubtle on AppBackground",
-            "TextSubtle on CardBackground",
-            "TextSubtle on FieldBackground",
-            "TextSubtle on PanelBackground",
-            "TextSubtle on SidebarBackground",
-        ];
-
-        Assert.Equal(known, failing);
+        Assert.True(failures.Count == 0,
+            "Light promises AA for body text and these pairs fall short:" +
+            Environment.NewLine + string.Join(Environment.NewLine, failures));
     }
 
     // ----- Measuring -----
@@ -134,85 +116,10 @@ public class PaletteContrastTests {
     }
 
     private static double Ratio(string variant, string textKey, string surfaceKey) {
-        var brushes = Palette.Value;
-        var text = Resolve(brushes, variant, textKey);
-        var surface = Resolve(brushes, variant, surfaceKey);
+        var text = PaletteFile.Resolve(variant, textKey);
+        var surface = PaletteFile.Resolve(variant, surfaceKey);
 
         // A surface is opaque, so its own alpha never needs compositing.
         return ContrastRatio.Of(text.Color, text.Opacity, surface.Color);
-    }
-
-    /// <summary>A variant's value for a key, falling back to the variant it inherits from — which is how
-    /// the high-contrast dictionaries get away with authoring only their differences.</summary>
-    private static Brush Resolve(Dictionary<string, Dictionary<string, Brush>> brushes, string variant, string key) {
-        if (brushes[variant].TryGetValue(key, out var brush))
-            return brush;
-
-        var parent = variant switch {
-            "HighContrastDark" => "Dark",
-            "HighContrastLight" => "Light",
-            _ => throw new InvalidOperationException($"{variant} has no value for {key} and inherits nothing."),
-        };
-
-        return brushes[parent][key];
-    }
-
-    // ----- Reading the authored file -----
-
-    private readonly record struct Brush((int R, int G, int B) Color, double Opacity);
-
-    private static readonly Lazy<Dictionary<string, Dictionary<string, Brush>>> Palette = new(Read);
-
-    /// <summary>One brush table per theme dictionary. Deliberately a plain parse of the authored XAML:
-    /// loading it through Avalonia would need a render backend, which these tests do not have.</summary>
-    private static Dictionary<string, Dictionary<string, Brush>> Read() {
-        var xaml = File.ReadAllText(Path.Combine(SourceRoot(), "src/Shared/Styles/Palette.axaml"));
-        var tables = new Dictionary<string, Dictionary<string, Brush>>(StringComparer.Ordinal);
-
-        // Each theme dictionary opens with its key — "Dark"/"Light" plainly, the high-contrast pair
-        // through an x:Static reference to AppVariants.
-        var blocks = Regex.Matches(
-            xaml,
-            """<ResourceDictionary x:Key="(?:\{x:Static theming:AppVariants\.)?(\w+?)\}?">(.*?)</ResourceDictionary>""",
-            RegexOptions.Singleline);
-
-        foreach (Match block in blocks) {
-            var table = new Dictionary<string, Brush>(StringComparer.Ordinal);
-
-            foreach (Match entry in Regex.Matches(
-                         block.Groups[2].Value,
-                         """<SolidColorBrush x:Key="(\w+)" Color="#([0-9A-Fa-f]{6})"(?: Opacity="([\d.]+)")?\s*/>""")) {
-                var hex = entry.Groups[2].Value;
-                var opacity = entry.Groups[3].Success
-                    ? double.Parse(entry.Groups[3].Value, CultureInfo.InvariantCulture)
-                    : 1.0;
-
-                table[entry.Groups[1].Value] = new Brush(
-                    (Convert.ToInt32(hex[..2], 16), Convert.ToInt32(hex[2..4], 16), Convert.ToInt32(hex[4..], 16)),
-                    opacity);
-            }
-
-            tables[block.Groups[1].Value] = table;
-        }
-
-        // A silent parse failure would make every assertion above vacuously true.
-        foreach (var variant in new[] { "Dark", "Light", "HighContrastDark", "HighContrastLight" }) {
-            Assert.True(tables.ContainsKey(variant), $"No theme dictionary parsed for {variant}.");
-            Assert.NotEmpty(tables[variant]);
-        }
-
-        return tables;
-    }
-
-    /// <summary>Walks up to the repository from this file's own compile-time path, as
-    /// <c>PaletteOwnershipTests</c> does: anchoring to the binaries breaks under
-    /// <c>--artifacts-path</c>.</summary>
-    private static string SourceRoot([CallerFilePath] string thisFile = "") {
-        var dir = new DirectoryInfo(Path.GetDirectoryName(thisFile)!);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DashDetective.sln")))
-            dir = dir.Parent;
-
-        Assert.NotNull(dir);
-        return Path.Combine(dir!.FullName, "DashDetective");
     }
 }

@@ -689,10 +689,12 @@ keeps a mode regardless — a 0.9 margin is inside the error of any simulation, 
 deuteranopia's confusion axis — but the number is asserted so nobody has to guess whether it was
 measured or assumed.
 
-**What this does not reach:** the two banners. The resource alert is amber and the notice green through
-`{StaticResource}`, so neither follows a mode. Both carry an icon and a sentence, so color is not their
-only channel — but a future phase wanting them to follow would have to move them to `{DynamicResource}`
-first.
+**What this does not reach:** the two banners. The resource alert is amber and the notice green, and
+neither follows a mode. Both carry an icon and a sentence, so color is not their only channel. The
+light-mode contrast work below moved their marks to `{DynamicResource YellowGraphic}` /
+`{DynamicResource GreenGraphic}` so they follow the **theme** — which is the binding a future phase
+wanting them to follow a mode would have needed, but those two keys are authored per theme rather than
+swapped, so a mode still passes them by.
 
 ### What the contrast test found
 
@@ -705,17 +707,80 @@ High contrast clears **AAA (7:1)** for all body text in both variants, and lifts
 `TextGhost` past AA. A fourth test pins that it is never *worse* than the plain variant on any pair, so
 a table that raised one entry and lowered another could not slip through.
 
-It also found two things in the **shipped** themes, which are recorded rather than changed:
-- **Dark**: `TextSubtle` misses AA on the three raised surfaces, at 4.36–4.48 against a 4.5 bar.
-- **Light**: `TextMuted` and `TextSubtle` miss AA on every surface. Dark text on a white card is a
-  smaller step than white text on a near-black one at the same opacity, so the ramp that clears AA in
-  dark falls short in light.
+It also found two things in the **shipped** themes. **Light has since been fixed** — see *Light-mode
+contrast* below — and dark is still recorded rather than changed:
+- **Dark**: `TextSubtle` misses AA on the three raised surfaces, at 4.36–4.48 against a 4.5 bar. Asserted
+  **exactly**, so a new failure fails the build and so does fixing this one, with a message saying so.
+- **Light** used to miss on `TextMuted` and `TextSubtle` across every surface. It now clears AA outright,
+  and the assertion is a positive one.
 
-Both lists are asserted **exactly**, so a new failure fails the build and so does fixing one of these —
-with a message saying so. They are not fixed here because the ramp's steps are 5% apart: lifting
-`TextSubtle` to clear AA puts it within 2% of `TextMuted` above it and the two stop being
-distinguishable. Rebalancing the ramp is a design decision, not a test fix, and high contrast is the
-answer offered today.
+### Light-mode contrast
+
+The light theme was under-contrasted for anything drawn thin or pale, and it went wider than the ramp.
+Three families were wrong for three different reasons, and the fix is one rule in three places.
+
+**The ramp was spaced on the wrong scale.** It was authored as equal *opacity* steps, and equal alpha is
+not equal perceptual weight: `TextMuted` sat at 3.86:1 and `TextSubtle` at 3.26:1, with `TextTertiary`
+already at 0.60 and AA needing 0.545 — two rungs to fit in a five-point band. That is why the earlier
+note called rebalancing a design decision rather than a test fix. Respaced on **CIE L\***, now about 6.5 apart,
+all six rungs clear AA with room to tell them apart. `PaletteRampTests` pins the spacing, the pairwise
+separation and the direction, so a later nudge cannot quietly re-flatten it.
+
+**A colour was doing two jobs.** A chart series or a status hue is authored for a near-black page — warn
+reads **1.47:1** on white, the lowest number in the app — and the same brush drew both a trace and the
+figure beside it. This is the `Accent` / `AccentText` split the accent already has, applied to the graphs
+and the status set: `Chart*Text`, `SemanticBrushes.Status*Text`, and a `*Text` / `*Graphic` pair for each
+fixed hue — in `Palette.axaml` for the views that bind a key, and mirrored on `SemanticBrushes` for the
+catalogues that hand a brush straight to a view. `ResourceRow` gained `TraceBrush` beside `ValueBrush`,
+and `ToolkitIcons` a `LabelForegroundFor` beside `ForegroundFor`, for the same reason.
+
+**The sweep found four more of it after the obvious ones.** A grep for `Foreground=` cannot see a brush
+that reaches the screen through a C# property, and that is where the worst numbers were hiding: the
+Processes Status column, the network adapter state, the connections table and the drive health pill all
+read `SemanticBrushes.Status*` directly (warn at 1.47:1). A second pass found three more — the Toolkit
+kind label at 1.38–2.11:1 on its own tile, Storage's usage bar at 1.8:1 against its track, and the two
+shell banner marks, the alert triangle at 1.38:1 and the notice checkmark at 1.82:1. **Audit the
+consumers, not the markup**: every one of these was a property, a catalogue lookup or a `<Setter>`.
+
+**Two rungs, because a trace and a figure are not the same thing.** Contrast against white depends only on
+luminance and L\* is a function of luminance, so **any hue at a given rung reads the same ratio** — one
+number serves every colour. Text sits at `Tone.LightText` (48 L\*, 4.82:1, WCAG's 4.5 bar) and a trace at
+`Tone.LightGraphic` (61 L\*, 3.07:1, WCAG's 3:1 for a graphic), so a trace stays a step lighter than the
+figure that names it.
+
+**The rung is darken-only, and that is load-bearing.** `Tone.TextOnLight` never *lightens* a colour to its
+rung, and a colour-vision mode is skipped entirely. Those tables were searched against a light background
+and several entries already sit below the rung; re-lightening them would undo the separation the search
+bought, and light's measured margin is only 21.5 against a bar of 20.
+
+**The lines split three ways by what they carry.** `TrackOff` is the one that encodes a *state* — it is how
+an off toggle is told from an on one — so it goes to 3:1. The chart traces carry the content, so they do
+too. `Hairline` and `RowLine` were lifted to a stated floor (both 1.52:1) but deliberately **not** to 3:1:
+they repeat what the surfaces and the spacing already say, and at 3:1 a card edge reads as a rule rather
+than a hairline. `ChartGrid` rose to 1.46:1 so the lattice is visible on a white card, but stays a step
+lighter than the dividers, for the reason the high-contrast tables hold it back — it is a scale, and at
+the other lines' weight it outshouts the trace drawn over it. `PaletteLineTests` pins the floor, the
+ceiling and that ordering, so lifting a line further is a decision somebody makes on purpose.
+
+**The first pass measured right and still looked wrong.** Every rung cleared AA, yet supporting text read
+as washed out. Sampling the rendered pixels explained it: small antialiased text renders roughly **twice as
+light as its nominal colour** — `TextSubtle` at `#707070` averaged `#B5` of ink, and chart axis labels
+never reached their nominal colour at all. A second pass respaced the ramp darker (`TextSubtle` `#545454`,
+`TextMuted` `#454545`) and gave axis text its own `ChartAxisText` key a rung heavier on light, since at
+`TextSizeMicro` it is the smallest text in the app. The active nav item did not move, so the hierarchy held.
+What colour cannot fix is the remaining lightness from glyph thinness; a Medium weight on the descriptive
+styles measured a further ~15% darker, but it changes both themes and text widths, so it is not applied.
+
+**What the numbers could not have told us.** Darkening `TrackOff` far enough to be found on a white page
+left the off toggle's near-black `TextStrong` knob reading as a *filled* dot rather than an off one — both
+contrast checks passed while the control lied about its state. This is the same trap the checked state fell
+into once before, and it is why the knob now has its own token (`ThumbOff`) and its own assertion, in all four
+variants. It is not simply "light" — high-contrast dark draws a near-white track, so its knob is black;
+what is pinned is that the knob clears 3:1 **against its own track**, whichever way round that falls.
+**A toggle's track and its knob move together or not at all.**
+
+**Dark is untouched**, which is the point: every identity hue already clears AA on the lightest dark
+surface, so the model returns them unchanged and the recorded dark miss above still stands.
 
 **The window's minimum size scales with it.** At 200 % the same page needs twice the room, and a
 window draggable below that would clip rather than reflow — so `MainWindowViewModel` exposes

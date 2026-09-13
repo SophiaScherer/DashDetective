@@ -85,7 +85,7 @@
                                Classes="cellPid" Text="{Binding PidText}"/>
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).StatusColumn}"
                                Text="{Binding Status}" FontSize="{DynamicResource TextSizeSmall}"
-                               Foreground="{Binding StatusBrush}"/>
+                               Foreground="{Binding StatusTextBrush}"/>
                     <TextBlock Grid.Column="{Binding #Page.((vm:ProcessesViewModel)DataContext).CpuColumn}"
                                Classes="cpuCell"
                                Classes.high="{Binding CpuHigh}" Classes.med="{Binding CpuMed}"
@@ -279,10 +279,10 @@
             <Setter Property="TextAlignment" Value="Right"/>
         </Style>
         <Style Selector="TextBlock.cpuCell.med">
-            <Setter Property="Foreground" Value="{StaticResource StatusWarn}"/>
+            <Setter Property="Foreground" Value="{DynamicResource StatusWarnText}"/>
         </Style>
         <Style Selector="TextBlock.cpuCell.high">
-            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OrangeText}"/>
         </Style>
 
         <!-- Summary-card value. -->
@@ -303,7 +303,7 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="{StaticResource RedSoft}"/>
             <Setter Property="BorderBrush" Value="{StaticResource RedLine}"/>
-            <Setter Property="Foreground" Value="{StaticResource Orange}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OrangeText}"/>
         </Style>
         <Style Selector="Button.endTask:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{StaticResource RedSoftHover}"/>
@@ -339,21 +339,21 @@
             <Border Classes="card" layout:Reorder.Id="processes.cpu">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="CPU"/>
-                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpu}"
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartCpuText}"
                                Text="{Binding CpuUsageText}"/>
                 </StackPanel>
             </Border>
             <Border Classes="card" layout:Reorder.Id="processes.memory">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="MEMORY"/>
-                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemory}"
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartMemoryText}"
                                Text="{Binding MemoryUsageText}"/>
                 </StackPanel>
             </Border>
             <Border Classes="card" layout:Reorder.Id="processes.threads">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
                     <TextBlock Classes="cardLabel" Text="THREADS"/>
-                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartThreads}" Text="{Binding ThreadsText}"/>
+                    <TextBlock Classes="sumValue" Foreground="{DynamicResource ChartThreadsText}" Text="{Binding ThreadsText}"/>
                 </StackPanel>
             </Border>
             </layout:UniformFlowPanel>
@@ -418,7 +418,7 @@
                                IsVisible="{Binding HasSelection}"/>
                     <TextBlock DockPanel.Dock="Right" Classes="cardSub" VerticalAlignment="Center"
                                TextAlignment="Right" TextWrapping="Wrap"
-                               Foreground="{StaticResource Orange}" Text="{Binding ActionMessage}"
+                               Foreground="{DynamicResource OrangeText}" Text="{Binding ActionMessage}"
                                IsVisible="{Binding ActionMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                     <!-- Tab fills in a running process name from what has been typed. -->

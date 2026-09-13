@@ -43,15 +43,10 @@ public static class ToolkitIcons {
 
     // ----- Fixed per-kind colours (foreground + tinted background), from the shared palette -----
 
-    private static readonly IBrush Blue = SemanticBrushes.Blue;
     private static readonly IBrush BlueBg = SemanticBrushes.BlueSoft;
-    private static readonly IBrush Purple = SemanticBrushes.Purple;
     private static readonly IBrush PurpleBg = SemanticBrushes.PurpleSoft;
-    private static readonly IBrush Green = SemanticBrushes.Green;
     private static readonly IBrush GreenBg = SemanticBrushes.GreenSoft;
-    private static readonly IBrush Yellow = SemanticBrushes.Yellow;
     private static readonly IBrush YellowBg = SemanticBrushes.YellowSoft;
-    private static readonly IBrush Orange = SemanticBrushes.Orange;
     private static readonly IBrush OrangeBg = SemanticBrushes.OrangeSoft;
 
     /// <summary>The row glyph for a kind.</summary>
@@ -63,13 +58,23 @@ public static class ToolkitIcons {
         _ => Command,
     };
 
-    /// <summary>The badge/glyph colour for a kind.</summary>
+    /// <summary>The badge glyph's colour for a kind — a mark, so it takes the graphic shade.</summary>
     public static IBrush ForegroundFor(ToolkitEntryKind kind) => kind switch {
-        ToolkitEntryKind.Folder => Blue,
-        ToolkitEntryKind.App => Purple,
-        ToolkitEntryKind.Panel => Yellow,
-        ToolkitEntryKind.Link => Orange,
-        _ => Green,
+        ToolkitEntryKind.Folder => SemanticBrushes.BlueGraphic,
+        ToolkitEntryKind.App => SemanticBrushes.PurpleGraphic,
+        ToolkitEntryKind.Panel => SemanticBrushes.YellowGraphic,
+        ToolkitEntryKind.Link => SemanticBrushes.OrangeGraphic,
+        _ => SemanticBrushes.GreenGraphic,
+    };
+
+    /// <summary>The badge label's colour for a kind. The word beside the glyph is read, so it takes the
+    /// text shade — "Panel" in the authored yellow reads 1.38:1 on its own tile.</summary>
+    public static IBrush LabelForegroundFor(ToolkitEntryKind kind) => kind switch {
+        ToolkitEntryKind.Folder => SemanticBrushes.BlueText,
+        ToolkitEntryKind.App => SemanticBrushes.PurpleText,
+        ToolkitEntryKind.Panel => SemanticBrushes.YellowText,
+        ToolkitEntryKind.Link => SemanticBrushes.OrangeText,
+        _ => SemanticBrushes.GreenText,
     };
 
     /// <summary>The tinted badge/tile fill for a kind.</summary>

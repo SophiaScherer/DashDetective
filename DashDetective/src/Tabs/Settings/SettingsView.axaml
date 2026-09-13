@@ -659,7 +659,7 @@
                                                                        Text="{Binding Description}"/>
                                                             <TextBlock Classes="settingDesc" Text="{Binding Note}"
                                                                        IsVisible="{Binding HasNote}"
-                                                                       Foreground="{DynamicResource StatusWarn}"/>
+                                                                       Foreground="{DynamicResource StatusWarnText}"/>
                                                         </StackPanel>
                                                         <settings:ShortcutCaptureBox
                                                             Grid.Column="1"

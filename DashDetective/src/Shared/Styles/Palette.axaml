@@ -114,6 +114,21 @@
          re-hues with them. Pink keeps it clear of GPU's green. -->
     <SolidColorBrush x:Key="ChartThreads" Color="{StaticResource PinkColor}"/>
 
+    <!-- The same series drawn as TEXT — the Dashboard's percentages, the Processes summary figures,
+         Network's rates, Storage's readouts. Authored for a near-black page, a series colour reads about
+         2:1 on white, so the light theme darkens it to Tone.LightText; these are the dark values, for the
+         frame before ThemeService runs. Accent / AccentText, applied to the graphs. -->
+    <SolidColorBrush x:Key="ChartCpuText" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartMemoryText" Color="{StaticResource PurpleColor}"/>
+    <SolidColorBrush x:Key="ChartGpuText" Color="{StaticResource GreenColor}"/>
+    <SolidColorBrush x:Key="ChartStorageText" Color="{StaticResource YellowColor}"/>
+    <SolidColorBrush x:Key="ChartNetDownText" Color="{StaticResource BlueColor}"/>
+    <SolidColorBrush x:Key="ChartNetUpText" Color="{StaticResource OrangeColor}"/>
+    <SolidColorBrush x:Key="ChartThreadsText" Color="{StaticResource PinkColor}"/>
+    <!-- Warn drawn as a sentence rather than as a mark. Swapped with the series, since it follows a
+         color-vision mode too. -->
+    <SolidColorBrush x:Key="StatusWarnText" Color="{StaticResource YellowColor}"/>
+
     <!-- ===== Theme-invariant: console surface =====
          The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
          output and execution log. Two features draw it, so it lives here rather than being declared
@@ -145,9 +160,20 @@
             <!-- Faint lattice drawn behind the larger utilization charts (matches the design's rgba(255,255,255,0.055)). -->
             <SolidColorBrush x:Key="ChartGrid" Color="#FFFFFF" Opacity="0.055"/>
 
+            <SolidColorBrush x:Key="ThumbOff" Color="#FFFFFF"/>
+
             <!-- Hover overlays (for icon buttons / faint fills) -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.07"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#FFFFFF" Opacity="0.12"/>
+
+            <!-- The fixed hues drawn as text. Dark draws them at their authored lightness; only the
+                 light theme darkens them. -->
+            <SolidColorBrush x:Key="BlueText" Color="{StaticResource BlueColor}"/>
+            <SolidColorBrush x:Key="OrangeText" Color="{StaticResource OrangeColor}"/>
+            <SolidColorBrush x:Key="GreenText" Color="{StaticResource GreenColor}"/>
+            <!-- The banner marks: a mark rather than a word, so the graphic rung. -->
+            <SolidColorBrush x:Key="YellowGraphic" Color="{StaticResource YellowColor}"/>
+            <SolidColorBrush x:Key="GreenGraphic" Color="{StaticResource GreenColor}"/>
 
             <!-- Text (decreasing emphasis) -->
             <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
@@ -156,6 +182,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF" Opacity="0.62"/>
             <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF" Opacity="0.50"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF" Opacity="0.45"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#FFFFFF" Opacity="0.45"/>
             <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF" Opacity="0.35"/>
             <!-- Ghosted completion text. Fainter than TextFaint on purpose: it sits directly beside
                  what the user is typing, so it has to read as a suggestion rather than as input. -->
@@ -171,24 +198,46 @@
             <SolidColorBrush x:Key="CardBackground" Color="#ffffff"/>
             <SolidColorBrush x:Key="FieldBackground" Color="#eceef1"/>
 
-            <!-- Lines & tracks -->
-            <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.10"/>
-            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.08"/>
-            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.20"/>
-            <!-- Faint lattice drawn behind the larger utilization charts (dark's white 5.5% mirrored to a matching faint black). -->
-            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.08"/>
+            <!-- Lines & tracks. The separators are lifted above their dark counterparts rather than to
+                 WCAG's 3:1: they repeat what the surfaces and spacing already say, and at 3:1 a card edge
+                 reads as a rule. PaletteLineTests pins both the floor and the ceiling. -->
+            <SolidColorBrush x:Key="Hairline" Color="#000000" Opacity="0.18"/>
+            <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.18"/>
+            <!-- The toggle's off track, and the one line token that carries state rather than structure:
+                 it is how an off switch is told from an on one, so it is held to WCAG's 3:1. The
+                 separators below are not — see PaletteLineTests. -->
+            <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.46"/>
+            <SolidColorBrush x:Key="ThumbOff" Color="#FFFFFF"/>
+            <!-- The chart lattice. A step lighter than the dividers so it stays under the trace drawn
+                 over it; at 8% it had all but vanished on a white card. -->
+            <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.165"/>
 
             <!-- Hover overlays -->
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.05"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.09"/>
 
-            <!-- Text (decreasing emphasis) -->
-            <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.95"/>
-            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.88"/>
-            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.70"/>
-            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.60"/>
-            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.50"/>
-            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.45"/>
+            <!-- The fixed hues drawn as text: Storage's read / write / temp readouts and the Processes
+                 action message. Darkened to Tone.LightText, the rung any hue reads 4.82:1 on white at.
+                 The hues themselves are unchanged — a glyph tint or a status mark still takes them. -->
+            <SolidColorBrush x:Key="BlueText" Color="#0078B6"/>
+            <SolidColorBrush x:Key="OrangeText" Color="#D23B00"/>
+            <SolidColorBrush x:Key="GreenText" Color="#35812A"/>
+            <!-- The banner marks, on the graphic rung: the alert triangle read 1.38:1 on its own tint. -->
+            <SolidColorBrush x:Key="YellowGraphic" Color="#BE8B00"/>
+            <SolidColorBrush x:Key="GreenGraphic" Color="#44A836"/>
+
+            <!-- Text (decreasing emphasis), spaced on CIE L* about 6.5 apart. Authored darker than contrast
+                 alone asks for: small antialiased text renders roughly twice as light as its nominal
+                 colour, so a rung that measured 4.7:1 still read as washed out. Dark keeps its own ramp. -->
+            <SolidColorBrush x:Key="TextStrong" Color="#000000" Opacity="0.948"/>
+            <SolidColorBrush x:Key="TextPrimary" Color="#000000" Opacity="0.893"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#000000" Opacity="0.842"/>
+            <SolidColorBrush x:Key="TextTertiary" Color="#000000" Opacity="0.787"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#000000" Opacity="0.728"/>
+            <SolidColorBrush x:Key="TextSubtle" Color="#000000" Opacity="0.669"/>
+            <!-- Chart axis text. At TextSizeMicro it is the smallest text in the app and renders lightest,
+                 so light draws it at the Tertiary rung; the other three variants keep what they drew. -->
+            <SolidColorBrush x:Key="ChartAxisText" Color="#000000" Opacity="0.787"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000" Opacity="0.35"/>
             <!-- See the dark theme's note; a touch stronger, as dark-on-light reads fainter. -->
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.22"/>
@@ -209,6 +258,7 @@
             <SolidColorBrush x:Key="Hairline" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="RowLine" Color="#FFFFFF" Opacity="0.65"/>
             <SolidColorBrush x:Key="TrackOff" Color="#FFFFFF" Opacity="0.75"/>
+            <SolidColorBrush x:Key="ThumbOff" Color="#000000"/>
             <!-- The one line that does NOT strengthen with the rest. The grid is a scale, not the
                  subject, and at the others' weight it outshouts the trace drawn over it. -->
             <SolidColorBrush x:Key="ChartGrid" Color="#FFFFFF" Opacity="0.28"/>
@@ -222,6 +272,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextMuted" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextFaint" Color="#FFFFFF"/>
             <!-- The one deliberate exception: ghosted completion sits beside what is being typed and has
                  to read as a suggestion, not as input. Kept legible rather than equal. -->
@@ -239,6 +290,7 @@
             <SolidColorBrush x:Key="Hairline" Color="#000000"/>
             <SolidColorBrush x:Key="RowLine" Color="#000000" Opacity="0.65"/>
             <SolidColorBrush x:Key="TrackOff" Color="#000000" Opacity="0.75"/>
+            <SolidColorBrush x:Key="ThumbOff" Color="#FFFFFF"/>
             <!-- Lower than the dark table's: black on white reads heavier than white on black. -->
             <SolidColorBrush x:Key="ChartGrid" Color="#000000" Opacity="0.20"/>
 
@@ -251,6 +303,7 @@
             <SolidColorBrush x:Key="TextTertiary" Color="#000000"/>
             <SolidColorBrush x:Key="TextMuted" Color="#000000"/>
             <SolidColorBrush x:Key="TextSubtle" Color="#000000"/>
+            <SolidColorBrush x:Key="ChartAxisText" Color="#000000"/>
             <SolidColorBrush x:Key="TextFaint" Color="#000000"/>
             <SolidColorBrush x:Key="TextGhost" Color="#000000" Opacity="0.55"/>
         </ResourceDictionary>

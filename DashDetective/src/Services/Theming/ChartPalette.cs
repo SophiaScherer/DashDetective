@@ -77,6 +77,24 @@ public static class ChartPalette {
             Threads: Rotate(Default.Threads, turn));
     }
 
+    /// <summary>The palette as light-theme <b>text</b>. The series colours are authored for a near-black
+    /// page — CPU's blue reads 2.01:1 on white — and the six figures drawn in them (the Dashboard's
+    /// percentages, the Processes summary, Network's rates, Storage's readouts) are text, not decoration.
+    /// The traces themselves keep the authored colour; this is the <c>Accent</c> / <c>AccentText</c> split
+    /// applied to the graphs.</summary>
+    public static ChartSeriesColors TextShades(ChartSeriesColors series) => new(
+        Tone.TextOnLight(series.Cpu), Tone.TextOnLight(series.Memory), Tone.TextOnLight(series.Gpu),
+        Tone.TextOnLight(series.Storage), Tone.TextOnLight(series.NetDown), Tone.TextOnLight(series.NetUp),
+        Tone.TextOnLight(series.Threads));
+
+    /// <summary>The palette as light-theme <b>traces</b>. A line is a graphic, so it is held to 3:1
+    /// rather than the text rung — the same hue as the figure above it, a step lighter.</summary>
+    public static ChartSeriesColors TraceShades(ChartSeriesColors series) => new(
+        Tone.GraphicOnLight(series.Cpu), Tone.GraphicOnLight(series.Memory),
+        Tone.GraphicOnLight(series.Gpu), Tone.GraphicOnLight(series.Storage),
+        Tone.GraphicOnLight(series.NetDown), Tone.GraphicOnLight(series.NetUp),
+        Tone.GraphicOnLight(series.Threads));
+
     /// <summary>Turns <paramref name="color"/>'s hue by <paramref name="degrees"/>, keeping its
     /// saturation, lightness and alpha — so a rotated palette stays as readable as the authored one.</summary>
     private static Color Rotate(Color color, double degrees) {

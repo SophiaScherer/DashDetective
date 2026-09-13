@@ -76,12 +76,91 @@ public static class SemanticBrushes {
     /// <summary>The soft fill paired with <see cref="StatusWarn"/>.</summary>
     public static SolidColorBrush StatusWarnSoft { get; } = new(YellowColor, SoftAlpha);
 
-    /// <summary>Re-points the status brushes for a color-vision mode; mutating them repaints every
-    /// consumer with no event. The hop is because <c>Color</c> is a styled property with UI-thread
-    /// affinity — the app is always on it, xUnit is not.</summary>
-    public static void Apply(SemanticColors colors) {
+    // ----- The fixed hues, drawn as text or as a mark rather than as a tint -----
+    // The C# mirror of Palette.axaml's BlueText / OrangeText / GreenText, for the catalogues that hand a
+    // brush straight to a view. Two rungs, because a word and a mark answer to different bars. The plain
+    // hues above stay authored: a 16% tint does not need either.
+
+    /// <summary>Blue as text.</summary>
+    public static SolidColorBrush BlueText { get; } = new(BlueColor);
+
+    /// <summary>Purple as text.</summary>
+    public static SolidColorBrush PurpleText { get; } = new(PurpleColor);
+
+    /// <summary>Green as text.</summary>
+    public static SolidColorBrush GreenText { get; } = new(GreenColor);
+
+    /// <summary>Yellow as text. The worst of them on a white page: 1.47:1 unshaded.</summary>
+    public static SolidColorBrush YellowText { get; } = new(YellowColor);
+
+    /// <summary>Orange as text.</summary>
+    public static SolidColorBrush OrangeText { get; } = new(OrangeColor);
+
+    /// <summary>Blue as a mark that carries meaning — a fill, a bar, a stroke.</summary>
+    public static SolidColorBrush BlueGraphic { get; } = new(BlueColor);
+
+    /// <summary>Green as a mark that carries meaning.</summary>
+    public static SolidColorBrush GreenGraphic { get; } = new(GreenColor);
+
+    /// <summary>Yellow as a mark that carries meaning.</summary>
+    public static SolidColorBrush YellowGraphic { get; } = new(YellowColor);
+
+    /// <summary>Purple as a mark that carries meaning.</summary>
+    public static SolidColorBrush PurpleGraphic { get; } = new(PurpleColor);
+
+    /// <summary>Orange as a mark that carries meaning.</summary>
+    public static SolidColorBrush OrangeGraphic { get; } = new(OrangeColor);
+
+    /// <summary>Re-points the fixed hues' two shade sets for the theme. Unlike the status set these do not
+    /// follow a color-vision mode — each is paired with a shape and a label, so hue is not their only
+    /// channel.</summary>
+    public static void ApplyHues(bool dark) {
         if (!Dispatcher.UIThread.CheckAccess()) {
-            Dispatcher.UIThread.Post(() => Apply(colors));
+            Dispatcher.UIThread.Post(() => ApplyHues(dark));
+            return;
+        }
+
+        BlueText.Color = dark ? BlueColor : Tone.TextOnLight(BlueColor);
+        PurpleText.Color = dark ? PurpleColor : Tone.TextOnLight(PurpleColor);
+        GreenText.Color = dark ? GreenColor : Tone.TextOnLight(GreenColor);
+        YellowText.Color = dark ? YellowColor : Tone.TextOnLight(YellowColor);
+        OrangeText.Color = dark ? OrangeColor : Tone.TextOnLight(OrangeColor);
+
+        BlueGraphic.Color = dark ? BlueColor : Tone.GraphicOnLight(BlueColor);
+        GreenGraphic.Color = dark ? GreenColor : Tone.GraphicOnLight(GreenColor);
+        YellowGraphic.Color = dark ? YellowColor : Tone.GraphicOnLight(YellowColor);
+        PurpleGraphic.Color = dark ? PurpleColor : Tone.GraphicOnLight(PurpleColor);
+        OrangeGraphic.Color = dark ? OrangeColor : Tone.GraphicOnLight(OrangeColor);
+    }
+
+    // ----- Status, drawn as text rather than as a mark -----
+    // The authored hues are for a near-black page: warn reads 1.47:1 on white, good 2.03:1, against a
+    // 4.5:1 bar. A dot beside a label is a mark and keeps the hue; the label itself takes these. Same
+    // split as Accent / AccentText and ChartCpu / ChartCpuText.
+
+    /// <summary>The text counterpart of <see cref="StatusGood"/>.</summary>
+    public static SolidColorBrush StatusGoodText { get; } = new(GreenColor);
+
+    /// <summary>The text counterpart of <see cref="StatusWarn"/>.</summary>
+    public static SolidColorBrush StatusWarnText { get; } = new(YellowColor);
+
+    /// <summary>The text counterpart of <see cref="StatusBad"/>.</summary>
+    public static SolidColorBrush StatusBadText { get; } = new(RedColor);
+
+    /// <summary>The text counterpart of <see cref="StatusInfo"/>.</summary>
+    public static SolidColorBrush StatusInfoText { get; } = new(BlueColor);
+
+    /// <summary>The text counterpart of <see cref="StatusIdle"/>.</summary>
+    public static SolidColorBrush StatusIdleText { get; } = new(NeutralColor);
+
+    /// <summary>Re-points the status brushes for a color-vision mode and theme; mutating them repaints
+    /// every consumer with no event. <paramref name="text"/> is the same set as the theme draws it as
+    /// text, which differs from <paramref name="colors"/> only on the light theme. The hop is because
+    /// <c>Color</c> is a styled property with UI-thread affinity — the app is always on it, xUnit is
+    /// not.</summary>
+    public static void Apply(SemanticColors colors, SemanticColors text) {
+        if (!Dispatcher.UIThread.CheckAccess()) {
+            Dispatcher.UIThread.Post(() => Apply(colors, text));
             return;
         }
 
@@ -92,5 +171,11 @@ public static class SemanticBrushes {
         StatusIdle.Color = colors.Idle;
         StatusGoodSoft.Color = colors.Good;
         StatusWarnSoft.Color = colors.Warn;
+
+        StatusGoodText.Color = text.Good;
+        StatusWarnText.Color = text.Warn;
+        StatusBadText.Color = text.Bad;
+        StatusInfoText.Color = text.Info;
+        StatusIdleText.Color = text.Idle;
     }
 }

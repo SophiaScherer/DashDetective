@@ -164,12 +164,12 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="18">
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                                <TextBlock Text="↓" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetDown}"/>
+                                <TextBlock Text="↓" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetDownText}"/>
                                 <TextBlock Text="{Binding DownText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
                                 <TextBlock Text="{Binding DownUnit}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
-                                <TextBlock Text="↑" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetUp}"/>
+                                <TextBlock Text="↑" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetUpText}"/>
                                 <TextBlock Text="{Binding UpText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
                                 <TextBlock Text="{Binding UpUnit}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>

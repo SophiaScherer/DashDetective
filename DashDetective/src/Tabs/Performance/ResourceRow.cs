@@ -117,6 +117,15 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     /// it. Set from <see cref="Series2"/> alongside <see cref="ValueBrush"/>.</summary>
     [ObservableProperty] private IBrush? _valueBrush2;
 
+    /// <summary>The series colour as the chart draws it. Separate from <see cref="ValueBrush"/>, which is
+    /// the same series as text: a trace keeps the authored colour on either theme, while a figure drawn in
+    /// it has to be readable on a white page.</summary>
+    [ObservableProperty] private IBrush _traceBrush = Brushes.Transparent;
+
+    /// <summary>The second series' trace colour, paired with <see cref="TraceBrush"/> the way
+    /// <see cref="ValueBrush2"/> is with <see cref="ValueBrush"/>.</summary>
+    [ObservableProperty] private IBrush? _traceBrush2;
+
     /// <summary>What the chart plots, e.g. "% Utilization" or "Receive and send" — the caption's fixed half,
     /// so it never claims a scale the chart isn't drawn on.</summary>
     public string ChartSubject { get; init; } = "% Utilization";

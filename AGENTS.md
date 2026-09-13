@@ -98,6 +98,33 @@ WCAG's 3:1 for a graphic that carries meaning (the nav highlight bar, the select
 against both a near-black and a white page — the feasible luminance ranges do not overlap — which is why
 the text pair exists at all.
 
+The **light theme's contrast** follows the same shape, generalised. `Tone` owns the lightness maths the
+accent, the text ramp and the chart series all measure against, and **any hue at a given CIE L\* rung reads
+the same ratio on white**, so one number serves every colour: `Tone.LightText` (48 L\*, 4.82:1) for anything
+read, `Tone.LightGraphic` (61 L\*, 3.07:1) for a trace. **A colour that draws both a mark and a word needs
+two brushes** — `ChartCpu`/`ChartCpuText`, `StatusGood`/`StatusGoodText`, `BlueGraphic`/`BlueText`,
+`ResourceRow.TraceBrush`/`ValueBrush`, `ToolkitIcons.ForegroundFor`/`LabelForegroundFor` — and the light
+ramp is spaced on L\* rather than on opacity, because equal alpha steps are not equal perceptual steps.
+Three rules came out of it:
+
+- **The rung darkens, never lightens, and a color-vision mode is skipped entirely.** Those tables were
+  searched against a light background and light's margin is 21.5 against a bar of 20; re-lightening one
+  would undo the separation the search bought.
+- **A line is held to the bar its job earns.** `TrackOff` encodes a state and a trace carries the content,
+  so both clear 3:1; `Hairline`/`RowLine` sit at a stated floor below it and `ChartGrid` a step lighter
+  than those, because a separator repeats what spacing already says and the grid must stay under the trace
+  drawn over it. `PaletteLineTests` pins the floor, the ceiling and that ordering.
+- **Judge small text by what renders, not by its nominal colour.** Antialiased 10–11.5px text reads about
+  twice as light as its token — a rung measuring 4.7:1 still looked washed out — so the light ramp is
+  authored darker than contrast alone asks for, and chart axis text (the smallest in the app) takes its
+  own `ChartAxisText` key a rung heavier. Verify a change here with a screenshot, not a ratio.
+- **A toggle's track and its knob move together.** Darkening `TrackOff` to be findable on white left the
+  near-black knob reading as a filled dot — both contrast checks passed while the control lied about its
+  state. The knob is `ThumbOff` now, and is asserted against its own track.
+
+**Dark is untouched by all of it**, and the light values are the only ones that vary: every identity hue
+already clears AA on the lightest dark surface.
+
 Two rules came out of phase 6. **`SemanticBrushes`' status brushes are mutable and each is its own
 instance** — mutating one re-points every consumer for free, and aliasing them back onto the fixed hues
 would recolor the file-type glyphs and icon tints too. And **a color palette is searched against the

@@ -44,7 +44,14 @@ public sealed class ThemeService {
     /// so re-applying an unchanged one hands back the same instance and changes nothing downstream.</summary>
     public IBrush BrushFor(ChartSeries series) => _seriesBrushes[(int)series];
 
+    /// <summary>One series' current colour as <b>text</b>. The same split as <c>Accent</c> /
+    /// <c>AccentText</c>: a trace keeps the authored colour, a figure drawn in it has to be readable.</summary>
+    public IBrush TextBrushFor(ChartSeries series) => _seriesTextBrushes[(int)series];
+
+    // Seeded with the authored palette — the dark look — for the frame before the first apply.
     private IBrush[] _seriesBrushes = BuildSeriesBrushes(ChartPalette.Default);
+
+    private IBrush[] _seriesTextBrushes = BuildSeriesBrushes(ChartPalette.Default);
 
     /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
     public AccentPreset? CurrentAccent { get; private set; }
@@ -101,11 +108,11 @@ public sealed class ThemeService {
         WatchOsTheme(app);
         app.RequestedThemeVariant = Variant();
 
-        // The accent's text pair and the color-vision tables are both per-theme, so a theme change
-        // reinstalls them.
+        // The accent's text pair, the series' text shades and the color-vision tables are all per-theme,
+        // so a theme change reinstalls them.
         SetAccent(CurrentAccent ?? AccentPreset.Default);
-        if (ColorVision != ColorVisionMode.None)
-            ApplyVisionPalettes();
+        ApplyStatus();
+        SetChartSeries(SeriesForCurrentSelections());
     }
 
     /// <summary>The variant for the current pair of selections.</summary>
@@ -159,9 +166,31 @@ public sealed class ThemeService {
     /// <summary>Installs the tables for the current mode and theme. Re-run on a theme change: the safe
     /// colors differ by background, so one set cannot serve both.</summary>
     private void ApplyVisionPalettes() {
-        SemanticBrushes.Apply(Theming.ColorVision.Status(ColorVision, IsDarkIntended()));
+        ApplyStatus();
         SetChartSeries(SeriesForCurrentSelections());
     }
+
+    /// <summary>Installs the status set the current mode and theme imply, keeping the copy the warn text
+    /// shade is derived from in step with the brushes.</summary>
+    private void ApplyStatus() {
+        _status = Theming.ColorVision.Status(ColorVision, IsDarkIntended());
+        var text = TextStatusFor(_status);
+        SemanticBrushes.Apply(_status, text);
+        SemanticBrushes.ApplyHues(IsDarkIntended());
+
+        if (Application.Current is { } app)
+            app.Resources["StatusWarnText"] = new SolidColorBrush(text.Warn);
+    }
+
+    /// <summary>The status set as text for the theme being rendered, on the same rule as the series: dark
+    /// draws the authored colour, light darkens it, and a color-vision mode is left exactly as searched.
+    /// Warn is the reason this exists — the authored yellow reads 1.47:1 on white.</summary>
+    private SemanticColors TextStatusFor(SemanticColors colors) =>
+        IsDarkIntended() || ColorVision != ColorVisionMode.None
+            ? colors
+            : new SemanticColors(Tone.TextOnLight(colors.Good), Tone.TextOnLight(colors.Warn),
+                                 Tone.TextOnLight(colors.Bad), Tone.TextOnLight(colors.Info),
+                                 Tone.TextOnLight(colors.Idle));
 
     /// <summary>The series palette the current selections imply. A color-vision mode beats the accent:
     /// rotating a safe palette by the accent's hue offset would undo what makes it safe.</summary>
@@ -238,22 +267,51 @@ public sealed class ThemeService {
     /// announces them for the pages that hold brushes instead of resource references.</summary>
     private void SetChartSeries(ChartSeriesColors series) {
         CurrentSeries = series;
-        _seriesBrushes = BuildSeriesBrushes(series);
+
+        var trace = TraceSeriesFor(series);
+        _seriesBrushes = BuildSeriesBrushes(trace);
+
+        var text = TextSeriesFor(series);
+        _seriesTextBrushes = BuildSeriesBrushes(text);
 
         if (Application.Current is { } app) {
             var res = app.Resources;
-            res["ChartCpu"] = new SolidColorBrush(series.Cpu);
-            res["ChartMemory"] = new SolidColorBrush(series.Memory);
-            res["ChartGpu"] = new SolidColorBrush(series.Gpu);
-            res["ChartStorage"] = new SolidColorBrush(series.Storage);
-            res["ChartNetDown"] = new SolidColorBrush(series.NetDown);
-            res["ChartNetUp"] = new SolidColorBrush(series.NetUp);
-            res["ChartThreads"] = new SolidColorBrush(series.Threads);
+            res["ChartCpu"] = new SolidColorBrush(trace.Cpu);
+            res["ChartMemory"] = new SolidColorBrush(trace.Memory);
+            res["ChartGpu"] = new SolidColorBrush(trace.Gpu);
+            res["ChartStorage"] = new SolidColorBrush(trace.Storage);
+            res["ChartNetDown"] = new SolidColorBrush(trace.NetDown);
+            res["ChartNetUp"] = new SolidColorBrush(trace.NetUp);
+            res["ChartThreads"] = new SolidColorBrush(trace.Threads);
+
+            res["ChartCpuText"] = new SolidColorBrush(text.Cpu);
+            res["ChartMemoryText"] = new SolidColorBrush(text.Memory);
+            res["ChartGpuText"] = new SolidColorBrush(text.Gpu);
+            res["ChartStorageText"] = new SolidColorBrush(text.Storage);
+            res["ChartNetDownText"] = new SolidColorBrush(text.NetDown);
+            res["ChartNetUpText"] = new SolidColorBrush(text.NetUp);
+            res["ChartThreadsText"] = new SolidColorBrush(text.Threads);
         }
 
         // Raised even with no Application (headless tests): the palette itself has still changed.
         SeriesChanged?.Invoke(series);
     }
+
+    /// <summary>The series as the chart draws them for the theme being rendered. Same rule as the text
+    /// shades, one rung lighter: a trace is a graphic, so the bar is 3:1 rather than 4.5:1.</summary>
+    private ChartSeriesColors TraceSeriesFor(ChartSeriesColors series) =>
+        IsDarkIntended() || ColorVision != ColorVisionMode.None ? series : ChartPalette.TraceShades(series);
+
+    /// <summary>The series as text for the theme being rendered. Dark draws the authored colour; light
+    /// darkens it to the readable rung — <b>except</b> under a color-vision mode, whose light table was
+    /// searched against a light background already and would lose its separation if re-lightened.</summary>
+    private ChartSeriesColors TextSeriesFor(ChartSeriesColors series) =>
+        IsDarkIntended() || ColorVision != ColorVisionMode.None ? series : ChartPalette.TextShades(series);
+
+    /// <summary>The status colours currently in force. Held rather than read back off the brushes:
+    /// <c>SemanticBrushes.Apply</c> hops to the UI thread when it is not already on it, so a brush may not
+    /// have caught up yet.</summary>
+    private SemanticColors _status = Theming.ColorVision.Authored;
 
     /// <summary>One brush per series, indexed by the enum so a reordered <see cref="ChartSeries"/> cannot
     /// silently mis-map.</summary>
