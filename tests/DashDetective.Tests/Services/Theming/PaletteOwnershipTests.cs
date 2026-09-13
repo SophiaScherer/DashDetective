@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -42,7 +41,7 @@ public class PaletteOwnershipTests {
 
     [Fact]
     public void NoSourceFileOutsideTheThemeSpellsAHexColor() {
-        var source = SourceRoot();
+        var source = PaletteFile.SourceRoot();
 
         var offenders = new List<string>();
         foreach (var file in Directory.EnumerateFiles(source, "*.*", SearchOption.AllDirectories)) {
@@ -62,16 +61,5 @@ public class PaletteOwnershipTests {
             "Colours belong in src/Shared/Styles/Palette.axaml, referenced with {StaticResource} or " +
             "{DynamicResource} (or via SemanticBrushes/ChartPalette from code):" +
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
-    }
-
-    /// <summary>Walks up to the repository from this file's own compile-time path. Anchoring to the
-    /// binaries instead would break under <c>--artifacts-path</c>, which puts them outside the repo.</summary>
-    private static string SourceRoot([CallerFilePath] string thisFile = "") {
-        var dir = new DirectoryInfo(Path.GetDirectoryName(thisFile)!);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DashDetective.sln")))
-            dir = dir.Parent;
-
-        Assert.NotNull(dir);
-        return Path.Combine(dir!.FullName, "DashDetective");
     }
 }

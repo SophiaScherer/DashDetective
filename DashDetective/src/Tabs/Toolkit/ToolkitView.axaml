@@ -133,7 +133,7 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- Console text: one fixed pitch and one fixed colour set on the dark inset. -->
+        <!-- Console text: one fixed pitch on the console inset. Colours are per theme (Console*). -->
         <Style Selector="TextBlock.console">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
             <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
@@ -596,7 +596,7 @@
                             Command="{Binding ClearLogCommand}" IsEnabled="{Binding HasLog}"/>
                 </StackPanel>
             </controls:WidgetPanel.HeaderContent>
-            <Border Background="{StaticResource ConsoleBg}" CornerRadius="6"
+            <Border Background="{DynamicResource ConsoleBg}" CornerRadius="6"
                     Padding="10" ClipToBounds="True">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <Panel>
@@ -605,12 +605,12 @@
                                     <DataTemplate x:DataType="vm:ToolkitLogEntry">
                                         <StackPanel Margin="0,0,0,9">
                                             <TextBlock Text="{Binding Time}" Classes="console"
-                                                       Foreground="{StaticResource ConsoleMuted}"/>
+                                                       Foreground="{DynamicResource ConsoleMuted}"/>
                                             <TextBlock Classes="console"
-                                                       Foreground="{StaticResource ConsoleBlue}"
+                                                       Foreground="{DynamicResource ConsoleBlue}"
                                                        Text="{Binding Command, StringFormat='$ {0}'}"/>
                                             <TextBlock Text="{Binding Output}" Classes="console"
-                                                       Foreground="{StaticResource ConsoleGreen}"/>
+                                                       Foreground="{DynamicResource ConsoleGreen}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -618,7 +618,7 @@
 
                             <TextBlock Classes="console" VerticalAlignment="Top"
                                        IsVisible="{Binding !HasLog}"
-                                       Foreground="{StaticResource ConsoleMuted}"
+                                       Foreground="{DynamicResource ConsoleMuted}"
                                        Text="Output from commands you run will appear here."/>
                         </Panel>
                     </ScrollViewer>

@@ -119,7 +119,7 @@ internal static class PaletteFile {
 
     /// <summary>Walks up to the repository from this file's own compile-time path. Anchoring to the
     /// binaries instead would break under <c>--artifacts-path</c>, which puts them outside the repo.</summary>
-    private static string SourceRoot([CallerFilePath] string thisFile = "") {
+    internal static string SourceRoot([CallerFilePath] string thisFile = "") {
         var dir = new DirectoryInfo(Path.GetDirectoryName(thisFile)!);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DashDetective.sln")))
             dir = dir.Parent;

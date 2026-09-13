@@ -216,7 +216,10 @@ stays in its tab folder.
                                  axis labels, the smallest text in the app, their own rung on light while
                                  the other three variants keep exactly what TextSubtle drew. The high-contrast tables author only their DIFFERENCES and inherit
                                  the rest. Their chart grid deliberately does NOT strengthen with the
-                                 other lines: at that weight it outshouts the trace drawn over it)
+                                 other lines: at that weight it outshouts the trace drawn over it.
+                                 Console* (the ping/DNS/execution-log inset) is per theme too; its light
+                                 hues are measured against the gray inset, not white, and a theme key is
+                                 never {StaticResource} — ThemeResourceBindingTests fails the build on one)
         SharedStyles.axaml      (REDUCE MOTION: the reveal flash's transition is undone here because it
                                  is declared here; the nav bar's and the Processes pulse's live in their
                                  own files, since a local style outranks an app-level one. The selector
@@ -1481,9 +1484,9 @@ stays in its tab folder.
                                                          adapter/connection/ping timers and the keyed-diff
                                                          for the connections list. THE PING AND DNS PANELS
                                                          ARE USER-INITIATED and start nothing on their own —
-                                                         see the write-up in the Appendix. Tab-local
-                                                         MonoFont + fixed console-colour resources live in
-                                                         the view — promote to Shared if reused)
+                                                         see the write-up in the Appendix. MonoFont and
+                                                         the per-theme Console* brushes are app-level in
+                                                         Palette.axaml, shared with the Toolkit log)
                                 NetworkProviders.cs     (the tab's provider bundle + ForCurrentPlatform();
                                                          see Provider seams above. TWO platform choices here
                                                          — which IConnectionsInterop and which

@@ -129,18 +129,8 @@
          color-vision mode too. -->
     <SolidColorBrush x:Key="StatusWarnText" Color="{StaticResource YellowColor}"/>
 
-    <!-- ===== Theme-invariant: console surface =====
-         The terminal look shared by the Network tab's ping/DNS output and the Toolkit tab's command
-         output and execution log. Two features draw it, so it lives here rather than being declared
-         twice. ConsoleBg stays dark in BOTH themes: the text colours below are fixed, and a light
-         inset would wash them out. That is also why these do not follow the theme ramp or the accent.
-         Fixed, so {StaticResource} is the correct binding for them. -->
+    <!-- The console's fixed pitch. Its colours (Console*) are per theme, below. -->
     <FontFamily x:Key="MonoFont">Cascadia Mono,Consolas,Courier New,monospace</FontFamily>
-    <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
-    <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
-    <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
-    <SolidColorBrush x:Key="ConsoleGreen" Color="{StaticResource GreenColor}"/>
-    <SolidColorBrush x:Key="ConsoleBlue" Color="{StaticResource BlueColor}"/>
 
     <ResourceDictionary.ThemeDictionaries>
 
@@ -174,6 +164,13 @@
             <!-- The banner marks: a mark rather than a word, so the graphic rung. -->
             <SolidColorBrush x:Key="YellowGraphic" Color="{StaticResource YellowColor}"/>
             <SolidColorBrush x:Key="GreenGraphic" Color="{StaticResource GreenColor}"/>
+
+            <!-- Console inset: the Network ping/DNS output and the Toolkit execution log. -->
+            <SolidColorBrush x:Key="ConsoleBg" Color="#111318"/>
+            <SolidColorBrush x:Key="ConsoleFg" Color="#c8ccd2"/>
+            <SolidColorBrush x:Key="ConsoleMuted" Color="#8b9099"/>
+            <SolidColorBrush x:Key="ConsoleGreen" Color="{StaticResource GreenColor}"/>
+            <SolidColorBrush x:Key="ConsoleBlue" Color="{StaticResource BlueColor}"/>
 
             <!-- Text (decreasing emphasis) -->
             <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
@@ -226,6 +223,14 @@
             <SolidColorBrush x:Key="YellowGraphic" Color="#BE8B00"/>
             <SolidColorBrush x:Key="GreenGraphic" Color="#44A836"/>
 
+            <!-- Console inset, matching the field above it. The hues sit at 42 L*, not Tone.LightText:
+                 that rung is measured on white and reads 4.18:1 on this gray. -->
+            <SolidColorBrush x:Key="ConsoleBg" Color="#eceef1"/>
+            <SolidColorBrush x:Key="ConsoleFg" Color="#000000" Opacity="0.893"/>
+            <SolidColorBrush x:Key="ConsoleMuted" Color="#000000" Opacity="0.728"/>
+            <SolidColorBrush x:Key="ConsoleGreen" Color="#2E7025"/>
+            <SolidColorBrush x:Key="ConsoleBlue" Color="#00689F"/>
+
             <!-- Text (decreasing emphasis), spaced on CIE L* about 6.5 apart. Authored darker than contrast
                  alone asks for: small antialiased text renders roughly twice as light as its nominal
                  colour, so a rung that measured 4.7:1 still read as washed out. Dark keeps its own ramp. -->
@@ -266,6 +271,10 @@
             <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF" Opacity="0.28"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#FFFFFF" Opacity="0.45"/>
 
+            <!-- Console text to AAA on the inherited inset; the hues already clear it. -->
+            <SolidColorBrush x:Key="ConsoleFg" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="ConsoleMuted" Color="#FFFFFF"/>
+
             <SolidColorBrush x:Key="TextStrong" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="TextSecondary" Color="#FFFFFF"/>
@@ -296,6 +305,12 @@
 
             <SolidColorBrush x:Key="HoverOverlay" Color="#000000" Opacity="0.18"/>
             <SolidColorBrush x:Key="HoverOverlayStrong" Color="#000000" Opacity="0.30"/>
+
+            <!-- Console text to AAA on the inherited inset: the hues drop to 32 L*. -->
+            <SolidColorBrush x:Key="ConsoleFg" Color="#000000"/>
+            <SolidColorBrush x:Key="ConsoleMuted" Color="#000000"/>
+            <SolidColorBrush x:Key="ConsoleGreen" Color="#23561C"/>
+            <SolidColorBrush x:Key="ConsoleBlue" Color="#004F79"/>
 
             <SolidColorBrush x:Key="TextStrong" Color="#000000"/>
             <SolidColorBrush x:Key="TextPrimary" Color="#000000"/>

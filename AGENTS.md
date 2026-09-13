@@ -118,6 +118,8 @@ Three rules came out of it:
   twice as light as its token — a rung measuring 4.7:1 still looked washed out — so the light ramp is
   authored darker than contrast alone asks for, and chart axis text (the smallest in the app) takes its
   own `ChartAxisText` key a rung heavier. Verify a change here with a screenshot, not a ratio.
+- **A rung is measured against the surface the colour sits on.** `Tone.LightText` assumes white; the
+  console's gray inset needs its own darker shades (`Console*`, pinned by `PaletteConsoleTests`).
 - **A toggle's track and its knob move together.** Darkening `TrackOff` to be findable on white left the
   near-black knob reading as a filled dot — both contrast checks passed while the control lied about its
   state. The knob is `ThumbOff` now, and is asserted against its own track.
@@ -540,7 +542,8 @@ per-theme `AccentText`/`AccentTextHover`) and the
 per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStorage`, `ChartNetDown`,
 `ChartNetUp`) sit top-level and are **swapped at runtime**. **Rule:** any key that can change at runtime
 must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours
-`Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeService` (`src/Services/Theming`) is the
+`Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeResourceBindingTests` fails the build on a
+theme-dictionary key bound statically — how the console insets stayed dark in light mode. `ThemeService` (`src/Services/Theming`) is the
 **only** code that writes to `Application.Current` — `ApplyTheme` sets the variant; `ApplyAccent` swaps
 the accent and installs the palette derived from it; `ApplyDefaultAppearance` restores the authored one.
 It's constructed once in `MainWindowViewModel`, applied at startup, and handed to `SettingsViewModel` and

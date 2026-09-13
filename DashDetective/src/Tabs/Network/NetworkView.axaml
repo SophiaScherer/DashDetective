@@ -294,9 +294,9 @@
                                   LinkCommand="{Binding OpenPingSiteCommand}"
                                   LinkToolTip="{Binding PingLinkTip}"
                                   ConsoleText="{Binding PingConsole}"
-                                  ConsoleBrush="{StaticResource ConsoleGreen}"
+                                  ConsoleBrush="{DynamicResource ConsoleGreen}"
                                   FooterText="{Binding PingSummary}"
-                                  FooterBrush="{StaticResource ConsoleMuted}"/>
+                                  FooterBrush="{DynamicResource ConsoleMuted}"/>
 
                 <!-- Editable host: Enter or the button re-resolves it, so both run the same command. -->
                 <vm:ConsolePanel WidgetId="network.dns" Title="DNS Lookup"
@@ -309,8 +309,8 @@
                                   LinkCommand="{Binding OpenDnsSiteCommand}"
                                   LinkToolTip="{Binding DnsLinkTip}"
                                   ConsoleText="{Binding DnsConsole}"
-                                  ConsoleBrush="{StaticResource ConsoleFg}"
+                                  ConsoleBrush="{DynamicResource ConsoleFg}"
                                   FooterText="{Binding DnsFooter}"
-                                  FooterBrush="{StaticResource ConsoleBlue}"/>
+                                  FooterBrush="{DynamicResource ConsoleBlue}"/>
     </layout:WidgetBoard>
 </UserControl>
