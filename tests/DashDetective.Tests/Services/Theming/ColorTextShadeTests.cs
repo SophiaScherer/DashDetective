@@ -72,20 +72,20 @@ public class ColorTextShadeTests {
         Assert.Equal(before, ChartPalette.Default);
     }
 
-    /// <summary>Every accent's derived palette has to survive the same treatment, not just the default
-    /// look — the text shades are taken after the accent has re-hued the series.</summary>
+    /// <summary>Every Graph colors palette has to survive the same treatment, not just the default
+    /// look — the text shades are taken after the hue has re-hued the series.</summary>
     [Fact]
-    public void TextShade_MeetsAaOnWhite_ForEveryAccent() {
+    public void TextShade_MeetsAaOnWhite_ForEveryGraphColors() {
         var failures = new List<string>();
 
-        foreach (var accent in AccentPreset.All) {
-            var text = ChartPalette.TextShades(ChartPalette.Derive(accent.Color));
+        foreach (var colors in GraphColors.All) {
+            var text = ChartPalette.TextShades(ChartPalette.Derive(colors.Hue));
 
             foreach (var series in System.Enum.GetValues<ChartSeries>()) {
                 var shade = text.For(series);
                 var ratio = ContrastRatio.Of((shade.R, shade.G, shade.B), 1.0, White);
                 if (ratio < ContrastRatio.AA)
-                    failures.Add($"{accent.Name}/{series}: {ratio:F2}:1");
+                    failures.Add($"{colors.Name}/{series}: {ratio:F2}:1");
             }
         }
 

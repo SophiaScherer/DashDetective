@@ -6,7 +6,7 @@ namespace DashDetective.Tabs.Settings;
 /// </summary>
 public enum SettingId {
     Theme,
-    Accent,
+    GraphColors,
     ClockFormat,
     UiScale,
     TextScale,

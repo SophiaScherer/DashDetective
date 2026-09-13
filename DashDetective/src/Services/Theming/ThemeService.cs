@@ -10,22 +10,16 @@ namespace DashDetective.Services.Theming;
 
 /// <summary>
 /// The single place that applies appearance settings to the live application. Views and
-/// view-models ask this service to change the theme or accent; nothing else writes to the
+/// view-models ask this service to change the theme or graph colors; nothing else writes to the
 /// application resource dictionary or <see cref="Application.RequestedThemeVariant"/>.
 ///
-/// Accent selection has two modes:
-/// <list type="bullet">
-///   <item><b>Default</b> (multi-colour) — the highlight is blue and each dashboard graph keeps a
-///     distinct colour. This is the startup look. <see cref="CurrentAccent"/> is <c>null</c>.</item>
-///   <item><b>Single accent</b> — the highlight becomes the chosen colour and the graphs take a
-///     palette <i>derived</i> from it (see <see cref="ChartPalette"/>). They are re-hued, never
-///     flattened: painting all six the one accent colour left download and upload indistinguishable
-///     on the same chart.</item>
-/// </list>
+/// Graph colors touch chart series only, and the accent never touches them. Default keeps the authored
+/// per-series palette; a single hue derives a re-hued one (see <see cref="ChartPalette"/>). The accent
+/// is pinned to <see cref="AccentPreset.Default"/>.
 ///
 /// This service applies but does not persist: it stays the single place that writes appearance to the
 /// live application. Persistence is layered on separately — the composition root applies the saved
-/// theme/accent through here at startup and observes changes to save them (see
+/// theme/graph colors through here at startup and observes changes to save them (see
 /// <c>src/Services/Settings</c>), so the earlier "session-only by design" note no longer holds.
 /// </summary>
 public sealed class ThemeService {
@@ -35,7 +29,7 @@ public sealed class ThemeService {
     /// its own brushes in code rather than through {DynamicResource} — the Performance tab.</summary>
     public ChartSeriesColors CurrentSeries { get; private set; } = ChartPalette.Default;
 
-    /// <summary>Raised after the accent (and with it the chart palette) has been applied. A page that
+    /// <summary>Raised after the chart palette has been applied. A page that
     /// holds brushes rather than resource references re-resolves them here.</summary>
     public event Action<ChartSeriesColors>? SeriesChanged;
 
@@ -53,11 +47,10 @@ public sealed class ThemeService {
 
     private IBrush[] _seriesTextBrushes = BuildSeriesBrushes(ChartPalette.Default);
 
-    /// <summary>The chosen single accent, or <c>null</c> for the default multi-colour look.</summary>
-    public AccentPreset? CurrentAccent { get; private set; }
+    /// <summary>The chosen single-hue graph colors, or <c>null</c> for the Default palette.</summary>
+    public GraphColors? CurrentGraphColors { get; private set; }
 
-    /// <summary>The color-vision mode in force. Anything but None overrides the accent's chart palette;
-    /// the accent still drives the highlight.</summary>
+    /// <summary>The color-vision mode in force. Anything but None overrides the graph colors.</summary>
     public ColorVisionMode ColorVision { get; private set; }
 
     /// <summary>Whether high contrast is in force. Composes with light/dark rather than replacing them,
@@ -76,7 +69,7 @@ public sealed class ThemeService {
     /// <summary>Applies the current selections. Call once at startup after the app is built.</summary>
     public void ApplyDefaults() {
         ApplyTheme(CurrentTheme);
-        ApplyDefaultAppearance();
+        ApplyGraphColors(null);
     }
 
     /// <summary>Switches the light/dark/system colour scheme via the app's ThemeVariant.</summary>
@@ -110,7 +103,7 @@ public sealed class ThemeService {
 
         // The accent's text pair, the series' text shades and the color-vision tables are all per-theme,
         // so a theme change reinstalls them.
-        SetAccent(CurrentAccent ?? AccentPreset.Default);
+        SetAccent(AccentPreset.Default);
         ApplyStatus();
         SetChartSeries(SeriesForCurrentSelections());
     }
@@ -147,17 +140,15 @@ public sealed class ThemeService {
 
     private bool _watchingOs;
 
-    /// <summary>
-    /// Restores the default look: blue highlight and distinct per-graph colours.
-    /// </summary>
-    public void ApplyDefaultAppearance() {
-        CurrentAccent = null;
-        SetAccent(AccentPreset.Default);
+    /// <summary>Applies graph colors to the chart series only: <paramref name="colors"/>' derived palette,
+    /// or the authored Default for <c>null</c>. Never touches the accent.</summary>
+    public void ApplyGraphColors(GraphColors? colors) {
+        CurrentGraphColors = colors;
         SetChartSeries(SeriesForCurrentSelections());
     }
 
     /// <summary>Applies a color-vision mode: status brushes re-pointed, charts on its series palette
-    /// instead of the accent-derived one.</summary>
+    /// instead of the graph colors.</summary>
     public void ApplyColorVision(ColorVisionMode mode) {
         ColorVision = mode;
         ApplyVisionPalettes();
@@ -192,11 +183,12 @@ public sealed class ThemeService {
                                  Tone.TextOnLight(colors.Bad), Tone.TextOnLight(colors.Info),
                                  Tone.TextOnLight(colors.Idle));
 
-    /// <summary>The series palette the current selections imply. A color-vision mode beats the accent:
-    /// rotating a safe palette by the accent's hue offset would undo what makes it safe.</summary>
+    /// <summary>The series palette the current selections imply. A color-vision mode beats the graph
+    /// colors: rotating a safe palette by a hue offset would undo what makes it safe.</summary>
     private ChartSeriesColors SeriesForCurrentSelections() =>
         Theming.ColorVision.Series(ColorVision, IsDarkIntended())
-        ?? (CurrentAccent is { } accent ? ChartPalette.Derive(accent.Color) : ChartPalette.Default);
+        ?? CurrentGraphColors?.Series
+        ?? ChartPalette.Default;
 
     /// <summary>Whether the app renders dark under the current selections. Read from the selection, not
     /// <c>ActualThemeVariant</c>, which has not caught up when the palettes are installed.</summary>
@@ -207,16 +199,6 @@ public sealed class ThemeService {
         AppTheme.Dark => true,
         _ => OsPrefersDark(Application.Current),
     };
-
-    /// <summary>
-    /// Applies a single accent: the highlight becomes <paramref name="accent"/> and the graphs take the
-    /// palette derived from it, so each metric keeps a hue of its own.
-    /// </summary>
-    public void ApplyAccent(AccentPreset accent) {
-        CurrentAccent = accent;
-        SetAccent(accent);
-        SetChartSeries(SeriesForCurrentSelections());
-    }
 
     /// <summary>
     /// Installs the UI scale. <c>ScaleHost</c> transforms by <paramref name="scale"/>; the two popup

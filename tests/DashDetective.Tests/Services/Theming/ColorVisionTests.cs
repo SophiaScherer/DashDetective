@@ -122,7 +122,7 @@ public class ColorVisionTests {
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void None_KeepsTheAuthoredColorsAndDefersToTheAccent(bool dark) {
+    public void None_KeepsTheAuthoredColorsAndDefersToTheGraphColors(bool dark) {
         Assert.Equal(ColorVision.Authored, ColorVision.Status(ColorVisionMode.None, dark));
         Assert.Null(ColorVision.Series(ColorVisionMode.None, dark));
     }

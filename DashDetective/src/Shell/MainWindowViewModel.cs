@@ -284,7 +284,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _clockTimer.Start();
     }
 
-    /// <summary>Applies persisted appearance + layout through the owning seams: theme/accent via
+    /// <summary>Applies persisted appearance + layout through the owning seams: theme/graph colors via
     /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
@@ -308,11 +308,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _theme.ApplyTheme(settings.Theme);
         _accessibility.Apply(settings);
         SyncNavTextScale();
-        var accent = FindAccent(settings.AccentName);
-        if (accent is { } preset)
-            _theme.ApplyAccent(preset);
-        else
-            _theme.ApplyDefaultAppearance();
+        _theme.ApplyGraphColors(GraphColors.Find(settings.EffectiveGraphColorsName));
 
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
@@ -385,21 +381,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             saved.Order = [];
     }
 
-    /// <summary>Resolves a persisted accent name to its preset, or <c>null</c> for the default look
-    /// (an unknown name also falls back to default).</summary>
-    private static AccentPreset? FindAccent(string? name) {
-        if (string.IsNullOrEmpty(name))
-            return null;
-        foreach (var preset in AccentPreset.All)
-            if (preset.Name == name)
-                return preset;
-        return null;
-    }
-
     /// <summary>Captures the live state of every persisted seam into an immutable snapshot.</summary>
     private AppSettings CaptureCurrent() => new() {
         Theme = _theme.CurrentTheme,
-        AccentName = _theme.CurrentAccent?.Name,
+        GraphColorsName = _theme.CurrentGraphColors?.Name,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,

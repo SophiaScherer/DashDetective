@@ -37,7 +37,7 @@ DashDetective/
     Services/        shared by more than one tab
       SystemMetrics/ CPU, memory, GPU, storage samplers and providers
       Platform/      Linux (IProcFileSystem + the /proc and /sys parsers), Windows (WmiRead)
-      Theming/       ThemeService, ChartPalette, AccentPreset
+      Theming/       ThemeService, ChartPalette, GraphColors, AccentPreset
       Settings/      AppSettings, SettingsStore, SettingsJsonContext
       Network/ Startup/ Threading/ Identity/ Diagnostics/ Search/ Notifications/ Links/
     Shell/           MainWindow, MainWindowViewModel, ViewLocator, Navigation, Search, Help, Shortcuts
@@ -188,9 +188,10 @@ Colour lives in `src/Shared/Styles/Palette.axaml` in three groups: theme-variant
 the text ramp) under `ThemeDictionaries`; the accent set; and the chart-series keys. The last two are
 rewritten at runtime, so **anything that can change at runtime is bound with `{DynamicResource}`**.
 
-**`ThemeService`** (`src/Services/Theming`) is the only code that writes to `Application.Current`. An
-accent change re-hues the chart palette through `ChartPalette.Derive` rather than flattening all six
-series to one colour, so per-metric colour coding survives any accent.
+**`ThemeService`** (`src/Services/Theming`) is the only code that writes to `Application.Current`. The
+accent and the chart series are independent: **Graph colors** (`GraphColors`) touch the series only, and
+re-hue them through `ChartPalette.Derive` rather than flattening all six to one colour, so per-metric
+colour coding survives any choice. The accent never changes a chart.
 
 Layout dimensions live separately in `Dimensions.axaml` and are theme-invariant, so they are always
 `{StaticResource}`.

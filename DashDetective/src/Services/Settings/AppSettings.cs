@@ -1,6 +1,7 @@
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shell.Navigation;
+using System.Text.Json.Serialization;
 
 namespace DashDetective.Services.Settings;
 
@@ -18,9 +19,17 @@ public sealed record AppSettings {
 
     public AppTheme Theme { get; init; } = AppTheme.Dark;
 
-    /// <summary>The chosen accent's <see cref="AccentPreset.Name"/>, or <c>null</c> for the default
-    /// multi-colour look.</summary>
-    public string? AccentName { get; init; }
+    /// <summary>The chosen <see cref="GraphColors.Name"/>, or <c>null</c> for the Default palette.</summary>
+    public string? GraphColorsName { get; init; }
+
+    /// <summary>The pre-Graph-colors key for the same choice. Read once as a fallback, never written.</summary>
+    [JsonPropertyName("AccentName")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyAccentName { get; init; }
+
+    /// <summary>The graph colors to apply: the current key, else the legacy one.</summary>
+    [JsonIgnore]
+    public string? EffectiveGraphColorsName => GraphColorsName ?? LegacyAccentName;
 
     /// <summary>How on-screen wall-clock times read (the toolbar clock, the Toolkit log). Display only:
     /// export file names, the report's "Generated" line and the app log stay 24-hour so files remain

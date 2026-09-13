@@ -9,7 +9,7 @@
              x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
 
-    <!-- Every section is live and wired to SettingsViewModel: Appearance (Theme + Accent via the
+    <!-- Every section is live and wired to SettingsViewModel: Appearance (Theme + Graph colors via the
          ThemeService), Navigation (the shared NavigationViewModel), Monitoring (refresh interval,
          resource-alert / tray / startup toggles) and Export & Data (report / CSV / clipboard, handled
          in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
@@ -46,7 +46,7 @@
         <!-- The chrome-less button wrapper that makes a whole segment / swatch clickable is the shared
              Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
 
-        <!-- Accent swatch + its selection ring. ClipToBounds so the four-colour legend of the
+        <!-- Graph colors swatch + its selection ring. ClipToBounds so the four-colour legend of the
              default option is clipped to the rounded corners. -->
         <Style Selector="Border.swatch">
             <Setter Property="Width" Value="24"/>
@@ -95,22 +95,22 @@
                 </Grid>
                 </Border>
 
-                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.Accent}">
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.GraphColors}">
                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Classes="settingName" Text="{Binding Catalog.Accent.Name}"/>
-                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.Accent.Description}"/>
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.GraphColors.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.GraphColors.Description}"/>
                     </StackPanel>
-                    <ItemsControl Grid.Column="1" ItemsSource="{Binding AccentOptions}">
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding GraphColorsOptions}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal" Spacing="8"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="settings:AccentOption">
+                            <DataTemplate x:DataType="settings:GraphColorsOption">
                                 <Button Classes="bare" Command="{Binding SelectCommand}"
-                                        ToolTip.Tip="{Binding Preset.Name, FallbackValue='Default'}">
+                                        ToolTip.Tip="{Binding Colors.Name, FallbackValue='Default'}">
                                     <Border Classes="swatch" Classes.selected="{Binding IsSelected}"
                                             Background="{Binding Swatch}">
                                         <!-- Four-colour legend, shown only for the Default option. -->

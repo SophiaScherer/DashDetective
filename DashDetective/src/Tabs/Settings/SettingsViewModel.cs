@@ -39,7 +39,7 @@ public partial class SettingsViewModel : ViewModelBase {
     private bool _initializing;
 
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
-    public ObservableCollection<AccentOption> AccentOptions { get; }
+    public ObservableCollection<GraphColorsOption> GraphColorsOptions { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
 
@@ -79,7 +79,7 @@ public partial class SettingsViewModel : ViewModelBase {
     /// otherwise run the shortcut being rebound instead of letting it be captured.</summary>
     public bool IsCapturingShortcut { get; private set; }
 
-    /// <summary>Raised after any persisted setting changes (theme, accent, interval, or a toggle), so the
+    /// <summary>Raised after any persisted setting changes (theme, graph colors, interval, or a toggle), so the
     /// composition root can capture and save the current state.</summary>
     public event Action? Changed;
 
@@ -168,12 +168,12 @@ public partial class SettingsViewModel : ViewModelBase {
             new("System", AppTheme.System, SelectTheme),
         };
 
-        // The default (multi-colour) option comes first, then the single accents.
-        AccentOptions = new ObservableCollection<AccentOption> {
-            new(null, SelectAccent),
+        // The Default (multi-colour) option comes first, then the single hues.
+        GraphColorsOptions = new ObservableCollection<GraphColorsOption> {
+            new(null, SelectGraphColors),
         };
-        foreach (var preset in AccentPreset.All)
-            AccentOptions.Add(new AccentOption(preset, SelectAccent));
+        foreach (var colors in GraphColors.All)
+            GraphColorsOptions.Add(new GraphColorsOption(colors, SelectGraphColors));
 
         ClockFormatOptions = new ObservableCollection<ClockFormatOption> {
             new("24-hour", ClockFormat.TwentyFourHour, SelectClockFormat),
@@ -207,8 +207,8 @@ public partial class SettingsViewModel : ViewModelBase {
         // Reflect the theme service's current selections (the shell already applied them from settings).
         foreach (var option in ThemeOptions)
             option.IsSelected = option.Value == _theme.CurrentTheme;
-        foreach (var option in AccentOptions)
-            option.IsSelected = Equals(option.Preset, _theme.CurrentAccent);
+        foreach (var option in GraphColorsOptions)
+            option.IsSelected = Equals(option.Colors, _theme.CurrentGraphColors);
 
         // Select and apply the persisted refresh interval (falling back to 1 s if it's an unknown value).
         var interval = MatchInterval(settings.RefreshIntervalSeconds);
@@ -426,14 +426,11 @@ public partial class SettingsViewModel : ViewModelBase {
         Changed?.Invoke();
     }
 
-    private void SelectAccent(AccentOption option) {
-        foreach (var other in AccentOptions)
+    private void SelectGraphColors(GraphColorsOption option) {
+        foreach (var other in GraphColorsOptions)
             other.IsSelected = other == option;
 
-        if (option.Preset is { } preset)
-            _theme.ApplyAccent(preset);
-        else
-            _theme.ApplyDefaultAppearance();
+        _theme.ApplyGraphColors(option.Colors);
         Changed?.Invoke();
     }
 

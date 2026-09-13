@@ -437,7 +437,12 @@ stays in its tab folder.
 
 ```
       /Settings
-        AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field)
+        AppSettings.cs          (immutable persisted-preferences record + Defaults; schemaVersion field.
+                                 GraphColorsName replaced the "AccentName" key WITHOUT a schema bump — a
+                                 bump resets every setting. LegacyAccentName reads the old key, is never
+                                 written (WhenWritingNull, and capture leaves it null), and
+                                 EffectiveGraphColorsName falls back to it. Do not reuse "AccentName" for
+                                 a new accent setting: old files would be misread as one)
         SettingsStore.cs        (load-on-start soft-fail to defaults; debounced atomic save to
                                 (Load MERGES the file over AppSettings.Defaults key by key — LOAD-BEARING,
                                  not belt-and-braces. Deserializing directly discards every non-default
@@ -525,7 +530,7 @@ stays in its tab folder.
 
 ```
       /Theming
-        ThemeService.cs         (single seam that applies theme + accent + CONTRAST to Application at
+        ThemeService.cs         (single seam that applies theme + accent + GRAPH COLORS + CONTRAST to Application at
                                  runtime. ApplyContrast picks a ThemeVariant rather than writing keys, for
                                  the reason in AppVariants below; under "System" it resolves which scheme
                                  the OS is showing via PlatformSettings and re-applies on
@@ -534,12 +539,18 @@ stays in its tab folder.
                                  the brush seam for a page that assigns colours in code rather than through
                                  {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
-                                 needs it; everything else binds the resource keys)
+                                 needs it; everything else binds the resource keys. ApplyGraphColors
+                                 writes the series ONLY; the accent is pinned to AccentPreset.Default and
+                                 never follows a graph colors choice)
         AppTheme.cs             (enum: System / Light / Dark)
+        GraphColors.cs          (the Settings "Graph colors" choices: a name and the hue ChartPalette.Derive
+                                 re-hues the series from. null is the authored Default. Find() resolves a
+                                 persisted name, unknown → Default. Charts only — nothing accent reads it.
+                                 Its hex literals put it in PaletteOwnershipTests' allowed list)
         AccentPreset.cs         (the four accents, each ONE identity colour. Its graphic AccentShades are
                                  the same in both themes; only Text(dark) differs, and only because the
-                                 identity reads 2.01:1 on white against a 4.5:1 bar. Color stays the
-                                 identity, since that is what ChartPalette.Derive anchors on)
+                                 identity reads 2.01:1 on white against a 4.5:1 bar. No longer derives
+                                 the chart palette — that is GraphColors)
         AccentTone.cs           (the rule those shades follow, stated once: hue and saturation never vary,
                                  lightness targets a CIE L* rung from one ladder shared by all four
                                  accents. The rungs are Blue's own measured lightness, so the default
@@ -588,11 +599,11 @@ stays in its tab folder.
         AccentPreset.cs         (record: one accent's Identity, its graphic Shades and its per-theme
                                  Text pair; .All = the four)
         ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
-                                 accent, plus the ChartSeries enum and the ChartSeriesColors record.
-                                 An accent ROTATES the palette rather than flattening it: the accent is the
+                                 graph colors hue, plus the ChartSeries enum and the ChartSeriesColors record.
+                                 A hue ROTATES the palette rather than flattening it: the hue is the
                                  CPU (and net-down) series, and every other series keeps its own saturation
-                                 and lightness while its hue turns by the accent's offset from the default
-                                 blue. Derive(AccentPreset.Default.Color) reproduces Default exactly, which
+                                 and lightness while its hue turns by the same offset from the default
+                                 blue. The Blue choice reproduces Default exactly, which
                                  is what makes the blue swatch and the "Default" swatch agree. Pure HSL
                                  maths over Avalonia.Media value types — no render backend, so it is
                                  unit-testable)
@@ -1311,7 +1322,7 @@ stays in its tab folder.
                                                          and the reset is an Action HANDED IN BY THE SHELL,
                                                          like buildReport/buildMetricsCsv: the orders are the
                                                          shell's, and this page is not itself reorderable)
-                                ThemeOption.cs, AccentOption.cs, ClockFormatOption.cs,
+                                ThemeOption.cs, GraphColorsOption.cs, ClockFormatOption.cs,
                                 IntervalOption.cs, UiScaleOption.cs
                                                         (selectable item VMs for the Appearance,
                                                          Accessibility + refresh-interval controls, like
