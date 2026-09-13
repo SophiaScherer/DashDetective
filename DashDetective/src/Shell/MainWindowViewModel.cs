@@ -308,7 +308,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _theme.ApplyTheme(settings.Theme);
         _accessibility.Apply(settings);
         SyncNavTextScale();
-        _theme.ApplyGraphColors(GraphColors.Find(settings.AccentName));
+        _theme.ApplyGraphColors(GraphColors.Find(settings.EffectiveGraphColorsName));
 
         Nav.Orientation = settings.NavOrientation;
         Nav.IsCollapsed = settings.NavCollapsed;
@@ -384,7 +384,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Captures the live state of every persisted seam into an immutable snapshot.</summary>
     private AppSettings CaptureCurrent() => new() {
         Theme = _theme.CurrentTheme,
-        AccentName = _theme.CurrentGraphColors?.Name,
+        GraphColorsName = _theme.CurrentGraphColors?.Name,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,

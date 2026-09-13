@@ -35,7 +35,7 @@ public sealed class SettingsStoreTests : IDisposable {
     public void SaveThenLoad_RoundTripsSettings() {
         var settings = AppSettings.Defaults with {
             Theme = AppTheme.Light,
-            AccentName = "Teal",
+            GraphColorsName = "Teal",
             ClockFormat = ClockFormat.TwelveHour,
             AlertCpuEnabled = true,
             AlertMemoryEnabled = false,
@@ -98,6 +98,46 @@ public sealed class SettingsStoreTests : IDisposable {
         Assert.True(loaded.AlertCpuEnabled);
         Assert.False(loaded.AlertGpuEnabled);   // ships off, but with a number already in the box
         Assert.Equal(90, loaded.AlertGpuPercent);
+    }
+
+    /// <summary>A file saved before Graph colors existed keeps its choice under the old key.</summary>
+    [Fact]
+    public void Load_FileWithOnlyTheLegacyAccentName_CarriesItOverAsGraphColors() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "AccentName": "Green" }
+            """);
+
+        var loaded = new SettingsStore(_path).Load();
+
+        Assert.Null(loaded.GraphColorsName);
+        Assert.Equal("Green", loaded.EffectiveGraphColorsName);
+    }
+
+    [Fact]
+    public void Load_FileWithBothKeys_PrefersGraphColorsName() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "AccentName": "Green", "GraphColorsName": "Purple" }
+            """);
+
+        Assert.Equal("Purple", new SettingsStore(_path).Load().EffectiveGraphColorsName);
+    }
+
+    /// <summary>Default chosen after migrating must stay Default, so the legacy key cannot be written back.</summary>
+    [Fact]
+    public void SavedFile_NeverWritesTheLegacyAccentName() {
+        using (var store = new SettingsStore(_path)) {
+            store.Save(AppSettings.Defaults with { GraphColorsName = "Orange" });
+            store.Flush();
+        }
+
+        var json = File.ReadAllText(_path);
+        Assert.DoesNotContain("AccentName", json);
+        Assert.Contains("\"GraphColorsName\": \"Orange\"", json);
+    }
+
+    [Fact]
+    public void Defaults_UseTheDefaultGraphColors() {
+        Assert.Null(AppSettings.Defaults.EffectiveGraphColorsName);
     }
 
     [Fact]
