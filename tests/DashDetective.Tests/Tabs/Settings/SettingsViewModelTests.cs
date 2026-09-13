@@ -89,6 +89,34 @@ public class SettingsViewModelTests {
         Assert.Equal([Notices.WidgetPlacementsReset], notices);
     }
 
+    /// <summary>Applying an accent persists it and confirms, since it changes the whole app.</summary>
+    [Fact]
+    public void AccentApply_RaisesChangedAndConfirms() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        var notices = new List<string>();
+        var changes = 0;
+        viewModel.Notify = notices.Add;
+        viewModel.Changed += () => changes++;
+
+        viewModel.Accent.HexText = "#1a3a8a";
+        viewModel.Accent.ApplyCommand.Execute(null);
+
+        Assert.Equal(1, changes);
+        Assert.Equal([Notices.AccentApplied], notices);
+    }
+
+    /// <summary>A draft is not a setting yet, so it must not be saved.</summary>
+    [Fact]
+    public void AccentDraft_DoesNotRaiseChanged() {
+        var viewModel = Create(new FakeStartupRegistration(enabled: false));
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.Accent.HexText = "#1a3a8a";
+
+        Assert.Equal(0, changes);
+    }
+
     /// <summary>Nothing was rebound, so the command returns early and there is nothing to confirm. A
     /// banner here would claim an undo that never happened.</summary>
     [Fact]

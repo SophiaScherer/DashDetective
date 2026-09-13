@@ -39,7 +39,8 @@ public sealed class ColorWheel : ColorPickSurface {
         set => SetValue(BrightnessProperty, value);
     }
 
-    private static readonly IBrush HueRing = BuildHueRing();
+    /// <summary>The full-saturation hue sweep; also the Custom swatch's fill.</summary>
+    internal static readonly IBrush HueRing = BuildHueRing();
 
     private static readonly IBrush WhiteCenter = new ImmutableRadialGradientBrush(
         [new ImmutableGradientStop(0, Colors.White), new ImmutableGradientStop(1, Color.FromArgb(0, 255, 255, 255))],

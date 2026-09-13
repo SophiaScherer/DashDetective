@@ -40,6 +40,9 @@ public partial class SettingsViewModel : ViewModelBase {
 
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<GraphColorsOption> GraphColorsOptions { get; }
+
+    /// <summary>The Accent color row: swatches, the wheel, and the draft previewed before it applies.</summary>
+    public AccentPickerViewModel Accent { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
 
@@ -174,6 +177,8 @@ public partial class SettingsViewModel : ViewModelBase {
         };
         foreach (var colors in GraphColors.All)
             GraphColorsOptions.Add(new GraphColorsOption(colors, SelectGraphColors));
+
+        Accent = new AccentPickerViewModel(theme, OnAccentApplied);
 
         ClockFormatOptions = new ObservableCollection<ClockFormatOption> {
             new("24-hour", ClockFormat.TwentyFourHour, SelectClockFormat),
@@ -426,6 +431,12 @@ public partial class SettingsViewModel : ViewModelBase {
         Changed?.Invoke();
     }
 
+    /// <summary>An accent change happens off this row too — the nav bar, every button — so it confirms.</summary>
+    private void OnAccentApplied() {
+        Changed?.Invoke();
+        Notify?.Invoke(Notices.AccentApplied);
+    }
+
     private void SelectGraphColors(GraphColorsOption option) {
         foreach (var other in GraphColorsOptions)
             other.IsSelected = other == option;
@@ -477,6 +488,8 @@ public partial class SettingsViewModel : ViewModelBase {
 
         foreach (var option in ColorVisionOptions)
             option.IsSelected = option.Value == _accessibility.ColorVision;
+
+        Accent.RefreshVariants();
     }
 
     private void SelectColorVision(ColorVisionOption option) {

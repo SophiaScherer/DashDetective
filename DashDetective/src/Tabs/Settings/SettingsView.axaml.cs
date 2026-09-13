@@ -70,6 +70,31 @@ public partial class SettingsView : UserControl {
             vm.ResetShortcut(row);
     }
 
+    /// <summary>A hex edit ended; the box is tidied back to the draft it produced.</summary>
+    private void OnAccentHexLostFocus(object? sender, FocusChangedEventArgs e) =>
+        (DataContext as SettingsViewModel)?.Accent.ReconcileHex();
+
+    private void OnAccentHexKeyDown(object? sender, KeyEventArgs e) {
+        if (e.Key is not (Key.Enter or Key.Escape))
+            return;
+
+        (DataContext as SettingsViewModel)?.Accent.ReconcileHex();
+        e.Handled = true;
+    }
+
+    /// <summary>Apply and Cancel hide the editor under their own focus, so a keyboard user is handed back
+    /// to the selected swatch. Posted to run after the command; pointer clicks keep the ring hidden.</summary>
+    private void OnAccentEditorClosing(object? sender, RoutedEventArgs e) {
+        if (sender is not Button { IsKeyboardFocusWithin: true } button || !button.Classes.Contains(":focus-visible"))
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+            AccentSwatches.GetVisualDescendants()
+                .OfType<Button>()
+                .FirstOrDefault(swatch => swatch.DataContext is AccentSwatchOption { IsSelected: true })
+                ?.Focus(NavigationMethod.Tab));
+    }
+
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>
     private async void OnCopyDiagnosticsClick(object? sender, RoutedEventArgs e) {
         if (DataContext is not SettingsViewModel vm)

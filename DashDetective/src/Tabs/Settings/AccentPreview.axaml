@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
+             x:Class="DashDetective.Tabs.Settings.AccentPreview">
+
+    <!-- The accent's surfaces, drawn with the real shared styles so the preview cannot drift from the app.
+         Colors come from the enclosing AccentPreviewScope. Nothing here takes focus; the button and link
+         still hover, to show those shades. -->
+    <Border Background="{DynamicResource PanelBackground}" BorderBrush="{DynamicResource Hairline}"
+            BorderThickness="1" CornerRadius="{StaticResource RadiusPanel}" Padding="12">
+        <StackPanel Spacing="10">
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Width="30" Height="30" CornerRadius="7">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
+                            <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="DD" FontSize="{DynamicResource TextSizeBody}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource OnAccent}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <Border Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="11,7">
+                    <Panel>
+                        <Rectangle Width="3" Height="18" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
+                                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-8,0,0,0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,0">
+                            <Path Width="18" Height="18" Stretch="None" Data="{x:Static nav:Icons.Dashboard}"
+                                  Stroke="{DynamicResource Accent}" StrokeThickness="1.4" StrokeLineCap="Round"
+                                  StrokeJoin="Round" VerticalAlignment="Center"/>
+                            <TextBlock Text="Dashboard" FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextStrong}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Panel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Border Classes="segments">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border Classes="seg selected">
+                            <TextBlock Text="On"/>
+                        </Border>
+                        <Border Classes="seg">
+                            <TextBlock Text="Off"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+                <ToggleButton Classes="toggle" IsChecked="True" IsHitTestVisible="False" Focusable="False"
+                              VerticalAlignment="Center"/>
+                <CheckBox Classes="optionCheck" IsChecked="True" IsHitTestVisible="False" Focusable="False"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Classes="action primary" Content="Apply" Focusable="False"/>
+                <TextBlock Text="18.9 / 31 GB" FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentText}" VerticalAlignment="Center"/>
+                <Button Classes="link" Content="Open" Focusable="False"/>
+            </StackPanel>
+
+            <Border Classes="card selectable selected" Padding="10,6">
+                <TextBlock Text="Selected card" FontSize="{DynamicResource TextSizeCompact}"
+                           Foreground="{DynamicResource TextPrimary}"/>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -17,7 +17,7 @@ public sealed class SettingCatalog {
 
     private SettingCatalog() {
         All = [
-            Theme, GraphColors, ClockFormat,
+            Theme, GraphColors, AccentColor, ClockFormat,
             UiScale, TextScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
             KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
@@ -41,6 +41,10 @@ public sealed class SettingCatalog {
     public SettingEntry GraphColors { get; } = new(
         SettingId.GraphColors, "Appearance", "Graph colors", "Colors used for chart lines and figures",
         Keywords: "graph colors colours chart series palette swatch");
+
+    public SettingEntry AccentColor { get; } = new(
+        SettingId.AccentColor, "Appearance", "Accent color", "Color for highlights, buttons and selection",
+        Keywords: "accent colour color picker wheel custom highlight hex brand");
 
     public SettingEntry ClockFormat { get; } = new(
         SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
