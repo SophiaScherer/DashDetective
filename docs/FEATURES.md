@@ -439,6 +439,12 @@ actually showing and picks the matching high-contrast variant. That takes Avalon
 switch out of the picture, so the service subscribes to `ColorValuesChanged` to re-apply — without it
 the app would pick a variant once and stay on it when the OS flipped.
 
+**Plain System re-applies on an OS flip too, not only high contrast** (AB#85). Avalonia flips the theme
+dictionaries by itself, but the per-theme shades `ThemeService` writes at runtime — the accent text pair,
+the series trace and text keys, the status brushes — are top-level keys it never touches, so they kept the
+previous scheme's shade. The re-apply fires only when the OS scheme actually changed from the one last
+installed, since Windows raises the same event for its own accent color.
+
 ### Color independence
 
 Two charts draw two series on one axis — the Dashboard's Network Throughput and the Performance detail

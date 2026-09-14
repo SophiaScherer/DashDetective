@@ -538,7 +538,9 @@ stays in its tab folder.
                                  the reason in AppVariants below; under "System" it resolves which scheme
                                  the OS is showing via PlatformSettings and re-applies on
                                  ColorValuesChanged, since resolving System itself is what takes
-                                 Avalonia's automatic switch out of the picture. Also
+                                 Avalonia's automatic switch out of the picture. Plain System re-applies
+                                 there too (FollowsOsFlip, only on a real scheme change): Avalonia's own
+                                 switch never reaches the per-theme top-level keys written here. Also
                                  the brush seam for a page that assigns colours in code rather than through
                                  {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
