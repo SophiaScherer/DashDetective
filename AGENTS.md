@@ -89,8 +89,10 @@ shades — logo, highlight bar, borders, buttons, swatches — are the **same in
 that changed with the theme did not read as the same accent. Only `AccentText`/`AccentTextHover` follow the
 theme, because the identity measures about 2:1 on white against a 4.5:1 bar. **`Accent` is therefore not a
 text brush** — a Foreground takes `AccentText`; everything else takes `Accent`. Hue and saturation never
-vary; only lightness does, to a stated CIE L\* rung. `AccentPreset.Color` stays the identity, used to derive
-the chart palette.
+vary; only lightness does. Blue, the default and the only authored accent, sits on the ladder's rungs; a
+**custom accent keeps its own lightness** and every shade keeps the same L\* distance from it, while its text
+shades are moved to a readable rung and a fill that all but vanishes on a theme is warned about
+(`AccentGuard`), not corrected.
 
 **A recorded cost, not an oversight:** an accent fill or border on a white surface reads 2.0:1, under
 WCAG's 3:1 for a graphic that carries meaning (the nav highlight bar, the selected-widget border).
@@ -161,6 +163,12 @@ after the Toolkit's launcher and File Explorer's `IShellInterop`. And every Dash
 opens its own device on the Performance tab, through `PerformanceViewModel.Reveal` and the `DeviceIds`
 identity the inventory mints. Both halves' decisions are in [docs/FEATURES.md](docs/FEATURES.md) under
 *Network*, *Dashboard* and *Performance*.
+
+A **custom accent color** is complete: Settings → Appearance opens a modal picker (wheel, brightness, hex,
+Dark and Light previews built from the real shared styles) hosted by the shell beside Help. Blue is the
+default and the only authored accent. Its decisions are in [docs/FEATURES.md](docs/FEATURES.md) under
+*Settings*; the one easiest to undo by accident is that `AccentPreviewScope` re-asserts its theme variant
+on every app theme switch.
 
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
@@ -544,8 +552,10 @@ per-graph *chart-series* keys (`ChartCpu`, `ChartMemory`, `ChartGpu`, `ChartStor
 must be referenced with `{DynamicResource ...}`, never `{StaticResource}` (only the fixed legend colours
 `Blue`/`Green`/`Purple`/`Orange`/`Yellow` stay static). `ThemeResourceBindingTests` fails the build on a
 theme-dictionary key bound statically — how the console insets stayed dark in light mode. `ThemeService` (`src/Services/Theming`) is the
-**only** code that writes to `Application.Current` — `ApplyTheme` sets the variant (and installs the accent,
-pinned to blue until a free accent ships); `ApplyGraphColors` installs the chart series only.
+**only** code that writes to `Application.Current` — `ApplyTheme` sets the variant (and reinstalls
+`CurrentAccent` for its per-theme text pair); `ApplyAccent` installs the accent and `ApplyGraphColors` the
+chart series, each touching only its own keys. The accent key list is `AccentResources`, which the Settings
+preview also writes into its own subtree, which works because the accent keys are top-level.
 It's constructed once in `MainWindowViewModel`, applied at startup, and handed to `SettingsViewModel` and
 `PerformanceViewModel`. Note this feature deliberately touched shared styles + the shell
 (Palette/SharedStyles, MainWindow, NavItem) — theming is cross-cutting, so it lives in `src/Services`,

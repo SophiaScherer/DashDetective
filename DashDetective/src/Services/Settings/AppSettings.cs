@@ -31,6 +31,10 @@ public sealed record AppSettings {
     [JsonIgnore]
     public string? EffectiveGraphColorsName => GraphColorsName ?? LegacyAccentName;
 
+    /// <summary>The accent's identity as "#rrggbb", or <c>null</c> for Blue. Not "AccentName": old files
+    /// use that key for graph colors.</summary>
+    public string? AccentColor { get; init; }
+
     /// <summary>How on-screen wall-clock times read (the toolbar clock, the Toolkit log). Display only:
     /// export file names, the report's "Generated" line and the app log stay 24-hour so files remain
     /// sortable and machine-parseable.</summary>

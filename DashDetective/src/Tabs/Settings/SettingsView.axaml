@@ -9,8 +9,8 @@
              x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
 
-    <!-- Every section is live and wired to SettingsViewModel: Appearance (Theme + Graph colors via the
-         ThemeService), Navigation (the shared NavigationViewModel), Monitoring (refresh interval,
+    <!-- Every section is live and wired to SettingsViewModel: Appearance (Theme + Graph colors + Accent
+         color via the ThemeService), Navigation (the shared NavigationViewModel), Monitoring (refresh interval,
          resource-alert / tray / startup toggles) and Export & Data (report / CSV / clipboard, handled
          in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
          store. Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
@@ -46,19 +46,7 @@
         <!-- The chrome-less button wrapper that makes a whole segment / swatch clickable is the shared
              Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
 
-        <!-- Graph colors swatch + its selection ring. ClipToBounds so the four-colour legend of the
-             default option is clipped to the rounded corners. -->
-        <Style Selector="Border.swatch">
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="ClipToBounds" Value="True"/>
-        </Style>
-        <Style Selector="Border.swatch.selected">
-            <Setter Property="BorderBrush" Value="{DynamicResource TextStrong}"/>
-        </Style>
+        <!-- The swatch and its selection ring are the shared Border.swatch. -->
     </UserControl.Styles>
 
     <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
@@ -126,6 +114,23 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                </Grid>
+                </Border>
+
+                <!-- Accent color: the applied accent as a swatch that opens the picker modal. The modal is
+                     hosted by the shell beside Help, so it covers the nav bar; nothing reaches the app
+                     until Apply there. -->
+                <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AccentColor}">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.AccentColor.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.AccentColor.Description}"/>
+                    </StackPanel>
+                    <Button x:Name="AccentOpener" Grid.Column="1" Classes="bare"
+                            Command="{Binding Accent.OpenCommand}" Click="OnAccentOpenerClick"
+                            ToolTip.Tip="Choose accent color" AutomationProperties.Name="Choose accent color">
+                        <Border Classes="swatch" Background="{Binding Accent.AppliedBrush}"/>
+                    </Button>
                 </Grid>
                 </Border>
 

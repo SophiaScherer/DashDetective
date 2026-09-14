@@ -63,11 +63,12 @@ public class SettingSearchProviderTests {
         Assert.Equal("Graph colors", (await Best("graph colors")).Title);
     }
 
-    /// <summary>Guard: "accent" is kept free for the planned accent setting, so Graph colors must not match it.</summary>
+    /// <summary>"accent" belongs to the accent setting; Graph colors must not match it.</summary>
     [Fact]
-    public async Task QueryAsync_Accent_DoesNotFindGraphColors() {
+    public async Task QueryAsync_Accent_FindsTheAccentAndNotGraphColors() {
         var results = await Query("accent");
 
+        Assert.Equal("Accent color", (await Best("accent")).Title);
         Assert.DoesNotContain(results, r => r.Title == "Graph colors");
     }
 

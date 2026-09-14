@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -22,13 +23,37 @@ public partial class SettingsView : UserControl {
     protected override void OnDataContextChanged(EventArgs e) {
         base.OnDataContextChanged(e);
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.RevealRequested -= OnRevealRequested;
+            HookAccentPicker(false);
+        }
 
         _boundViewModel = DataContext as SettingsViewModel;
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.RevealRequested += OnRevealRequested;
+            HookAccentPicker(this.IsAttachedToVisualTree());
+        }
+    }
+
+    // Held only while on screen: the view is rebuilt on every visit, and the view model outlives it.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnAttachedToVisualTree(e);
+        HookAccentPicker(true);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnDetachedFromVisualTree(e);
+        HookAccentPicker(false);
+    }
+
+    private void HookAccentPicker(bool hook) {
+        if (_boundViewModel is null)
+            return;
+
+        _boundViewModel.Accent.Closed -= OnAccentPickerClosed;
+        if (hook)
+            _boundViewModel.Accent.Closed += OnAccentPickerClosed;
     }
 
     /// <summary>
@@ -69,6 +94,18 @@ public partial class SettingsView : UserControl {
         if (DataContext is SettingsViewModel vm && (sender as Control)?.DataContext is ShortcutRow row)
             vm.ResetShortcut(row);
     }
+
+    // Whether the picker was opened from the keyboard, so closing it can bring the focus ring back too.
+    private bool _accentOpenedByKeyboard;
+
+    private void OnAccentOpenerClick(object? sender, RoutedEventArgs e) =>
+        _accentOpenedByKeyboard = AccentOpener.Classes.Contains(":focus-visible");
+
+    /// <summary>The modal closed over its own focus; the opener takes it back. Posted so the modal has
+    /// hidden before focus moves.</summary>
+    private void OnAccentPickerClosed() =>
+        Dispatcher.UIThread.Post(() =>
+            AccentOpener.Focus(_accentOpenedByKeyboard ? NavigationMethod.Tab : NavigationMethod.Pointer));
 
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>
     private async void OnCopyDiagnosticsClick(object? sender, RoutedEventArgs e) {

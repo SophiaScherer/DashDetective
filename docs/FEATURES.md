@@ -211,8 +211,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   four single-hue swatches hand the graphs a palette **derived** from that hue, each metric keeping a hue
   of its own. **Charts only, on purpose:** the row was "Accent color" and recoloured the highlights too,
   which made it a theme rather than an accent. It no longer touches buttons, selection, navigation or the
-  logo, and the accent stays blue until a separate accent setting exists. The name avoids clashing with
-  **Theme**, and the search keywords leave out "accent" for that future row. A settings file saved under
+  logo — that is the **Accent color** row's job, below. The name avoids clashing with **Theme**, and its
+  search keywords leave out "accent", which belongs to the accent row. A settings file saved under
   the old `AccentName` key carries over: `AppSettings.EffectiveGraphColorsName` falls back to it, and the
   next save writes `GraphColorsName` only, so choosing Default later cannot resurrect the old choice.
   The **Clock format** segments (24-hour / 12-hour) are a `ClockFormatOption` on the `ThemeOption`
@@ -223,6 +223,35 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   remain sortable and machine-parseable. `ToolkitLogEntry` keeps its raw `DateTime` alongside the
   formatted string so rows already on screen re-stamp when the preference changes, and the toolbar
   clock's fixed width is sized for the wider 12-hour string so switching does not reflow the toolbar.
+- **Accent color.** The row is one swatch of the accent in force; pressing it opens a **modal picker**
+  (`AccentPickerOverlay`): a hue/saturation wheel, a brightness bar, a hex field, a before/after chip, and
+  the draft previewed in a **Dark and a Light strip** side by side. Any colour can be picked; blue is the
+  default and the only authored one. Decisions inside it:
+  - **Preview, then Apply.** Nothing reaches the app until Apply. Cancel, the ×, and Esc discard the draft;
+    **Revert to default** only drafts Blue. The backdrop dismisses **only with nothing pending**, so a stray
+    click cannot lose a pick, and Open while already open does nothing for the same reason.
+  - **Hosted by the shell beside Help**, not inside the page, so its scrim covers the nav bar and the page
+    cannot scroll it away. The shortcut chain treats it as modal — every shortcut is swallowed and Esc
+    cancels — **except Enter**, which falls through so a focused button still presses. Tab cycles inside
+    the card; the wheel takes focus on open and the row's swatch gets it back on close. The body scrolls,
+    so the footer stays reachable at 200 % in a short window.
+  - **The strips are the real shared styles**, not imitations. `AccentPreviewScope` is a
+    `ThemeVariantScope` that writes the draft into its own `Resources` through `AccentResources`, the same
+    key list `ThemeService` writes to the application; the accent keys are top-level, so a subtree can
+    shadow them. **It re-asserts its variant whenever the app's theme changes**: after a runtime switch,
+    inline `{DynamicResource}` theme keys inside the scope resolved against the app's variant while style
+    setters did not, and only a screenshot after a toggle caught it.
+  - **Lightness is free.** The fill is exactly the chosen colour; on-accent and accent text are corrected
+    by `AccentTone` (see *The accent is one colour, and a ladder*); a fill that falls under 1.5:1 on a
+    theme's surfaces is **warned about, not corrected** (`AccentGuard`), since correcting it would change
+    the colour the user chose.
+  - **The wheel and bar are code-only controls** on one `ColorPickSurface` base, with the maths in
+    `ColorPickerGeometry`. Hue 0 is at the top running clockwise, because that is how
+    `ConicGradientBrush` draws. Every hue is wrapped before it reaches `HsvColor.ToRgb`, **whose own wrap
+    loops forever on a huge value**.
+  - **Persisted as `AccentColor`** (`#rrggbb`, `null` for Blue) — never under the old `AccentName` key,
+    which a pre-Graph-colors file uses for chart colours. It never touches a chart, and Graph colors never
+    touch it.
 - **Monitoring.** The **Refresh interval** segments (0.5 / 1 / 2 / 5 s) are real `IntervalOption`
   selectable-item VMs (the `ThemeOption` pattern); selecting one calls
   `SystemMetricsService.SetInterval`, which retimes **only** the five 1 Hz metric channels — the
@@ -594,14 +623,14 @@ Purple and Orange each lost 33-48 points of saturation.
 
 `AccentTone` replaces both sets with one rule: **an accent is one authored identity colour, which is its
 fill, and every other shade is that identity re-lightened to a target CIE L\* from one ladder shared by
-all four.** Hue and saturation cannot vary. The rungs are Blue's own measured lightness, so the default
+all four** (there were four accents then; see the AB#60 note below). Hue and saturation cannot vary. The rungs are Blue's own measured lightness, so the default
 accent reproduces byte-identically and `ChartPalette.Default.Cpu`, `AccentPreset.Color` and the Settings
 "Default" swatch are all untouched.
 
 **The second, which only a visual check found: uniform variation is not the same as no variation.** Each
 accent still dropped 26 L\* between themes, so it still read as a different colour {EM} most obviously on the
 app logo and the navigation highlight. The cause was that one `Accent` brush did two jobs. As a graphic
-(logo gradient, highlight bar, selected borders, buttons, toggles, the picker swatches) it should not move
+(logo gradient, highlight bar, selected borders, buttons, toggles, the old accent swatches) it should not move
 at all; as text on the page it has to darken. The text requirement was dragging the whole brand
 appearance dark in light mode.
 
@@ -611,9 +640,18 @@ accent is a `Foreground` and is the only accent shade a theme changes. **`Accent
 that is the rule to keep, and the ten Foreground call sites are the whole of the other side.
 
 Two things fell out of the split. `AccentOption.Refresh` and `SettingsViewModel.RefreshAccentSwatches`
-are **gone**: a swatch no longer depends on the theme, so it is painted once in the constructor. And the
+are **gone**: a swatch no longer depends on the theme, only on the accent applied. And the
 earlier note that the swatches "advertised the wrong color" no longer applies, because there is only one
 colour to advertise.
+
+**A custom accent (AB#60) keeps its own lightness.** Blue is the only authored accent now, and an identity
+within half an L\* of the fill rung still takes every rung exactly, so it is byte-identical. Any other
+colour keeps the same L\* *distance* from its own lightness for each shade; hover moves away from the
+on-accent text so a label only gains contrast; on-accent text is the 14 L\* rung, else a 98 L\* one, else
+black or white (one of which always clears AA); dark-theme text is lifted to at least 58 L\* (4.75:1 on the
+lightest dark surface) and light-theme text darkened to at most `Tone.LightText`. A hover that would clamp
+past black or white steps the other way instead. `AccentContrastTests` checks a 6-level grid across the
+RGB cube plus a gray ramp and Blue itself.
 
 **The cost, recorded rather than fixed.** An accent fill or border on a white surface reads **2.0:1**,
 under WCAG's 3:1 for a graphic that carries meaning {EM} the navigation highlight bar and the

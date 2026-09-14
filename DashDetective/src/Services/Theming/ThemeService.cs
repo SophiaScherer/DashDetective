@@ -15,7 +15,7 @@ namespace DashDetective.Services.Theming;
 ///
 /// Graph colors touch chart series only, and the accent never touches them. Default keeps the authored
 /// per-series palette; a single hue derives a re-hued one (see <see cref="ChartPalette"/>). The accent
-/// is pinned to <see cref="AccentPreset.Default"/>.
+/// is <see cref="CurrentAccent"/>, Blue unless the user picks another.
 ///
 /// This service applies but does not persist: it stays the single place that writes appearance to the
 /// live application. Persistence is layered on separately — the composition root applies the saved
@@ -24,6 +24,9 @@ namespace DashDetective.Services.Theming;
 /// </summary>
 public sealed class ThemeService {
     public AppTheme CurrentTheme { get; private set; } = AppTheme.Dark;
+
+    /// <summary>The accent in force: highlights, buttons, selection and navigation, never a chart.</summary>
+    public AccentPreset CurrentAccent { get; private set; } = AccentPreset.Default;
 
     /// <summary>The series colours currently in the resource dictionary. Read by a page that resolves
     /// its own brushes in code rather than through {DynamicResource} — the Performance tab.</summary>
@@ -103,7 +106,7 @@ public sealed class ThemeService {
 
         // The accent's text pair, the series' text shades and the color-vision tables are all per-theme,
         // so a theme change reinstalls them.
-        SetAccent(AccentPreset.Default);
+        SetAccent(CurrentAccent);
         ApplyStatus();
         SetChartSeries(SeriesForCurrentSelections());
     }
@@ -139,6 +142,12 @@ public sealed class ThemeService {
     }
 
     private bool _watchingOs;
+
+    /// <summary>Applies the accent. Never touches the chart series.</summary>
+    public void ApplyAccent(AccentPreset accent) {
+        CurrentAccent = accent;
+        SetAccent(accent);
+    }
 
     /// <summary>Applies graph colors to the chart series only: <paramref name="colors"/>' derived palette,
     /// or the authored Default for <c>null</c>. Never touches the accent.</summary>
@@ -229,20 +238,8 @@ public sealed class ThemeService {
     /// pair follows the one being rendered. Every accent-colored element binds these keys with
     /// {DynamicResource}, so the change is global.</summary>
     private void SetAccent(AccentPreset accent) {
-        if (Application.Current is not { } app)
-            return;
-
-        var shades = accent.Shades;
-        var text = accent.Text(IsDarkIntended());
-        var res = app.Resources;
-        res["Accent"] = new SolidColorBrush(shades.Fill);
-        res["AccentHover"] = new SolidColorBrush(shades.Hover);
-        res["OnAccent"] = new SolidColorBrush(shades.OnAccent);
-        res["AccentSoft"] = new SolidColorBrush(shades.Fill, 0.12); // faint fill (e.g. sidebar highlight)
-        res["AccentColor"] = shades.Fill;                           // brand-gradient top stop
-        res["AccentDeep"] = shades.Deep;                            // brand-gradient bottom stop
-        res["AccentText"] = new SolidColorBrush(text.Fill);         // the accent drawn as page text
-        res["AccentTextHover"] = new SolidColorBrush(text.Hover);
+        if (Application.Current is { } app)
+            AccentResources.Write(app.Resources, accent, IsDarkIntended());
     }
 
     /// <summary>Sets the per-graph chart brushes the dashboard binds to via {DynamicResource ...}, then

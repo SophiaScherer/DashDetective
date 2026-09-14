@@ -72,6 +72,13 @@ internal static class Tone {
         return At(hsl, (low + high) / 2);
     }
 
+    /// <summary>The WCAG contrast ratio between two opaque colours, lighter over darker.</summary>
+    internal static double Contrast(Color a, Color b) {
+        var x = Luminance(a) + 0.05;
+        var y = Luminance(b) + 0.05;
+        return x > y ? x / y : y / x;
+    }
+
     /// <summary>The L* of <paramref name="foreground"/> drawn at <paramref name="alpha"/> over
     /// <paramref name="background"/>. The text ramp is opacity over a surface rather than a colour, so a
     /// rung's weight is only meaningful once composited.</summary>
