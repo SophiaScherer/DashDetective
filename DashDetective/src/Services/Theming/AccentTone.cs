@@ -8,14 +8,14 @@ namespace DashDetective.Services.Theming;
 /// every other shade is that identity re-lightened. Hue and saturation never change, and the graphic
 /// shades do not change with the theme either.
 ///
-/// The presets sit on the ladder's <see cref="Fill"/> rung and take its rungs exactly. A custom accent
+/// An identity on the ladder's <see cref="Fill"/> rung, as Blue is, takes its rungs exactly. A custom accent
 /// keeps its own lightness, so each shade keeps the same distance from it instead, and anything drawn as
 /// text is moved to a readable rung. The lightness maths itself lives on <see cref="Tone"/>.
 /// </summary>
 internal static class AccentTone {
-    // ----- The ladder: one set of rungs, shared by every preset -----
+    // ----- The ladder: Blue's own measured rungs -----
 
-    /// <summary>Every preset identity sits on this rung; <c>AccentIdentityTests</c> fails if one drifts
+    /// <summary>The default identity sits on this rung; <c>AccentIdentityTests</c> fails if it drifts
     /// off it.</summary>
     internal const double Fill = 74.4;
 
@@ -35,7 +35,7 @@ internal static class AccentTone {
     internal const double LightTextHover = 42.2;
 
     /// <summary>Where a dark custom accent is lifted to as text on a dark page: 4.75:1 on the lightest
-    /// dark surface. Every preset already sits above it.</summary>
+    /// dark surface. Blue already sits above it.</summary>
     internal const double DarkText = 58.0;
 
     /// <summary>Below this the logo gradient's deep stop turns lighter instead, or it vanishes into black.</summary>
@@ -91,8 +91,8 @@ internal static class AccentTone {
             : Colors.White;
     }
 
-    /// <summary>A preset's rung, or the same distance from a custom identity's own lightness. Within half
-    /// an L* counts as on the rung, which keeps the presets byte-identical.</summary>
+    /// <summary>The ladder's rung, or the same distance from a custom identity's own lightness. Within half
+    /// an L* counts as on the rung, which keeps Blue byte-identical.</summary>
     private static double Step(double lightness, double rung) =>
         Math.Abs(lightness - Fill) < 0.5 ? rung : lightness + (rung - Fill);
 

@@ -220,6 +220,35 @@
         <Setter Property="Foreground" Value="{DynamicResource AccentTextHover}"/>
     </Style>
 
+    <!-- ===== Modal chrome ===== -->
+    <!-- A modal card's × button. Promoted from the Help overlay once the accent picker wanted it. -->
+    <Style Selector="Button.modalClose">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="28"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.modalClose:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+    </Style>
+
+    <!-- A color chip with an optional selection ring. ClipToBounds so the Graph colors Default legend is
+         clipped to the rounded corners. Promoted from Settings once the accent picker wanted it. -->
+    <Style Selector="Border.swatch">
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+    </Style>
+    <Style Selector="Border.swatch.selected">
+        <Setter Property="BorderBrush" Value="{DynamicResource TextStrong}"/>
+    </Style>
+
     <!-- ===== Bare button ===== -->
     <!-- Strips a Button back to a click target with no chrome of its own, so the content inside it (a
          segment, a selectable card) carries the whole appearance. The partner of the selectable-card and

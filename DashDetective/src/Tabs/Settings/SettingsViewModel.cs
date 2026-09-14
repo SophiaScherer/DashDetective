@@ -41,7 +41,7 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ThemeOption> ThemeOptions { get; }
     public ObservableCollection<GraphColorsOption> GraphColorsOptions { get; }
 
-    /// <summary>The Accent color row: swatches, the wheel, and the draft previewed before it applies.</summary>
+    /// <summary>The accent picker modal the Accent color row opens. The shell hosts its overlay.</summary>
     public AccentPickerViewModel Accent { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
     public ObservableCollection<UiScaleOption> UiScaleOptions { get; }

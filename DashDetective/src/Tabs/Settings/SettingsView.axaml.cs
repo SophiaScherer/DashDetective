@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -22,13 +23,37 @@ public partial class SettingsView : UserControl {
     protected override void OnDataContextChanged(EventArgs e) {
         base.OnDataContextChanged(e);
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.RevealRequested -= OnRevealRequested;
+            HookAccentPicker(false);
+        }
 
         _boundViewModel = DataContext as SettingsViewModel;
 
-        if (_boundViewModel is not null)
+        if (_boundViewModel is not null) {
             _boundViewModel.RevealRequested += OnRevealRequested;
+            HookAccentPicker(this.IsAttachedToVisualTree());
+        }
+    }
+
+    // Held only while on screen: the view is rebuilt on every visit, and the view model outlives it.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnAttachedToVisualTree(e);
+        HookAccentPicker(true);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
+        base.OnDetachedFromVisualTree(e);
+        HookAccentPicker(false);
+    }
+
+    private void HookAccentPicker(bool hook) {
+        if (_boundViewModel is null)
+            return;
+
+        _boundViewModel.Accent.Closed -= OnAccentPickerClosed;
+        if (hook)
+            _boundViewModel.Accent.Closed += OnAccentPickerClosed;
     }
 
     /// <summary>
@@ -70,30 +95,17 @@ public partial class SettingsView : UserControl {
             vm.ResetShortcut(row);
     }
 
-    /// <summary>A hex edit ended; the box is tidied back to the draft it produced.</summary>
-    private void OnAccentHexLostFocus(object? sender, FocusChangedEventArgs e) =>
-        (DataContext as SettingsViewModel)?.Accent.ReconcileHex();
+    // Whether the picker was opened from the keyboard, so closing it can bring the focus ring back too.
+    private bool _accentOpenedByKeyboard;
 
-    private void OnAccentHexKeyDown(object? sender, KeyEventArgs e) {
-        if (e.Key is not (Key.Enter or Key.Escape))
-            return;
+    private void OnAccentOpenerClick(object? sender, RoutedEventArgs e) =>
+        _accentOpenedByKeyboard = AccentOpener.Classes.Contains(":focus-visible");
 
-        (DataContext as SettingsViewModel)?.Accent.ReconcileHex();
-        e.Handled = true;
-    }
-
-    /// <summary>Apply and Cancel hide the editor under their own focus, so a keyboard user is handed back
-    /// to the selected swatch. Posted to run after the command; pointer clicks keep the ring hidden.</summary>
-    private void OnAccentEditorClosing(object? sender, RoutedEventArgs e) {
-        if (sender is not Button { IsKeyboardFocusWithin: true } button || !button.Classes.Contains(":focus-visible"))
-            return;
-
+    /// <summary>The modal closed over its own focus; the opener takes it back. Posted so the modal has
+    /// hidden before focus moves.</summary>
+    private void OnAccentPickerClosed() =>
         Dispatcher.UIThread.Post(() =>
-            AccentSwatches.GetVisualDescendants()
-                .OfType<Button>()
-                .FirstOrDefault(swatch => swatch.DataContext is AccentSwatchOption { IsSelected: true })
-                ?.Focus(NavigationMethod.Tab));
-    }
+            AccentOpener.Focus(_accentOpenedByKeyboard ? NavigationMethod.Tab : NavigationMethod.Pointer));
 
     /// <summary>Copies the diagnostics report to the clipboard (via the window's TopLevel).</summary>
     private async void OnCopyDiagnosticsClick(object? sender, RoutedEventArgs e) {

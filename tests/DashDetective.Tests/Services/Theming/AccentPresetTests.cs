@@ -5,7 +5,7 @@ using Xunit;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Covers how an accent is named and persisted: a preset colour resolves to the preset itself, anything
+/// Covers how an accent is named and persisted: Blue's colour resolves to the default itself, anything
 /// else is Custom, and a stored hex that cannot be read falls back to Blue rather than failing.
 /// </summary>
 public class AccentPresetTests {
@@ -46,9 +46,8 @@ public class AccentPresetTests {
     }
 
     [Fact]
-    public void FromHex_APresetsColour_ResolvesToThePreset() {
-        foreach (var preset in AccentPreset.All)
-            Assert.Same(preset, AccentPreset.FromHex(preset.Hex));
+    public void FromHex_TheDefaultsColour_ResolvesToTheDefault() {
+        Assert.Same(AccentPreset.Default, AccentPreset.FromHex(AccentPreset.Default.Hex));
     }
 
     [Fact]

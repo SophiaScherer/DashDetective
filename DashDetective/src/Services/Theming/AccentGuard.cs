@@ -8,7 +8,7 @@ namespace DashDetective.Services.Theming;
 /// <see cref="AccentTone"/>; the fill cannot be without no longer being the chosen colour, so it is flagged.
 /// </summary>
 internal static class AccentGuard {
-    /// <summary>The weakest a fill may read against a surface. The presets' worst is 1.76:1, Blue on the
+    /// <summary>The weakest a fill may read against a surface. The default's worst is 1.76:1, Blue on the
     /// light app background.</summary>
     internal const double VisibleFloor = 1.5;
 

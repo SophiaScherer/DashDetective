@@ -34,11 +34,11 @@ public class AccentToneTests {
                     < Tone.Lightness(identity));
     }
 
-    /// <summary>Generalising the rule for a custom accent must not move a preset: each still takes the
-    /// ladder's rungs exactly.</summary>
+    /// <summary>Generalising the rule for a custom accent must not move an identity on the fill rung: each
+    /// still takes the ladder's rungs exactly. These are the design comp's four hues.</summary>
     [Theory]
     [MemberData(nameof(Identities))]
-    public void Preset_TakesTheLaddersRungsExactly(string hex) {
+    public void OnTheFillRung_TakesTheLaddersRungsExactly(string hex) {
         var identity = Color.Parse(hex);
 
         Assert.Equal(new AccentShades(identity,

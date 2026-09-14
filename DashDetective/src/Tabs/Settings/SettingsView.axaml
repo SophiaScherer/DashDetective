@@ -46,19 +46,7 @@
         <!-- The chrome-less button wrapper that makes a whole segment / swatch clickable is the shared
              Button.bare (src/Shared/Styles/SharedStyles.axaml). -->
 
-        <!-- Graph colors swatch + its selection ring. ClipToBounds so the four-colour legend of the
-             default option is clipped to the rounded corners. -->
-        <Style Selector="Border.swatch">
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="ClipToBounds" Value="True"/>
-        </Style>
-        <Style Selector="Border.swatch.selected">
-            <Setter Property="BorderBrush" Value="{DynamicResource TextStrong}"/>
-        </Style>
+        <!-- The swatch and its selection ring are the shared Border.swatch. -->
     </UserControl.Styles>
 
     <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
@@ -129,85 +117,21 @@
                 </Grid>
                 </Border>
 
-                <!-- Accent color: presets and Custom on the row, and an editor under it while a draft is
-                     pending. Inline rather than a flyout, which would need its own ScaleHost. The strips
-                     render the draft through AccentPreviewScope; nothing reaches the app until Apply. -->
+                <!-- Accent color: the applied accent as a swatch that opens the picker modal. The modal is
+                     hosted by the shell beside Help, so it covers the nav bar; nothing reaches the app
+                     until Apply there. -->
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.AccentColor}">
-                <StackPanel Spacing="12">
-                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" Spacing="2">
-                            <TextBlock Classes="settingName" Text="{Binding Catalog.AccentColor.Name}"/>
-                            <TextBlock Classes="settingDesc" Text="{Binding Catalog.AccentColor.Description}"/>
-                        </StackPanel>
-                        <ItemsControl x:Name="AccentSwatches" Grid.Column="1" ItemsSource="{Binding Accent.Swatches}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="8"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="settings:AccentSwatchOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}"
-                                            ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
-                                        <Border Classes="swatch" Classes.selected="{Binding IsSelected}"
-                                                Background="{Binding Swatch}"/>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-
-                    <WrapPanel IsVisible="{Binding Accent.IsEditorOpen}" ItemSpacing="16" LineSpacing="12">
-                        <StackPanel Width="200" Spacing="10">
-                            <settings:ColorWheel Width="200" Height="200"
-                                                 Hue="{Binding Accent.Hue}" Saturation="{Binding Accent.Saturation}"
-                                                 Brightness="{Binding Accent.Brightness}"
-                                                 AutomationProperties.Name="Accent hue and saturation"/>
-                            <settings:BrightnessBar Hue="{Binding Accent.Hue}" Saturation="{Binding Accent.Saturation}"
-                                                    Brightness="{Binding Accent.Brightness}"
-                                                    AutomationProperties.Name="Accent brightness"/>
-                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                <Border Grid.Column="0" Classes="field" Width="96">
-                                    <TextBox Classes="flat" Text="{Binding Accent.HexText}" MaxLength="7"
-                                             AutomationProperties.Name="Accent hex color"
-                                             LostFocus="OnAccentHexLostFocus" KeyDown="OnAccentHexKeyDown"/>
-                                </Border>
-                                <!-- Before and after: what the app uses now, beside the draft. -->
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                                            HorizontalAlignment="Right" VerticalAlignment="Center"
-                                            ToolTip.Tip="Current and new accent">
-                                    <Border Classes="swatch" Background="{Binding Accent.AppliedBrush}"/>
-                                    <TextBlock Text="→" Foreground="{DynamicResource TextSubtle}"
-                                               FontSize="{DynamicResource TextSizeSmall}" VerticalAlignment="Center"/>
-                                    <Border Classes="swatch" Background="{Binding Accent.DraftBrush}"/>
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock Text="{Binding Accent.Warning}" IsVisible="{Binding Accent.HasWarning}"
-                                       Foreground="{DynamicResource StatusWarnText}"
-                                       FontSize="{DynamicResource TextSizeSmall}" TextWrapping="Wrap"/>
-                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                <Button Classes="action" Content="Cancel" Command="{Binding Accent.CancelCommand}"
-                                        Click="OnAccentEditorClosing"/>
-                                <Button Classes="action primary" Content="Apply" Command="{Binding Accent.ApplyCommand}"
-                                        IsEnabled="{Binding Accent.IsDirty}" Click="OnAccentEditorClosing"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <!-- One column for both strips: side by side they overflow the 720 page. -->
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="settingDesc" Text="Dark"/>
-                            <settings:AccentPreviewScope RequestedThemeVariant="{Binding Accent.DarkVariant}"
-                                                         Accent="{Binding Accent.Draft}">
-                                <settings:AccentPreview AutomationProperties.Name="Accent preview, dark theme"/>
-                            </settings:AccentPreviewScope>
-                            <TextBlock Classes="settingDesc" Text="Light" Margin="0,6,0,0"/>
-                            <settings:AccentPreviewScope RequestedThemeVariant="{Binding Accent.LightVariant}"
-                                                         Accent="{Binding Accent.Draft}">
-                                <settings:AccentPreview AutomationProperties.Name="Accent preview, light theme"/>
-                            </settings:AccentPreviewScope>
-                        </StackPanel>
-                    </WrapPanel>
-                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Classes="settingName" Text="{Binding Catalog.AccentColor.Name}"/>
+                        <TextBlock Classes="settingDesc" Text="{Binding Catalog.AccentColor.Description}"/>
+                    </StackPanel>
+                    <Button x:Name="AccentOpener" Grid.Column="1" Classes="bare"
+                            Command="{Binding Accent.OpenCommand}" Click="OnAccentOpenerClick"
+                            ToolTip.Tip="Choose accent color" AutomationProperties.Name="Choose accent color">
+                        <Border Classes="swatch" Background="{Binding Accent.AppliedBrush}"/>
+                    </Button>
+                </Grid>
                 </Border>
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.ClockFormat}">

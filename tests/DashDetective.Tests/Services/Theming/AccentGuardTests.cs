@@ -5,7 +5,7 @@ using Xunit;
 namespace DashDetective.Tests.Services.Theming;
 
 /// <summary>
-/// Covers <see cref="AccentGuard"/>: its surfaces are the ones Palette.axaml ships, no preset is flagged,
+/// Covers <see cref="AccentGuard"/>: its surfaces are the ones Palette.axaml ships, the default is not flagged,
 /// and a fill that all but disappears on a theme is.
 /// </summary>
 public class AccentGuardTests {
@@ -27,9 +27,8 @@ public class AccentGuardTests {
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Presets_AreNeverFlagged(bool dark) {
-        foreach (var preset in AccentPreset.All)
-            Assert.False(AccentGuard.IsFaint(preset.Shades.Fill, dark), $"{preset.Name} flagged.");
+    public void Default_IsNeverFlagged(bool dark) {
+        Assert.False(AccentGuard.IsFaint(AccentPreset.Default.Shades.Fill, dark));
     }
 
     [Fact]

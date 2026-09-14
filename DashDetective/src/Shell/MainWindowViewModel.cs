@@ -113,6 +113,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// whole window, navigation bar included.</summary>
     public HelpViewModel Help { get; }
 
+    /// <summary>The accent picker modal. Owned by the Settings page; exposed here because the shell hosts
+    /// the overlay beside Help, above the nav bar.</summary>
+    public AccentPickerViewModel AccentPicker => _settings.Accent;
+
     /// <summary>The toolbar's universal search. Built here because this is the one class that already
     /// holds every page instance, so a result's "go there and reveal it" callback is a closure over the
     /// page it targets — no routing layer, and no page needs to know about search.</summary>
@@ -582,7 +586,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
     /// no shortcuts of its own. Read by the window before resolving a key.</summary>
     public ShortcutScope ActiveScope =>
-        Help.IsOpen ? ShortcutScope.Global
+        Help.IsOpen || AccentPicker.IsOpen ? ShortcutScope.Global
         : Search.IsOpen ? Search.Scope
         : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
 
@@ -598,6 +602,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         if (Help.IsOpen) {
             if (id == ShortcutId.Escape)
                 Help.Close();
+            return true;
+        }
+
+        // The accent picker is modal the same way; Esc discards its draft. Enter falls through so a
+        // focused button in the picker can still be pressed with it.
+        if (AccentPicker.IsOpen) {
+            if (id == ShortcutId.Activate)
+                return false;
+            if (id == ShortcutId.Escape)
+                AccentPicker.CancelCommand.Execute(null);
             return true;
         }
 

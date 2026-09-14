@@ -1,5 +1,4 @@
 using Avalonia.Media;
-using System.Collections.Generic;
 using System.Globalization;
 
 namespace DashDetective.Services.Theming;
@@ -17,11 +16,11 @@ public sealed record AccentTextShades(Color Fill, Color Hover);
 /// One accent: a name and a single identity color, which is also its fill. Every shade comes from
 /// <see cref="AccentTone"/>, so an accent keeps one appearance across themes.
 ///
-/// Immutable; the presets live in <see cref="All"/>, and anything else is <see cref="CustomName"/>.
-/// Applied by <see cref="ThemeService"/>.
+/// Immutable. Blue is <see cref="Default"/>; any other color is <see cref="CustomName"/>. Applied by
+/// <see cref="ThemeService"/>.
 /// </summary>
 public sealed record AccentPreset(string Name, Color Identity) {
-    /// <summary>The name of an accent that is not one of the presets.</summary>
+    /// <summary>The name of an accent that is not the default.</summary>
     public const string CustomName = "Custom";
 
     /// <summary>The accent's identity, used to fill the Settings swatch.</summary>
@@ -41,25 +40,15 @@ public sealed record AccentPreset(string Name, Color Identity) {
 
     private readonly AccentTextShades _lightText = AccentTone.Text(Identity, dark: false);
 
-    /// <summary>The four accents from the design comp, each placed on the ladder's fill rung; blue
-    /// (index 0) is the default and is what the rungs were measured from.</summary>
-    public static readonly IReadOnlyList<AccentPreset> All = [
-        new("Blue", Color.Parse("#4cc2ff")),
-        new("Green", Color.Parse("#6dcc61")),
-        new("Purple", Color.Parse("#d0a4ff")),
-        new("Orange", Color.Parse("#ff9f79")),
-    ];
+    /// <summary>The default accent (blue), matching the comp. It sits on the ladder's fill rung, which is
+    /// what the rungs were measured from.</summary>
+    public static AccentPreset Default { get; } = new("Blue", Color.Parse("#4cc2ff"));
 
-    /// <summary>The default accent (blue), matching the comp.</summary>
-    public static AccentPreset Default => All[0];
-
-    /// <summary>The preset with this identity, else a custom accent. Alpha is dropped: an accent is opaque.</summary>
+    /// <summary><see cref="Default"/> for its own color, else a custom accent. Alpha is dropped: an accent
+    /// is opaque.</summary>
     public static AccentPreset FromIdentity(Color identity) {
         var opaque = Color.FromRgb(identity.R, identity.G, identity.B);
-        foreach (var preset in All)
-            if (preset.Identity == opaque)
-                return preset;
-        return new AccentPreset(CustomName, opaque);
+        return opaque == Default.Identity ? Default : new AccentPreset(CustomName, opaque);
     }
 
     /// <summary>Resolves a persisted hex, or <see cref="Default"/> for an empty or unreadable one.</summary>

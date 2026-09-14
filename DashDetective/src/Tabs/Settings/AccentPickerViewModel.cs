@@ -4,12 +4,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.Theming;
 using System;
-using System.Collections.ObjectModel;
 
 namespace DashDetective.Tabs.Settings;
 
 /// <summary>
-/// The Accent color row. A draft is picked on the wheel, typed as hex or taken from a preset, previewed in
+/// The accent picker modal. A draft is picked on the wheel, typed as hex or reverted to Blue, previewed in
 /// both themes, and reaches the app only through <see cref="ApplyCommand"/>.
 /// </summary>
 public partial class AccentPickerViewModel : ObservableObject {
@@ -22,21 +21,15 @@ public partial class AccentPickerViewModel : ObservableObject {
     internal AccentPickerViewModel(ThemeService theme, Action applied) {
         _theme = theme;
         _applied = applied;
-
-        Swatches = [];
-        foreach (var preset in AccentPreset.All)
-            Swatches.Add(new AccentSwatchOption(preset, Select));
-        Swatches.Add(new AccentSwatchOption(null, Select));
-
         _appliedBrush = new SolidColorBrush(Applied.Identity);
         SetDraft(Applied.Identity);
 
-        // Blue is also the field's initial draft, in which case no change fired to paint the swatches.
+        // Blue is also the field's initial draft, in which case no change fired to paint the brush.
         OnDraftChanged(Draft);
     }
 
-    /// <summary>The four presets, then Custom.</summary>
-    public ObservableCollection<AccentSwatchOption> Swatches { get; }
+    /// <summary>Raised when the modal closes, so the opener can take focus back.</summary>
+    public event Action? Closed;
 
     /// <summary>The wheel's hue, 0-360.</summary>
     [ObservableProperty] private double _hue;
@@ -54,16 +47,20 @@ public partial class AccentPickerViewModel : ObservableObject {
 
     [ObservableProperty] private IBrush _draftBrush = Brushes.Transparent;
 
+    /// <summary>The applied accent's fill, for the Settings row and the before chip.</summary>
     [ObservableProperty] private IBrush _appliedBrush;
+
+    /// <summary>Whether the modal is up. Stored rather than derived from the draft, so an edit landing back
+    /// on the applied color cannot close it.</summary>
+    [ObservableProperty] private bool _isOpen;
 
     /// <summary>The accent the app is using now.</summary>
     public AccentPreset Applied => _theme.CurrentAccent;
 
     public bool IsDirty => Draft.Identity != Applied.Identity;
 
-    /// <summary>Opened by any swatch, closed only by Apply, Cancel or Custom with nothing pending. Stored
-    /// rather than derived from the draft, so an edit landing back on the applied color cannot close it.</summary>
-    [ObservableProperty] private bool _isEditorOpen;
+    /// <summary>Whether reverting would change the draft.</summary>
+    public bool CanRevert => Draft != AccentPreset.Default;
 
     /// <summary>Where the draft's fill all but disappears, or empty. Text is corrected, so only the fill
     /// is warned about.</summary>
@@ -88,35 +85,52 @@ public partial class AccentPickerViewModel : ObservableObject {
     /// <summary>Puts the draft's hex back in the box, for an edit that ended unreadable or untidy.</summary>
     public void ReconcileHex() => WriteHex(Draft.Identity);
 
+    /// <summary>Opens on the applied accent. Already open, it does nothing, so a pending pick survives.</summary>
+    [RelayCommand]
+    private void Open() {
+        if (IsOpen)
+            return;
+
+        SetDraft(Applied.Identity);
+        IsOpen = true;
+    }
+
     [RelayCommand]
     private void Apply() {
         if (!IsDirty)
             return;
 
         _theme.ApplyAccent(Draft);
-        IsEditorOpen = false;
         AppliedBrush = new SolidColorBrush(Applied.Identity);
         RaiseDraftState();
+        Close();
         _applied();
     }
 
-    /// <summary>Drops the draft and closes the editor.</summary>
+    /// <summary>Drops the draft and closes. Esc routes here too.</summary>
     [RelayCommand]
     private void Cancel() {
         SetDraft(Applied.Identity);
-        IsEditorOpen = false;
+        Close();
     }
 
-    /// <summary>A preset drafts itself and opens the editor. Custom toggles it, but will not close over a
-    /// pending draft — that is Cancel's job, and a silent discard would lose the pick.</summary>
-    private void Select(AccentSwatchOption option) {
-        if (option.Preset is { } preset) {
-            SetDraft(preset.Identity);
-            IsEditorOpen = true;
-            return;
-        }
+    /// <summary>Drafts Blue; Apply still commits it.</summary>
+    [RelayCommand]
+    private void RevertToDefault() => SetDraft(AccentPreset.Default.Identity);
 
-        IsEditorOpen = IsDirty || !IsEditorOpen;
+    /// <summary>A press on the dim backdrop. Closes only with nothing pending, so a stray click cannot lose
+    /// a pick.</summary>
+    public void DismissFromBackdrop() {
+        if (!IsDirty)
+            Close();
+    }
+
+    private void Close() {
+        if (!IsOpen)
+            return;
+
+        IsOpen = false;
+        Closed?.Invoke();
     }
 
     partial void OnHueChanged(double value) => TakeWheel();
@@ -170,15 +184,12 @@ public partial class AccentPickerViewModel : ObservableObject {
 
     partial void OnDraftChanged(AccentPreset value) {
         DraftBrush = new SolidColorBrush(value.Identity);
-        foreach (var swatch in Swatches)
-            swatch.IsSelected = swatch.Preset is { } preset
-                ? preset.Identity == value.Identity
-                : value.Name == AccentPreset.CustomName;
         RaiseDraftState();
     }
 
     private void RaiseDraftState() {
         OnPropertyChanged(nameof(IsDirty));
+        OnPropertyChanged(nameof(CanRevert));
         OnPropertyChanged(nameof(Warning));
         OnPropertyChanged(nameof(HasWarning));
     }
