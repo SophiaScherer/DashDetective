@@ -230,7 +230,9 @@ stays in its tab folder.
                                  for every nav item. A local Name in markup still wins.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
-                                 tileLabel/tileValue, card.selectable…)
+                                 tileLabel/tileValue, card.selectable, swatch (a colour chip with a
+                                 selection ring, promoted from Settings) and modalClose (a modal card's ×,
+                                 promoted from the Help overlay), both once the accent picker wanted them…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource} — EXCEPT the runtime-swapped block at the
                                  bottom: UiScale, PopupFontSize and the TextSize* ladder, which
@@ -441,8 +443,9 @@ stays in its tab folder.
                                  GraphColorsName replaced the "AccentName" key WITHOUT a schema bump — a
                                  bump resets every setting. LegacyAccentName reads the old key, is never
                                  written (WhenWritingNull, and capture leaves it null), and
-                                 EffectiveGraphColorsName falls back to it. Do not reuse "AccentName" for
-                                 a new accent setting: old files would be misread as one)
+                                 EffectiveGraphColorsName falls back to it. The accent is AccentColor
+                                 (#rrggbb, null = Blue) for exactly that reason: "AccentName" in an old file
+                                 means graph colors, and must never be read as an accent)
         SettingsStore.cs        (load-on-start soft-fail to defaults; debounced atomic save to
                                 (Load MERGES the file over AppSettings.Defaults key by key — LOAD-BEARING,
                                  not belt-and-braces. Deserializing directly discards every non-default
@@ -540,22 +543,35 @@ stays in its tab folder.
                                  {DynamicResource} — BrushFor(ChartSeries), cached per palette, plus a
                                  SeriesChanged event so that page can re-resolve. Only the Performance tab
                                  needs it; everything else binds the resource keys. ApplyGraphColors
-                                 writes the series ONLY; the accent is pinned to AccentPreset.Default and
-                                 never follows a graph colors choice)
+                                 writes the series ONLY and ApplyAccent the accent ONLY — CurrentAccent is
+                                 reinstalled on a theme change for its text pair, never a graph colors
+                                 choice)
         AppTheme.cs             (enum: System / Light / Dark)
         GraphColors.cs          (the Settings "Graph colors" choices: a name and the hue ChartPalette.Derive
                                  re-hues the series from. null is the authored Default. Find() resolves a
                                  persisted name, unknown → Default. Charts only — nothing accent reads it.
                                  Its hex literals put it in PaletteOwnershipTests' allowed list)
-        AccentPreset.cs         (the four accents, each ONE identity colour. Its graphic AccentShades are
-                                 the same in both themes; only Text(dark) differs, and only because the
-                                 identity reads 2.01:1 on white against a 4.5:1 bar. No longer derives
-                                 the chart palette — that is GraphColors)
-        AccentTone.cs           (the rule those shades follow, stated once: hue and saturation never vary,
-                                 lightness targets a CIE L* rung from one ladder shared by all four
-                                 accents. The rungs are Blue's own measured lightness, so the default
-                                 accent reproduces byte-identically. Only the RUNGS live here now; the
-                                 maths moved to Tone.cs once the ramp and the series wanted it too)
+        AccentPreset.cs         (record: one accent's Identity, its graphic Shades and per-theme Text pair.
+                                 Blue is Default and the ONLY authored accent; FromIdentity names any other
+                                 colour Custom and drops alpha. Hex / FromHex / TryParseHex are the
+                                 persisted form — #rrggbb or #rgb, '#' optional, no names or alpha, always
+                                 saved as #rrggbb; unreadable → Default. The graphic shades are the same in both
+                                 themes; only Text(dark) differs. No longer derives the chart palette)
+        AccentTone.cs           (the rule those shades follow, stated once: hue and saturation never vary.
+                                 An identity on the Fill rung (Blue) takes the rungs EXACTLY — Step's half-L*
+                                 band is what keeps it byte-identical. A custom identity keeps each shade's
+                                 L* DISTANCE instead. OnAccent is 14 L*, else 98, else black/white (one
+                                 always clears AA); hover moves AWAY from it; dark text lifts to 58 L*,
+                                 light darkens to Tone.LightText; a hover past black or white steps the
+                                 other way (Reachable), or it would clamp onto the fill and vanish)
+        AccentResources.cs      (the accent key list and what goes in each. ThemeService writes it to the
+                                 application, the Settings preview to its own subtree — one list, so a key
+                                 added to Palette.axaml cannot stay blue in one and not the other;
+                                 AccentResourcesTests pins it against the palette's top-level keys)
+        AccentGuard.cs          (whether a fill all but vanishes on a theme: under 1.5:1 against any of that
+                                 theme's surfaces. WARNS, never corrects — correcting the fill would change
+                                 the colour chosen. Its surfaces mirror Palette.axaml, pinned by
+                                 AccentGuardTests, which is why it is in PaletteOwnershipTests' allowed list)
         Tone.cs                 (the lightness maths itself: Lightness, WithLightness, CompositedLightness,
                                  and the two shared rungs — LightText 48 L* for anything read, LightGraphic
                                  61 L* for a trace. Contrast on white depends only on luminance and L* is a
@@ -596,8 +612,6 @@ stays in its tab folder.
                                  same key into Application.Resources — the theme lookup wins and the write
                                  is silently ignored. That is why the accent and chart series, which are
                                  top-level keys, can be swapped that way and the surfaces cannot)
-        AccentPreset.cs         (record: one accent's Identity, its graphic Shades and its per-theme
-                                 Text pair; .All = the four)
         ChartPalette.cs         (THE source of every chart series colour, for the default look and for each
                                  graph colors hue, plus the ChartSeries enum and the ChartSeriesColors record.
                                  A hue ROTATES the palette rather than flattening it: the hue is the
@@ -1134,7 +1148,9 @@ stays in its tab folder.
                                      window behind it. Esc is NOT handled in the code-behind: the
                                      shell's shortcut chain owns the key app-wide. The VM takes
                                      ShortcutBindings, not the catalog, so the table lists the keys the
-                                     user actually chose, and re-announces its groups on a rebind)
+                                     user actually chose, and re-announces its groups on a rebind.
+                                     The accent picker is the second overlay on this shape; see
+                                     AccentPickerOverlay under src/Tabs/Settings)
         HelpContent.cs              (the CURATED copy — the description, the page tour, the tips. A
                                      static table like HardwareCatalog, so it is testable with no UI.
                                      The shortcut table is NOT here: it is generated from
@@ -1332,6 +1348,47 @@ stays in its tab folder.
                                                          columns are star, because a WrapPanel in an Auto
                                                          column is measured against infinity and would
                                                          overflow the card rather than wrap)
+                                AccentPickerViewModel.cs
+                                                        (the accent picker MODAL: a draft picked on the wheel,
+                                                         typed as hex or reverted to Blue, applied only by
+                                                         Apply. IsOpen is STORED, not derived from the draft —
+                                                         derived, an edit landing back on the applied colour
+                                                         closed it mid-keystroke. Open while open does nothing
+                                                         and the backdrop dismisses only when clean, so a pick
+                                                         cannot be lost. _syncing guards the wheel/hex pair;
+                                                         gray keeps the wheel's hue and black its saturation.
+                                                         Raises Changed through SettingsViewModel on Apply
+                                                         ONLY — a draft is not a setting)
+                                AccentPickerOverlay.axaml(.cs)
+                                                        (its view, on HelpOverlay's shape and HOSTED BY THE
+                                                         SHELL beside it, so the scrim covers the nav bar.
+                                                         Two differences from Help: a press on the Card ITSELF
+                                                         counts as inside — IsVisualAncestorOf is false for
+                                                         the element, and an empty spot reports the card — and
+                                                         Tab cycles in the card. The body scrolls so the footer
+                                                         survives 200 % in a short window. Esc is the shell's;
+                                                         Enter falls through its modal swallow so buttons press)
+                                AccentPreviewScope.cs   (a ThemeVariantScope writing the draft into its OWN
+                                                         Resources through AccentResources — the accent keys
+                                                         are top-level, so a subtree can shadow them. It
+                                                         RE-ASSERTS its variant on every app theme change:
+                                                         after a runtime switch, inline {DynamicResource} theme
+                                                         keys inside it followed the app's variant)
+                                AccentPreview.axaml(.cs)
+                                                        (one strip of real shared styles — nav row, logo,
+                                                         segments, toggle, checkbox, primary button, link,
+                                                         accent figure, selected card. Its automation peer is
+                                                         one named Image with no children, or a screen reader
+                                                         met a second set of dead Apply buttons)
+                                ColorPickSurface.cs, ColorWheel.cs, BrightnessBar.cs, ColorPickerGeometry.cs
+                                                        (the wheel and brightness bar: code-only controls on
+                                                         one base — pointer capture, arrow nudges with Shift for
+                                                         coarse, Ctrl/Alt/Meta chords left to the app, a black
+                                                         and white thumb that reads on any colour, a focus ring
+                                                         only for keyboard focus. Hue 0 is at the TOP running
+                                                         clockwise because ConicGradientBrush draws it so.
+                                                         NormalizeHue wraps non-finite and huge hues:
+                                                         HsvColor.ToRgb's own wrap loops forever on 1e20)
                                 NumericField.axaml(.cs) (a typed whole number with its unit beside it —
                                 ShortcutCaptureBox.axaml(.cs)
                                                         (arms, then captures the next key press as a
