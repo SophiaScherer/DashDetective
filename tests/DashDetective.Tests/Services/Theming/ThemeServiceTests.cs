@@ -99,6 +99,24 @@ public class ThemeServiceTests {
         Assert.Same(custom, theme.CurrentAccent);
     }
 
+    /// <summary>AB#85: under System an OS flip re-applies whether or not high contrast is on, but an OS
+    /// color change that leaves the scheme alone does not.</summary>
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
+    public void FollowsOsFlip_System_ReappliesOnlyOnAFlip(bool appliedDark, bool osDark, bool expected) {
+        Assert.Equal(expected, ThemeService.FollowsOsFlip(AppTheme.System, appliedDark, osDark));
+    }
+
+    [Theory]
+    [InlineData(AppTheme.Light, false, true)]
+    [InlineData(AppTheme.Dark, true, false)]
+    public void FollowsOsFlip_ExplicitTheme_IgnoresTheOs(AppTheme theme, bool appliedDark, bool osDark) {
+        Assert.False(ThemeService.FollowsOsFlip(theme, appliedDark, osDark));
+    }
+
     [Fact]
     public void ColorVisionOff_ReturnsToTheGraphColors() {
         var theme = new ThemeService();

@@ -102,6 +102,7 @@ public sealed class ThemeService {
             return;
 
         WatchOsTheme(app);
+        _appliedDark = IsDarkIntended();
         app.RequestedThemeVariant = Variant();
 
         // The accent's text pair, the series' text shades and the color-vision tables are all per-theme,
@@ -128,20 +129,36 @@ public sealed class ThemeService {
     private static bool OsPrefersDark(Application? app) =>
         app?.PlatformSettings?.GetColorValues().ThemeVariant == PlatformThemeVariant.Dark;
 
-    /// <summary>Follows the OS scheme while high contrast is on under "System". Resolving System here is
-    /// what takes Avalonia's automatic switch out of the picture, so it has to be replaced.</summary>
+    /// <summary>Re-applies under "System" when the OS flips scheme. Avalonia flips the theme dictionaries
+    /// itself, but not the per-theme keys written here, and high contrast resolves System outright.</summary>
     private void WatchOsTheme(Application app) {
         if (_watchingOs || app.PlatformSettings is not { } settings)
             return;
 
         _watchingOs = true;
         settings.ColorValuesChanged += (_, _) => {
-            if (HighContrast && CurrentTheme == AppTheme.System)
-                Dispatcher.UIThread.Post(ApplyVariant);
+            // Inline when possible, so the keys change in the same frame as the surfaces.
+            if (Dispatcher.UIThread.CheckAccess())
+                FollowOs(app);
+            else
+                Dispatcher.UIThread.Post(() => FollowOs(app));
         };
     }
 
+    private void FollowOs(Application app) {
+        if (FollowsOsFlip(CurrentTheme, _appliedDark, OsPrefersDark(app)))
+            ApplyVariant();
+    }
+
+    /// <summary>Whether an OS color change needs a re-apply: only under System, and only when the scheme
+    /// actually flipped, since the OS also raises the event for its own accent.</summary>
+    internal static bool FollowsOsFlip(AppTheme theme, bool appliedDark, bool osDark) =>
+        theme == AppTheme.System && appliedDark != osDark;
+
     private bool _watchingOs;
+
+    /// <summary>The scheme the per-theme keys were last installed for.</summary>
+    private bool _appliedDark;
 
     /// <summary>Applies the accent. Never touches the chart series.</summary>
     public void ApplyAccent(AccentPreset accent) {
