@@ -841,6 +841,10 @@ temperature is the expected outcome, not a defect.
   in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
   left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
   authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
+- **A scroller's content keeps `ScrollGutter` from the bar, as a Margin.** Auto-hide is pinned off, so
+  content sits beside the bar and touches it without one. Never `ScrollViewer` Padding, which the scroll
+  extent leaves out. A control that template-binds its scroller's `AllowAutoHide` (TreeView, ListBox)
+  escapes the app-wide pin and needs its own. `ScrollViewerInsetTests` pins the Padding ban and the pins.
 - **Wheel behavior is app-level.** `WheelScrolling` is attached to every `ScrollViewer` by the
   shared style, so a view that handles `PointerWheelChanged` itself takes that surface back out
   of the OS's scroll setting.
