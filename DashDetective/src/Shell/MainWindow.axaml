@@ -195,8 +195,9 @@
                 <Panel Grid.Row="2" Background="{DynamicResource AppBackground}">
                     <!-- Padding lives on the inner content (as Margin), not the ScrollViewer: Avalonia's
                          ScrollViewer does not include its own Padding in the scroll extent, so a bottom
-                         Padding here would make the last chunk of a long page unreachable. -->
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                         Padding here would make the last chunk of a long page unreachable. Every
+                         scrolling page shares this one, so code-behind resets it on each page change. -->
+                    <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                   IsVisible="{Binding !CurrentPageSelfScrolls}">
                         <ContentControl Margin="{StaticResource PageInset}" Content="{Binding ScrollingPage}"/>
                     </ScrollViewer>

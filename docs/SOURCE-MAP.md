@@ -1111,7 +1111,10 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer.
+                                 the viewport — see File Explorer. The scrolling host (PageScroll) is
+                                 SHARED by every scrolling page, so code-behind calls ScrollToHome on
+                                 each CurrentPage change; without it a page opened at the last page's
+                                 offset. Synchronous, so a reveal's posted BringIntoView still wins.
                                  Between the toolbar and the page sit the TWO banners, in a StackPanel so
                                  a confirmation cannot displace a live warning: the amber resource alert,
                                  pinned, and the green NoticeService confirmation below it, which takes
