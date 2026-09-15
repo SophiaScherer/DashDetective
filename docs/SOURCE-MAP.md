@@ -1111,7 +1111,10 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer.
+                                 the viewport — see File Explorer. The scrolling host (PageScroll) is
+                                 SHARED by every scrolling page, so code-behind calls ScrollToHome on
+                                 each CurrentPage change; without it a page opened at the last page's
+                                 offset. Synchronous, so a reveal's posted BringIntoView still wins.
                                  Between the toolbar and the page sit the TWO banners, in a StackPanel so
                                  a confirmation cannot displace a live warning: the amber resource alert,
                                  pinned, and the green NoticeService confirmation below it, which takes
@@ -1411,7 +1414,13 @@ stays in its tab folder.
                                                          Only the ceiling is enforced mid-edit — raising a
                                                          too-small number to the floor rewrites the box
                                                          under the caret — and the box is reconciled to
-                                                         the stored value when the edit ends)
+                                                         the stored value when the edit ends. The box
+                                                         SWALLOWS RequestBringIntoView WHILE UNFOCUSED:
+                                                         Avalonia scrolls to any caret move, including the
+                                                         TextBox's own clamp when Text shrinks, so a render
+                                                         on load opened Settings at the Alerts card and one
+                                                         on focus loss yanked the page back to it. Guarding
+                                                         the caret write alone misses the clamp)
                                 AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
                                                          switched-off row remembers its number. The
                                                          settings layer encodes "not watched" as 0, which

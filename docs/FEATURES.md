@@ -961,6 +961,9 @@ each pane scrolls on its own). The page-host is a `Panel` with two mutually-excl
 `ContentControl`s: the current page is routed to the scrolling host via
 **`MainWindowViewModel.ScrollingPage`** or the bounded host via **`SelfScrollingPage`** (the other
 is fed `null` so the view is only ever built once), toggled by **`CurrentPageSelfScrolls`**.
+Every scrolling page shares that one `ScrollViewer`, so `MainWindow` code-behind **resets it to the top
+on each `CurrentPage` change**; otherwise a page opened at the previous page's offset. The reset runs
+synchronously, ahead of a reveal's posted `BringIntoView`.
 Dashboard/Settings scroll as a whole page (unchanged); `FileExplorerViewModel` is the only
 self-scrolling implementer so far. (A `Disabled` `ScrollViewer` was tried first but does not
 reliably bound its child, which clipped the bottom of long trees.) Resizing: the pane grid is *fixed · splitter · star · splitter · fixed* with two

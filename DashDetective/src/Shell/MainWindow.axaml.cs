@@ -73,13 +73,24 @@ public partial class MainWindow : Window {
         _viewModel?.Nav.SetShellWidth(e.NewSize.Width);
 
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.ExportRequested -= OnExportRequested;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
 
         _viewModel = DataContext as MainWindowViewModel;
 
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.ExportRequested += OnExportRequested;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+    }
+
+    /// <summary>Every scrolling page shares one scroller, so a new page would open at the last one's
+    /// offset. Synchronous, so it lands before a search reveal's posted scroll.</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(MainWindowViewModel.CurrentPage))
+            PageScroll.ScrollToHome();
     }
 
     /// <summary>
