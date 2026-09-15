@@ -1411,7 +1411,13 @@ stays in its tab folder.
                                                          Only the ceiling is enforced mid-edit — raising a
                                                          too-small number to the floor rewrites the box
                                                          under the caret — and the box is reconciled to
-                                                         the stored value when the edit ends)
+                                                         the stored value when the edit ends. The box
+                                                         SWALLOWS RequestBringIntoView WHILE UNFOCUSED:
+                                                         Avalonia scrolls to any caret move, including the
+                                                         TextBox's own clamp when Text shrinks, so a render
+                                                         on load opened Settings at the Alerts card and one
+                                                         on focus loss yanked the page back to it. Guarding
+                                                         the caret write alone misses the clamp)
                                 AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
                                                          switched-off row remembers its number. The
                                                          settings layer encodes "not watched" as 0, which

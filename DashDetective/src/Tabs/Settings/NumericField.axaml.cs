@@ -67,8 +67,16 @@ public partial class NumericField : UserControl {
         Entry.TextChanged += (_, _) => Capture();
         Entry.LostFocus += (_, _) => Render();
         Entry.KeyDown += OnKeyDown;
+        Entry.AddHandler(RequestBringIntoViewEvent, OnEntryBringIntoView);
 
         Render();
+    }
+
+    /// <summary>Avalonia scrolls to any caret move, even in an unfocused box, so a render on load or on
+    /// focus loss dragged the page to this field. Only an edit in progress may scroll to it.</summary>
+    private void OnEntryBringIntoView(object? sender, RequestBringIntoViewEventArgs e) {
+        if (!Entry.IsFocused)
+            e.Handled = true;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
