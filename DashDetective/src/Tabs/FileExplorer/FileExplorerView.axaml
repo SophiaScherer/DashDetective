@@ -326,8 +326,9 @@
 
         <!-- ===== Folder tree ===== -->
         <Border x:Name="TreePane" Grid.Column="0" Classes="panel" Padding="8">
+            <!-- Padding is the templated items presenter's Margin, inside the scroller. -->
             <TreeView ItemsSource="{Binding RootNodes}"
-                      Background="Transparent" BorderThickness="0" Padding="0">
+                      Background="Transparent" BorderThickness="0" Padding="{StaticResource ScrollGutter}">
                 <TreeView.ItemContainerTheme>
                     <ControlTheme TargetType="TreeViewItem" x:DataType="fe:FileSystemNode"
                                   BasedOn="{StaticResource {x:Type TreeViewItem}}">
