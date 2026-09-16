@@ -79,7 +79,9 @@
              clicking it again raises no focus event and the dropdown would never come back. Both events
              bubble out of the field's inner box, so they still reach these handlers.
              Tab fills in the best result's name; Enter is bound inside the field because the shortcut
-             layer deliberately leaves Enter to whatever text box has focus. -->
+             layer deliberately leaves Enter to whatever text box has focus.
+             The clear ×'s tooltip is off while results are showing: they open directly beneath it, under
+             a pointer the expand button has already left there. -->
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
                               IsVisible="{Binding IsExpanded}"
                               MinWidth="180" MaxWidth="320"
@@ -89,6 +91,7 @@
                               LostFocus="OnSearchBoxLostFocus"
                               PlaceholderText="Search pages, settings, processes, files…"
                               ClearToolTip="Clear search"
+                              ClearToolTipEnabled="{Binding !IsOpen}"
                               Text="{Binding Text, Mode=TwoWay}"
                               Completion="{Binding Completion}"
                               EnterCommand="{Binding ActivateSelectedCommand}"

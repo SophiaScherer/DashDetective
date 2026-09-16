@@ -37,6 +37,12 @@ public partial class SearchField : UserControl {
     public static readonly StyledProperty<string?> ClearToolTipProperty =
         AvaloniaProperty.Register<SearchField, string?>(nameof(ClearToolTip), defaultValue: "Clear");
 
+    /// <summary>Set false while something is drawn over the field — the clear button's tip would open
+    /// on top of it, under a pointer that is already resting there. On by default, so a field with
+    /// nothing over it is unaffected.</summary>
+    public static readonly StyledProperty<bool> ClearToolTipEnabledProperty =
+        AvaloniaProperty.Register<SearchField, bool>(nameof(ClearToolTipEnabled), defaultValue: true);
+
     public static readonly StyledProperty<double> IconSizeProperty =
         AvaloniaProperty.Register<SearchField, double>(nameof(IconSize), defaultValue: 14);
 
@@ -87,6 +93,11 @@ public partial class SearchField : UserControl {
         set => SetValue(ClearToolTipProperty, value);
     }
 
+    public bool ClearToolTipEnabled {
+        get => GetValue(ClearToolTipEnabledProperty);
+        set => SetValue(ClearToolTipEnabledProperty, value);
+    }
+
     public double IconSize {
         get => GetValue(IconSizeProperty);
         set => SetValue(IconSizeProperty, value);
@@ -105,6 +116,17 @@ public partial class SearchField : UserControl {
     public Thickness IconGap {
         get => GetValue(IconGapProperty);
         set => SetValue(IconGapProperty, value);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
+        base.OnPropertyChanged(change);
+
+        // Switching the service off only cancels a tip that has not opened yet; one already on screen
+        // has to be taken down. The service goes on pointing at the button, so the tip stays away until
+        // the pointer leaves and returns — cheaper than one glued over the results.
+        if (change.Property == ClearToolTipEnabledProperty && !change.GetNewValue<bool>())
+            ToolTip.SetIsOpen(ClearButton, false);
     }
 
     /// <summary>Forwarded from the inner box: puts the caret in the field and selects what is there, so
