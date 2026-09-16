@@ -425,7 +425,7 @@
                     <controls:SearchField x:Name="FilterBox" HorizontalAlignment="Left"
                                           VerticalAlignment="Center"
                                           MaxWidth="360" Height="30"
-                                          IconSize="13" TextSize="12.5"
+                                          IconSize="13" TextSize="{DynamicResource TextSizeBody}"
                                           ContentPadding="10,0" IconGap="8,0,0,0"
                                           PlaceholderText="Filter by name or PID"
                                           ClearToolTip="Clear filter"

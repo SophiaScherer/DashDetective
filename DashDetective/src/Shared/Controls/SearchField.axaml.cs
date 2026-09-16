@@ -42,8 +42,10 @@ public partial class SearchField : UserControl {
     public static readonly StyledProperty<double> IconSizeProperty =
         AvaloniaProperty.Register<SearchField, double>(nameof(IconSize), defaultValue: 14);
 
+    /// <summary>Defaulted from the TextSize ladder in the control's own markup, never from a literal
+    /// here — a literal is a size the Text size setting cannot reach.</summary>
     public static readonly StyledProperty<double> TextSizeProperty =
-        AvaloniaProperty.Register<SearchField, double>(nameof(TextSize), defaultValue: 13);
+        AvaloniaProperty.Register<SearchField, double>(nameof(TextSize));
 
     /// <summary>Inset from the field's border to its contents.</summary>
     public static readonly StyledProperty<Thickness> ContentPaddingProperty =
