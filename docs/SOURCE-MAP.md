@@ -348,8 +348,8 @@ stays in its tab folder.
         ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
                                         content is MEASURED at the reduced size and RENDERED enlarged, so
                                         text and chrome grow together and no view has to know its own font
-                                        size — which is why the app's ~87 FontSize literals needed no
-                                        change. ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
+                                        size — which is why no authored FontSize needed changing.
+                                        ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
                                         second window are each their own tree and inherit nothing from the
                                         shell's. Fluent templates the tooltip and context-menu presenters,
                                         so those two cannot host one and follow the scale by type size
@@ -643,13 +643,25 @@ stays in its tab folder.
                                  shell reads to size its window minimum. Re-applying the current value is
                                  deliberate — startup has to push it through either way — but only a real
                                  change raises Changed, or every launch would report one and persist)
-        UiScale.cs              (the scale ladder and its arithmetic, pure so both are testable without a
-                                 layout pass. Factor() CLAMPS: the settings file is hand-editable and 0
-                                 would collapse the window rather than degrade. Nearest() snaps an
-                                 unrecognized value onto the ladder, so the segmented control always has a
-                                 selection. BasePopupFontSize is a C# mirror of Dimensions.axaml's
-                                 PopupFontSize, as SemanticBrushes mirrors Palette.axaml, and a test pins
-                                 the two together)
+        ScaleRange.cs           (the range BOTH scales offer — 80 to 200% in 5% steps — and the arithmetic
+                                 over it, pure so it is testable without a layout pass and shared so the
+                                 interface size and the text size cannot drift into offering different
+                                 things. Normalize() CLAMPS and then rounds onto a step: the settings file
+                                 is hand-editable and 0 would collapse the window rather than degrade, and
+                                 the slider and the % field both have to be able to show the stored value
+                                 exactly. It replaced a snap-to-ladder, which is what a five-segment
+                                 control needed instead. Factor() is taken from the normalized value, so
+                                 what is in force and what is on screen cannot disagree)
+        UiScale.cs              (what the interface size means beyond its range: the tooltip and
+                                 context-menu type size, which those two carry themselves because Fluent
+                                 templates their presenters and neither can host a ScaleHost.
+                                 BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
+                                 SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
+        TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
+                                 name. They are the sizes the app already shipped, not a redesign: a tidier
+                                 ladder would change how the app looks at 100%, which is the one thing every
+                                 option on this card must not do. Mirrors the TextSize* defaults in
+                                 Dimensions.axaml, pinned both ways by a test)
 ```
 
 ## `src/Services/Notifications`
@@ -1351,15 +1363,15 @@ stays in its tab folder.
                                                          like buildReport/buildMetricsCsv: the orders are the
                                                          shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, GraphColorsOption.cs, ClockFormatOption.cs,
-                                IntervalOption.cs, UiScaleOption.cs
-                                                        (selectable item VMs for the Appearance,
-                                                         Accessibility + refresh-interval controls, like
-                                                         NavItem. The interface-size row is the only one
-                                                         with FIVE segments, and the only one its own
-                                                         setting narrows, so it alone wraps: both its grid
-                                                         columns are star, because a WrapPanel in an Auto
-                                                         column is measured against infinity and would
-                                                         overflow the card rather than wrap)
+                                IntervalOption.cs
+                                                        (selectable item VMs for the Appearance and
+                                                         refresh-interval segmented controls, like NavItem.
+                                                         The two SCALE rows are not among them: a segment
+                                                         per 5% step would be twenty-five of them, so they
+                                                         carry a Slider plus a NumericField instead, over
+                                                         ScaleRange. Both their grid columns are star —
+                                                         they are the only rows their own setting narrows,
+                                                         and at 200% the page measures at half its width)
                                 AccentPickerViewModel.cs
                                                         (the accent picker MODAL: a draft picked on the wheel,
                                                          typed as hex or reverted to Blue, applied only by
@@ -1427,7 +1439,12 @@ stays in its tab folder.
                                                          TextBox's own clamp when Text shrinks, so a render
                                                          on load opened Settings at the Alerts card and one
                                                          on focus loss yanked the page back to it. Guarding
-                                                         the caret write alone misses the clamp)
+                                                         the caret write alone misses the clamp. Committed
+                                                         is raised when the edit ENDS, for the caller that
+                                                         must act on the finished number rather than on
+                                                         each keystroke — the scale rows, which normalize
+                                                         what they are given and would otherwise rewrite
+                                                         the box mid-typing)
                                 AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
                                                          switched-off row remembers its number. The
                                                          settings layer encodes "not watched" as 0, which
