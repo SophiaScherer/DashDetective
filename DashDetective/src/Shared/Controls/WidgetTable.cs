@@ -16,8 +16,8 @@ public class WidgetTable : ContentControl {
     public static readonly StyledProperty<object?> HeaderProperty =
         AvaloniaProperty.Register<WidgetTable, object?>(nameof(Header));
 
-    /// <summary>Right inset the header and the rows share. Avalonia lays content out underneath the
-    /// scrollbar, so without it the bar sits over the last column.</summary>
+    /// <summary>Right inset the header and the rows share, so the last column keeps a gap from the
+    /// scrollbar beside it.</summary>
     public static readonly StyledProperty<Thickness> GutterProperty =
         AvaloniaProperty.Register<WidgetTable, Thickness>(nameof(Gutter), new Thickness(0, 0, 14, 0));
 

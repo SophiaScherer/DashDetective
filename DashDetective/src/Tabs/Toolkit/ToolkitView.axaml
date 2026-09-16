@@ -193,7 +193,7 @@
              rounded grouped list of command rows. The column scrolls on its own so the Execution
              Log panel beside it stays pinned — the page is ISelfScrollingPage. -->
         <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Spacing="16">
+            <StackPanel Spacing="16" Margin="{StaticResource ScrollGutter}">
 
                 <!-- ===== "+ Add command" ===== -->
                 <!-- Closed to one button, so the page still opens on its commands rather than on a form.
@@ -599,7 +599,7 @@
             <Border Background="{DynamicResource ConsoleBg}" CornerRadius="6"
                     Padding="10" ClipToBounds="True">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                        <Panel>
+                        <Panel Margin="{StaticResource ScrollGutter}">
                             <ItemsControl ItemsSource="{Binding Log}" IsVisible="{Binding HasLog}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ToolkitLogEntry">

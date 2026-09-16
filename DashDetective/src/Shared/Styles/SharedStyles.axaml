@@ -514,16 +514,17 @@
     </Style>
 
     <!-- ===== Scrollbars ===== -->
-    <!-- Fluent's default scrollbars auto-hide: a thin line that expands on hover as an overlay ON TOP
-         of content. Pin auto-hide off app-wide so a present bar stays solid and stable rather than
-         fading in and out over the content. Fluent lays content out UNDERNEATH the bar, so lists keep
-         a right gutter (row/header padding) that the bar sits in; flush lists add that padding locally
-         (see the Network Adapters/Connections rows) rather than via the ScrollViewer, which would also
-         shift a sticky header out of alignment with its rows. -->
+    <!-- Fluent's default scrollbars auto-hide: a thin line that expands on hover over the content. Pin
+         auto-hide off app-wide so a present bar stays solid. With it off, Fluent lays content BESIDE
+         the bar, so content that would touch it takes ScrollGutter as a Margin. -->
     <!-- And the wheel steps by what the OS asks for: Avalonia's own step is a fixed 50 px, about half
          what the rest of the desktop moves. -->
     <Style Selector="ScrollViewer">
         <Setter Property="AllowAutoHide" Value="False"/>
         <Setter Property="controls:WheelScrolling.FollowsSystem" Value="True"/>
+    </Style>
+    <!-- TreeView template-binds its inner scroller's AllowAutoHide, which outranks the rule above. -->
+    <Style Selector="TreeView">
+        <Setter Property="ScrollViewer.AllowAutoHide" Value="False"/>
     </Style>
 </Styles>

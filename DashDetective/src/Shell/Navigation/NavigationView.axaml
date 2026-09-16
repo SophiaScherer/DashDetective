@@ -423,10 +423,10 @@
             </Border>
 
             <!-- Navigation (fills the remaining space) -->
-            <ScrollViewer Padding="12,4"
-                          VerticalScrollBarVisibility="{Binding ScrollV}"
+            <!-- Inset on the items, not ScrollViewer Padding, which the scroll extent leaves out. -->
+            <ScrollViewer VerticalScrollBarVisibility="{Binding ScrollV}"
                           HorizontalScrollBarVisibility="{Binding ScrollH}">
-                <ItemsControl ItemsSource="{Binding NavItems}">
+                <ItemsControl ItemsSource="{Binding NavItems}" Margin="12,4">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="{Binding ItemsOrientation}"

@@ -91,7 +91,7 @@
             </Border>
 
             <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl ItemsSource="{Binding Resources}" Margin="0,0,2,0">
+                <ItemsControl ItemsSource="{Binding Resources}" Margin="{StaticResource ScrollGutter}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <!-- One column: a flow panel rather than a StackPanel because it is the
@@ -253,7 +253,8 @@
                          MaxHeight, so a small grid shows flush while many cores scroll. -->
                     <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding SelectedResource.IsDetailed}">
-                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}">
+                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}"
+                                      Margin="{StaticResource ScrollGutter}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <layout:UniformFlowPanel MinItemWidth="140" ColumnSpacing="8" RowSpacing="8"/>

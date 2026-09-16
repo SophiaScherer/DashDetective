@@ -14,6 +14,9 @@
     <Thickness x:Key="PageInset">22,20,22,30</Thickness>
     <Thickness x:Key="PanelPadding">16</Thickness>
     <Thickness x:Key="CardPadding">13,12</Thickness>
+    <!-- ScrollGutter keeps a scroller's content off its vertical bar. A Margin on the content, never
+         ScrollViewer Padding, which the scroll extent leaves out. -->
+    <Thickness x:Key="ScrollGutter">0,0,14,0</Thickness>
 
     <!-- ===== Corner radii ===== -->
     <!-- Largest surface to smallest affordance. -->

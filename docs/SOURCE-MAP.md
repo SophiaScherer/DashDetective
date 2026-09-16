@@ -228,6 +228,9 @@ stays in its tab folder.
                                  AutomationProperties.Name at its tooltip, because an icon-only button
                                  otherwise reports its content's type name — "Avalonia.Controls.Border"
                                  for every nav item. A local Name in markup still wins.
+                                 SCROLLBARS: AllowAutoHide is pinned off, which lays content BESIDE the bar,
+                                 not under it. TreeView is pinned separately — its template binds the flag,
+                                 which outranks the ScrollViewer rule.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
@@ -242,7 +245,11 @@ stays in its tab folder.
                                  first apply. TEXT SCALE: the ladder is every font size in the app,
                                  TextScale.BaseSizes mirrors it, and a test fails on any authored
                                  FontSize literal. A token with no call site should not exist — the
-                                 ladder is the one authorized sweep, see AGENTS.md)
+                                 ladder is the one authorized sweep, see AGENTS.md.
+                                 ScrollGutter is the gap between a scroller's content and its bar, set as
+                                 the content's Margin (or a ListBox/TreeView's Padding, which its template
+                                 applies as the presenter's Margin). Never ScrollViewer Padding: the scroll
+                                 extent leaves it out. ScrollViewerInsetTests pins both)
         Widgets.axaml           (the WidgetPanel and WidgetTable templates — TemplateBinding throughout,
                                  and the :collapsed rules. The chevron is a plain Button, not a
                                  ToggleButton: Fluent's checked/pressed states would all need undoing,
