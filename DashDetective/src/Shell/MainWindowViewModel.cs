@@ -39,6 +39,7 @@ namespace DashDetective.Shell;
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>The window minimum at 100%: the width an expanded nav bar plus a usable page needs.</summary>
     private const double BaseMinWindowWidth = 640;
+    private const double BaseClockWidth = 76;
     private const double BaseMinWindowHeight = 480;
 
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
@@ -163,6 +164,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// reflow it.</summary>
     public double MinWindowWidth => BaseMinWindowWidth * _accessibility.ScaleFactor;
     public double MinWindowHeight => BaseMinWindowHeight * _accessibility.ScaleFactor;
+
+    /// <summary>The toolbar clock's reserved width. Fixed so the ticking digits never reflow the
+    /// toolbar, and scaled with the text, or at 200% the time was cut to "11:07:".</summary>
+    public double ClockWidth => BaseClockWidth * ScaleRange.Factor(_accessibility.TextScalePercent);
 
     /// <summary>Whether the current page manages its own scrolling (e.g. File Explorer): such pages
     /// fill the viewport and scroll their own panes, so the shell hosts them in a bounded,
@@ -293,25 +298,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
     private void OnAccessibilityChanged() {
-        SyncNavTextScale();
+        SyncNavScales();
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
+        OnPropertyChanged(nameof(ClockWidth));
         OnPropertyChanged(nameof(ReduceMotion));
         OnPropertyChanged(nameof(AlertLiveSetting));
         OnPropertyChanged(nameof(NoticeLiveSetting));
     }
 
-    /// <summary>Sizes the navigation bar against the text scale. Called from both the startup apply and
+    /// <summary>Sizes the navigation bar against both scales. Called from the startup apply as well as
     /// the change event, because settings are applied before that event is subscribed to.</summary>
-    private void SyncNavTextScale() =>
-        Nav.SetTextScale(TextScale.Factor(_accessibility.TextScalePercent));
+    private void SyncNavScales() {
+        Nav.SetTextScale(ScaleRange.Factor(_accessibility.TextScalePercent));
+        Nav.SetUiScale(_accessibility.ScaleFactor);
+    }
 
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
         _theme.ApplyTheme(settings.Theme);
         _accessibility.Apply(settings);
-        SyncNavTextScale();
+        SyncNavScales();
         _theme.ApplyGraphColors(GraphColors.Find(settings.EffectiveGraphColorsName));
         _theme.ApplyAccent(AccentPreset.FromHex(settings.AccentColor));
 

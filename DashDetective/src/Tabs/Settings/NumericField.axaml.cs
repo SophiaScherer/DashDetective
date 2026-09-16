@@ -60,12 +60,17 @@ public partial class NumericField : UserControl {
         set => SetValue(SuffixProperty, value);
     }
 
+    /// <summary>Raised when an edit ends — focus leaves, or Enter. <see cref="Value"/> still moves as
+    /// the digits arrive; a caller that must act on the finished number rather than on each keystroke
+    /// listens here instead.</summary>
+    public event EventHandler? Committed;
+
     public NumericField() {
         InitializeComponent();
 
         Entry.AddHandler(TextInputEvent, OnTextInput, RoutingStrategies.Tunnel);
         Entry.TextChanged += (_, _) => Capture();
-        Entry.LostFocus += (_, _) => Render();
+        Entry.LostFocus += (_, _) => Commit();
         Entry.KeyDown += OnKeyDown;
         Entry.AddHandler(RequestBringIntoViewEvent, OnEntryBringIntoView);
 
@@ -103,7 +108,7 @@ public partial class NumericField : UserControl {
 
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         if (e.Key == Key.Enter) {
-            Render();
+            Commit();
             e.Handled = true;
             return;
         }
@@ -138,6 +143,12 @@ public partial class NumericField : UserControl {
         if (int.TryParse(Entry.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var typed) &&
             typed >= Minimum)
             Value = Math.Min(typed, Maximum);
+    }
+
+    /// <summary>Reconciles the box and tells anyone waiting for the finished number.</summary>
+    private void Commit() {
+        Render();
+        Committed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Puts the stored value back in the box, which is where a clamped or abandoned edit is

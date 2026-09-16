@@ -15,7 +15,7 @@ public class AccessibilityServiceTests {
 
     [Fact]
     public void Ctor_StartsAtTheShippedScale() =>
-        Assert.Equal(UiScale.DefaultPercent, Create().ScalePercent);
+        Assert.Equal(ScaleRange.DefaultPercent, Create().ScalePercent);
 
     [Fact]
     public void SetScalePercent_SelectsTheStepAndItsFactor() {
@@ -27,15 +27,16 @@ public class AccessibilityServiceTests {
         Assert.Equal(1.5, service.ScaleFactor);
     }
 
-    /// <summary>The card's segmented control reads <see cref="AccessibilityService.ScalePercent"/> back,
-    /// so an unrecognized stored value has to arrive on the ladder or no segment shows as selected.</summary>
+    /// <summary>The card's controls read <see cref="AccessibilityService.ScalePercent"/> back, so an
+    /// off-step stored value has to arrive on a step or neither of them can show it exactly.</summary>
     [Fact]
-    public void Apply_UnknownPercent_LandsOnTheLadder() {
+    public void Apply_OffStepPercent_LandsOnAStep() {
         var service = Create();
 
         service.Apply(AppSettings.Defaults with { UiScalePercent = 133 });
 
-        Assert.Contains(service.ScalePercent, UiScale.Percents);
+        Assert.Equal(ScaleRange.Normalize(133), service.ScalePercent);
+        Assert.Equal(0, service.ScalePercent % ScaleRange.StepPercent);
     }
 
     [Fact]
@@ -72,7 +73,7 @@ public class AccessibilityServiceTests {
         service.Changed += () => raised++;
         service.RestoreDefaults();
 
-        Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
+        Assert.Equal(ScaleRange.DefaultPercent, service.ScalePercent);
         Assert.Equal(1, raised);
     }
     /// <summary>Both visible-change options ship off, so switching nothing leaves the app looking exactly
@@ -143,8 +144,8 @@ public class AccessibilityServiceTests {
 
         service.RestoreDefaults();
 
-        Assert.Equal(UiScale.DefaultPercent, service.ScalePercent);
-        Assert.Equal(TextScale.DefaultPercent, service.TextScalePercent);
+        Assert.Equal(ScaleRange.DefaultPercent, service.ScalePercent);
+        Assert.Equal(ScaleRange.DefaultPercent, service.TextScalePercent);
         Assert.False(service.HighContrast);
         Assert.False(service.DistinguishWithoutColor);
 

@@ -18,8 +18,9 @@ using Xunit;
 namespace DashDetective.Tests.Tabs.Settings;
 
 /// <summary>Covers <see cref="SettingsViewModel"/>'s startup toggle through the
-/// <see cref="IStartupRegistration"/> seam: it is seeded from the real registration, construction
-/// itself must never write, and a user edit writes through exactly once.</summary>
+/// <see cref="IStartupRegistration"/> seam — seeded from the real registration, construction itself
+/// must never write, a user edit writes through exactly once — and the two scale controls, whose value
+/// is pending until the gesture that set it ends.</summary>
 public class SettingsViewModelTests {
     private static SettingsViewModel Create(IStartupRegistration startup) =>
         Create(startup, () => { });
@@ -212,6 +213,126 @@ public class SettingsViewModelTests {
     public void CanUseNvidiaMetrics_FollowsWhetherTheFigureNeedsAHelperTool() =>
         Assert.Equal(GpuMetricsSupport.NeedsHelperTool,
                      Create(new FakeStartupRegistration(enabled: false)).CanUseNvidiaMetrics);
+
+    /// <summary>The shell applies the persisted settings to the service before it builds this page, so
+    /// the helper does the same: the controls are seeded off the service, never off the raw file.</summary>
+    private static (SettingsViewModel ViewModel, AccessibilityService Accessibility)
+        CreateWithAccessibility(AppSettings? settings = null) {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var theme = new ThemeService();
+        var accessibility = new AccessibilityService(theme);
+        var resolved = settings ?? AppSettings.Defaults;
+
+        accessibility.Apply(resolved);
+
+        var viewModel = new SettingsViewModel(
+            theme, accessibility, new NavigationViewModel(), metrics, resolved,
+            new FakeStartupRegistration(enabled: false), new ShortcutBindings(), _ => "", () => "",
+            () => { });
+
+        return (viewModel, accessibility);
+    }
+
+    /// <summary>The controls hold a pending value: Settings sits inside the window's ScaleHost, so
+    /// applying on every tick would rescale the slider out from under the pointer.</summary>
+    [Fact]
+    public void UiScalePercent_OnItsOwn_DoesNotReachTheService() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+
+        viewModel.UiScalePercent = 150;
+
+        Assert.Equal(ScaleRange.DefaultPercent, accessibility.ScalePercent);
+    }
+
+    [Fact]
+    public void ApplyScales_AfterADrag_ReachesTheServiceAndReportsOneChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.UiScalePercent = 150;
+        viewModel.ApplyScales();
+
+        Assert.Equal(150, accessibility.ScalePercent);
+        Assert.Equal(1, changes);
+    }
+
+    /// <summary>A drag that ends where it started must not write the settings file.</summary>
+    [Fact]
+    public void ApplyScales_WithNothingMoved_ReportsNoChange() {
+        var (viewModel, _) = CreateWithAccessibility();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ApplyScales();
+
+        Assert.Equal(0, changes);
+    }
+
+    /// <summary>A typed number past the end of the range comes back inside it, in the service and in
+    /// the controls that read the service back.</summary>
+    [Fact]
+    public void ApplyScales_APercentPastTheRange_IsClampedInBothPlaces() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+
+        viewModel.TextScalePercent = 500;
+        viewModel.ApplyScales();
+
+        Assert.Equal(ScaleRange.MaxPercent, accessibility.TextScalePercent);
+        Assert.Equal(ScaleRange.MaxPercent, viewModel.TextScalePercent);
+    }
+
+    /// <summary>An off-step number settles onto a step, or the slider could not show what is in force.</summary>
+    [Fact]
+    public void ApplyScales_AnOffStepPercent_SettlesOntoAStep() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+
+        viewModel.UiScalePercent = 133;
+        viewModel.ApplyScales();
+
+        Assert.Equal(ScaleRange.Normalize(133), accessibility.ScalePercent);
+        Assert.Equal(accessibility.ScalePercent, viewModel.UiScalePercent);
+    }
+
+    /// <summary>Both rows can hold a pending value at once, and applying one must not reflect the
+    /// other row's old value back over it before it has been pushed.</summary>
+    [Fact]
+    public void ApplyScales_WithBothRowsPending_AppliesBoth() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+
+        viewModel.UiScalePercent = 150;
+        viewModel.TextScalePercent = 130;
+        viewModel.ApplyScales();
+
+        Assert.Equal(150, accessibility.ScalePercent);
+        Assert.Equal(130, accessibility.TextScalePercent);
+    }
+
+    /// <summary>The controls follow the service rather than the gesture, so a change made anywhere
+    /// else — Restore defaults — moves them the same way.</summary>
+    [Fact]
+    public void RestoreDefaults_PutsBothControlsBackOnTheDefault() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.UiScalePercent = 200;
+        viewModel.TextScalePercent = 200;
+        viewModel.ApplyScales();
+        Assert.Equal(200, accessibility.TextScalePercent);
+
+        accessibility.RestoreDefaults();
+
+        Assert.Equal(ScaleRange.DefaultPercent, viewModel.UiScalePercent);
+        Assert.Equal(ScaleRange.DefaultPercent, viewModel.TextScalePercent);
+    }
+
+    /// <summary>A hand-edited settings file is normalized before the controls ever see it.</summary>
+    [Fact]
+    public void Ctor_SeedsTheControlsFromTheNormalizedValue() {
+        var (viewModel, _) = CreateWithAccessibility(AppSettings.Defaults with { UiScalePercent = 133 });
+
+        Assert.Equal(ScaleRange.Normalize(133), viewModel.UiScalePercent);
+    }
 
     private sealed class FakeStartupRegistration(bool enabled) : IStartupRegistration {
         public List<bool> Writes { get; } = [];

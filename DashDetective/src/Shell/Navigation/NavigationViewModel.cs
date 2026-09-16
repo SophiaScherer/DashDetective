@@ -51,22 +51,48 @@ public partial class NavigationViewModel : ViewModelBase {
     /// it. Everything that lays the bar out reads this rather than either flag alone.</summary>
     public bool IsRailCollapsed => IsCollapsed || IsAutoCollapsed;
 
-    /// <summary>Shell width below which an expanded rail leaves too little for the page.</summary>
+    /// <summary>Shell width below which an expanded rail leaves too little for the page, at an
+    /// interface size of 100%.</summary>
     internal const double AutoCollapseWidth = 820;
 
     // Tracks the last side of the threshold so auto-collapse fires on a crossing rather than on every
     // resize — that way an explicit toggle sticks until the window crosses back.
     private bool _belowAutoCollapseWidth;
 
+    // The last reported width, so a scale change can re-test the threshold without a resize.
+    private double _shellWidth;
+
     // The text scale the bar is sized against. 1 until the accessibility state is applied.
     private double _textScale = 1;
+
+    // The interface scale, on the same terms.
+    private double _uiScale = 1;
 
     /// <summary>Reports the shell's width so the rail can fold itself away on a narrow window.</summary>
     public void SetShellWidth(double width) {
         if (!double.IsFinite(width) || width <= 0)
             return;
 
-        var below = width < AutoCollapseWidth;
+        _shellWidth = width;
+        UpdateAutoCollapse();
+    }
+
+    /// <summary>The interface size the threshold is measured against. The width is reported in the
+    /// window's own pixels, but the rail is drawn inside the scale host, so it takes that many more of
+    /// them: at 200% an expanded rail costs twice what the threshold was chosen against.</summary>
+    public void SetUiScale(double factor) {
+        if (!double.IsFinite(factor) || factor <= 0 || factor == _uiScale)
+            return;
+
+        _uiScale = factor;
+        UpdateAutoCollapse();
+    }
+
+    private void UpdateAutoCollapse() {
+        if (_shellWidth <= 0)
+            return;
+
+        var below = _shellWidth < AutoCollapseWidth * _uiScale;
         if (below == _belowAutoCollapseWidth)
             return;
 
@@ -215,7 +241,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        _textScale * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
+        Math.Max(1, _textScale) * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
 
     /// <summary>Grows the bar with the text scale. The rail is the one surface sized in pixels that has
     /// to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped both.
