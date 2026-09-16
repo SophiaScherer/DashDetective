@@ -197,6 +197,11 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   the caret for `Tab` to accept, used by the search box, the address bar and the process filter.
   `PrefixCompleter` is the shared rule: one match completes fully, several complete only as far as
   they agree.
+- **The box's width.** Bounded 180–400, never sized to its content. `SearchField` takes the room the
+  toolbar offers and refuses to measure its own text, so a long term, a ghost completion or the clear
+  × appearing cannot reflow the toolbar or move the box's left edge; it still gives ground to 180 on a
+  narrow window so the title and actions keep their room. The dropdown's width binding therefore
+  follows something stable. The Processes filter is capped at 360 by the same rule.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.

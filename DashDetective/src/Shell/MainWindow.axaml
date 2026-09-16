@@ -125,11 +125,10 @@
                             </StackPanel>
 
                             <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the
-                                 outside-click dismissal all live in the component. Bounded rather than
-                                 sized to content, which would collapse it to nothing when empty and grow
-                                 it as the user types. It gives ground down to 180px on a narrow window so
-                                 the title and actions keep their room; the dropdown follows via the
-                                 popup's width binding. -->
+                                 outside-click dismissal all live in the component. The field takes the
+                                 room it is offered within its own bounds rather than sizing to its text,
+                                 so it gives ground down to 180px on a narrow window and never reflows the
+                                 toolbar as the user types; the dropdown follows the popup's width binding. -->
                             <search:UniversalSearchView DataContext="{Binding Search}"
                                                         Margin="16,0"
                                                         HorizontalAlignment="Right" VerticalAlignment="Center"/>

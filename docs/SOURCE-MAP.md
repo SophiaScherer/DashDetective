@@ -384,6 +384,23 @@ stays in its tab folder.
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
+        SearchField.axaml(.cs), FieldWidth.cs, GhostCompletionBox.axaml(.cs)
+                                       (the app's search / filter field — magnifier, input, clear × — drawn
+                                        by the toolbar search, the Processes filter and the Toolkit
+                                        filter. It TAKES THE ROOM ITS CONTAINER OFFERS and never measures
+                                        its text (FieldWidth.Desired, from a MeasureOverride), so a longer
+                                        term, a ghost completion or the clear × appearing cannot move its
+                                        edges — a call site sets MinWidth/MaxWidth, not Width. An unbounded
+                                        container offers infinity and the measured content is the only
+                                        answer left there, which is why the Toolkit's WrapPanel call site
+                                        carries an explicit Width. TextSize is a FONT SIZE UNDER ANOTHER
+                                        NAME: it is defaulted from the TextSize ladder on the control's
+                                        own root tag and bound to it at every call site, because a literal
+                                        is a size the Text size setting cannot reach — the font-size-
+                                        literal scan covers it for that reason. The input is always a
+                                        GhostCompletionBox, which draws the rest of a suggestion after the
+                                        caret for Tab to accept and consumes Tab only when one was
+                                        actually accepted, so a field with no suggestions still tabs on)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; StatCard.Selectable is opt-in and adds the
                                         shared card.selectable hover for a card that is also a click
