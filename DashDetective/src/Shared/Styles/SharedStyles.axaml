@@ -523,8 +523,12 @@
         <Setter Property="AllowAutoHide" Value="False"/>
         <Setter Property="controls:WheelScrolling.FollowsSystem" Value="True"/>
     </Style>
-    <!-- TreeView template-binds its inner scroller's AllowAutoHide, which outranks the rule above. -->
+    <!-- TreeView and ListBox template-bind their inner scroller's AllowAutoHide, which outranks the
+         rule above. -->
     <Style Selector="TreeView">
+        <Setter Property="ScrollViewer.AllowAutoHide" Value="False"/>
+    </Style>
+    <Style Selector="ListBox">
         <Setter Property="ScrollViewer.AllowAutoHide" Value="False"/>
     </Style>
 </Styles>

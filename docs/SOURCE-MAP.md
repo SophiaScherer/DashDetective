@@ -229,8 +229,10 @@ stays in its tab folder.
                                  otherwise reports its content's type name — "Avalonia.Controls.Border"
                                  for every nav item. A local Name in markup still wins.
                                  SCROLLBARS: AllowAutoHide is pinned off, which lays content BESIDE the bar,
-                                 not under it. TreeView is pinned separately — its template binds the flag,
-                                 which outranks the ScrollViewer rule.
+                                 not under it. TreeView and ListBox are pinned separately — each template
+                                 binds the flag, which outranks the ScrollViewer rule. The pins live HERE
+                                 and not in the view that owns the control: ScrollViewerInsetTests matches
+                                 the selector in this file exactly.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a

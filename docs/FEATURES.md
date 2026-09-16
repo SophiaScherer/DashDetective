@@ -202,6 +202,17 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   × appearing cannot reflow the toolbar or move the box's left edge; it still gives ground to 180 on a
   narrow window so the title and actions keep their room. The dropdown's width binding therefore
   follows something stable. The Processes filter is capped at 360 by the same rule.
+- **The dropdown.** The results `ListBox` is the app's only one, and a `ListBox` template-binds its
+  scroller's `AllowAutoHide`, so the app-wide pin never reached it: the bar auto-hid to a line and
+  expanded back over the rows on hover. It is pinned beside the `TreeView` in `SharedStyles.axaml`,
+  and the rows take `ScrollGutter` as the list's `Padding` — which its template applies as the items
+  presenter's `Margin`, inside the scroll extent.
+- **The dropdown's size and place.** A solid bar plus that gutter costs about 30px, which leaves a
+  result unreadable at the box's own 180px floor, so the popup's `Border` carries a `MinWidth` of 320
+  — inside the `ScaleHost`, beside the width binding, because `Bounds` are pre-transform. It is
+  placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
+  itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
+  showing, since they open directly beneath a pointer the expand button has already left there.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.

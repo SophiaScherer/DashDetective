@@ -17,7 +17,9 @@
         <Style Selector="ListBox.results">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
+            <!-- The rows' gap from the scroll bar: a ListBox takes it as Padding, which its template
+                 applies as the items presenter's Margin, inside the scroll extent. -->
+            <Setter Property="Padding" Value="{StaticResource ScrollGutter}"/>
         </Style>
         <Style Selector="ListBox.results ListBoxItem">
             <Setter Property="Padding" Value="0"/>
@@ -77,7 +79,9 @@
              clicking it again raises no focus event and the dropdown would never come back. Both events
              bubble out of the field's inner box, so they still reach these handlers.
              Tab fills in the best result's name; Enter is bound inside the field because the shortcut
-             layer deliberately leaves Enter to whatever text box has focus. -->
+             layer deliberately leaves Enter to whatever text box has focus.
+             The clear ×'s tooltip is off while results are showing: they open directly beneath it, under
+             a pointer the expand button has already left there. -->
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
                               IsVisible="{Binding IsExpanded}"
                               MinWidth="180" MaxWidth="400"
@@ -88,6 +92,7 @@
                               LostFocus="OnSearchBoxLostFocus"
                               PlaceholderText="Search pages, settings, processes, files…"
                               ClearToolTip="Clear search"
+                              ClearToolTipEnabled="{Binding !IsOpen}"
                               Text="{Binding Text, Mode=TwoWay}"
                               Completion="{Binding Completion}"
                               EnterCommand="{Binding ActivateSelectedCommand}"
@@ -95,17 +100,21 @@
 
         <!-- Overlay-free so the caret stays in the box while results are showing — a light-dismiss popup
              takes focus, which would stop the user typing. Close-on-outside-click is emulated in the
-             code-behind, the same trade the File Explorer's Options menu makes. -->
+             code-behind, the same trade the File Explorer's Options menu makes.
+             Aligned to the box's RIGHT edge: the popup is wider than the box on a narrow window, and
+             growing rightwards would lay it over the toolbar actions beside it. -->
         <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #SearchBox}"
-               Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+               Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                IsLightDismissEnabled="False" Focusable="False"
                IsOpen="{Binding IsOpen}">
             <!-- A popup is its own visual root, so it carries the interface scale itself. -->
             <controls:ScaleHost Scale="{DynamicResource UiScale}">
                 <!-- Width matched inside the scale host rather than on the Popup: the search box's
                      Bounds are pre-transform, so a popup sized to this content is exactly as wide as the
-                     box renders at any scale. -->
-                <Border Width="{Binding #SearchBox.Bounds.Width}"
+                     box renders at any scale. The floor is there because a solid bar and the rows'
+                     gutter cost about 30px, which leaves a result unreadable at the box's own 180px
+                     floor. -->
+                <Border Width="{Binding #SearchBox.Bounds.Width}" MinWidth="320"
                         Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
                         CornerRadius="8" Padding="6" BoxShadow="{StaticResource ShadowPopup}">

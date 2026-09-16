@@ -30,8 +30,9 @@
                                          Completion="{Binding #Root.Completion}"
                                          EnterCommand="{Binding #Root.EnterCommand}"/>
 
-            <Button Grid.Column="2" Classes="clearField"
+            <Button Grid.Column="2" x:Name="ClearButton" Classes="clearField"
                     ToolTip.Tip="{Binding #Root.ClearToolTip}"
+                    ToolTip.ServiceEnabled="{Binding #Root.ClearToolTipEnabled}"
                     Command="{Binding #Root.ClearCommand}"
                     IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"

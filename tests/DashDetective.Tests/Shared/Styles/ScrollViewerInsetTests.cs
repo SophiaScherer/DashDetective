@@ -44,11 +44,13 @@ public class ScrollViewerInsetTests {
             "Use ScrollGutter as the content's Margin:" + Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
-    /// <summary>The gutter assumes content sits beside the bar, which is only true with auto-hide off. TreeView
-    /// template-binds the flag, so the ScrollViewer rule alone does not reach it.</summary>
+    /// <summary>The gutter assumes content sits beside the bar, which is only true with auto-hide off.
+    /// TreeView and ListBox template-bind the flag, so the ScrollViewer rule alone does not reach them.
+    /// The selector is matched exactly, so a pin local to a view would not satisfy this.</summary>
     [Theory]
     [InlineData("ScrollViewer")]
     [InlineData("TreeView")]
+    [InlineData("ListBox")]
     public void SharedStylesPinAutoHideOff(string selector) {
         var styles = XDocument.Load(Path.Combine(PaletteFile.SourceRoot(), "src/Shared/Styles/SharedStyles.axaml"));
 
