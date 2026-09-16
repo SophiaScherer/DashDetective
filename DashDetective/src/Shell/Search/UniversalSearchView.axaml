@@ -96,17 +96,21 @@
 
         <!-- Overlay-free so the caret stays in the box while results are showing — a light-dismiss popup
              takes focus, which would stop the user typing. Close-on-outside-click is emulated in the
-             code-behind, the same trade the File Explorer's Options menu makes. -->
+             code-behind, the same trade the File Explorer's Options menu makes.
+             Aligned to the box's RIGHT edge: the popup is wider than the box on a narrow window, and
+             growing rightwards would lay it over the toolbar actions beside it. -->
         <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #SearchBox}"
-               Placement="BottomEdgeAlignedLeft" VerticalOffset="6"
+               Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                IsLightDismissEnabled="False" Focusable="False"
                IsOpen="{Binding IsOpen}">
             <!-- A popup is its own visual root, so it carries the interface scale itself. -->
             <controls:ScaleHost Scale="{DynamicResource UiScale}">
                 <!-- Width matched inside the scale host rather than on the Popup: the search box's
                      Bounds are pre-transform, so a popup sized to this content is exactly as wide as the
-                     box renders at any scale. -->
-                <Border Width="{Binding #SearchBox.Bounds.Width}"
+                     box renders at any scale. The floor is there because a solid bar and the rows'
+                     gutter cost about 30px, which leaves a result unreadable at the box's own 180px
+                     floor. -->
+                <Border Width="{Binding #SearchBox.Bounds.Width}" MinWidth="320"
                         Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
                         CornerRadius="8" Padding="6" BoxShadow="{StaticResource ShadowPopup}">
