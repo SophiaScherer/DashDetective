@@ -80,7 +80,7 @@
              layer deliberately leaves Enter to whatever text box has focus. -->
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
                               IsVisible="{Binding IsExpanded}"
-                              MinWidth="180" MaxWidth="320"
+                              MinWidth="180" MaxWidth="400"
                               HorizontalAlignment="Right" VerticalAlignment="Center"
                               PointerPressed="OnFieldPressed"
                               GotFocus="OnSearchBoxGotFocus"
