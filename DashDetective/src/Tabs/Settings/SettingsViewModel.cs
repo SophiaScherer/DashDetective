@@ -44,9 +44,6 @@ public partial class SettingsViewModel : ViewModelBase {
     /// <summary>The accent picker modal the Accent color row opens. The shell hosts its overlay.</summary>
     public AccentPickerViewModel Accent { get; }
     public ObservableCollection<ClockFormatOption> ClockFormatOptions { get; }
-    public ObservableCollection<UiScaleOption> UiScaleOptions { get; }
-
-    public ObservableCollection<UiScaleOption> TextScaleOptions { get; }
     public ObservableCollection<ColorVisionOption> ColorVisionOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
@@ -121,6 +118,21 @@ public partial class SettingsViewModel : ViewModelBase {
     /// only reading in the app that costs a process launch.</summary>
     [ObservableProperty] private bool _nvidiaGpuMetrics;
 
+    /// <summary>The interface size the slider and the % field show. It is the PENDING value while the
+    /// slider is dragged; <see cref="ApplyScales"/> is what puts it into force.</summary>
+    [ObservableProperty] private int _uiScalePercent = ScaleRange.DefaultPercent;
+
+    /// <summary>The text size, on the same terms.</summary>
+    [ObservableProperty] private int _textScalePercent = ScaleRange.DefaultPercent;
+
+    /// <summary>The span both scale controls cover, so a slider's ends, its step and the field's clamp
+    /// all come from the one place that defines the range.</summary>
+    public int ScaleMinimum => ScaleRange.MinPercent;
+
+    public int ScaleMaximum => ScaleRange.MaxPercent;
+
+    public int ScaleStep => ScaleRange.StepPercent;
+
     /// <summary>Flatten the surfaces and drop the text ramp's opacity steps. Off by default.</summary>
     [ObservableProperty] private bool _highContrast;
 
@@ -185,17 +197,6 @@ public partial class SettingsViewModel : ViewModelBase {
             new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
         };
 
-        // The sizes the segmented controls offer, which are a handful of the range rather than all
-        // of it — a segment per 5% step would be twenty-five of them.
-        int[] segments = [100, 125, 150, 175, 200];
-
-        UiScaleOptions = [];
-        foreach (var percent in segments)
-            UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
-
-        TextScaleOptions = [];
-        foreach (var percent in segments)
-            TextScaleOptions.Add(new UiScaleOption(percent, SelectTextScale));
 
         // Named for the deficiency rather than for the colors it swaps, because that is what someone
         // looking for this already knows the name of.
@@ -461,15 +462,21 @@ public partial class SettingsViewModel : ViewModelBase {
             Changed?.Invoke();
     }
 
-    private void SelectUiScale(UiScaleOption option) {
-        _accessibility.SetScalePercent(option.Percent);
-        if (!_initializing)
-            Changed?.Invoke();
-    }
+    /// <summary>Puts the pending scales into force. Called when a drag ends, a keyboard step lands or a
+    /// typed number is committed — never per tick, since this page sits inside the window's ScaleHost
+    /// and applying mid-drag would rescale the slider out from under the pointer. The service normalizes,
+    /// and reflecting that back is what settles an off-step number onto a step in both controls.</summary>
+    internal void ApplyScales() {
+        // Both pending values are read FIRST: applying one raises the service's Changed, and the
+        // reflect that follows would put the other row's old value back before it was ever pushed.
+        var scale = UiScalePercent;
+        var text = TextScalePercent;
+        var before = (_accessibility.ScalePercent, _accessibility.TextScalePercent);
 
-    private void SelectTextScale(UiScaleOption option) {
-        _accessibility.SetTextScalePercent(option.Percent);
-        if (!_initializing)
+        _accessibility.SetScalePercent(scale);
+        _accessibility.SetTextScalePercent(text);
+
+        if (!_initializing && before != (_accessibility.ScalePercent, _accessibility.TextScalePercent))
             Changed?.Invoke();
     }
 
@@ -478,12 +485,8 @@ public partial class SettingsViewModel : ViewModelBase {
     /// way and cannot disagree. Writing the toggle back through its own property is safe rather than
     /// circular: the service re-applies an unchanged value silently, so the round trip stops there.</summary>
     private void ReflectAccessibility() {
-        foreach (var option in UiScaleOptions)
-            option.IsSelected = option.Percent == _accessibility.ScalePercent;
-
-        foreach (var option in TextScaleOptions)
-            option.IsSelected = option.Percent == _accessibility.TextScalePercent;
-
+        UiScalePercent = _accessibility.ScalePercent;
+        TextScalePercent = _accessibility.TextScalePercent;
         HighContrast = _accessibility.HighContrast;
         DistinguishWithoutColor = _accessibility.DistinguishWithoutColor;
         AnnounceUpdates = _accessibility.AnnounceUpdates;

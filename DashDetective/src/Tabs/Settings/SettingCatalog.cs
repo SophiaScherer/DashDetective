@@ -53,7 +53,7 @@ public sealed class SettingCatalog {
     // ----- Accessibility -----
 
     // "Interface size" rather than "text size": the whole window scales together, and promising only
-    // text would be the wrong promise. Text scaling on its own is a separate setting, not shipped yet.
+    // text would be the wrong promise. Text on its own is the setting below.
     public SettingEntry UiScale { get; } = new(
         SettingId.UiScale, "Accessibility", "Interface size",
         "Draw everything larger — text, controls and charts together",

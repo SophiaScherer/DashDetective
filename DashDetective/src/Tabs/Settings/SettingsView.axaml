@@ -14,7 +14,23 @@
          resource-alert / tray / startup toggles) and Export & Data (report / CSV / clipboard, handled
          in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
          store. Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
+    <!-- Fluent supplies the Slider template; the two scale rows are its only call sites in the app, so
+         the sizing and the app's own track colors stay here rather than in SharedStyles. Foreground draws
+         the filled side of the track and Background the rest, which is how the template reads them. -->
+    <UserControl.Resources>
+        <!-- Fluent reserves 15px above and below the track for tick bars this slider does not draw,
+             which would make these two rows half again as tall as every other row on the card. -->
+        <GridLength x:Key="SliderPreContentMargin">0</GridLength>
+        <GridLength x:Key="SliderPostContentMargin">0</GridLength>
+    </UserControl.Resources>
+
     <UserControl.Styles>
+        <Style Selector="Slider.scale">
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Background" Value="{DynamicResource TrackOff}"/>
+        </Style>
         <!-- Both trim. Each row is a star column beside an Auto control, so the text column shrinks as the
              window narrows, and an untrimmed TextBlock overflows its column instead of clipping to it —
              the description drew straight under the segmented control at the window's minimum. -->
@@ -173,11 +189,9 @@
             <StackPanel Spacing="16">
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.UiScale}">
-                <!-- The only row with five segments, and the one row whose own setting narrows it: at
-                     200% the page measures at half its width, so the fixed strip every other row uses
-                     would starve the label column to nothing. Both columns are star so the steps are
-                     measured against a real width and wrap onto a second line; an Auto column would
-                     measure them against infinity and they would never wrap, only overflow the card. -->
+                <!-- The one row its own setting narrows: at 200% the page measures at half its width,
+                     so the fixed strip every other row uses would starve the label column to nothing.
+                     Both columns stay star for that reason. -->
                 <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="110"/>
@@ -187,33 +201,26 @@
                         <TextBlock Classes="settingName" Text="{Binding Catalog.UiScale.Name}"/>
                         <TextBlock Classes="settingDesc" Text="{Binding Catalog.UiScale.Description}"/>
                     </StackPanel>
-                    <!-- Right-aligned, so at a width where nothing has to wrap the strip sits exactly
-                         where the Theme and Clock format strips above it do. -->
-                    <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
-                        <ItemsControl ItemsSource="{Binding UiScaleOptions}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="settings:UiScaleOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}"
-                                            AutomationProperties.Name="{Binding Label}">
-                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                            <TextBlock Text="{Binding Label}"/>
-                                        </Border>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Border>
+                    <!-- The slider is the coarse gesture and the field the exact one; both show the
+                         same pending value, and the code-behind applies it when a gesture ends. -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Slider Classes="scale" x:Name="UiScaleSlider"
+                                Minimum="{Binding ScaleMinimum}" Maximum="{Binding ScaleMaximum}"
+                                TickFrequency="{Binding ScaleStep}" IsSnapToTickEnabled="True"
+                                Value="{Binding UiScalePercent, Mode=TwoWay}"
+                                AutomationProperties.Name="{Binding Catalog.UiScale.Name}"/>
+                        <settings:NumericField x:Name="UiScaleField"
+                                               Value="{Binding UiScalePercent, Mode=TwoWay}"
+                                               Minimum="{Binding ScaleMinimum}"
+                                               Maximum="{Binding ScaleMaximum}" Suffix="%"/>
+                    </StackPanel>
                 </Grid>
                 </Border>
 
                 <Border Classes="settingRow revealFlash" Tag="{x:Static settings:SettingId.TextScale}">
-                <!-- Same five-segment shape as the interface size above, and narrowed by the same two
-                     scales, so it takes the same star columns rather than the fixed strip. -->
+                <!-- Same shape as the interface size above, and narrowed by the same two scales, so it
+                     takes the same star columns rather than the fixed strip. -->
                 <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="110"/>
@@ -223,25 +230,18 @@
                         <TextBlock Classes="settingName" Text="{Binding Catalog.TextScale.Name}"/>
                         <TextBlock Classes="settingDesc" Text="{Binding Catalog.TextScale.Description}"/>
                     </StackPanel>
-                    <Border Grid.Column="1" Classes="segments" HorizontalAlignment="Right">
-                        <ItemsControl ItemsSource="{Binding TextScaleOptions}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="settings:UiScaleOption">
-                                    <Button Classes="bare" Command="{Binding SelectCommand}"
-                                            AutomationProperties.Name="{Binding Label}">
-                                        <Border Classes="seg" Classes.selected="{Binding IsSelected}">
-                                            <TextBlock Text="{Binding Label}"/>
-                                        </Border>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Border>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Slider Classes="scale" x:Name="TextScaleSlider"
+                                Minimum="{Binding ScaleMinimum}" Maximum="{Binding ScaleMaximum}"
+                                TickFrequency="{Binding ScaleStep}" IsSnapToTickEnabled="True"
+                                Value="{Binding TextScalePercent, Mode=TwoWay}"
+                                AutomationProperties.Name="{Binding Catalog.TextScale.Name}"/>
+                        <settings:NumericField x:Name="TextScaleField"
+                                               Value="{Binding TextScalePercent, Mode=TwoWay}"
+                                               Minimum="{Binding ScaleMinimum}"
+                                               Maximum="{Binding ScaleMaximum}" Suffix="%"/>
+                    </StackPanel>
                 </Grid>
                 </Border>
 
