@@ -112,6 +112,9 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
             return;
         }
 
+        // The term the running query answers is already out of date, so it is canceled now rather than
+        // when the next debounce starts one: its answer could otherwise land in the gap and flash.
+        CancelRunning();
         IsSearching = true;
         IsOpen = true;
         _debounce.Start();
