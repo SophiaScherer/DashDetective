@@ -185,12 +185,16 @@ public partial class SettingsViewModel : ViewModelBase {
             new("12-hour", ClockFormat.TwelveHour, SelectClockFormat),
         };
 
+        // The sizes the segmented controls offer, which are a handful of the range rather than all
+        // of it — a segment per 5% step would be twenty-five of them.
+        int[] segments = [100, 125, 150, 175, 200];
+
         UiScaleOptions = [];
-        foreach (var percent in UiScale.Percents)
+        foreach (var percent in segments)
             UiScaleOptions.Add(new UiScaleOption(percent, SelectUiScale));
 
         TextScaleOptions = [];
-        foreach (var percent in TextScale.Percents)
+        foreach (var percent in segments)
             TextScaleOptions.Add(new UiScaleOption(percent, SelectTextScale));
 
         // Named for the deficiency rather than for the colors it swaps, because that is what someone

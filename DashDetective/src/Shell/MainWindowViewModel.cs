@@ -304,7 +304,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Sizes the navigation bar against the text scale. Called from both the startup apply and
     /// the change event, because settings are applied before that event is subscribed to.</summary>
     private void SyncNavTextScale() =>
-        Nav.SetTextScale(TextScale.Factor(_accessibility.TextScalePercent));
+        Nav.SetTextScale(ScaleRange.Factor(_accessibility.TextScalePercent));
 
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));

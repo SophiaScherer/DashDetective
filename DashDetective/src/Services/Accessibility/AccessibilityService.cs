@@ -17,15 +17,15 @@ internal sealed class AccessibilityService {
 
     internal AccessibilityService(ThemeService theme) => _theme = theme;
 
-    /// <summary>The chosen UI scale, always one of <see cref="UiScale.Percents"/>.</summary>
-    internal int ScalePercent { get; private set; } = UiScale.DefaultPercent;
+    /// <summary>The chosen UI scale, always normalized onto <see cref="ScaleRange"/>.</summary>
+    internal int ScalePercent { get; private set; } = ScaleRange.DefaultPercent;
 
     /// <summary>The same value as a transform factor, for <c>ScaleHost</c> and the window minimum.</summary>
-    internal double ScaleFactor => UiScale.Factor(ScalePercent);
+    internal double ScaleFactor => ScaleRange.Factor(ScalePercent);
 
-    /// <summary>The chosen text scale, always one of <see cref="TextScale.Percents"/>. Independent of
-    /// the interface size: type can grow without the chrome around it.</summary>
-    internal int TextScalePercent { get; private set; } = TextScale.DefaultPercent;
+    /// <summary>The chosen text scale, on the same range. Independent of the interface size: type can
+    /// grow without the chrome around it.</summary>
+    internal int TextScalePercent { get; private set; } = ScaleRange.DefaultPercent;
 
     /// <summary>Whether high contrast is in force. Off by default: it changes what the app looks like.</summary>
     internal bool HighContrast { get; private set; }
@@ -65,8 +65,8 @@ internal sealed class AccessibilityService {
 
     /// <summary>Puts every option on the card back to what it ships as.</summary>
     internal void RestoreDefaults() {
-        SetScalePercent(UiScale.DefaultPercent);
-        SetTextScalePercent(TextScale.DefaultPercent);
+        SetScalePercent(ScaleRange.DefaultPercent);
+        SetTextScalePercent(ScaleRange.DefaultPercent);
         SetHighContrast(false);
         SetDistinguishWithoutColor(false);
         SetColorVision(ColorVisionMode.None);
@@ -78,7 +78,7 @@ internal sealed class AccessibilityService {
     /// <summary>Selects a scale. Re-applying the current one is deliberate — startup has to push the
     /// value through whether or not it differs — but only a real change is announced.</summary>
     internal void SetScalePercent(int percent) {
-        var next = UiScale.Nearest(percent);
+        var next = ScaleRange.Normalize(percent);
         var changed = next != ScalePercent;
 
         ScalePercent = next;
@@ -91,7 +91,7 @@ internal sealed class AccessibilityService {
     /// <summary>Selects a text scale, on the same re-apply rule as <see cref="SetScalePercent"/>. It also
     /// re-pushes the popup size, which is the one surface carrying both scales.</summary>
     internal void SetTextScalePercent(int percent) {
-        var next = TextScale.Nearest(percent);
+        var next = ScaleRange.Normalize(percent);
         var changed = next != TextScalePercent;
 
         TextScalePercent = next;
@@ -106,7 +106,7 @@ internal sealed class AccessibilityService {
     /// unlike the rest of the app they have to carry the interface scale and the text scale themselves.
     /// </summary>
     private double PopupFontSize =>
-        UiScale.PopupFontSize(ScalePercent) * TextScale.Factor(TextScalePercent);
+        UiScale.PopupFontSize(ScalePercent) * ScaleRange.Factor(TextScalePercent);
 
     /// <summary>Turns high contrast on or off. Re-applies unconditionally and announces only a real
     /// change, for the same reason <see cref="SetScalePercent"/> does.</summary>
