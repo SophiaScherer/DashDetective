@@ -311,7 +311,7 @@
         <!-- ===== Three panes ===== -->
         <!-- Fixed side panels + star middle, split by draggable GridSplitters. The 12px splitter
              columns stand in for the old 12px ColumnSpacing. Widths reset each launch (no persist);
-             min/max keep the file list usable at the window's 920px minimum. -->
+             min/max keep the file list usable at the window's minimum width. -->
         <!-- The side panes collapse rather than clip once the page can no longer hold their minimums:
              details first, then the tree (see FileExplorerPanes). The code-behind zeroes the collapsed
              column so it stops reserving width. -->
