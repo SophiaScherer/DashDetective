@@ -121,7 +121,7 @@
                                  wider 12-hour string ("11:59:59 PM"), so switching clock format does not
                                  shift the toolbar either. -->
                             <TextBlock Text="{Binding Clock}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextTertiary}"
-                                       VerticalAlignment="Center" Width="76" TextAlignment="Center"/>
+                                       VerticalAlignment="Center" Width="{Binding ClockWidth}" TextAlignment="Center"/>
                             </StackPanel>
 
                             <!-- Universal search (Ctrl+F). Self-contained: the box, its dropdown and the

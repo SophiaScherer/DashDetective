@@ -241,7 +241,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        _textScale * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
+        Math.Max(1, _textScale) * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
 
     /// <summary>Grows the bar with the text scale. The rail is the one surface sized in pixels that has
     /// to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped both.

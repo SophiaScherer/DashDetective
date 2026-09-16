@@ -520,8 +520,11 @@ reading:
 - **Fixed containers holding scaled text.** The toolbar was a fixed 54px row and the navigation rail a
   fixed 236px, so at 200 % the page subtitle was cut off and the brand read "DashDetectiv". The toolbar
   row is now `Auto` with a 54px minimum, and `NavigationViewModel.RailThickness` multiplies by the text
-  scale. **This is where the feature breaks next:** any new pixel dimension around text needs the same
-  treatment.
+  scale — above 100 % only: the rail's icons do not shrink with smaller text, and a collapsed rail
+  narrowed to 80 % let its scroll bar cover half of every icon. The toolbar clock's reserved width
+  (`MainWindowViewModel.ClockWidth`) scales with the text across the whole range, since it holds
+  nothing but text, or at 200 % the time was cut to "11:07:". **This is where the feature breaks next:** any new pixel dimension around text needs the
+  same treatment.
 
 **Verified by measurement.** The height of the same label, in pixels, across both scales:
 
@@ -861,7 +864,13 @@ were never shared.
   every launch and persist for nothing.
 - **The two scale rows' grid columns are both star.** They are the only rows their own setting
   narrows: at 200 % the page measures at half its width, and the fixed strip every other row uses
-  would starve the label column to nothing.
+  would starve the label column to nothing. Inside the right column the slider sits in a weighted star
+  column capped at 180: a fixed width overran the card at 200 %, and a right-aligned `Slider` sizes
+  to its thumb.
+- **The slider's parts are colored directly** (`/template/` selectors on the track buttons and the
+  thumb, in every state). Fluent's hover and pressed states put its own accent on them, which
+  outranks `Foreground`/`Background`, and aliasing its resource keys would not follow an accent picked
+  at runtime — the accent brushes are replaced, not mutated.
 - **The rail's auto-collapse threshold is multiplied by the interface scale.** The width is reported
   from the `Window`, which sits outside the `ScaleHost`, while the rail it protects is drawn inside
   it. Compared raw, a 900px window at 200 % kept an expanded rail that left the page 214 logical

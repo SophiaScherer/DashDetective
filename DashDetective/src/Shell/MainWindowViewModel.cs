@@ -39,6 +39,7 @@ namespace DashDetective.Shell;
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>The window minimum at 100%: the width an expanded nav bar plus a usable page needs.</summary>
     private const double BaseMinWindowWidth = 640;
+    private const double BaseClockWidth = 76;
     private const double BaseMinWindowHeight = 480;
 
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;
@@ -163,6 +164,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// reflow it.</summary>
     public double MinWindowWidth => BaseMinWindowWidth * _accessibility.ScaleFactor;
     public double MinWindowHeight => BaseMinWindowHeight * _accessibility.ScaleFactor;
+
+    /// <summary>The toolbar clock's reserved width. Fixed so the ticking digits never reflow the
+    /// toolbar, and scaled with the text, or at 200% the time was cut to "11:07:".</summary>
+    public double ClockWidth => BaseClockWidth * ScaleRange.Factor(_accessibility.TextScalePercent);
 
     /// <summary>Whether the current page manages its own scrolling (e.g. File Explorer): such pages
     /// fill the viewport and scroll their own panes, so the shell hosts them in a bounded,
@@ -296,6 +301,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         SyncNavScales();
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
+        OnPropertyChanged(nameof(ClockWidth));
         OnPropertyChanged(nameof(ReduceMotion));
         OnPropertyChanged(nameof(AlertLiveSetting));
         OnPropertyChanged(nameof(NoticeLiveSetting));

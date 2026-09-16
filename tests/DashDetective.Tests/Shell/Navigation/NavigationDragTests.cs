@@ -67,4 +67,24 @@ public class NavigationDragTests {
         Assert.Equal(64, bar.RailThickness(horizontal: false));
         Assert.Equal(54, bar.RailThickness(horizontal: true));
     }
+
+    /// <summary>The rail grows with the text it holds, but its icons do not shrink with smaller text, so
+    /// below 100% it keeps the width they were drawn for — narrower, a collapsed rail's scroll bar
+    /// covered half of every icon.</summary>
+    [Fact]
+    public void RailThickness_TextBelowOneHundred_KeepsTheAuthoredWidth() {
+        var bar = Bar(NavOrientation.Left, collapsed: true);
+        bar.SetTextScale(0.8);
+
+        Assert.Equal(64, bar.RailThickness(horizontal: false));
+        Assert.Equal(54, bar.RailThickness(horizontal: true));
+    }
+
+    [Fact]
+    public void RailThickness_TextAboveOneHundred_GrowsWithIt() {
+        var bar = Bar(NavOrientation.Left, collapsed: false);
+        bar.SetTextScale(2);
+
+        Assert.Equal(472, bar.RailThickness(horizontal: false));
+    }
 }
