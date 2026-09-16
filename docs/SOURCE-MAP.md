@@ -1415,9 +1415,12 @@ stays in its tab folder.
                                                          "90 %", "10 s". Digits only, filtered on a
                                                          TUNNELLED TextInput so a paste cannot smuggle a
                                                          letter past it. Takes the value AS IT IS TYPED,
-                                                         not on focus loss: clicking anything that does
-                                                         not take focus leaves the box focused, so a
-                                                         commit-on-blur field silently lost the number.
+                                                         so a number is kept even if the edit never ends.
+                                                         Enter, Escape and a click ANYWHERE ELSE end it by
+                                                         clearing focus: a click on a card or heading takes
+                                                         no focus of its own, and a box left holding the
+                                                         caret suppresses every bare-key shortcut app-wide.
+                                                         Escape restores the value from before the edit.
                                                          Only the ceiling is enforced mid-edit — raising a
                                                          too-small number to the floor rewrites the box
                                                          under the caret — and the box is reconciled to

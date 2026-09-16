@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using System;
 using System.Globalization;
 
@@ -17,7 +18,8 @@ namespace DashDetective.Tabs.Settings;
 /// clamped into <see cref="Minimum"/>..<see cref="Maximum"/> when the edit is committed (focus leaves, or
 /// Enter). An emptied or unusable box reverts to the last good value rather than reporting zero — zero is
 /// a meaningful threshold to the settings layer, so guessing it here would silently change what is
-/// watched. Escape abandons the edit.
+/// watched. Escape abandons the edit. Enter, Escape and a click anywhere else all end the edit by taking
+/// the caret out, because a focused text box makes the shell suppress every bare-key shortcut.
 ///
 /// Feature-local rather than in <c>src/Shared/Controls</c>: Settings is the only page with a number to
 /// type. Promote it if a second one appears.
@@ -65,8 +67,8 @@ public partial class NumericField : UserControl {
 
         Entry.AddHandler(TextInputEvent, OnTextInput, RoutingStrategies.Tunnel);
         Entry.TextChanged += (_, _) => Capture();
-        Entry.GotFocus += (_, _) => _valueAtEditStart = Value;
-        Entry.LostFocus += (_, _) => Render();
+        Entry.GotFocus += (_, _) => BeginEdit();
+        Entry.LostFocus += (_, _) => EndEdit();
         Entry.KeyDown += OnKeyDown;
         Entry.AddHandler(RequestBringIntoViewEvent, OnEntryBringIntoView);
 
@@ -104,8 +106,7 @@ public partial class NumericField : UserControl {
 
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         if (e.Key == Key.Enter) {
-            Render();
-            _valueAtEditStart = Value;
+            ReleaseFocus();
             e.Handled = true;
             return;
         }
@@ -115,7 +116,7 @@ public partial class NumericField : UserControl {
         // Capture has already stored every digit typed since.
         if (e.Key == Key.Escape) {
             Value = _valueAtEditStart;
-            Render();
+            ReleaseFocus();
             e.Handled = true;
         }
     }
@@ -156,6 +157,40 @@ public partial class NumericField : UserControl {
         Entry.CaretIndex = text.Length;
         _rendering = false;
     }
+
+    private void BeginEdit() {
+        _valueAtEditStart = Value;
+
+        // A click on something that takes no focus of its own — a card, a heading, the page — would
+        // otherwise leave the caret here, so the whole window is watched for one while the edit lasts.
+        _watchedTopLevel = TopLevel.GetTopLevel(this);
+        _watchedTopLevel?.AddHandler(PointerPressedEvent, OnWindowPointerPressed,
+                                     RoutingStrategies.Tunnel, handledEventsToo: true);
+    }
+
+    private void EndEdit() {
+        _watchedTopLevel?.RemoveHandler(PointerPressedEvent, OnWindowPointerPressed);
+        _watchedTopLevel = null;
+        Render();
+    }
+
+    // Left unhandled, so the press still acts on whatever it landed on.
+    private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e) {
+        if (e.Source is Visual source && (source == this || this.IsVisualAncestorOf(source)))
+            return;
+
+        ReleaseFocus();
+    }
+
+    /// <summary>Takes the caret out without moving it into anything else; losing focus is what
+    /// reconciles the box.</summary>
+    private void ReleaseFocus() {
+        if (Entry.IsFocused)
+            _watchedTopLevel?.FocusManager?.Focus(null);
+    }
+
+    // The window being watched for a click away, held so the handler comes off the one it went on.
+    private TopLevel? _watchedTopLevel;
 
     // Set while Render writes to the box, so its own TextChanged is not read back as a user edit.
     private bool _rendering;
