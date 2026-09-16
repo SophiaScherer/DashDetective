@@ -65,6 +65,7 @@ public partial class NumericField : UserControl {
 
         Entry.AddHandler(TextInputEvent, OnTextInput, RoutingStrategies.Tunnel);
         Entry.TextChanged += (_, _) => Capture();
+        Entry.GotFocus += (_, _) => _valueAtEditStart = Value;
         Entry.LostFocus += (_, _) => Render();
         Entry.KeyDown += OnKeyDown;
         Entry.AddHandler(RequestBringIntoViewEvent, OnEntryBringIntoView);
@@ -104,13 +105,16 @@ public partial class NumericField : UserControl {
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         if (e.Key == Key.Enter) {
             Render();
+            _valueAtEditStart = Value;
             e.Handled = true;
             return;
         }
 
-        // Escape abandons the edit and puts the committed value back, so a half-typed number can be
-        // backed out of without having to remember what was there.
+        // Escape abandons the edit, so a half-typed number can be backed out of without having to
+        // remember what was there. The value it restores is the one from before the edit, because
+        // Capture has already stored every digit typed since.
         if (e.Key == Key.Escape) {
+            Value = _valueAtEditStart;
             Render();
             e.Handled = true;
         }
@@ -155,4 +159,7 @@ public partial class NumericField : UserControl {
 
     // Set while Render writes to the box, so its own TextChanged is not read back as a user edit.
     private bool _rendering;
+
+    // What the box held when the current edit began, for Escape to put back.
+    private int _valueAtEditStart;
 }
