@@ -3,7 +3,8 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:nav="using:DashDetective.Shell.Navigation"
              x:Class="DashDetective.Shared.Controls.SearchField"
-             x:Name="Root" x:CompileBindings="False">
+             x:Name="Root" x:CompileBindings="False"
+             TextSize="{DynamicResource TextSizeMedium}">
     <!-- The app's search / filter field: magnifier, input, and a × that appears once something is typed.
          The toolbar search, the process filter and the Toolkit command filter all draw this. The sizes
          differ by role (a toolbar field is larger than an inline list filter), so the dimensions are
@@ -29,8 +30,9 @@
                                          Completion="{Binding #Root.Completion}"
                                          EnterCommand="{Binding #Root.EnterCommand}"/>
 
-            <Button Grid.Column="2" Classes="clearField"
+            <Button Grid.Column="2" x:Name="ClearButton" Classes="clearField"
                     ToolTip.Tip="{Binding #Root.ClearToolTip}"
+                    ToolTip.ServiceEnabled="{Binding #Root.ClearToolTipEnabled}"
                     Command="{Binding #Root.ClearCommand}"
                     IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <Path Width="9" Height="9" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"

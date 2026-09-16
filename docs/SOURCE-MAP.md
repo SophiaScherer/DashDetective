@@ -229,8 +229,10 @@ stays in its tab folder.
                                  otherwise reports its content's type name — "Avalonia.Controls.Border"
                                  for every nav item. A local Name in markup still wins.
                                  SCROLLBARS: AllowAutoHide is pinned off, which lays content BESIDE the bar,
-                                 not under it. TreeView is pinned separately — its template binds the flag,
-                                 which outranks the ScrollViewer rule.
+                                 not under it. TreeView and ListBox are pinned separately — each template
+                                 binds the flag, which outranks the ScrollViewer rule. The pins live HERE
+                                 and not in the view that owns the control: ScrollViewerInsetTests matches
+                                 the selector in this file exactly.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
@@ -348,8 +350,8 @@ stays in its tab folder.
         ScaleHost.cs                   (a LayoutTransformControl that scales its content by Scale: the
                                         content is MEASURED at the reduced size and RENDERED enlarged, so
                                         text and chrome grow together and no view has to know its own font
-                                        size — which is why the app's ~87 FontSize literals needed no
-                                        change. ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
+                                        size — which is why no authored FontSize needed changing.
+                                        ONE IS NEEDED PER VISUAL ROOT: a popup, a flyout and a
                                         second window are each their own tree and inherit nothing from the
                                         shell's. Fluent templates the tooltip and context-menu presenters,
                                         so those two cannot host one and follow the scale by type size
@@ -384,6 +386,23 @@ stays in its tab folder.
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
+        SearchField.axaml(.cs), FieldWidth.cs, GhostCompletionBox.axaml(.cs)
+                                       (the app's search / filter field — magnifier, input, clear × — drawn
+                                        by the toolbar search, the Processes filter and the Toolkit
+                                        filter. It TAKES THE ROOM ITS CONTAINER OFFERS and never measures
+                                        its text (FieldWidth.Desired, from a MeasureOverride), so a longer
+                                        term, a ghost completion or the clear × appearing cannot move its
+                                        edges — a call site sets MinWidth/MaxWidth, not Width. An unbounded
+                                        container offers infinity and the measured content is the only
+                                        answer left there, which is why the Toolkit's WrapPanel call site
+                                        carries an explicit Width. TextSize is a FONT SIZE UNDER ANOTHER
+                                        NAME: it is defaulted from the TextSize ladder on the control's
+                                        own root tag and bound to it at every call site, because a literal
+                                        is a size the Text size setting cannot reach — the font-size-
+                                        literal scan covers it for that reason. The input is always a
+                                        GhostCompletionBox, which draws the rest of a suggestion after the
+                                        caret for Tab to accept and consumes Tab only when one was
+                                        actually accepted, so a field with no suggestions still tabs on)
         Sparkline, StatCard, ChartLegend, InfoRow
                                        (reusable widgets; StatCard.Selectable is opt-in and adds the
                                         shared card.selectable hover for a card that is also a click
@@ -643,13 +662,25 @@ stays in its tab folder.
                                  shell reads to size its window minimum. Re-applying the current value is
                                  deliberate — startup has to push it through either way — but only a real
                                  change raises Changed, or every launch would report one and persist)
-        UiScale.cs              (the scale ladder and its arithmetic, pure so both are testable without a
-                                 layout pass. Factor() CLAMPS: the settings file is hand-editable and 0
-                                 would collapse the window rather than degrade. Nearest() snaps an
-                                 unrecognized value onto the ladder, so the segmented control always has a
-                                 selection. BasePopupFontSize is a C# mirror of Dimensions.axaml's
-                                 PopupFontSize, as SemanticBrushes mirrors Palette.axaml, and a test pins
-                                 the two together)
+        ScaleRange.cs           (the range BOTH scales offer — 80 to 200% in 5% steps — and the arithmetic
+                                 over it, pure so it is testable without a layout pass and shared so the
+                                 interface size and the text size cannot drift into offering different
+                                 things. Normalize() CLAMPS and then rounds onto a step: the settings file
+                                 is hand-editable and 0 would collapse the window rather than degrade, and
+                                 the slider and the % field both have to be able to show the stored value
+                                 exactly. It replaced a snap-to-ladder, which is what a five-segment
+                                 control needed instead. Factor() is taken from the normalized value, so
+                                 what is in force and what is on screen cannot disagree)
+        UiScale.cs              (what the interface size means beyond its range: the tooltip and
+                                 context-menu type size, which those two carry themselves because Fluent
+                                 templates their presenters and neither can host a ScaleHost.
+                                 BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
+                                 SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
+        TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
+                                 name. They are the sizes the app already shipped, not a redesign: a tidier
+                                 ladder would change how the app looks at 100%, which is the one thing every
+                                 option on this card must not do. Mirrors the TextSize* defaults in
+                                 Dimensions.axaml, pinned both ways by a test)
 ```
 
 ## `src/Services/Notifications`
@@ -1351,15 +1382,15 @@ stays in its tab folder.
                                                          like buildReport/buildMetricsCsv: the orders are the
                                                          shell's, and this page is not itself reorderable)
                                 ThemeOption.cs, GraphColorsOption.cs, ClockFormatOption.cs,
-                                IntervalOption.cs, UiScaleOption.cs
-                                                        (selectable item VMs for the Appearance,
-                                                         Accessibility + refresh-interval controls, like
-                                                         NavItem. The interface-size row is the only one
-                                                         with FIVE segments, and the only one its own
-                                                         setting narrows, so it alone wraps: both its grid
-                                                         columns are star, because a WrapPanel in an Auto
-                                                         column is measured against infinity and would
-                                                         overflow the card rather than wrap)
+                                IntervalOption.cs
+                                                        (selectable item VMs for the Appearance and
+                                                         refresh-interval segmented controls, like NavItem.
+                                                         The two SCALE rows are not among them: a segment
+                                                         per 5% step would be twenty-five of them, so they
+                                                         carry a Slider plus a NumericField instead, over
+                                                         ScaleRange. Both their grid columns are star —
+                                                         they are the only rows their own setting narrows,
+                                                         and at 200% the page measures at half its width)
                                 AccentPickerViewModel.cs
                                                         (the accent picker MODAL: a draft picked on the wheel,
                                                          typed as hex or reverted to Blue, applied only by
@@ -1402,16 +1433,6 @@ stays in its tab folder.
                                                          NormalizeHue wraps non-finite and huge hues:
                                                          HsvColor.ToRgb's own wrap loops forever on 1e20)
                                 NumericField.axaml(.cs) (a typed whole number with its unit beside it —
-                                ShortcutCaptureBox.axaml(.cs)
-                                                        (arms, then captures the next key press as a
-                                                         binding. The SHELL SEES THE KEY FIRST — its
-                                                         listener tunnels from the window — so it raises
-                                                         CapturingChanged for the view model to hold, and
-                                                         the shell stands down on it. Modifier-only
-                                                         presses are ignored; Esc abandons)
-                                ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
-                                                         whether it is custom, and the note explaining a
-                                                         refused capture where it happened)
                                                          "90 %", "10 s". Digits only, filtered on a
                                                          TUNNELLED TextInput so a paste cannot smuggle a
                                                          letter past it. Takes the value AS IT IS TYPED,
@@ -1430,7 +1451,22 @@ stays in its tab folder.
                                                          TextBox's own clamp when Text shrinks, so a render
                                                          on load opened Settings at the Alerts card and one
                                                          on focus loss yanked the page back to it. Guarding
-                                                         the caret write alone misses the clamp)
+                                                         the caret write alone misses the clamp. Committed
+                                                         is raised when the edit ENDS, for the caller that
+                                                         must act on the finished number rather than on
+                                                         each keystroke — the scale rows, which normalize
+                                                         what they are given and would otherwise rewrite
+                                                         the box mid-typing)
+                                ShortcutCaptureBox.axaml(.cs)
+                                                        (arms, then captures the next key press as a
+                                                         binding. The SHELL SEES THE KEY FIRST — its
+                                                         listener tunnels from the window — so it raises
+                                                         CapturingChanged for the view model to hold, and
+                                                         the shell stands down on it. Modifier-only
+                                                         presses are ignored; Esc abandons)
+                                ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
+                                                         whether it is custom, and the note explaining a
+                                                         refused capture where it happened)
                                 AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
                                                          switched-off row remembers its number. The
                                                          settings layer encodes "not watched" as 0, which

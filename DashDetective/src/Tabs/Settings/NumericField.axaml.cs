@@ -62,6 +62,11 @@ public partial class NumericField : UserControl {
         set => SetValue(SuffixProperty, value);
     }
 
+    /// <summary>Raised when an edit ends — focus leaves, or Enter. <see cref="Value"/> still moves as
+    /// the digits arrive; a caller that must act on the finished number rather than on each keystroke
+    /// listens here instead.</summary>
+    public event EventHandler? Committed;
+
     public NumericField() {
         InitializeComponent();
 
@@ -106,6 +111,7 @@ public partial class NumericField : UserControl {
 
     private void OnKeyDown(object? sender, KeyEventArgs e) {
         if (e.Key == Key.Enter) {
+            Commit();
             ReleaseFocus();
             e.Handled = true;
             return;
@@ -145,6 +151,12 @@ public partial class NumericField : UserControl {
             Value = Math.Min(typed, Maximum);
     }
 
+    /// <summary>Reconciles the box and tells anyone waiting for the finished number.</summary>
+    private void Commit() {
+        Render();
+        Committed?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>Puts the stored value back in the box, which is where a clamped or abandoned edit is
     /// reconciled: type 999 into a 1..100 field and the box reads 100 once the edit ends.</summary>
     private void Render() {
@@ -171,7 +183,7 @@ public partial class NumericField : UserControl {
     private void EndEdit() {
         _watchedTopLevel?.RemoveHandler(PointerPressedEvent, OnWindowPointerPressed);
         _watchedTopLevel = null;
-        Render();
+        Commit();
     }
 
     // Left unhandled, so the press still acts on whatever it landed on.

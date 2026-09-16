@@ -197,6 +197,22 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   the caret for `Tab` to accept, used by the search box, the address bar and the process filter.
   `PrefixCompleter` is the shared rule: one match completes fully, several complete only as far as
   they agree.
+- **The box's width.** Bounded 180–400, never sized to its content. `SearchField` takes the room the
+  toolbar offers and refuses to measure its own text, so a long term, a ghost completion or the clear
+  × appearing cannot reflow the toolbar or move the box's left edge; it still gives ground to 180 on a
+  narrow window so the title and actions keep their room. The dropdown's width binding therefore
+  follows something stable. The Processes filter is capped at 360 by the same rule.
+- **The dropdown.** The results `ListBox` is the app's only one, and a `ListBox` template-binds its
+  scroller's `AllowAutoHide`, so the app-wide pin never reached it: the bar auto-hid to a line and
+  expanded back over the rows on hover. It is pinned beside the `TreeView` in `SharedStyles.axaml`,
+  and the rows take `ScrollGutter` as the list's `Padding` — which its template applies as the items
+  presenter's `Margin`, inside the scroll extent.
+- **The dropdown's size and place.** A solid bar plus that gutter costs about 30px, which leaves a
+  result unreadable at the box's own 180px floor, so the popup's `Border` carries a `MinWidth` of 320
+  — inside the `ScaleHost`, beside the width binding, because `Bounds` are pre-transform. It is
+  placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
+  itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
+  showing, since they open directly beneath a pointer the expand button has already left there.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -360,8 +376,8 @@ setting the user can switch off** — nothing is forced on, and each row has its
 `SettingCatalog` entry and `AppSettings` property, so each is separately findable through universal
 search and revealable on its own row.
 
-- **Interface size** (100 / 125 / 150 / 175 / 200 %, default 100). Everything grows together — text,
-  controls, charts and icons.
+- **Interface size** (80–200 % in 5 % steps, default 100). Everything grows together — text,
+  controls, charts and icons. A slider for the coarse gesture, a `%` field for the exact number.
 - **High contrast** (toggle, default **off**). Flattens every surface to one flat black or white and
   drops the text ramp's opacity steps. A separate axis from Light/Dark, so it composes with whichever
   scheme is chosen rather than replacing it.
@@ -374,8 +390,8 @@ search and revealable on its own row.
   reader keeps the name in either state.
 - **Reduce motion** (toggle, default **off**). Switches off the sliding and fading transitions and stops
   the loading pulse repeating.
-- **Text size** (100 / 125 / 150 / 175 / 200 %, default **100 %**). Grows type alone, leaving the
-  controls around it as they are. Multiplies with the interface size rather than replacing it.
+- **Text size** (the same 80–200 %, default **100 %**). Grows type alone, leaving the controls
+  around it as they are. Multiplies with the interface size rather than replacing it.
 - **Keyboard reordering** (toggle, default **on**). `Ctrl+Shift+←/→` moves the widget or card the
   keyboard is on. On by default because an unused gesture costs nothing.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
@@ -384,7 +400,7 @@ search and revealable on its own row.
 
 **One transform, not a font-size sweep.** `ScaleHost` (`src/Shared/Controls`) is a
 `LayoutTransformControl` that measures its content at the reduced size and renders it enlarged, so
-the app's ~87 authored `FontSize` literals needed no change and layout stays correct rather than
+the app's authored `FontSize` values needed no change and layout stays correct rather than
 merely bigger. `Sparkline` composes its own axis text with `FormattedText` and scales with the
 subtree, so charts needed nothing either.
 
@@ -501,7 +517,7 @@ a property the target has no local value for, or measure the real effect.
 Interface size transforms the whole app; text size grows only the type. They multiply, so 150 % of each
 gives text at 2.25x while the chrome grows 1.5x.
 
-**One ladder, swept across every view.** All ~110 authored `FontSize` values are now
+**One ladder, swept across every view.** Every authored `FontSize` value is now
 `{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
 `ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
 rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
@@ -520,8 +536,11 @@ reading:
 - **Fixed containers holding scaled text.** The toolbar was a fixed 54px row and the navigation rail a
   fixed 236px, so at 200 % the page subtitle was cut off and the brand read "DashDetectiv". The toolbar
   row is now `Auto` with a 54px minimum, and `NavigationViewModel.RailThickness` multiplies by the text
-  scale. **This is where the feature breaks next:** any new pixel dimension around text needs the same
-  treatment.
+  scale — above 100 % only: the rail's icons do not shrink with smaller text, and a collapsed rail
+  narrowed to 80 % let its scroll bar cover half of every icon. The toolbar clock's reserved width
+  (`MainWindowViewModel.ClockWidth`) scales with the text across the whole range, since it holds
+  nothing but text, or at 200 % the time was cut to "11:07:". **This is where the feature breaks next:** any new pixel dimension around text needs the
+  same treatment.
 
 **Verified by measurement.** The height of the same label, in pixels, across both scales:
 
@@ -835,18 +854,43 @@ surface, so the model returns them unchanged and the recorded dark miss above st
 window draggable below that would clip rather than reflow — so `MainWindowViewModel` exposes
 `MinWindowWidth`/`MinWindowHeight` off the base 640×480 and re-raises them when the scale changes.
 
+**One range, shared by both scales.** `ScaleRange` (`src/Services/Accessibility`) owns 80–200 % in
+5 % steps and the arithmetic over it, so the two rows cannot drift into offering different things.
+`UiScale` keeps only the popup type size and `TextScale` only its authored table — the parts that
+were never shared.
+
 **Decisions inside it that must not be undone:**
-- **`UiScale.Factor` clamps, and that is load-bearing.** `settings.json` is hand-editable; `0` would
-  collapse the window to nothing rather than degrade to something usable.
-- **`Nearest` snaps an unrecognized percentage onto the ladder**, because the segmented control reads
-  the service's value back — an unmatched number leaves no segment selected and no obvious way out.
+- **`ScaleRange.Normalize` clamps, and that is load-bearing.** `settings.json` is hand-editable; `0`
+  would collapse the window to nothing rather than degrade to something usable.
+- **`Normalize` clamps AND rounds onto a step**, which replaced snapping onto one of five offered
+  sizes. The controls read the service's value back, and what they now need of it is that a slider
+  and a `%` field can both show it exactly — not that it name an offered size. `Factor` is taken from
+  the normalized value for the same reason: what is in force and what is on screen cannot disagree.
+- **The value is applied when the gesture ends, not on every tick.** Settings sits inside the
+  window's `ScaleHost`, so applying mid-drag rescales the slider out from under the pointer. The
+  drag's end is read off the thumb's `DragCompleted`, which bubbles — `PointerCaptureLost` is a
+  *direct* event raised on the element holding the capture, so the `Slider` never sees it. A click on
+  the track jumps the value through a `RepeatButton` that marks the release handled, so that handler
+  takes handled events too.
+- **Both pending values are read before either is applied.** Applying one raises the service's
+  `Changed`, and the reflect that follows would put the other row's old value back before it was
+  ever pushed.
 - **`SetScalePercent` re-applies an unchanged value but announces only a real change.** Startup has
   to push the value through either way; raising `Changed` unconditionally would report a change on
   every launch and persist for nothing.
-- **The interface-size row's two grid columns are both star.** It is the only row with five segments
-  and the only row its own setting narrows, so it is the only one that wraps — and a `WrapPanel` in
-  an `Auto` column is measured against infinite width, so it never wraps and overflows the card
-  instead. A first attempt with `Auto` did exactly that at 200 %.
+- **The two scale rows' grid columns are both star.** They are the only rows their own setting
+  narrows: at 200 % the page measures at half its width, and the fixed strip every other row uses
+  would starve the label column to nothing. Inside the right column the slider sits in a weighted star
+  column capped at 180: a fixed width overran the card at 200 %, and a right-aligned `Slider` sizes
+  to its thumb.
+- **The slider's parts are colored directly** (`/template/` selectors on the track buttons and the
+  thumb, in every state). Fluent's hover and pressed states put its own accent on them, which
+  outranks `Foreground`/`Background`, and aliasing its resource keys would not follow an accent picked
+  at runtime — the accent brushes are replaced, not mutated.
+- **The rail's auto-collapse threshold is multiplied by the interface scale.** The width is reported
+  from the `Window`, which sits outside the `ScaleHost`, while the rail it protects is drawn inside
+  it. Compared raw, a 900px window at 200 % kept an expanded rail that left the page 214 logical
+  pixels, and the 80 % floor folded a rail that would have fitted.
 
 ### Console insets
 

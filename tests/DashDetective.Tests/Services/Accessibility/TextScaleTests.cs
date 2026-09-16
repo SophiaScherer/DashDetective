@@ -10,22 +10,10 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.Accessibility;
 
-/// <summary>Covers the text ladder: the arithmetic, and the two ways it can silently rot — a token
-/// whose default drifts from Dimensions.axaml, and a view that goes back to an authored literal.</summary>
+/// <summary>Covers the text ladder's table — the arithmetic over it is <c>ScaleRange</c>'s — and the two
+/// ways it can silently rot: a token whose default drifts from Dimensions.axaml, and a view that goes
+/// back to an authored literal.</summary>
 public class TextScaleTests {
-    [Theory]
-    [InlineData(100, 1.0)]
-    [InlineData(150, 1.5)]
-    [InlineData(200, 2.0)]
-    public void Factor_IsThePercentage(int percent, double expected) =>
-        Assert.Equal(expected, TextScale.Factor(percent));
-
-    [Theory]
-    [InlineData(0, 100)]
-    [InlineData(500, 200)]
-    public void Nearest_SnapsOntoTheLadder(int stored, int expected) =>
-        Assert.Equal(expected, TextScale.Nearest(stored));
-
     [Fact]
     public void Sizes_ScaleEveryStepTogether() {
         var doubled = TextScale.Sizes(200);
@@ -33,6 +21,15 @@ public class TextScaleTests {
         Assert.Equal(TextScale.BaseSizes.Count, doubled.Count);
         foreach (var (key, size) in TextScale.BaseSizes)
             Assert.Equal(size * 2, doubled[key]);
+    }
+
+    /// <summary>The range now reaches below 100%, and the table has to shrink as readily as it grows.</summary>
+    [Fact]
+    public void Sizes_BelowOneHundred_ShrinkEveryStepTogether() {
+        var smaller = TextScale.Sizes(ScaleRange.MinPercent);
+
+        foreach (var (key, size) in TextScale.BaseSizes)
+            Assert.Equal(size * 0.8, smaller[key]);
     }
 
     /// <summary>100% has to be the app exactly as it shipped — that is the rule every option on the
@@ -68,11 +65,12 @@ public class TextScaleTests {
     }
 
     /// <summary>Text scale is the one feature that IS a sweep: a size left as a literal simply would not
-    /// grow, and would do it invisibly on one page. This is what keeps the sweep swept.</summary>
+    /// grow, and would do it invisibly on one page. This keeps the sweep swept, SearchField's TextSize
+    /// included — it is a font size under another name, and a literal there opts three fields out.</summary>
     [Fact]
     public void NoViewAuthorsAFontSizeLiteral() {
         var offenders = new List<string>();
-        var literal = new Regex(@"FontSize=""[0-9]|Property=""FontSize"" Value=""[0-9]");
+        var literal = new Regex(@"(Font|Text)Size=""[0-9]|Property=""(Font|Text)Size"" Value=""[0-9]");
 
         foreach (var file in Directory.EnumerateFiles(Source(), "*.axaml", SearchOption.AllDirectories)) {
             var text = File.ReadAllText(file);

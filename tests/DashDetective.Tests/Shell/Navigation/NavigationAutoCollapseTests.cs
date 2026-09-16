@@ -4,8 +4,9 @@ using Xunit;
 namespace DashDetective.Tests.Shell.Navigation;
 
 /// <summary>Covers the width-driven rail collapse: that a narrow window folds the bar in without
-/// overwriting the user's persisted preference, that widening restores exactly what they chose, and
-/// that an explicit toggle still wins while the window is narrow.</summary>
+/// overwriting the user's persisted preference, that widening restores exactly what they chose, that
+/// an explicit toggle still wins while the window is narrow, and that the threshold follows the
+/// interface size — the width is the window's, while the rail it is protecting is scaled.</summary>
 public class NavigationAutoCollapseTests {
     private const double Narrow = NavigationViewModel.AutoCollapseWidth - 1;
     private const double Wide = NavigationViewModel.AutoCollapseWidth + 1;
@@ -97,6 +98,37 @@ public class NavigationAutoCollapseTests {
         bar.SetShellWidth(Narrow);
 
         Assert.True(bar.IsRailCollapsed);
+    }
+
+    /// <summary>A window wide enough at 100% is not wide enough at 200%.</summary>
+    [Fact]
+    public void SetUiScale_Enlarged_CollapsesAWindowThatWasWideEnough() {
+        var bar = new NavigationViewModel();
+        bar.SetShellWidth(Wide);
+
+        bar.SetUiScale(2);
+
+        Assert.True(bar.IsRailCollapsed);
+    }
+
+    /// <summary>And the other way: below 100% the rail needs fewer window pixels, so a window the
+    /// threshold would have folded stays expanded.</summary>
+    [Fact]
+    public void SetUiScale_Reduced_LeavesANarrowWindowExpanded() {
+        var bar = new NavigationViewModel();
+        bar.SetUiScale(0.8);
+        bar.SetShellWidth(Narrow);
+
+        Assert.False(bar.IsRailCollapsed);
+    }
+
+    /// <summary>A scale reported before any width must not fold a bar whose window is unknown.</summary>
+    [Fact]
+    public void SetUiScale_BeforeAnyWidth_LeavesTheRailAlone() {
+        var bar = new NavigationViewModel();
+        bar.SetUiScale(2);
+
+        Assert.False(bar.IsRailCollapsed);
     }
 
     [Fact]

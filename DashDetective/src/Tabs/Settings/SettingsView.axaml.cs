@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -18,7 +19,26 @@ public partial class SettingsView : UserControl {
 
     public SettingsView() {
         InitializeComponent();
+
+        // The drag has to be read off the Thumb: PointerCaptureLost is a direct event raised on the
+        // element that held the capture, so it never reaches the Slider. DragCompleted bubbles, and the
+        // Thumb raises it on a stolen capture as well as on a clean release.
+        foreach (var slider in new[] { UiScaleSlider, TextScaleSlider }) {
+            slider.AddHandler(Thumb.DragCompletedEvent, OnScaleGestureEnded);
+            slider.AddHandler(KeyUpEvent, OnScaleGestureEnded);
+
+            // Clicking the track jumps the value through a RepeatButton, which marks the release
+            // handled on its way up — so that click would otherwise never apply.
+            slider.AddHandler(PointerReleasedEvent, OnScaleGestureEnded, handledEventsToo: true);
+        }
+
+        UiScaleField.Committed += OnScaleGestureEnded;
+        TextScaleField.Committed += OnScaleGestureEnded;
     }
+
+    /// <summary>A scale gesture has finished, so the pending value goes into force. Applying while the
+    /// slider is still under the pointer would rescale the page it sits on and move the thumb away.</summary>
+    private void OnScaleGestureEnded(object? sender, EventArgs e) => _boundViewModel?.ApplyScales();
 
     protected override void OnDataContextChanged(EventArgs e) {
         base.OnDataContextChanged(e);
