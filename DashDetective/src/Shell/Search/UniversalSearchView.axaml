@@ -84,7 +84,8 @@
              a pointer the expand button has already left there. -->
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
                               IsVisible="{Binding IsExpanded}"
-                              MinWidth="180" MaxWidth="320"
+                              MinWidth="180" MaxWidth="400"
+                              TextSize="{DynamicResource TextSizeMedium}"
                               HorizontalAlignment="Right" VerticalAlignment="Center"
                               PointerPressed="OnFieldPressed"
                               GotFocus="OnSearchBoxGotFocus"

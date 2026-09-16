@@ -38,6 +38,21 @@ public class UniversalSearchViewModelTests {
         }
     }
 
+    /// <summary>Holds its answer until released, so a test can type again while a query is running.</summary>
+    private sealed class GatedProvider : ISearchProvider {
+        private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SearchCategory Category => SearchCategory.Page;
+
+        public void Release() => _released.SetResult();
+
+        public async Task<IReadOnlyList<SearchResult>> QueryAsync(SearchQuery query, CancellationToken token) {
+            await _released.Task;
+            return [new SearchResult(SearchCategory.Page, "Notifications", "", 500, () => { },
+                                     Completion: "Notifications")];
+        }
+    }
+
     private static (UniversalSearchViewModel Vm, FakeUiTimer Timer, StubProvider Provider) Build(
         Action? onActivate = null, params string[] titles) =>
         BuildWithRecents(new RecentSearches(), onActivate, titles);
@@ -54,6 +69,26 @@ public class UniversalSearchViewModelTests {
         vm.Text = term;
         timer.RaiseTick();
         await vm.InFlightQuery;
+    }
+
+    /// <summary>A keystroke landing while a query is still out makes that query's answer stale. It must
+    /// not reach the list in the gap before the next debounce starts a fresh one.</summary>
+    [Fact]
+    public async Task Text_TypedWhileAQueryIsRunning_DiscardsItsAnswer() {
+        var provider = new GatedProvider();
+        var timer = new FakeUiTimer();
+        var vm = new UniversalSearchViewModel([provider], new RecentSearches(), timer);
+
+        vm.Text = "n";
+        timer.RaiseTick();
+        var stale = vm.InFlightQuery;
+
+        vm.Text = "ne";
+        provider.Release();
+        await stale;
+
+        Assert.Empty(vm.Results);
+        Assert.True(vm.IsSearching);
     }
 
     [Fact]
