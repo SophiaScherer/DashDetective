@@ -156,7 +156,7 @@
                      leaves Tab alone. -->
                 <controls:SearchField x:Name="SearchBox" Width="300" Height="34"
                                       Margin="0,0,10,6" VerticalAlignment="Center"
-                                      IconSize="13" TextSize="12.5" IconGap="8,0,0,0"
+                                      IconSize="13" TextSize="{DynamicResource TextSizeBody}" IconGap="8,0,0,0"
                                       PlaceholderText="Search commands…"
                                       ClearToolTip="Clear search"
                                       Text="{Binding Search, Mode=TwoWay}"

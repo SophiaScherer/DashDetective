@@ -11,8 +11,10 @@ namespace DashDetective.Shared.Controls;
 /// the same two path geometries; it lives here once instead.
 ///
 /// Sizes are properties because the three differ by role rather than by accident — a toolbar field is
-/// deliberately larger than an inline list filter. Set <see cref="Control.Height"/> and
-/// <see cref="Layoutable.Width"/> on the control itself.
+/// deliberately larger than an inline list filter. Width is not one of them: the field takes the room
+/// its container offers, bounded by its own MinWidth/MaxWidth, and never measures its text — so typing,
+/// a ghost completion or the clear × appearing cannot move its edges. Set <see cref="Control.Height"/>
+/// and those bounds on the control itself; an unbounded container needs an explicit Width instead.
 /// </summary>
 public partial class SearchField : UserControl {
     public static readonly StyledProperty<string> TextProperty =
@@ -40,8 +42,10 @@ public partial class SearchField : UserControl {
     public static readonly StyledProperty<double> IconSizeProperty =
         AvaloniaProperty.Register<SearchField, double>(nameof(IconSize), defaultValue: 14);
 
+    /// <summary>Defaulted from the TextSize ladder in the control's own markup, never from a literal
+    /// here — a literal is a size the Text size setting cannot reach.</summary>
     public static readonly StyledProperty<double> TextSizeProperty =
-        AvaloniaProperty.Register<SearchField, double>(nameof(TextSize), defaultValue: 13);
+        AvaloniaProperty.Register<SearchField, double>(nameof(TextSize));
 
     /// <summary>Inset from the field's border to its contents.</summary>
     public static readonly StyledProperty<Thickness> ContentPaddingProperty =
@@ -105,6 +109,12 @@ public partial class SearchField : UserControl {
     public Thickness IconGap {
         get => GetValue(IconGapProperty);
         set => SetValue(IconGapProperty, value);
+    }
+
+    /// <inheritdoc/>
+    protected override Size MeasureOverride(Size availableSize) {
+        var content = base.MeasureOverride(availableSize);
+        return new Size(FieldWidth.Desired(availableSize.Width, content.Width), content.Height);
     }
 
     /// <summary>Forwarded from the inner box: puts the caret in the field and selects what is there, so

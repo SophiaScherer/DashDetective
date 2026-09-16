@@ -68,11 +68,12 @@ public class TextScaleTests {
     }
 
     /// <summary>Text scale is the one feature that IS a sweep: a size left as a literal simply would not
-    /// grow, and would do it invisibly on one page. This is what keeps the sweep swept.</summary>
+    /// grow, and would do it invisibly on one page. This keeps the sweep swept, SearchField's TextSize
+    /// included — it is a font size under another name, and a literal there opts three fields out.</summary>
     [Fact]
     public void NoViewAuthorsAFontSizeLiteral() {
         var offenders = new List<string>();
-        var literal = new Regex(@"FontSize=""[0-9]|Property=""FontSize"" Value=""[0-9]");
+        var literal = new Regex(@"(Font|Text)Size=""[0-9]|Property=""(Font|Text)Size"" Value=""[0-9]");
 
         foreach (var file in Directory.EnumerateFiles(Source(), "*.axaml", SearchOption.AllDirectories)) {
             var text = File.ReadAllText(file);
