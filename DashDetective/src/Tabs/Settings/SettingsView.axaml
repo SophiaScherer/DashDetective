@@ -15,8 +15,7 @@
          in the code-behind, which owns the save dialog + clipboard). Choices persist via the settings
          store. Surfaces, segments, toggles and buttons are styled from src/Shared/Styles. -->
     <!-- Fluent supplies the Slider template; the two scale rows are its only call sites in the app, so
-         the sizing and the app's own track colors stay here rather than in SharedStyles. Foreground draws
-         the filled side of the track and Background the rest, which is how the template reads them. -->
+         its sizing and colors stay here rather than in SharedStyles. -->
     <UserControl.Resources>
         <!-- Fluent reserves 15px above and below the track for tick bars this slider does not draw,
              which would make these two rows half again as tall as every other row on the card. -->
@@ -25,11 +24,23 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
+        <!-- The parts are colored directly: Fluent's hover and pressed states set its own accent on them,
+             which outranks Foreground/Background, and aliasing its resource keys would not follow an
+             accent picked at runtime. -->
         <Style Selector="Slider.scale">
-            <Setter Property="Width" Value="180"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Slider.scale /template/ RepeatButton#PART_DecreaseButton, Slider.scale:pointerover /template/ RepeatButton#PART_DecreaseButton, Slider.scale:pressed /template/ RepeatButton#PART_DecreaseButton">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Slider.scale /template/ RepeatButton#PART_IncreaseButton, Slider.scale:pointerover /template/ RepeatButton#PART_IncreaseButton, Slider.scale:pressed /template/ RepeatButton#PART_IncreaseButton">
             <Setter Property="Background" Value="{DynamicResource TrackOff}"/>
+        </Style>
+        <Style Selector="Slider.scale /template/ Thumb">
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
+        </Style>
+        <Style Selector="Slider.scale:pointerover /template/ Thumb, Slider.scale:pressed /template/ Thumb">
+            <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
         </Style>
         <!-- Both trim. Each row is a star column beside an Auto control, so the text column shrinks as the
              window narrows, and an untrimmed TextBlock overflows its column instead of clipping to it —
@@ -202,19 +213,26 @@
                         <TextBlock Classes="settingDesc" Text="{Binding Catalog.UiScale.Description}"/>
                     </StackPanel>
                     <!-- The slider is the coarse gesture and the field the exact one; both show the
-                         same pending value, and the code-behind applies it when a gesture ends. -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10"
-                                HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Slider Classes="scale" x:Name="UiScaleSlider"
+                         same pending value, and the code-behind applies it when a gesture ends. The
+                         slider's column is weighted to reach its cap first and gives up width as the row
+                         narrows: a fixed width overran the card at 200%, and a right-aligned slider sizes to
+                         its thumb. -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="9*" MaxWidth="180"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider Grid.Column="1" Classes="scale" x:Name="UiScaleSlider"
                                 Minimum="{Binding ScaleMinimum}" Maximum="{Binding ScaleMaximum}"
                                 TickFrequency="{Binding ScaleStep}" IsSnapToTickEnabled="True"
                                 Value="{Binding UiScalePercent, Mode=TwoWay}"
                                 AutomationProperties.Name="{Binding Catalog.UiScale.Name}"/>
-                        <settings:NumericField x:Name="UiScaleField"
+                        <settings:NumericField Grid.Column="2" Margin="10,0,0,0" x:Name="UiScaleField"
                                                Value="{Binding UiScalePercent, Mode=TwoWay}"
                                                Minimum="{Binding ScaleMinimum}"
                                                Maximum="{Binding ScaleMaximum}" Suffix="%"/>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
                 </Border>
 
@@ -230,18 +248,22 @@
                         <TextBlock Classes="settingName" Text="{Binding Catalog.TextScale.Name}"/>
                         <TextBlock Classes="settingDesc" Text="{Binding Catalog.TextScale.Description}"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10"
-                                HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Slider Classes="scale" x:Name="TextScaleSlider"
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="9*" MaxWidth="180"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider Grid.Column="1" Classes="scale" x:Name="TextScaleSlider"
                                 Minimum="{Binding ScaleMinimum}" Maximum="{Binding ScaleMaximum}"
                                 TickFrequency="{Binding ScaleStep}" IsSnapToTickEnabled="True"
                                 Value="{Binding TextScalePercent, Mode=TwoWay}"
                                 AutomationProperties.Name="{Binding Catalog.TextScale.Name}"/>
-                        <settings:NumericField x:Name="TextScaleField"
+                        <settings:NumericField Grid.Column="2" Margin="10,0,0,0" x:Name="TextScaleField"
                                                Value="{Binding TextScalePercent, Mode=TwoWay}"
                                                Minimum="{Binding ScaleMinimum}"
                                                Maximum="{Binding ScaleMaximum}" Suffix="%"/>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
                 </Border>
 
