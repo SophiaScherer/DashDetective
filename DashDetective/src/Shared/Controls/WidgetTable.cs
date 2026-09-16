@@ -17,9 +17,9 @@ public class WidgetTable : ContentControl {
         AvaloniaProperty.Register<WidgetTable, object?>(nameof(Header));
 
     /// <summary>Right inset the header and the rows share, so the last column keeps a gap from the
-    /// scrollbar beside it.</summary>
+    /// scrollbar beside it. Defaults to <c>ScrollGutter</c> through the app style in Widgets.axaml.</summary>
     public static readonly StyledProperty<Thickness> GutterProperty =
-        AvaloniaProperty.Register<WidgetTable, Thickness>(nameof(Gutter), new Thickness(0, 0, 14, 0));
+        AvaloniaProperty.Register<WidgetTable, Thickness>(nameof(Gutter));
 
     /// <summary>Height at which the body starts scrolling. Unset lets it grow and the page scroll.</summary>
     public static readonly StyledProperty<double> MaxBodyHeightProperty =

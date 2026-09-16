@@ -95,6 +95,9 @@
 
     <!-- WidgetTable: header above a body that scrolls, both inset by the same scrollbar gutter. -->
     <Style Selector="controls|WidgetTable">
+        <!-- The default gutter comes from the token here: a C# property default cannot read a resource.
+             A table that wants none, like Storage's, sets Gutter locally and outranks this. -->
+        <Setter Property="Gutter" Value="{StaticResource ScrollGutter}"/>
         <Setter Property="Template">
             <ControlTemplate>
                 <DockPanel LastChildFill="True">
