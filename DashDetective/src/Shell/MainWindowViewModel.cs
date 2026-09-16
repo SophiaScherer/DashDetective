@@ -293,7 +293,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
     private void OnAccessibilityChanged() {
-        SyncNavTextScale();
+        SyncNavScales();
         OnPropertyChanged(nameof(MinWindowWidth));
         OnPropertyChanged(nameof(MinWindowHeight));
         OnPropertyChanged(nameof(ReduceMotion));
@@ -301,17 +301,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(NoticeLiveSetting));
     }
 
-    /// <summary>Sizes the navigation bar against the text scale. Called from both the startup apply and
+    /// <summary>Sizes the navigation bar against both scales. Called from the startup apply as well as
     /// the change event, because settings are applied before that event is subscribed to.</summary>
-    private void SyncNavTextScale() =>
+    private void SyncNavScales() {
         Nav.SetTextScale(ScaleRange.Factor(_accessibility.TextScalePercent));
+        Nav.SetUiScale(_accessibility.ScaleFactor);
+    }
 
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
         _theme.ApplyTheme(settings.Theme);
         _accessibility.Apply(settings);
-        SyncNavTextScale();
+        SyncNavScales();
         _theme.ApplyGraphColors(GraphColors.Find(settings.EffectiveGraphColorsName));
         _theme.ApplyAccent(AccentPreset.FromHex(settings.AccentColor));
 
