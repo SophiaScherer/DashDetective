@@ -247,7 +247,9 @@ stays in its tab folder.
                                  first apply. TEXT SCALE: the ladder is every font size in the app,
                                  TextScale.BaseSizes mirrors it, and a test fails on any authored
                                  FontSize literal. A token with no call site should not exist — the
-                                 ladder is the one authorized sweep, see AGENTS.md.
+                                 ladder is the one authorized sweep, see AGENTS.md. The ladder's values
+                                 were rebalanced once (~1.12, rounded to 0.5) after measuring against
+                                 File Explorer; they must stay strictly increasing, which a test pins.
                                  ScrollGutter is the gap between a scroller's content and its bar, set as
                                  the content's Margin (or a ListBox/TreeView's Padding, which its template
                                  applies as the presenter's Margin). Never ScrollViewer Padding: the scroll
@@ -677,9 +679,9 @@ stays in its tab folder.
                                  BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
                                  SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
         TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
-                                 name. They are the sizes the app already shipped, not a redesign: a tidier
-                                 ladder would change how the app looks at 100%, which is the one thing every
-                                 option on this card must not do. Mirrors the TextSize* defaults in
+                                 name. Rebalanced once against File Explorer — every step ~1.12 bigger,
+                                 rounded to 0.5, body 12.5 -> 14 — and strictly increasing, since rounding
+                                 is how two steps merge onto one value. Mirrors the TextSize* defaults in
                                  Dimensions.axaml, pinned both ways by a test)
 ```
 

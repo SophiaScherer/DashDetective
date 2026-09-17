@@ -519,10 +519,16 @@ gives text at 2.25x while the chrome grows 1.5x.
 
 **One ladder, swept across every view.** Every authored `FontSize` value is now
 `{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
-`ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
-rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
-option on this card must not do. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins them
-together, as `SemanticBrushes` mirrors Palette.axaml.
+`ThemeService.ApplyTextScale` rewrites. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins
+them together, as `SemanticBrushes` mirrors Palette.axaml.
+
+**The 100 % baseline was raised once, on purpose.** Measured against File Explorer at the same DPI, the
+app's body type matched Explorer's glyph for glyph (Inter 12.5 and Segoe UI 12 both cap 9, x-height 6) —
+what read small was everything around it: secondary text a step below Explorer's flat 12, and a line box
+of 14.1 px against 16. So each step grew by ~1.12 rounded to 0.5, body 12.5 → 14, which puts Inter's line
+box at 15.8. The ladder is **strictly increasing and a test says so**: rounding is exactly how two
+neighbouring steps land on one value and flatten the hierarchy. Raising the baseline is a *rebalance of
+the default*, not a scale — 100 % is still the default and a saved scale still means what it did.
 
 **This is a deliberate exception to the adopt-by-contact rule** for dimensions. The feature *is* the
 sweep: a literal left behind would not grow, and would fail invisibly on one page. A test fails on any

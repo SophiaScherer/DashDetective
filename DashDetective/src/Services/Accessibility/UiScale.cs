@@ -7,7 +7,7 @@ namespace DashDetective.Services.Accessibility;
 internal static class UiScale {
     /// <summary>The unscaled context-menu and tooltip type size. Mirrors the <c>PopupFontSize</c> default
     /// in Dimensions.axaml, as <c>SemanticBrushes</c> mirrors Palette.axaml.</summary>
-    internal const double BasePopupFontSize = 12.5;
+    internal const double BasePopupFontSize = 14;
 
     /// <summary>The popup type size at a given scale. Fluent templates the tooltip and context-menu
     /// presenters, so neither can host a <c>ScaleHost</c> and both follow the scale by type size.</summary>

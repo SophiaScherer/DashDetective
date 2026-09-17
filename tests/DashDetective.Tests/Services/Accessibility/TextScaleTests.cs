@@ -32,11 +32,27 @@ public class TextScaleTests {
             Assert.Equal(size * 0.8, smaller[key]);
     }
 
-    /// <summary>100% has to be the app exactly as it shipped — that is the rule every option on the
+    /// <summary>100% has to be the authored ladder untouched — that is the rule every option on the
     /// Accessibility card follows, and the one this sweep could most easily break.</summary>
     [Fact]
     public void Sizes_AtOneHundredAreTheAuthoredSizes() =>
         Assert.Equal(TextScale.BaseSizes, TextScale.Sizes(100));
+
+    /// <summary>The ladder was rebalanced by a factor and rounded to 0.5, which is exactly how two
+    /// neighbouring steps land on one value and quietly flatten a hierarchy. Declaration order in
+    /// Dimensions.axaml is the ladder's order, so it is what has to ascend.</summary>
+    [Fact]
+    public void Dimensions_DeclaresTheLadderStrictlyIncreasing() {
+        var declared = Regex.Matches(File.ReadAllText(Dimensions()),
+                                     @"x:Key=""TextSize\w+"">([0-9.]+)<")
+                            .Select(m => double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture))
+                            .ToList();
+
+        Assert.Equal(TextScale.BaseSizes.Count, declared.Count);
+        for (var i = 1; i < declared.Count; i++)
+            Assert.True(declared[i] > declared[i - 1],
+                        $"Step {i} ({declared[i]}) does not exceed the one below it ({declared[i - 1]}).");
+    }
 
     /// <summary>The table is a C# mirror of Dimensions.axaml's ladder, as <c>UiScale</c> mirrors the
     /// popup size. Nothing else would catch a token's default drifting from the one it scales.</summary>

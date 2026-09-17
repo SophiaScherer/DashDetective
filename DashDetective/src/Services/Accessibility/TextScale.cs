@@ -10,26 +10,27 @@ namespace DashDetective.Services.Accessibility;
 /// <c>SemanticBrushes</c> mirrors Palette.axaml — a test pins the two together.
 /// </summary>
 internal static class TextScale {
-    /// <summary>Every authored type size in the app, keyed by its resource name. These are the sizes the
-    /// app already shipped, not a redesign: a ladder that rounded them would change how the app looks at
-    /// 100%, which is the one thing every option on this card must not do.</summary>
+    /// <summary>Every authored type size in the app, keyed by its resource name. The ladder was rebalanced
+    /// once, measured against File Explorer: the old steps read a size small beside it, so each grew by
+    /// ~1.12 rounded to 0.5. Steps stay strictly increasing — a test pins that — since rounding two
+    /// neighbours onto one value would flatten the hierarchy the ladder exists to carry.</summary>
     internal static readonly IReadOnlyDictionary<string, double> BaseSizes = new Dictionary<string, double> {
-        ["TextSizeNano"] = 9,
-        ["TextSizeMicro"] = 10,
-        ["TextSizeMini"] = 10.5,
-        ["TextSizeCaption"] = 11,
-        ["TextSizeSmall"] = 11.5,
-        ["TextSizeCompact"] = 12,
-        ["TextSizeBody"] = 12.5,
-        ["TextSizeMedium"] = 13,
-        ["TextSizeSubhead"] = 13.5,
-        ["TextSizeTitle"] = 14,
-        ["TextSizeTitleLarge"] = 15,
-        ["TextSizeHeading"] = 16,
-        ["TextSizeHeadingLarge"] = 16.5,
-        ["TextSizeDisplay"] = 18,
-        ["TextSizeDisplayLarge"] = 22,
-        ["TextSizeHero"] = 26,
+        ["TextSizeNano"] = 10,
+        ["TextSizeMicro"] = 11,
+        ["TextSizeMini"] = 11.5,
+        ["TextSizeCaption"] = 12,
+        ["TextSizeSmall"] = 12.5,
+        ["TextSizeCompact"] = 13,
+        ["TextSizeBody"] = 14,
+        ["TextSizeMedium"] = 14.5,
+        ["TextSizeSubhead"] = 15,
+        ["TextSizeTitle"] = 15.5,
+        ["TextSizeTitleLarge"] = 16.5,
+        ["TextSizeHeading"] = 17.5,
+        ["TextSizeHeadingLarge"] = 18,
+        ["TextSizeDisplay"] = 20,
+        ["TextSizeDisplayLarge"] = 24,
+        ["TextSizeHero"] = 28.5,
     };
 
     /// <summary>The ladder at a given scale, ready to install as resources.</summary>

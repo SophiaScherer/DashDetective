@@ -76,7 +76,9 @@
         <!-- The swatch and its selection ring are the shared Border.swatch. -->
     </UserControl.Styles>
 
-    <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
+    <!-- 800 is the old 720 carried up with the rebalanced type ladder: the descriptions trim, so a
+         width chosen against smaller text ellipsizes them instead of clipping, which reads as a bug. -->
+    <StackPanel MaxWidth="800" HorizontalAlignment="Left" Spacing="16">
 
         <!-- ===== Appearance ===== -->
         <controls:WidgetPanel WidgetId="settings.appearance" Collapse="{Binding Collapse}" Title="Appearance">

@@ -66,7 +66,7 @@
             </Setter>
         </Style>
         <!-- Filled, so Fill and not Stroke; Uniform scales the 18x18-authored caret into the 8px box
-             the tree's 12.5 row reads it against. -->
+             the tree's 14 row reads it against. -->
         <Style Selector="Path.treeCaret">
             <Setter Property="Width" Value="8"/>
             <Setter Property="Height" Value="8"/>
