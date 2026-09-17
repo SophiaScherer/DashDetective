@@ -106,12 +106,12 @@
                                 </StackPanel>
                             </Button>
                             <Button Classes="toolIcon" ToolTip.Tip="{Binding RefreshToolTip}" Command="{Binding RefreshCommand}">
-                                <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                       Data="M13,8 a5,5 0 1 1 -1.5,-3.5 M13,2.5 V5 H10.5"/>
                             </Button>
                             <Button Classes="toolIcon" ToolTip.Tip="Export (Ctrl+E)" Click="OnExportClick">
-                                <Path Width="16" Height="16" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                                <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                                       Data="M8,2 V10 M8,10 L5,7 M8,10 L11,7 M3,12 V13.5 H13 V12"/>
                             </Button>
@@ -149,7 +149,7 @@
                             AutomationProperties.Name="{Binding AlertText}"
                             Background="{StaticResource YellowSoft}" BorderBrush="{StaticResource YellowLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                            <Path Grid.Column="0" Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}" Stretch="Uniform" VerticalAlignment="Center"
                                   Fill="{DynamicResource YellowGraphic}" Data="M8,1 L15,14 H1 Z"/>
                             <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource TextSizeBody}"
                                        Foreground="{DynamicResource TextPrimary}" Text="{Binding AlertText}"/>
@@ -171,7 +171,7 @@
                             AutomationProperties.Name="{Binding NoticeText}"
                             Background="{StaticResource GreenSoft}" BorderBrush="{StaticResource GreenLine}" BorderThickness="0,0,0,1" Padding="18,9">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Path Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                            <Path Grid.Column="0" Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}" Stretch="Uniform" VerticalAlignment="Center"
                                   Stroke="{DynamicResource GreenGraphic}" StrokeThickness="2"
                                   StrokeLineCap="Round" StrokeJoin="Round" Data="M2,8.5 L6.5,13 L14,4"/>
                             <!-- The tooltip carries what the trim drops: an export names a path, and a

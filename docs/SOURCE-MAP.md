@@ -250,6 +250,13 @@ stays in its tab folder.
                                  ladder is the one authorized sweep, see AGENTS.md. The ladder's values
                                  were rebalanced once (~1.12, rounded to 0.5) after measuring against
                                  File Explorer; they must stay strictly increasing, which a test pins.
+                                 ICON SIZES: IconSize (an icon that identifies something or fills a
+                                 chrome button) and IconSizeSmall (inside a row button, a field or a
+                                 tinted tile). The nav geometries are authored on an 18x18 grid whose ink
+                                 fills ~78%, so a site must take Stretch="Uniform" — with "None" the box
+                                 grows and the ink does not, which is how an icon "resized" and did not
+                                 change. The Caret* set is the exception: it is authored 8x5 and stays
+                                 Stretch="None", or Uniform blows it up to fill the box.
                                  ScrollGutter is the gap between a scroller's content and its bar, set as
                                  the content's Margin (or a ListBox/TreeView's Padding, which its template
                                  applies as the presenter's Margin). Never ScrollViewer Padding: the scroll

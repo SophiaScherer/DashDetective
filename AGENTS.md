@@ -840,7 +840,13 @@ temperature is the expected outcome, not a defect.
   **The one authorized exception is the `TextSize*` ladder**, which was swept across every view at once
   in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
   left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
-  authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
+  authored `FontSize` literal, which is what keeps the sweep swept.
+  **`IconSize` / `IconSizeSmall` were swept once too**, when the defaults were rebalanced against File
+  Explorer: every icon size was a literal, so there was nothing to adopt by contact and no way to raise
+  them all coherently. Two tokens, because the app has two jobs for an icon — one that identifies
+  something or fills a chrome button, one inside a row-level button, a field or a tinted tile. A mark
+  that is deliberately smaller than either (a clear X, a status dot, a drag grip, the puck's caret) is
+  not an icon and stays a literal. Nothing else earns this.
 - **A scroller's content keeps `ScrollGutter` from the bar, as a Margin.** Auto-hide is pinned off, so
   content sits beside the bar and touches it without one. Never `ScrollViewer` Padding, which the scroll
   extent leaves out. A control that template-binds its scroller's `AllowAutoHide` (TreeView, ListBox)

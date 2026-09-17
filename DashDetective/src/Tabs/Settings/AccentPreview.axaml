@@ -28,7 +28,7 @@
                         <Rectangle Width="3" Height="18" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-8,0,0,0"/>
                         <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,0">
-                            <Path Width="18" Height="18" Stretch="None" Data="{x:Static nav:Icons.Dashboard}"
+                            <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Data="{x:Static nav:Icons.Dashboard}"
                                   Stroke="{DynamicResource Accent}" StrokeThickness="1.4" StrokeLineCap="Round"
                                   StrokeJoin="Round" VerticalAlignment="Center"/>
                             <TextBlock Text="Dashboard" FontSize="{DynamicResource TextSizeMedium}" FontWeight="SemiBold"

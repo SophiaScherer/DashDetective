@@ -194,17 +194,17 @@
                  Backspace / Alt+↑); these keep the navigation discoverable for the mouse. -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                 <Button Classes="navBtn" ToolTip.Tip="Back (Alt+←)" Command="{Binding GoBackCommand}">
-                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                    <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                           StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                           Data="M9,2 L4,7 L9,12"/>
                 </Button>
                 <Button Classes="navBtn" ToolTip.Tip="Forward (Alt+→)" Command="{Binding GoForwardCommand}">
-                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                    <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                           StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                           Data="M5,2 L10,7 L5,12"/>
                 </Button>
                 <Button Classes="navBtn" ToolTip.Tip="Up one folder (Backspace)" Command="{Binding GoUpCommand}">
-                    <Path Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
+                    <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                           StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                           Data="M7,12 V3 M3,7 L7,3 L11,7"/>
                 </Button>
@@ -340,8 +340,8 @@
                     <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="fe:FileSystemNode">
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <Path Data="{Binding Glyph}" Stroke="{Binding IconBrush}"
-                                  StrokeThickness="1.3" StrokeLineCap="Round" StrokeJoin="Round"
-                                  Width="15" Height="15" Stretch="Uniform" VerticalAlignment="Center"/>
+                                  StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" VerticalAlignment="Center"/>
                             <TextBlock Classes="nodeName" Text="{Binding Name}"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
@@ -398,9 +398,9 @@
                                               layout:GridColumns.Definitions="{Binding $parent[UserControl].((fe:FileExplorerViewModel)DataContext).ColumnLayout}">
                                             <Grid Grid.Column="0" ColumnDefinitions="Auto,*">
                                                 <Path Grid.Column="0" Data="{Binding Glyph}"
-                                                      Stroke="{Binding IconBrush}" StrokeThickness="1.3"
+                                                      Stroke="{Binding IconBrush}" StrokeThickness="1.5"
                                                       StrokeLineCap="Round" StrokeJoin="Round"
-                                                      Width="15" Height="15" Stretch="Uniform"
+                                                      Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform"
                                                       VerticalAlignment="Center" Margin="0,0,9,0"/>
                                                 <TextBlock Grid.Column="1" Classes="cellName"
                                                            Text="{Binding Name}"/>

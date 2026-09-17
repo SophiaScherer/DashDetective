@@ -35,8 +35,8 @@
                             <Border Width="30" Height="30" CornerRadius="7"
                                     Background="{Binding IconBackground}">
                                 <Path Data="{Binding Icon}" Stroke="{Binding IconColor}"
-                                      StrokeThickness="1.4" StrokeLineCap="Round"
-                                      StrokeJoin="Round" Stretch="None"
+                                      StrokeThickness="1.5" StrokeLineCap="Round"
+                                      StrokeJoin="Round" Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}" Stretch="Uniform"
                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">

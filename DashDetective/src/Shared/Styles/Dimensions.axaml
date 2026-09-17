@@ -26,6 +26,16 @@
     <CornerRadius x:Key="RadiusSmall">5</CornerRadius>
     <CornerRadius x:Key="RadiusHair">4</CornerRadius>
 
+    <!-- ===== Icon sizes ===== -->
+    <!-- Two, because the app needs two: IconSize is an icon that identifies something (a file, a page,
+         a command, a search result) or fills a chrome button; IconSizeSmall is a glyph inside a row-level
+         button, a field or a tinted tile. The nav geometries are authored on an 18x18 grid whose ink fills
+         about 78% of it, so a site takes Stretch="Uniform" — with "None" the box grows and the ink does
+         not. Marks that are deliberately smaller than either (a clear X, a status dot, a drag grip) stay
+         literals: they are not icons. -->
+    <sys:Double x:Key="IconSize">18</sys:Double>
+    <sys:Double x:Key="IconSizeSmall">16</sys:Double>
+
     <!-- ===== Widget and table metrics ===== -->
     <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
     <sys:Double x:Key="FieldHeight">32</sys:Double>
