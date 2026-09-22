@@ -85,6 +85,7 @@
         <controls:SearchField x:Name="SearchBox" Height="34" ToolTip.Tip="Search (Ctrl+F)"
                               IsVisible="{Binding IsExpanded}"
                               MinWidth="180" MaxWidth="400"
+                              IconSize="{StaticResource IconSize}"
                               TextSize="{DynamicResource TextSizeMedium}"
                               HorizontalAlignment="Right" VerticalAlignment="Center"
                               PointerPressed="OnFieldPressed"
