@@ -606,15 +606,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             return false;
 
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
-        // allowed to act on the page hidden behind the scrim.
+        // allowed to act on the page hidden behind the scrim. Enter falls through so a focused button in
+        // the card can still be pressed with it.
         if (Help.IsOpen) {
+            if (id == ShortcutId.Activate)
+                return false;
             if (id == ShortcutId.Escape)
                 Help.Close();
             return true;
         }
 
-        // The accent picker is modal the same way; Esc discards its draft. Enter falls through so a
-        // focused button in the picker can still be pressed with it.
+        // The accent picker is modal the same way, Enter included; Esc discards its draft.
         if (AccentPicker.IsOpen) {
             if (id == ShortcutId.Activate)
                 return false;
