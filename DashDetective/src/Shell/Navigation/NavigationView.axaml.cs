@@ -38,6 +38,7 @@ public partial class NavigationView : UserControl {
     public NavigationView() {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        ItemScroll.LayoutUpdated += OnItemScrollLayoutUpdated;
     }
 
     // Bridge the view model's UI-only PositionPicked signal to dismissing the dock menu: selecting a
@@ -55,13 +56,17 @@ public partial class NavigationView : UserControl {
 
     private void CloseDockMenu() => RailBorder.ContextFlyout?.Hide();
 
-    // ----- Collapse puck reveal -----
-    // Hover is tracked on the whole host panel, so the items, footer and empty space all count. The hide
-    // itself is the view model's (it owns the grace period); this only reports the pointer.
+    // A horizontal bar sizes to its content, so the drop preview learns its height from the layout.
+    private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        _viewModel?.ReportBarHeight(e.NewSize.Height);
 
-    private void OnRailPointerEntered(object? sender, PointerEventArgs e) => _viewModel?.PointerEnteredBar();
-
-    private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
+    // What a horizontal bar's labels need is measured, not guessed. Checked after every layout pass rather
+    // than on ScrollChanged: while the labels fit, the scroller's extent is pinned to its viewport, so a
+    // text-size change that widens them raises nothing there. The view model ignores an unchanged need.
+    private void OnItemScrollLayoutUpdated(object? sender, EventArgs e) {
+        if (ItemScroll.Content is Control strip)
+            _viewModel?.ReportLabeledBarWidth(RailBorder.Bounds.Width, ItemScroll.Viewport.Width, strip.DesiredSize.Width);
+    }
 
     // ----- Drag-to-dock -----
 
@@ -186,8 +191,10 @@ public partial class NavigationView : UserControl {
         if (_dropHint is null || _viewModel is null)
             return;
 
-        double vertical = _viewModel.RailThickness(horizontal: false);   // rail width on a Left/Right dock
-        double horizontal = _viewModel.RailThickness(horizontal: true);  // bar height on a Top/Bottom dock
+        // The thickness is in the rail's own units, inside the scale host; the overlay is outside it.
+        double scale = _viewModel.UiScale;
+        double vertical = _viewModel.RailThickness(horizontal: false) * scale;   // rail width on a Left/Right dock
+        double horizontal = _viewModel.RailThickness(horizontal: true) * scale;  // bar height on a Top/Bottom dock
 
         double left, top, width, height;
         switch (edge) {

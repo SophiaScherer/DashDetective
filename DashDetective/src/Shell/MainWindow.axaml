@@ -69,7 +69,7 @@
             <!-- ================= SIDEBAR ================= -->
             <!-- The nav bar is a self-contained component; it docks to the edge it chooses and the
                  main area (the last child) fills the remaining space. It needs no ZIndex: everything it
-                 draws, the collapse puck included, stays inside its own bounds. -->
+                 draws stays inside its own bounds. -->
             <nav:NavigationView DataContext="{Binding Nav}" DockPanel.Dock="{Binding Dock}"/>
 
             <!-- ================= MAIN ================= -->

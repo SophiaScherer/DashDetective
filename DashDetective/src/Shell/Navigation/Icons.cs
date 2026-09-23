@@ -112,8 +112,8 @@ public static class Icons {
     public static readonly Geometry CaretDown = Geometry.Parse("M5,6.5 L13,6.5 L9,11.5 Z");
 
     /// <summary>
-    /// The disclosure caret for a direction, used by the nav bar's edge puck. A plain map — the rule
-    /// deciding which way the puck points lives on <c>NavigationViewModel.ChevronPointing</c>, where it
+    /// The disclosure caret for a direction, used by the nav bar's collapse toggle. A plain map — the rule
+    /// deciding which way it points lives on <c>NavigationViewModel.ChevronPointing</c>, where it
     /// is testable without a render backend.
     /// </summary>
     public static Geometry Caret(ChevronDirection direction) => direction switch {

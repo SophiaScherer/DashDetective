@@ -31,29 +31,58 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>The user's collapse preference. Persisted. Layout reads <see cref="IsRailCollapsed"/>
     /// instead, so a narrow window can force the rail in without overwriting this.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
-        nameof(ChevronPointing), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock))]
+        nameof(ChevronPointing), nameof(ChevronIcon), nameof(CollapseToolTip),
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock))]
     private bool _isCollapsed;
 
     /// <summary>Collapsed because the window is too narrow to spare 236px for an expanded rail. Not
     /// persisted, and deliberately separate from <see cref="IsCollapsed"/> so widening the window
     /// restores whatever the user actually chose.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
-        nameof(ChevronPointing), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock))]
+        nameof(ChevronPointing), nameof(ChevronIcon), nameof(CollapseToolTip),
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock))]
     private bool _isAutoCollapsed;
 
     /// <summary>Whether the rail actually renders collapsed — the user's choice or the window forcing
     /// it. Everything that lays the bar out reads this rather than either flag alone.</summary>
     public bool IsRailCollapsed => IsCollapsed || IsAutoCollapsed;
 
-    /// <summary>Shell width below which an expanded rail leaves too little for the page, at an
-    /// interface size of 100%.</summary>
-    internal const double AutoCollapseWidth = 820;
+    /// <summary>An expanded vertical rail's width at 100% text, and a collapsed one's.</summary>
+    internal const double ExpandedRailWidth = 236;
+    internal const double CollapsedRailWidth = 64;
+
+    /// <summary>The narrowest the page may get beside an expanded rail before the rail folds to icons.
+    /// With the rail, that puts the fold at 1008px, the width Fluent's NavigationView leaves its
+    /// expanded mode at.</summary>
+    internal const double MinPageWidth = 772;
+
+    /// <summary>The fold point at 100% interface and text size. <see cref="AutoCollapseThreshold"/> is
+    /// the one in force.</summary>
+    internal const double AutoCollapseWidth = ExpandedRailWidth + MinPageWidth;
+
+    /// <summary>The window width below which the bar folds to icons, in the window's own pixels — the
+    /// one place the breakpoint is decided. A vertical rail folds when the page beside it would drop
+    /// under <see cref="MinPageWidth"/>, counting the rail at its text-scaled width; a horizontal bar
+    /// folds when its labeled items no longer fit, once it has been laid out expanded to measure them.
+    /// Either is multiplied by the interface size, since the rail is drawn inside the scale host and the
+    /// width is reported from outside it.</summary>
+    internal double AutoCollapseThreshold =>
+        _uiScale * (IsHorizontal && _labeledBarWidth > 0
+            ? _labeledBarWidth - LayoutSlack
+            : VerticalRailWidth(collapsed: false) + MinPageWidth);
+
+    /// <summary>One logical pixel given back from a measured need. The scale host rounds its child's size
+    /// up to whole logical pixels, so a bar whose labels fit exactly can measure a fraction wider than the
+    /// window reporting it, and would fold with nothing clipped.</summary>
+    internal const double LayoutSlack = 1;
+
+    // The width a horizontal bar needs to show every item with its label. 0 until it has been laid out
+    // expanded, and again after a text-scale change, since the labels change width with the text.
+    private double _labeledBarWidth;
 
     // Tracks the last side of the threshold so auto-collapse fires on a crossing rather than on every
     // resize — that way an explicit toggle sticks until the window crosses back.
@@ -88,11 +117,28 @@ public partial class NavigationViewModel : ViewModelBase {
         UpdateAutoCollapse();
     }
 
+    /// <summary>Records the width an expanded horizontal bar needs to show every label: its own width,
+    /// less the item strip's viewport, plus the strip's natural width. That is the strip's desired width,
+    /// not the scroller's extent, which is stretched to at least the viewport and so would report the
+    /// bar's current width as its need whenever the labels fit. Ignored while the labels are hidden or the
+    /// bar is vertical, since neither lays the labels out along the window's width.</summary>
+    internal void ReportLabeledBarWidth(double barWidth, double viewport, double content) {
+        if (!IsHorizontal || IsRailCollapsed)
+            return;
+
+        var needed = barWidth - viewport + content;
+        if (!double.IsFinite(needed) || needed <= 0 || needed == _labeledBarWidth)
+            return;
+
+        _labeledBarWidth = needed;
+        UpdateAutoCollapse();
+    }
+
     private void UpdateAutoCollapse() {
         if (_shellWidth <= 0)
             return;
 
-        var below = _shellWidth < AutoCollapseWidth * _uiScale;
+        var below = _shellWidth < AutoCollapseThreshold;
         if (below == _belowAutoCollapseWidth)
             return;
 
@@ -103,13 +149,11 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Which window edge the bar docks to. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
-        nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
+        nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
         nameof(ShowFullFooter), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock),
-        nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
-        nameof(ChevronHAlign), nameof(ChevronVAlign),
-        nameof(ChevronCornerRadius))]
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock),
+        nameof(ChevronPointing))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -132,18 +176,15 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
     /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowChevron))]
-    private bool _isDragging;
+    [ObservableProperty] private bool _isDragging;
 
     public NavigationViewModel()
-        : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter(),
-               IUserPictureProvider.ForCurrentPlatform()) { }
+        : this(new DispatcherTimerAdapter(), IUserPictureProvider.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: takes the puck's hide timer, the re-dock fade timer and the account-picture
-    /// reader explicitly. A real <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is
-    /// pumping, so headless tests inject fakes and tick them by hand.</summary>
-    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate, IUserPictureProvider picture) {
+    /// <summary>Test seam: takes the re-dock fade timer and the account-picture reader explicitly. A real
+    /// <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is pumping, so headless tests inject
+    /// fakes and tick them by hand.</summary>
+    internal NavigationViewModel(IUiTimer relocate, IUserPictureProvider picture) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -151,10 +192,6 @@ public partial class NavigationViewModel : ViewModelBase {
             new("Bottom", NavOrientation.Bottom, SelectPosition),
         };
         SyncPositions();
-
-        _chevronHide = chevronHide;
-        _chevronHide.Interval = ChevronHideDelay;
-        _chevronHide.Tick += OnChevronHideElapsed;
 
         _relocate = relocate;
         _relocate.Interval = RelocateFade;
@@ -223,7 +260,7 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => Dock.Bottom,
     };
 
-    /// <summary>The edge the brand/toggle dock to inside the bar (start of the running axis).</summary>
+    /// <summary>The edge the brand docks to inside the bar (start of the running axis).</summary>
     public Dock BrandDock => IsHorizontal ? Dock.Left : Dock.Top;
 
     /// <summary>The edge the footer docks to inside the bar (end of the running axis).</summary>
@@ -241,27 +278,64 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        Math.Max(1, _textScale) * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
+        horizontal ? HorizontalBarHeight : VerticalRailWidth(IsRailCollapsed);
 
-    /// <summary>Grows the bar with the text scale. The rail is the one surface sized in pixels that has
-    /// to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped both.
-    /// </summary>
+    // Grows with text above 100% only: the icons do not shrink with smaller text.
+    private double VerticalRailWidth(bool collapsed) =>
+        Math.Max(1, _textScale) * (collapsed ? CollapsedRailWidth : ExpandedRailWidth);
+
+    /// <summary>A horizontal bar's height before it has been laid out at the current text size and
+    /// collapse state: the 36px item rows plus their 4px list margin and the hairline, at 100%. Only the
+    /// drag preview reads it; the bar itself is as tall as its content.</summary>
+    internal const double HorizontalBarEstimate = 45;
+
+    // The last height a horizontal bar was laid out at. 0 until then, and again whenever something the
+    // bar's height depends on changes while it is not horizontal to report the new one.
+    private double _measuredBarHeight;
+
+    private double HorizontalBarHeight => _measuredBarHeight > 0 ? _measuredBarHeight : HorizontalBarEstimate;
+
+    /// <summary>Records the height a horizontal bar was laid out at, so the drop preview matches it. A
+    /// fixed height scaled with the text left an empty band above and below the items, since only the
+    /// labels grow.</summary>
+    internal void ReportBarHeight(double height) {
+        if (IsHorizontal && double.IsFinite(height) && height > 0)
+            _measuredBarHeight = height;
+    }
+
+    /// <summary>Grows a vertical rail with the text scale. The rail is the one surface sized in pixels
+    /// that has to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped
+    /// both. A horizontal bar needs no help: it sizes to its content.</summary>
     public void SetTextScale(double factor) {
         if (!double.IsFinite(factor) || factor <= 0 || factor == _textScale)
             return;
 
         _textScale = factor;
+        ForgetBarHeight();
+        _labeledBarWidth = 0;
         OnPropertyChanged(nameof(RailWidth));
-        OnPropertyChanged(nameof(RailHeight));
+        UpdateAutoCollapse();
     }
 
-    /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
-    /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
-    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
+    /// <summary>The interface size, for sizing the drop preview: the rail is drawn inside the scale host
+    /// and the preview in the window's overlay, which is outside it.</summary>
+    internal double UiScale => _uiScale;
 
-    /// <summary>Rail height. A fixed bar (full or collapsed) when horizontal; <see cref="double.NaN"/>
-    /// (auto) when vertical so it stretches to the docked edge.</summary>
-    public double RailHeight => IsHorizontal ? RailThickness(horizontal: true) : double.NaN;
+    // A horizontal bar reports its own height on every change, so only a vertical one holds a stale report.
+    private void ForgetBarHeight() {
+        if (!IsHorizontal)
+            _measuredBarHeight = 0;
+    }
+
+    // Collapsing hides the labels, which at large text are taller than the icons beside them.
+    partial void OnIsCollapsedChanged(bool value) => ForgetBarHeight();
+
+    partial void OnIsAutoCollapsedChanged(bool value) => ForgetBarHeight();
+
+    /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
+    /// docked edge; a fixed rail (full or collapsed) when vertical. There is no height counterpart: a
+    /// vertical rail stretches and a horizontal bar is as tall as its content.</summary>
+    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
 
     /// <summary>The bar's separator hairline, drawn only on the edge that faces the content area.</summary>
     public Thickness HairlineThickness => Orientation switch {
@@ -288,61 +362,24 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsRailCollapsed && !IsHorizontal;
 
-    /// <summary>Where the footer's Help button sits relative to the avatar: beneath it on a collapsed
-    /// vertical rail (64px is too narrow to fit both side by side), to its right otherwise.</summary>
+    /// <summary>Where the footer's buttons (Help and the collapse toggle) sit relative to the avatar:
+    /// beneath it on a collapsed vertical rail (64px is too narrow to fit them side by side), to its right
+    /// otherwise.</summary>
     public Dock ControlsDock => IsRailCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
+
+    /// <summary>How the footer's buttons stack: in a column on a collapsed vertical rail, for the same
+    /// reason as <see cref="ControlsDock"/>, and in a row otherwise.</summary>
+    public Orientation ControlsOrientation =>
+        IsRailCollapsed && !IsHorizontal ? Avalonia.Layout.Orientation.Vertical : Avalonia.Layout.Orientation.Horizontal;
 
     /// <summary>Where the footer's avatar sits: the start of the same axis <see cref="ControlsDock"/>
     /// ends, so the two bracket the user's name when it is shown.</summary>
     public Dock FooterAvatarDock => IsRailCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
-    // ----- Collapse/expand puck (the hover-revealed semi-circle domed into the bar's content edge) -----
+    // ----- Collapse toggle (the caret button in the footer, beside Help) -----
 
-    /// <summary>The semi-circle's radius: how far the puck reaches into the bar from its edge, and half
-    /// the length of the flat side lying on it. Keeping it exactly half of <see cref="PuckLength"/> is
-    /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
-    private const double PuckRadius = 20;
-
-    /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
-    private const double PuckLength = PuckRadius * 2;
-
-    /// <summary>How long the puck lingers after the pointer leaves the bar, so a moment's wobble on the
-    /// way to it does not snatch it away mid-reach.</summary>
-    private static readonly TimeSpan ChevronHideDelay = TimeSpan.FromMilliseconds(600);
-
-    private readonly IUiTimer _chevronHide;
-
-    /// <summary>Whether the pointer currently counts as over the bar. Hover sets it at once; leaving clears
-    /// it only after <see cref="ChevronHideDelay"/>. UI-only, never persisted.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowChevron))]
-    private bool _isChevronVisible;
-
-    /// <summary>Whether the puck draws. A drag masks it without disturbing the hover state, so a gesture that
-    /// ends with the pointer still on the bar brings it straight back. The view binds this, not the flag:
-    /// a style setter cannot override a local binding, so the drag rule has to live here.</summary>
-    public bool ShowChevron => IsChevronVisible && !IsDragging;
-
-    /// <summary>The pointer entered the bar: show the puck and cancel any pending hide.</summary>
-    internal void PointerEnteredBar() {
-        _chevronHide.Stop();
-        IsChevronVisible = true;
-    }
-
-    /// <summary>The pointer left the bar: hide the puck once the grace period elapses. Restarting the timer
-    /// from scratch is what lets a re-entry cancel the pending hide.</summary>
-    internal void PointerExitedBar() {
-        _chevronHide.Stop();
-        _chevronHide.Start();
-    }
-
-    private void OnChevronHideElapsed(object? sender, EventArgs e) {
-        _chevronHide.Stop();
-        IsChevronVisible = false;
-    }
-
-    /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
-    /// will collapse), away from it when collapsed (it will expand).</summary>
+    /// <summary>Which way the collapse toggle's caret points: toward the docked edge when the bar is
+    /// expanded (it will collapse), away from it when collapsed (it will expand).</summary>
     public ChevronDirection ChevronPointing => Orientation switch {
         NavOrientation.Left => IsRailCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
         NavOrientation.Right => IsRailCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
@@ -350,37 +387,12 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => IsRailCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
     };
 
-    /// <summary>The caret glyph shown on the puck. Filled, so the view sets Fill rather than Stroke.</summary>
+    /// <summary>The caret glyph shown on the toggle. Filled, so the view sets Fill rather than Stroke.</summary>
     public Geometry ChevronIcon => Icons.Caret(ChevronPointing);
 
-    /// <summary>Puck width: the stand-off axis on a vertical rail, the flat side on a horizontal bar.</summary>
-    public double ChevronWidth => IsHorizontal ? PuckLength : PuckRadius;
-
-    /// <summary>Puck height: the flat side on a vertical rail, the stand-off axis on a horizontal bar.</summary>
-    public double ChevronHeight => IsHorizontal ? PuckRadius : PuckLength;
-
-    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
-    public HorizontalAlignment ChevronHAlign => Orientation switch {
-        NavOrientation.Left => HorizontalAlignment.Right,
-        NavOrientation.Right => HorizontalAlignment.Left,
-        _ => HorizontalAlignment.Center,
-    };
-
-    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
-    public VerticalAlignment ChevronVAlign => Orientation switch {
-        NavOrientation.Top => VerticalAlignment.Bottom,
-        NavOrientation.Bottom => VerticalAlignment.Top,
-        _ => VerticalAlignment.Center,
-    };
-
-    /// <summary>Rounds the two corners facing into the bar by the full radius. On a box one radius deep
-    /// and two long that is exactly a half-disc — domed inward, flat side flush on the content edge.</summary>
-    public CornerRadius ChevronCornerRadius => Orientation switch {
-        NavOrientation.Left => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
-        NavOrientation.Right => new CornerRadius(0, PuckRadius, PuckRadius, 0),
-        NavOrientation.Top => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
-        _ => new CornerRadius(0, 0, PuckRadius, PuckRadius),
-    };
+    /// <summary>What the toggle will do, which is also its accessible name: the shared Button style names a
+    /// button after its tooltip.</summary>
+    public string CollapseToolTip => IsRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
@@ -478,8 +490,13 @@ public partial class NavigationViewModel : ViewModelBase {
     }
 
     // The computed layout properties are fanned out via [NotifyPropertyChangedFor] on the source fields;
-    // this hook only carries the non-property side effect (keeping the position picker's selection in sync).
-    partial void OnOrientationChanged(NavOrientation value) => SyncPositions();
+    // this hook carries the side effects: the position picker's selection, and re-testing the fold point.
+    partial void OnOrientationChanged(NavOrientation value) {
+        SyncPositions();
+
+        // A horizontal bar and a vertical rail fold at different widths.
+        UpdateAutoCollapse();
+    }
 
     /// <summary>Populates the bar and selects the first item. Items must be created with
     /// <see cref="Navigate"/> as their select callback so clicks route back here.</summary>

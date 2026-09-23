@@ -1215,11 +1215,14 @@ stays in its tab folder.
 ```
       /Navigation
         NavigationView.axaml(.cs)   (the collapsible/dockable nav-bar component; brand + item list +
-        NavigationViewModel.cs       footer, with no permanent control chrome — collapse is the hover
-                                     puck, re-docking is the right-click menu or the drag gesture. The
-                                     VM owns Orientation + IsCollapsed and exposes all layout as computed
-                                     properties — Dock, Rail sizes, ItemsOrientation, Hairline edge,
-                                     scroll axis, puck geometry — no converters. Selection/layout visuals
+        NavigationViewModel.cs       footer. Collapse is the caret button beside Help in the footer
+                                     (and Ctrl+B); re-docking is the right-click menu or the drag
+                                     gesture. The VM owns Orientation + IsCollapsed and exposes all
+                                     layout as computed properties — Dock, Rail sizes, ItemsOrientation,
+                                     Hairline edge, scroll axis, footer-control stacking, the toggle's
+                                     caret and tooltip — no converters. AutoCollapseThreshold is the ONE
+                                     place the fold-to-icons width is decided: rail + MinPageWidth for a
+                                     vertical rail, the measured labeled width for a horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
         NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all
@@ -1231,7 +1234,7 @@ stays in its tab folder.
                                      navigation rather than disclosure, and a stop bar only reads against a
                                      stroked arrow)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
-        ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
+        ChevronDirection.cs         (enum: which way the collapse toggle's caret points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
                                      which the unit tests do not have, so touching Icons at all throws)
         NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
