@@ -3,7 +3,8 @@ using System.Collections.Generic;
 namespace DashDetective.Services.Platform.Linux;
 
 /// <summary>
-/// Reads the Linux pseudo-filesystems (<c>/proc</c>, <c>/sys</c>) behind a seam, so every Linux provider
+/// Reads the Linux pseudo-filesystems (<c>/proc</c>, <c>/sys</c>), and the few <c>/etc</c> files a Linux
+/// reader needs (<c>os-release</c>, <c>group</c>), behind a seam, so every Linux provider
 /// can be unit-tested from a Windows dev box against canned fixtures. Infrastructure rather than a
 /// provider seam — the same shape and placement as <c>Services/Threading/IUiTimer</c>, which is why it
 /// lives in its own <c>Services</c> folder rather than a tab folder.
