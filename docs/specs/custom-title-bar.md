@@ -11,7 +11,7 @@ in [SOURCE-MAP.md](../SOURCE-MAP.md) under `src/Shared/Controls` and `src/Shared
 
 | Piece | Where | What it does |
 | --- | --- | --- |
-| `WindowChrome.Custom` | `src/Shared/Controls/WindowChrome.cs` | Attached to a `Window`. Sets `ExtendClientAreaToDecorationsHint` on Windows only, and not under a Windows contrast theme; re-decides on `ColorValuesChanged`; closes on Alt+F4 while extended. |
+| `WindowChrome.Custom` | `src/Shared/Controls/WindowChrome.cs` | Attached to a `Window`. Sets `ExtendClientAreaToDecorationsHint` on Windows only, and not under a Windows contrast theme; re-decides on `ColorValuesChanged`; honors `SC_CLOSE` (taskbar close, thumbnail ×, Alt+F4) through a `Win32Properties` WndProc hook while extended, with an Alt+F4 key handler as backup. |
 | `TitleBar` | `src/Shared/Controls/TitleBar.axaml(.cs)` | The strip. Marked `ElementRole=TitleBar`, sized from the window's `WindowDecorationMargin`, hidden whenever the window is not extended. |
 | `TitleBarRules` | `src/Shared/Controls/TitleBarRules.cs` | The pure part: the platform decision, the geometry, Windows 11's caption metrics (46 × 32). Unit-tested. |
 | `AppWindowDecorations` | `src/Shared/Styles/WindowChrome.axaml` | The caption-button theme: minimize, maximize/restore, close, with their `PART_` names and roles. Palette colors only; close hover is Windows' own red (`CaptionCloseHover` in `Palette.axaml`). |
@@ -35,7 +35,23 @@ A second window (work item 45) opts in with the same three lines: `WindowDecorat
 - **Outside the `ScaleHost`.** The buttons are drawn at the OS's scale; the bar matches them rather than
   the interface size. Its text follows text size, and the bar grows for it.
 - **Linux and macOS are untouched.** The hint is never set there and the bar hides itself.
+- **Every close path still works.** Avalonia greys Close in the system menu while extended, and Windows
+  ignores `SC_CLOSE` then — the taskbar's close, its thumbnail × and Alt+F4. A WndProc hook honors it.
+- **The window minimum counts the bar**, which now sits inside the client area: the real decoration
+  margin, not a flat 32, so Linux's minimum is unchanged.
 - **Out of scope:** merging the toolbar into the title bar (Edge / Terminal style). A possible follow-up.
+
+## Known gaps
+
+- **Alt+Space does not open the system menu** — Avalonia 12.1.2 swallows keyboard `SC_KEYMENU`
+  (upstream issue 14545, open). Win+arrows and Win+↑/↓ cover its move and size commands.
+- **Right-clicking the bar does not open the system menu** — added upstream after 12.1.2 (PR 21630).
+- The system menu's Close item stays greyed while extended.
+- The nav bar's drag-to-dock band for Top draws over the title bar rather than beneath it.
+- A disabled caption button would read as enabled in the app's high-contrast variants (`TextFaint` equals
+  `TextPrimary` there); none is ever disabled today.
+- With the nav docked Left, the app mark and name appear in both the title bar and the nav brand.
+- No `PART_TitleBar`, so the "AvaloniaTitleBar" automation element of Fluent's theme is gone.
 
 ## Manual verification
 
@@ -66,8 +82,9 @@ line says otherwise. Back up `%AppData%/DashDetective/settings.json` first if yo
 - [ ] Hover each: a light overlay; close turns red with a white glyph. Pressing darkens.
 - [ ] Maximized: moving the pointer to the top-right corner of the screen lands on close.
 - [ ] Tab through the window: focus never lands on a caption button.
-- [ ] Alt+F4 closes (to the tray when that setting is on). Alt+Space opens the system menu (its Close is
-      greyed — Avalonia's doing, known). Right-click on the bar opens the system menu.
+- [ ] Alt+F4 closes (to the tray when that setting is on), with focus in the page and with a flyout open.
+- [ ] Taskbar: right-click the button → "Close window" closes; hover it and click the thumbnail's × —
+      closes. Both honor "Show in system tray".
 - [ ] Accessibility Insights / Inspect: the three buttons are named Minimize, Maximize, Close.
 
 ### High contrast
@@ -83,6 +100,8 @@ line says otherwise. Back up `%AppData%/DashDetective/settings.json` first if yo
       content below scales.
 - [ ] Text size 200 %: the title grows and the bar grows with it; nothing is clipped; the buttons stay at
       the top.
+- [ ] Drag the bottom edge up as far as it goes, at 100 % and 200 % interface size: the page area below
+      the bar stops at the same height it did before this change.
 - [ ] Display scaling 125 % / 150 % (Windows setting): bar and buttons still line up, glyphs are crisp
       enough.
 

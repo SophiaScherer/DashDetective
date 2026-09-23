@@ -152,12 +152,30 @@ Win+arrows, double-click to maximize and the Windows 11 snap flyout. Any window 
   hover overlays.
 - **The theme replaces Fluent's.** Fluent's has no high-contrast colors and paints a second title over the
   window content. Close turns Windows' own red in every theme.
-- **Alt+F4 is closed by hand while extended**, because Avalonia greys Close out of the system menu and
-  Windows routes Alt+F4 through that item. It is marked handled, so the OS cannot close twice.
+- **SC_CLOSE is honored by hand while extended.** Avalonia greys Close in the system menu, and Windows
+  ignores `SC_CLOSE` while that item is disabled — which is how the taskbar's "Close window", its
+  thumbnail × and Alt+F4 all arrive. A `Win32Properties.AddWndProcHookCallback` hook, which runs before
+  Avalonia's own window procedure, catches it, closes the window the ordinary way and swallows the command.
+  A bubbling Alt+F4 key handler backs it up for the case where Windows drops the key before it becomes
+  `SC_CLOSE`; it marks the key handled, so the two cannot both fire. `Win32Properties` is unannotated and
+  inert off Windows, so neither needs a platform attribute.
+- **The window minimum counts the bar.** It sits inside the client area, which is what `MinHeight`
+  bounds, so `MainWindow` reports `TitleBarRules.Reserved` to the view model and the minimum is the scaled
+  page height plus that — the real decoration margin, and 0 where the system title bar is outside.
 
-**Known gaps:** the system menu's Close stays greyed while extended (Avalonia's doing); the nav bar's
-drag-to-dock band is measured against the whole window, so its Top band draws over the title bar rather
-than beneath it; and the window minimum does not yet count the bar's 32px.
+**Known gaps:**
+- **Alt+Space does not open the system menu.** Avalonia swallows keyboard `SC_KEYMENU` in its window
+  procedure (upstream issue 14545, open), extended or not.
+- **Right-clicking the bar does not open the system menu.** Upstream added that after 12.1.2 (PR 21630).
+- The system menu's Close stays greyed while extended, though every close path above works.
+- The nav bar's drag-to-dock band is measured against the whole window, so its Top band draws over the
+  title bar rather than beneath it.
+- A disabled caption button would read as enabled in the app's high-contrast variants, where `TextFaint`
+  equals `TextPrimary`. None is ever disabled today.
+- With the nav bar docked Left, the app mark and name now appear twice, in the title bar and the nav
+  brand — a judgment call left open.
+- There is no `PART_TitleBar` in the theme, so the "AvaloniaTitleBar" automation element Fluent's theme
+  exposes is gone.
 
 ## Dashboard
 

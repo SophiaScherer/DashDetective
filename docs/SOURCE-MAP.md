@@ -401,9 +401,11 @@ stays in its tab folder.
                                         Window and is the ONE place the platform is decided: it extends
                                         into the title bar on Windows only, and not under a Windows
                                         contrast theme — re-decided on ColorValuesChanged, so the OS
-                                        caption comes back in the user's contrast colors. It also closes on
-                                        Alt+F4 by hand while extended, since Avalonia greys Close out of the
-                                        system menu. TitleBar is the strip itself, placed at the top of a
+                                        caption comes back in the user's contrast colors. It also honors
+                                        SC_CLOSE (taskbar close, thumbnail ×, Alt+F4) through a
+                                        Win32Properties WndProc hook, since Avalonia greys Close in the
+                                        system menu and Windows then ignores the command; an Alt+F4 key
+                                        handler backs it up. TitleBar is the strip itself, placed at the top of a
                                         window's content: its Border carries ElementRole=TitleBar, which is
                                         what makes Avalonia answer HTCAPTION so WINDOWS owns drag, snap and
                                         double-click — never a BeginMoveDrag. It follows the window it sits
@@ -1179,6 +1181,9 @@ stays in its tab folder.
                                  ScaleHost, and the ScaleHost below it; the window opts in with
                                  WindowChrome.Custom + WindowDecorationsTheme=AppWindowDecorations, the
                                  theme set FIRST so the decorations are never built from Fluent's.
+                                 The bar sits inside the client area MinHeight bounds, so code-behind
+                                 reports TitleBarRules.Reserved to MainWindowViewModel.SetCaptionHeight
+                                 and MinWindowHeight adds it after scaling. MainWindowTests pins the wiring.
                                  Inside the ScaleHost, a DockPanel hosts the NavigationView at the
                                  user-chosen edge (DockPanel.Dock bound to Nav.Dock) + the main area.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
