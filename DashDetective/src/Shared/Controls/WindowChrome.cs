@@ -118,6 +118,7 @@ public static class WindowChrome {
             return;
 
         e.Handled = true;
-        window.Close();
+        // Posted for the same reason as the hook: this runs inside the window procedure's key dispatch.
+        Dispatcher.UIThread.Post(window.Close);
     }
 }

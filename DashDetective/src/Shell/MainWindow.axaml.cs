@@ -125,11 +125,20 @@ public partial class MainWindow : Window {
             return;
 
         e.Cancel = true;
+
+        // The tray notice is already up. A taskbar close reaches this window even while the notice holds
+        // it modal, and a second notice stacked on the first could answer differently.
+        if (_askingAboutTray)
+            return;
+
         if (vm.NeedsTrayNotice)
             _ = ConfirmTrayAsync(vm);
         else
             HideToTray(vm);
     }
+
+    // Whether the one-time tray notice is waiting for an answer.
+    private bool _askingAboutTray;
 
     /// <summary>Shows the one-time tray notice and acts on the answer. Split out of
     /// <see cref="OnClosing"/> because a closing handler cannot await — the same split
@@ -137,7 +146,14 @@ public partial class MainWindow : Window {
     /// screen underneath the dialog, which is the whole point of asking before hiding rather than after.
     /// </summary>
     private async Task ConfirmTrayAsync(MainWindowViewModel vm) {
-        var keepRunning = await TrayNoticeWindow.AskAsync(this);
+        bool keepRunning;
+        _askingAboutTray = true;
+        try {
+            keepRunning = await TrayNoticeWindow.AskAsync(this);
+        } finally {
+            _askingAboutTray = false;
+        }
+
         vm.MarkTrayNoticeShown();
 
         if (keepRunning)
