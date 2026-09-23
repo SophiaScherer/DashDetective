@@ -223,10 +223,6 @@ Before performing any of the following, stop and ask first:
 
 ## Folder Structure
 
-Source lives under `DashDetective/src/`, split into three areas: shared building blocks,
-the application shell, and one folder per feature ("tab"). All nine tabs exist — Dashboard,
-File Explorer, Processes, Performance, Network, Storage, Hardware, Toolkit and Settings.
-
 Source lives under `DashDetective/src/`, split into three areas: shared building blocks
 (`Shared`), the application shell (`Shell`), and one folder per feature (`Tabs/<Feature>`), with
 `Services` for anything more than one tab needs. Namespaces follow folders.
@@ -274,10 +270,6 @@ where it matters, the trap it exists to avoid. Jump straight to the folder you a
   [Hardware](docs/SOURCE-MAP.md#srctabshardware) ·
   [Toolkit](docs/SOURCE-MAP.md#srctabstoolkit) ·
   [Settings](docs/SOURCE-MAP.md#srctabssettings)
-
-Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
-until a second feature needs them.
-
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
 until a second feature needs them (per the "keep each tab self-contained" rule). Live **sampling**,
