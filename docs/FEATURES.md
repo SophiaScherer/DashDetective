@@ -37,21 +37,21 @@ The sidebar is a self-contained, **collapsible and dockable**
 component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
 (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
 so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
-icons-only rail**, in any orientation. The bar carries **no permanent control chrome**; every entry
-point drives the **same shared** `NavigationViewModel`:
-- **Collapse/expand** — a **semi-circular puck domed INTO the bar**, its flat side flush on the
-  content-facing edge, revealed while the pointer is over the bar **and for a 600 ms grace period after
-  it leaves**. It is a true half-disc: one radius deep, two long, both **inward** corners rounded by the
-  full radius (no clamping). Its chevron points the way the bar will move (at the docked edge when
-  expanded, away from it when collapsed). It is a sibling of the rail, not a child, so its rounding and
-  alignment stay its own. **It used to stand outside the bar and that was the bug**: a hidden control is
-  not hit-testable, so reaching for it left the rail, dropped `:pointerover`, and took the puck away
-  mid-reach. Inside the bounds, reaching for it never leaves the rail. Two consequences: the view needs
-  no `ClipToBounds` and the shell no `ZIndex` (both existed only to let it draw outside), and the
-  reveal is a **bound flag, not a style** — `ShowChevron` (`IsChevronVisible && !IsDragging`), because a
-  style setter cannot override a local `IsVisible` binding, so the drag rule had to move to the VM. The
-  grace period is an `IUiTimer` on the `UniversalSearchViewModel` debounce shape (internal ctor +
-  `FakeUiTimer`), which is what makes it testable headlessly.
+icons-only rail**, in any orientation. Its only permanent controls are the two in the footer, Help and
+the collapse toggle; every entry point drives the **same shared** `NavigationViewModel`:
+- **Collapse/expand** — a **caret button in the footer, beside Help** (`Button.navCtl`, the same
+  control as Help), plus `Ctrl+B` and Settings. Its caret points the way the bar will move (at the docked
+  edge when expanded, away from it when collapsed) and its tooltip — which the shared Button style also
+  makes its accessible name — says "Collapse navigation" or "Expand navigation". On a collapsed vertical
+  rail the two buttons stack in a column (`ControlsOrientation`), since 64px will not hold them side by
+  side. **It replaced a hover-revealed half-disc puck on the content edge** (work item 47), chosen over a
+  toggle beside the logo, a thin full-length edge strip, and no on-bar control at all. The puck appeared
+  only on hover, so it could not be found without knowing it was there and was never a Tab stop; it sat
+  over the middle item of a horizontal bar; and its half-disc shape, drawn nowhere else in the app, read
+  as out of place. The footer was already the bar's control cluster in every orientation, and the logo
+  strip is the drag handle, which a button there would crowd. **The cost is permanent chrome**, which the
+  puck existed to avoid — two 30px buttons in place of one. The reveal machinery (`ShowChevron`, the
+  600 ms grace timer, the pointer tracking on `RailHost`) went with the puck.
 - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
   `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
   items, the footer and any empty space all reach it.
@@ -77,11 +77,11 @@ image, so it holds no UI type; `NavigationViewModel` decodes once and falls back
 gradient stays the backdrop either way, so it still re-tints with the accent.
 
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
-label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
-alignment / rounding) are **computed properties on the VM — no value converters**. The rail
-thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth` delegates to and the
-drop preview measures against; it takes the axis as an argument because a drag previews edges the bar
-is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
+label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the footer controls'
+stacking and the collapse toggle's caret and tooltip) are **computed properties on the VM — no value
+converters**. The rail thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`
+delegates to and the drop preview measures against; it takes the axis as an argument because a drag
+previews edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
 `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
 *Persistence* below); this is shared shell work, not a tab-local change.
 

@@ -66,8 +66,8 @@ and the Settings **Layout card**, whose "Reset widget placements" clears every `
 [docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
 A **UI-affordance pass** is also complete, across four small changes: the widget fold chevron got the
-Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's edge
-puck moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
+Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's
+collapse control moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
 stroked arrows alone; a `WidgetPanel` header now **folds on a double-click**; and every Settings action
 plus all four exports **confirm** through `NoticeService` (`src/Services/Notifications`) in a green
 banner below the resource alert's. Their decisions are in
