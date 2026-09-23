@@ -293,9 +293,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _clockTimer.Start();
     }
 
-    /// <summary>Applies persisted appearance + layout through the owning seams: theme/graph colors via
-    /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
-    /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
     private void OnAccessibilityChanged() {
         SyncNavScales();
@@ -314,6 +311,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.SetUiScale(_accessibility.ScaleFactor);
     }
 
+    /// <summary>Applies persisted appearance + layout through the owning seams: theme/graph colors via
+    /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
+    /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
@@ -585,18 +585,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     // ----- Keyboard shortcuts -----
 
-    /// <summary>
-    /// Runs a keyboard shortcut, returning whether it was consumed (an unconsumed key falls through to
-    /// the rest of the app). The priority chain lives here rather than in the window so it is testable
-    /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
-    /// own shortcuts, and anything left over is handled globally.
-    /// </summary>
     /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
     /// no shortcuts of its own. Read by the window before resolving a key.</summary>
     public ShortcutScope ActiveScope =>
         ModalShortcuts.Scope(Help, AccentPicker,
             Search.IsOpen ? Search.Scope : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global);
 
+    /// <summary>
+    /// Runs a keyboard shortcut, returning whether it was consumed (an unconsumed key falls through to
+    /// the rest of the app). The priority chain lives here rather than in the window so it is testable
+    /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
+    /// own shortcuts, and anything left over is handled globally.
+    /// </summary>
     public bool HandleShortcut(ShortcutId id) {
         // A capture box on the Settings page is waiting for a key press. This listener tunnels from the
         // window, so it sees the press first; claiming it here would run the shortcut being rebound
