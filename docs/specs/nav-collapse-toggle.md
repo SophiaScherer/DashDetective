@@ -50,10 +50,16 @@ bar, plus a 600 ms grace period after leaving. The problems:
    then points away from the edge, and clicking again expands it.
 2. On a collapsed left or right rail, Help and the toggle stack vertically under the avatar and
    nothing clips.
-3. Press Tab through the window. The toggle takes focus, draws the focus ring, and Space or Enter
-   toggles the bar. `Ctrl+B` still works.
+3. Press Tab through the window. The toggle takes focus after Help, draws the focus ring, and Space
+   toggles the bar. `Ctrl+B` still works. Enter is not a reliable check: the shell's global Activate
+   shortcut sees Enter first, and on File Explorer, with an entry selected, it opens the entry instead.
+   That affects every button, not only this one.
 4. Hover the toggle. The tooltip says what a click will do and updates after each click. Narrow the
    window below the auto-collapse width: the rail folds, and the tooltip says "Expand navigation".
 5. Check light, dark and both high-contrast themes, and interface sizes of 80%, 100% and 200%.
 6. With a screen reader (Narrator), the toggle is announced as "Collapse navigation" or "Expand
-   navigation".
+   navigation" when it gets focus. **Known limitation:** a press does not announce the new name.
+   Avalonia 12.1.2's automation peer raises no NameChanged event for a property change, so the new
+   name is read on the next focus. A `ToggleButton` bound to `IsRailCollapsed` would announce its
+   toggle state instead, but Fluent's checked visuals would then need overriding, and no one could
+   check that on screen overnight.

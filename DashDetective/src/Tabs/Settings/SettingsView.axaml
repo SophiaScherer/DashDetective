@@ -375,7 +375,7 @@
 
         <!-- ===== Navigation ===== -->
         <!-- These controls drive the shared NavigationViewModel, so they stay in sync with the bar's
-             hover chevron, its right-click dock menu and the drag-to-dock gesture. -->
+             collapse toggle, its right-click dock menu and the drag-to-dock gesture. -->
         <controls:WidgetPanel WidgetId="settings.navigation" Collapse="{Binding Collapse}" Title="Navigation">
             <StackPanel Spacing="16">
 

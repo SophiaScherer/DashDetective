@@ -37,8 +37,8 @@ The sidebar is a self-contained, **collapsible and dockable**
 component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
 (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
 so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
-icons-only rail**, in any orientation. Its only permanent controls are the two in the footer, Help and
-the collapse toggle; every entry point drives the **same shared** `NavigationViewModel`:
+icons-only rail**, in any orientation. Its only permanent control chrome is the two buttons in the footer,
+Help and the collapse toggle; every entry point drives the **same shared** `NavigationViewModel`:
 - **Collapse/expand** — a **caret button in the footer, beside Help** (`Button.navCtl`, the same
   control as Help), plus `Ctrl+B` and Settings. Its caret points the way the bar will move (at the docked
   edge when expanded, away from it when collapsed) and its tooltip — which the shared Button style also
@@ -51,7 +51,9 @@ the collapse toggle; every entry point drives the **same shared** `NavigationVie
   as out of place. The footer was already the bar's control cluster in every orientation, and the logo
   strip is the drag handle, which a button there would crowd. **The cost is permanent chrome**, which the
   puck existed to avoid — two 30px buttons in place of one. The reveal machinery (`ShowChevron`, the
-  600 ms grace timer, the pointer tracking on `RailHost`) went with the puck.
+  600 ms grace timer, the pointer tracking on `RailHost`) went with the puck. **Known limitation:** a
+  press does not announce the toggle's new name to a screen reader, since Avalonia 12.1.2's automation
+  peer raises no NameChanged on a property change; it is read on the next focus.
 - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
   `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
   items, the footer and any empty space all reach it.

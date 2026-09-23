@@ -214,7 +214,7 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => Dock.Bottom,
     };
 
-    /// <summary>The edge the brand/toggle dock to inside the bar (start of the running axis).</summary>
+    /// <summary>The edge the brand docks to inside the bar (start of the running axis).</summary>
     public Dock BrandDock => IsHorizontal ? Dock.Left : Dock.Top;
 
     /// <summary>The edge the footer docks to inside the bar (end of the running axis).</summary>

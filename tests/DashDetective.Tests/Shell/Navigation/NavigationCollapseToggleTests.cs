@@ -1,7 +1,11 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using DashDetective.Shell.Navigation;
+using DashDetective.Tests.Services.Theming;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
 using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
@@ -105,6 +109,20 @@ public class NavigationCollapseToggleTests {
 
         Assert.Contains(nameof(NavigationViewModel.CollapseToolTip), changed);
         Assert.Contains(nameof(NavigationViewModel.ControlsOrientation), changed);
+    }
+
+    /// <summary>The view-model tests cannot see the button itself: deleting it, or breaking its command or
+    /// tooltip binding, would leave them all green.</summary>
+    [Fact]
+    public void Markup_FooterCarriesTheToggleBesideHelp() {
+        var file = Path.Combine(PaletteFile.SourceRoot(), "src/Shell/Navigation/NavigationView.axaml");
+        var buttons = XDocument.Load(file).Root!.Descendants().Where(e => e.Name.LocalName == "Button").ToList();
+
+        var toggle = Assert.Single(buttons, b => (string?)b.Attribute("Command") == "{Binding ToggleCollapseCommand}");
+        Assert.Equal("{Binding CollapseToolTip}", (string?)toggle.Attribute("ToolTip.Tip"));
+
+        var help = Assert.Single(buttons, b => (string?)b.Attribute("Command") == "{Binding ShowHelpCommand}");
+        Assert.Same(help.Parent, toggle.Parent);
     }
 
     [Fact]

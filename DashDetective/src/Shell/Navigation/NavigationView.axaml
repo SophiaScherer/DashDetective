@@ -261,7 +261,7 @@
            Classes.dragging="{Binding IsDragging}">
 
     <!-- A vertical rail has a fixed width; a horizontal bar is as tall as its content. Either stretches
-         along the docked edge. The inner DockPanel lays brand/toggle at the start, footer at the end, and
+         along the docked edge. The inner DockPanel lays the brand at the start, the footer at the end, and
          the item list fills the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
             Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
@@ -342,8 +342,8 @@
                 </StackPanel>
             </Panel>
 
-            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help button.
-                 One cluster serves every state — the avatar and the button bracket the running axis,
+            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help and collapse
+                 buttons. One cluster serves every state — the avatar and the buttons bracket the running axis,
                  dropping into a column on a collapsed rail. -->
             <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}"
                     BorderBrush="{DynamicResource Hairline}">
