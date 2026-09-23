@@ -170,8 +170,9 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   tier can never be crossed. `SearchAggregator` fans one query out to independent `ISearchProvider`s,
   merges and caps what comes back, and discards an answer whose term the user has already typed past.
   A provider that throws costs its own category and nothing else, and so does one that **never
-  answers**: each has `ProviderDeadline` (4 s), past which its category is left out and a warning
-  logged. The merge used to wait on the slowest provider unconditionally, so a stalled Windows index
+  answers**: each has `ProviderDeadline` (6 s), past which its category is left out and a warning
+  logged. The Files provider gives the index its own 2 s (`IndexDeadline`) before asking the scan, so a
+  stalled index costs the index's answer, not the category. The merge used to wait on the slowest provider unconditionally, so a stalled Windows index
   query — no timeout, not cancellable mid-call — could blank every category for every later term until
   a restart (a candidate cause of work item 66, unconfirmed).
 - **Providers.** Pages (over the live nav items), Settings (over `SettingCatalog`), Shortcuts (over

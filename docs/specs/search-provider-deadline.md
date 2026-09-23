@@ -24,18 +24,38 @@ That matches the report: search worked, a remembered term ran, a new term showed
 
 ## What was built
 
-- Every provider gets `SearchAggregator.ProviderDeadline` (4 s) to answer, via `Task.WaitAsync`. A provider
+- Every provider gets `SearchAggregator.ProviderDeadline` (6 s) to answer, via `Task.WaitAsync`. A provider
   that misses it contributes nothing to that result set, and the miss is logged. The other categories
   show as normal.
+- **The Files provider's index gets its own 2 s** (`FileSearchProvider.IndexDeadline`). Past that, it is
+  treated as unable to answer, and the capped scan runs instead. The index and the scan run *in turn*
+  under the one provider deadline, so without this a stalled index would have used up the scan's time as
+  well. With it, a stalled index still leaves the Files category answering, from the scan.
 - Cancellation still returns at once. A superseded term doesn't wait out the deadline.
 - `WaitAsync` stops *waiting* but can't stop the provider. A stalled index call keeps a thread-pool
   thread until the OS gives up. Its answer is never read.
 
+## Why only a restart cleared it
+
+The index's connection string leaves OLE DB connection pooling on. A connection wedged in the pool
+outlives every search, and only a fresh process gets a fresh pool. This is why a restart, and nothing
+short of it, brought search back.
+
+## Known limitations
+
+- **A stalled call is abandoned, not stopped.** `WaitAsync` stops *waiting*. The blocked OLE DB call
+  keeps its thread-pool thread and its connection until the OS gives up. While the index stays wedged,
+  each new term leaves one more behind. Search now *looks* healthy, so more may pile up before a restart
+  than did before. **This change fixes what the user sees; the stalled call underneath is unchanged.**
+- An abandoned call's eventual exception goes unobserved by the aggregator. `Program.cs`'s
+  `UnobservedTaskException` handler logs it when the task is collected, but without the search term.
+
 ## Decisions
 
-- **4 seconds.** The index answers in milliseconds when it's working, and the fallback scan is capped at
-  2000 folders. The deadline is there to catch a stall, not a slow answer. A deliberately slow machine
-  could lose the Files category for one term; that is the trade-off.
+- **6 seconds overall, 2 for the index.** The index answers in milliseconds when it's working, and the scan
+  is capped at 2000 folders. This leaves the scan about 4 s. The deadline is there to catch a stall, not a
+  slow answer. A slow network-mounted scope could still lose the Files category for one term; that is the
+  trade-off.
 - **Fix it in the aggregator, not in the index.** A deadline in `WindowsSearchIndex` would protect one
   provider. In the aggregator it protects all seven, including any added later.
 - **Not progressive results.** Showing fast categories first and merging slow ones in later would remove

@@ -22,10 +22,10 @@ namespace DashDetective.Shell.Search;
 /// category's results back, for that term and for every later one queued behind it.
 /// </summary>
 public sealed class SearchAggregator {
-    /// <summary>How long one provider may take before its category is left out. Far above what the
-    /// index or the capped fallback scan take when they are working, so only a stalled source hits it.
-    /// </summary>
-    internal static readonly TimeSpan ProviderDeadline = TimeSpan.FromSeconds(4);
+    /// <summary>How long one provider may take before its category is left out. Far above what any
+    /// provider takes when it is working, so only a stalled source hits it; the Files provider hands a
+    /// stalled index over to its scan well inside it.</summary>
+    internal static readonly TimeSpan ProviderDeadline = TimeSpan.FromSeconds(6);
 
     private readonly IReadOnlyList<ISearchProvider> _providers;
     private readonly TimeSpan _deadline;
