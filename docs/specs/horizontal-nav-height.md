@@ -27,12 +27,14 @@ tall around ~50px of content, and at 200% ~128px around ~60px. That surplus was 
 - **The drag preview uses the last measured height.** The view reports the rail's height from
   `SizeChanged` (`ReportBarHeight`), and `RailThickness(horizontal: true)` returns it. Before the bar
   has been horizontal at the current text size, it returns `HorizontalBarEstimate` (45px, the height
-  at 100%). A text-scale change discards the measurement. This is the one place the preview can be a
-  few pixels off: the first drag to a horizontal edge after raising the text size.
+  at 100%). A text-scale or collapse change made while the bar is vertical discards the measurement;
+  a horizontal bar reports its own new height. This is the one place the preview can be a few pixels
+  off: the first drag to a horizontal edge after one of those changes.
+- **The drop band is multiplied by the interface size.** The rail is drawn inside the scale host and
+  the band in the window's overlay, outside it, so at 150% the band used to be two-thirds of the bar
+  on either axis. This predates this change but broke step 5 below.
 
 ## How to verify
-
-Nobody has looked at this change in the running app yet (see the PR).
 
 1. Settings → Appearance → Navigation → Position: **Top**. The bar should hug its items: no band of
    empty space above or below the row of items, the brand logo or the avatar.

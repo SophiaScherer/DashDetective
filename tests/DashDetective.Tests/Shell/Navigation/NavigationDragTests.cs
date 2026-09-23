@@ -1,5 +1,9 @@
 using DashDetective.Shell.Navigation;
+using DashDetective.Tests.Services.Theming;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
 using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
@@ -93,15 +97,75 @@ public class NavigationDragTests {
         Assert.Equal(58, bar.RailThickness(horizontal: true));
     }
 
-    // The labels change height with the text, so a height measured at the old size is stale.
+    // A report is stale once the bar's labels change height, but only a bar that is not horizontal
+    // needs telling: a horizontal one reports its new height itself.
     [Fact]
-    public void SetTextScale_DiscardsTheMeasuredHeight() {
+    public void SetTextScale_WhileVertical_DiscardsTheMeasuredHeight() {
         var bar = Bar(NavOrientation.Top, collapsed: false);
         bar.ReportBarHeight(47);
+        bar.Orientation = NavOrientation.Left;
         bar.SetTextScale(1.5);
 
         Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
     }
+
+    // A horizontal bar with a scroll bar is taller than the estimate and may not change height with the
+    // text, so throwing its report away would leave nothing to correct the preview.
+    [Fact]
+    public void SetTextScale_WhileHorizontal_KeepsTheMeasuredHeight() {
+        var bar = Bar(NavOrientation.Top, collapsed: true);
+        bar.ReportBarHeight(57);
+        bar.SetTextScale(0.8);
+
+        Assert.Equal(57, bar.RailThickness(horizontal: true));
+    }
+
+    [Fact]
+    public void Collapsing_WhileVertical_DiscardsTheMeasuredHeight() {
+        var bar = Bar(NavOrientation.Top, collapsed: false);
+        bar.ReportBarHeight(58);
+        bar.Orientation = NavOrientation.Left;
+        bar.IsCollapsed = true;
+
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
+    }
+
+    [Fact]
+    public void AutoCollapsing_WhileVertical_DiscardsTheMeasuredHeight() {
+        var bar = Bar(NavOrientation.Top, collapsed: false);
+        bar.ReportBarHeight(58);
+        bar.Orientation = NavOrientation.Left;
+        bar.SetShellWidth(NavigationViewModel.AutoCollapseWidth - 1);
+
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
+    }
+
+    [Fact]
+    public void UiScale_FollowsTheInterfaceSize_ForTheDropBand() {
+        var bar = Bar(NavOrientation.Left, collapsed: false);
+        Assert.Equal(1, bar.UiScale);
+
+        bar.SetUiScale(1.5);
+
+        Assert.Equal(1.5, bar.UiScale);
+    }
+
+    /// <summary>The fix itself lives in markup, where a view-model test cannot see it: a Height on the rail
+    /// brings the fixed bar back, and an inline Padding on the footer silently beats the horizontal
+    /// style that keeps it to the item rows' height.</summary>
+    [Fact]
+    public void Markup_LeavesTheBarHeightToItsContent() {
+        var file = Path.Combine(PaletteFile.SourceRoot(), "src/Shell/Navigation/NavigationView.axaml");
+        var root = XDocument.Load(file).Root!;
+
+        var rail = root.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "RailBorder");
+        Assert.Null(rail.Attribute("Height"));
+
+        var footer = root.Descendants().Single(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Classes") == "footer");
+        Assert.Null(footer.Attribute("Padding"));
+    }
+
+    private static readonly XNamespace X = "http://schemas.microsoft.com/winfx/2006/xaml";
 
     // Dragging previews edges the bar is not docked to, so both axes must answer whichever edge it is on.
     [Theory]

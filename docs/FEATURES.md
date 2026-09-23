@@ -90,8 +90,10 @@ above and below it. It now has no `Height` at all, and its footer drops to `14,6
 avatar does not out-grow the item rows. The drop preview cannot measure a bar that is not horizontal
 yet, so `RailThickness(horizontal: true)` answers the height the view last reported
 (`ReportBarHeight`, from the rail's `SizeChanged`), and `HorizontalBarEstimate` (45) until there is
-one; a text-scale change discards the report, since the labels change height with it. The estimate
-is a preview only — the bar itself never reads it. `MainWindowViewModel` owns page routing and delegates the bar to
+one. A text-scale or collapse change made while the bar is vertical discards the report, since the
+labels change height with both; a horizontal bar reports its new height itself. The estimate is a
+preview only — the bar itself never reads it. The band is multiplied by the interface size
+(`UiScale`), because the overlay it is drawn in sits outside the scale host. `MainWindowViewModel` owns page routing and delegates the bar to
 `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
 *Persistence* below); this is shared shell work, not a tab-local change.
 

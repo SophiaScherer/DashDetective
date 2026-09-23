@@ -265,8 +265,8 @@
         </Style>
         <!-- Declared after the drag dim so it wins the overlap: a dropped drag re-docks before EndDrag
              clears the dim, and the arriving bar must be fully out, not four-tenths in. Dropping the size
-             transition for the duration is the other half: a dock change flips which axis is NaN, and NaN
-             is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
+             transition for the duration is the other half: a dock change moves Width between a number and
+             NaN, and NaN is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
              is insurance rather than a fix for something visible. Opacity keeps its transition here, or
              there would be no fade at all. -->
         <Style Selector="Border.rail.relocating">

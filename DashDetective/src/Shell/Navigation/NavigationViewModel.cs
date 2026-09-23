@@ -243,11 +243,13 @@ public partial class NavigationViewModel : ViewModelBase {
     public double RailThickness(bool horizontal) =>
         horizontal ? HorizontalBarHeight : Math.Max(1, _textScale) * (IsRailCollapsed ? 64 : 236);
 
-    /// <summary>A horizontal bar's height before it has been laid out at the current text size. Only the
+    /// <summary>A horizontal bar's height before it has been laid out at the current text size and
+    /// collapse state: the 36px item rows plus their 4px list margin and the hairline, at 100%. Only the
     /// drag preview reads it; the bar itself is as tall as its content.</summary>
     internal const double HorizontalBarEstimate = 45;
 
-    // The last height a horizontal bar was laid out at. 0 until then, and again after a text-scale change.
+    // The last height a horizontal bar was laid out at. 0 until then, and again whenever something the
+    // bar's height depends on changes while it is not horizontal to report the new one.
     private double _measuredBarHeight;
 
     private double HorizontalBarHeight => _measuredBarHeight > 0 ? _measuredBarHeight : HorizontalBarEstimate;
@@ -268,9 +270,24 @@ public partial class NavigationViewModel : ViewModelBase {
             return;
 
         _textScale = factor;
-        _measuredBarHeight = 0;
+        ForgetBarHeight();
         OnPropertyChanged(nameof(RailWidth));
     }
+
+    /// <summary>The interface size, for sizing the drop preview: the rail is drawn inside the scale host
+    /// and the preview in the window's overlay, which is outside it.</summary>
+    internal double UiScale => _uiScale;
+
+    // A horizontal bar reports its own height on every change, so only a vertical one holds a stale report.
+    private void ForgetBarHeight() {
+        if (!IsHorizontal)
+            _measuredBarHeight = 0;
+    }
+
+    // Collapsing hides the labels, which at large text are taller than the icons beside them.
+    partial void OnIsCollapsedChanged(bool value) => ForgetBarHeight();
+
+    partial void OnIsAutoCollapsedChanged(bool value) => ForgetBarHeight();
 
     /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
     /// docked edge; a fixed rail (full or collapsed) when vertical. There is no height counterpart: a
