@@ -116,7 +116,7 @@ Three rules came out of it:
   so both clear 3:1; `Hairline`/`RowLine` sit at a stated floor below it and `ChartGrid` a step lighter
   than those, because a separator repeats what spacing already says and the grid must stay under the trace
   drawn over it. `PaletteLineTests` pins the floor, the ceiling and that ordering.
-- **Judge small text by what renders, not by its nominal colour.** Antialiased 10–11.5px text reads about
+- **Judge small text by what renders, not by its nominal colour.** Antialiased 11–12.5px text reads about
   twice as light as its token — a rung measuring 4.7:1 still looked washed out — so the light ramp is
   authored darker than contrast alone asks for, and chart axis text (the smallest in the app) takes its
   own `ChartAxisText` key a rung heavier. Verify a change here with a screenshot, not a ratio.
@@ -155,6 +155,13 @@ to come: the Processes table's names and making the accent follow a color-vision
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
+
+A **default-sizing rebalance** is complete, measured against Windows File Explorer at the same DPI. The
+type ladder grew ~1.12 (body 12.5 → 14) and must stay strictly increasing; icons took the new `IconSize` /
+`IconSizeSmall` tokens and the 18-grid sites `Stretch="Uniform"`; and row pitch was set by measurement
+(Processes 16,7, the File Explorer tree 4,5 with an 11px caret, file rows 14,6 with their header in step).
+**100 % stays the default** — this changed what 100 % looks like, not the scale. Its decisions are in
+[docs/FEATURES.md](docs/FEATURES.md) under *Text size*, *File Explorer* and *Processes*.
 
 A **cross-page linking pass** is complete, in two halves. The Ping and DNS panels' fields each carry a
 link icon opening the typed host in the browser, over a new `IWebLinkOpener` seam (`src/Services/Links`) —
@@ -846,7 +853,9 @@ temperature is the expected outcome, not a defect.
   them all coherently. Two tokens, because the app has two jobs for an icon — one that identifies
   something or fills a chrome button, one inside a row-level button, a field or a tinted tile. A mark
   that is deliberately smaller than either (a clear X, a status dot, a drag grip, the puck's caret) is
-  not an icon and stays a literal. Nothing else earns this.
+  not an icon and stays a literal. **Unlike the type ladder, no test gates this one** — which mark counts
+  as an icon is a judgement call, so it is a convention and a stray literal will not fail the build.
+  Nothing else earns this.
 - **A scroller's content keeps `ScrollGutter` from the bar, as a Margin.** Auto-hide is pinned off, so
   content sits beside the bar and touches it without one. Never `ScrollViewer` Padding, which the scroll
   extent leaves out. A control that template-binds its scroller's `AllowAutoHide` (TreeView, ListBox)

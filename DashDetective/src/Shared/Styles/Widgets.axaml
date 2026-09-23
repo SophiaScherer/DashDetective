@@ -118,7 +118,7 @@
          hiding the panel itself would drop it out of a board's visible children and change what a drop
          index means. -->
     <Style Selector="controls|WidgetPanel /template/ TextBlock#PART_ChevronGlyph">
-        <!-- Body, not the Processes table's Nano: that one is read against a Body row, this against a
+        <!-- Body, not the Processes table's Micro: that one is read against a Body row, this against a
              Subhead SemiBold panel title, where anything much smaller reads as a dot rather than a
              chevron. -->
         <Setter Property="FontSize" Value="{DynamicResource TextSizeBody}"/>

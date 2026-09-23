@@ -5,7 +5,7 @@
              xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:settings="using:DashDetective.Tabs.Settings"
              xmlns:nav="using:DashDetective.Shell.Navigation"
-             mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="720"
+             mc:Ignorable="d" d:DesignWidth="840" d:DesignHeight="720"
              x:DataType="settings:SettingsViewModel"
              x:Class="DashDetective.Tabs.Settings.SettingsView">
 
