@@ -268,6 +268,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Icons.Document, Icons.FileExplorer),
         ], _recents);
         _recents.Changed += Persist;
+
+        // The search dropdown is a popup, so it draws above the Help scrim and its results would still
+        // navigate the page behind the modal. Opening Help puts it away, keeping the term.
+        Help.PropertyChanged += (_, e) => {
+            if (e.PropertyName == nameof(HelpViewModel.IsOpen) && Help.IsOpen)
+                Search.Close();
+        };
         _toolkit.PinsChanged += Persist;
         _toolkit.CommandsChanged += Persist;
 
@@ -293,9 +300,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _clockTimer.Start();
     }
 
-    /// <summary>Applies persisted appearance + layout through the owning seams: theme/graph colors via
-    /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
-    /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
     private void OnAccessibilityChanged() {
         SyncNavScales();
@@ -314,6 +318,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.SetUiScale(_accessibility.ScaleFactor);
     }
 
+    /// <summary>Applies persisted appearance + layout through the owning seams: theme/graph colors via
+    /// <see cref="ThemeService"/>, dock/collapse via <see cref="Nav"/>, and show-hidden via the File
+    /// Explorer. The refresh interval and toggles are applied by <see cref="SettingsViewModel"/>.</summary>
     private void ApplySettings(AppSettings settings) {
         Shortcuts.Load(ShortcutOverrideCodec.Decode(settings.ShortcutOverrides));
 
@@ -585,19 +592,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     // ----- Keyboard shortcuts -----
 
+    /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
+    /// no shortcuts of its own. Read by the window before resolving a key.</summary>
+    public ShortcutScope ActiveScope =>
+        ModalShortcuts.Scope(Help, AccentPicker,
+            Search.IsOpen ? Search.Scope : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global);
+
     /// <summary>
     /// Runs a keyboard shortcut, returning whether it was consumed (an unconsumed key falls through to
     /// the rest of the app). The priority chain lives here rather than in the window so it is testable
     /// without a UI: an open modal owns the keyboard first, then the current page gets a chance at its
     /// own shortcuts, and anything left over is handled globally.
     /// </summary>
-    /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
-    /// no shortcuts of its own. Read by the window before resolving a key.</summary>
-    public ShortcutScope ActiveScope =>
-        Help.IsOpen || AccentPicker.IsOpen ? ShortcutScope.Global
-        : Search.IsOpen ? Search.Scope
-        : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
-
     public bool HandleShortcut(ShortcutId id) {
         // A capture box on the Settings page is waiting for a key press. This listener tunnels from the
         // window, so it sees the press first; claiming it here would run the shortcut being rebound
@@ -605,23 +611,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         if (_settings.IsCapturingShortcut)
             return false;
 
-        // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
-        // allowed to act on the page hidden behind the scrim.
-        if (Help.IsOpen) {
-            if (id == ShortcutId.Escape)
-                Help.Close();
-            return true;
-        }
-
-        // The accent picker is modal the same way; Esc discards its draft. Enter falls through so a
-        // focused button in the picker can still be pressed with it.
-        if (AccentPicker.IsOpen) {
-            if (id == ShortcutId.Activate)
-                return false;
-            if (id == ShortcutId.Escape)
-                AccentPicker.CancelCommand.Execute(null);
-            return true;
-        }
+        // An open modal (Help or the accent picker) swallows every shortcut but two: Esc dismisses it, and
+        // Enter falls through so a focused button in its card can still be pressed.
+        if (ModalShortcuts.Handle(id, Help, AccentPicker) is { } consumed)
+            return consumed;
 
         // The search dropdown sits between the modal and the page: while it is open the arrows walk the
         // results and Esc puts it away, but unlike Help it doesn't swallow the rest — Ctrl+1 still

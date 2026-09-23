@@ -1574,6 +1574,13 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **Help** — **fully live**. A modal overlay (`F1` / `Ctrl+/` / the nav bar's button), **not a page**:
   no `NavItem`, no `ViewLocator` entry, so it can sit above every surface including the nav bar and
   needs no slot in the `Ctrl+1 … Ctrl+9` numbering.
+- **Modal for the keyboard as well as the pointer**, on the same rules as the accent picker. The shortcut
+  chain swallows every shortcut while it is open, Esc closes it, and **Enter falls through** so a focused
+  button presses. Tab cycles inside the card; the × takes focus on open, and closing hands focus back to
+  whatever held it, ring included, or clears it if that is gone. **The keyboard half is not cosmetic:**
+  without it, Tab walked out to the page behind the scrim, a Settings control could open the accent
+  picker on top of Help, and Esc then closed the hidden Help first. A click on empty space inside the card
+  leaves it open, because an empty spot reports the card itself as the source, and that counts as inside.
 - **Two kinds of content, one of them generated.** The keyboard table is built from
   `ShortcutBindings.HelpGroups` — the same object the key handler resolves against — so it lists the
   keys currently bound, rebinds included, and cannot describe a binding that is not live. Everything

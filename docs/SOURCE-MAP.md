@@ -1161,6 +1161,12 @@ stays in its tab folder.
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
                                  code-behind calls — MainWindow's own Export among them)
+      ModalShortcuts.cs         (the MODAL step of HandleShortcut and ActiveScope: while Help or the
+                                 accent picker is open, Esc dismisses it, Enter falls through to the
+                                 focused button, everything else is swallowed, and keys resolve in
+                                 Global. Split out, like RefreshHint, because MainWindowViewModel
+                                 builds every page and its samplers and cannot be constructed in a
+                                 test; it takes the two modal view models, which can)
 ```
 
 ## `src/Shell/TrayNotice`
@@ -1189,7 +1195,15 @@ stays in its tab folder.
                                      no NavItem, no ViewLocator entry. The scrim's non-null Background
                                      is what makes it modal — it swallows pointer input bound for the
                                      window behind it. Esc is NOT handled in the code-behind: the
-                                     shell's shortcut chain owns the key app-wide. The VM takes
+                                     shell's shortcut chain owns the key app-wide, and lets Enter
+                                     fall through its modal swallow so a focused button presses.
+                                     Modal for the KEYBOARD too: Tab cycles in the card, the × takes
+                                     focus on open, and closing hands focus back to what held it
+                                     (ring included) or clears it. Without that, Tab walked out to
+                                     the page behind and could open the accent picker ON TOP of
+                                     Help. A press on the Card ITSELF counts as inside
+                                     (IsInsideCard): IsVisualAncestorOf is false for the element,
+                                     and an empty spot on the card reports the card. The VM takes
                                      ShortcutBindings, not the catalog, so the table lists the keys the
                                      user actually chose, and re-announces its groups on a rebind.
                                      The accent picker is the second overlay on this shape; see
@@ -1405,7 +1419,7 @@ stays in its tab folder.
                                 AccentPickerOverlay.axaml(.cs)
                                                         (its view, on HelpOverlay's shape and HOSTED BY THE
                                                          SHELL beside it, so the scrim covers the nav bar.
-                                                         Two differences from Help: a press on the Card ITSELF
+                                                         Same modal rules as Help: a press on the Card ITSELF
                                                          counts as inside — IsVisualAncestorOf is false for
                                                          the element, and an empty spot reports the card — and
                                                          Tab cycles in the card. The body scrolls so the footer
