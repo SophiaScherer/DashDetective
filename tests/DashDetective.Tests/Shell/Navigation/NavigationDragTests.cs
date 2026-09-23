@@ -39,14 +39,68 @@ public class NavigationDragTests {
         Assert.Equal(bar.RailWidth, bar.RailThickness(horizontal: false));
     }
 
+    // A horizontal bar sizes to its content, so the band is whatever the layout last reported.
     [Theory]
     [InlineData(NavOrientation.Top, false)]
     [InlineData(NavOrientation.Top, true)]
     [InlineData(NavOrientation.Bottom, false)]
     [InlineData(NavOrientation.Bottom, true)]
-    public void RailThickness_HorizontalBar_MatchesRailHeight(NavOrientation orientation, bool collapsed) {
+    public void RailThickness_HorizontalBar_MatchesTheReportedHeight(NavOrientation orientation, bool collapsed) {
         var bar = Bar(orientation, collapsed);
-        Assert.Equal(bar.RailHeight, bar.RailThickness(horizontal: true));
+        bar.ReportBarHeight(47);
+
+        Assert.Equal(47, bar.RailThickness(horizontal: true));
+    }
+
+    [Fact]
+    public void RailThickness_HorizontalBarNotYetLaidOut_FallsBackToTheEstimate() {
+        var bar = Bar(NavOrientation.Left, collapsed: false);
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
+    }
+
+    // A vertical rail's width is not a horizontal bar's height, so a report from one must not size the other.
+    [Theory]
+    [InlineData(NavOrientation.Left)]
+    [InlineData(NavOrientation.Right)]
+    public void ReportBarHeight_VerticalRail_IsIgnored(NavOrientation orientation) {
+        var bar = Bar(orientation, collapsed: false);
+        bar.ReportBarHeight(700);
+
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void ReportBarHeight_UnusableHeight_KeepsTheLastGoodOne(double height) {
+        var bar = Bar(NavOrientation.Top, collapsed: false);
+        bar.ReportBarHeight(47);
+        bar.ReportBarHeight(height);
+
+        Assert.Equal(47, bar.RailThickness(horizontal: true));
+    }
+
+    /// <summary>The bug this pins: the bar's height was its authored height times the text scale, but only
+    /// the labels grow, so at 200% it drew an empty band as tall as its content.</summary>
+    [Fact]
+    public void RailThickness_HorizontalBarAtLargeText_IsWhatTheContentNeeds() {
+        var bar = Bar(NavOrientation.Top, collapsed: false);
+        bar.SetTextScale(2);
+        bar.ReportBarHeight(58);
+
+        Assert.Equal(58, bar.RailThickness(horizontal: true));
+    }
+
+    // The labels change height with the text, so a height measured at the old size is stale.
+    [Fact]
+    public void SetTextScale_DiscardsTheMeasuredHeight() {
+        var bar = Bar(NavOrientation.Top, collapsed: false);
+        bar.ReportBarHeight(47);
+        bar.SetTextScale(1.5);
+
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
     }
 
     // Dragging previews edges the bar is not docked to, so both axes must answer whichever edge it is on.
@@ -57,7 +111,7 @@ public class NavigationDragTests {
         var bar = Bar(orientation, collapsed: false);
 
         Assert.Equal(236, bar.RailThickness(horizontal: false));
-        Assert.Equal(64, bar.RailThickness(horizontal: true));
+        Assert.Equal(NavigationViewModel.HorizontalBarEstimate, bar.RailThickness(horizontal: true));
     }
 
     [Fact]
@@ -65,7 +119,6 @@ public class NavigationDragTests {
         var bar = Bar(NavOrientation.Left, collapsed: true);
 
         Assert.Equal(64, bar.RailThickness(horizontal: false));
-        Assert.Equal(54, bar.RailThickness(horizontal: true));
     }
 
     /// <summary>The rail grows with the text it holds, but its icons do not shrink with smaller text, so
@@ -77,7 +130,6 @@ public class NavigationDragTests {
         bar.SetTextScale(0.8);
 
         Assert.Equal(64, bar.RailThickness(horizontal: false));
-        Assert.Equal(54, bar.RailThickness(horizontal: true));
     }
 
     [Fact]

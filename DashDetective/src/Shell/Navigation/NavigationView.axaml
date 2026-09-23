@@ -30,11 +30,11 @@
 
         <!-- Motion. The rail is the one place in this app that animates, and only for its own two moves:
              a collapse that snaps 236px to 64px and a bar that teleports between window edges both read as
-             glitches rather than gestures. The size transition is declared PER AXIS because RailWidth and
-             RailHeight are NaN on whichever axis stretches, and NaN is not worth interpolating — a vertical
-             rail tweens Width only, a horizontal one Height only. A dock change cannot be tweened at all
-             (a DockPanel offers no path between edges), so it fades instead: out, relayout while
-             invisible, back in. Both live on the rail Border, which carries no :pointerover of its own. -->
+             glitches rather than gestures. Only a vertical rail tweens its size: RailWidth is NaN on a
+             horizontal bar, whose height follows its content, and NaN is not worth interpolating. A dock
+             change cannot be tweened at all (a DockPanel offers no path between edges), so it fades
+             instead: out, relayout while invisible, back in. Both live on the rail Border, which carries no
+             :pointerover of its own. -->
         <Style Selector="Border.rail:not(.horizontal)">
             <Setter Property="Transitions">
                 <Transitions>
@@ -46,7 +46,6 @@
         <Style Selector="Border.rail.horizontal">
             <Setter Property="Transitions">
                 <Transitions>
-                    <DoubleTransition Property="Height" Duration="0:0:0.15" Easing="CubicEaseOut"/>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
                 </Transitions>
             </Setter>
@@ -145,12 +144,15 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- Footer separator sits on the edge facing the content. -->
+        <!-- Footer separator sits on the edge facing the content. A horizontal bar is as tall as its
+             tallest part, so its footer keeps to the item rows' height rather than setting its own. -->
         <Style Selector="Border.rail Border.footer">
             <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Padding" Value="14,12"/>
         </Style>
         <Style Selector="Border.rail.horizontal Border.footer">
             <Setter Property="BorderThickness" Value="1,0,0,0"/>
+            <Setter Property="Padding" Value="14,6"/>
         </Style>
 
         <!-- On-bar control buttons: the collapse toggle beside the logo, and the Help + orientation
@@ -295,13 +297,14 @@
            Classes.dragging="{Binding IsDragging}"
            PointerEntered="OnRailPointerEntered" PointerExited="OnRailPointerExited">
 
-    <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
-         inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
-         the middle, with the dock edges flipped for a horizontal bar. -->
+    <!-- A vertical rail has a fixed width; a horizontal bar is as tall as its content. Either stretches
+         along the docked edge. The inner DockPanel lays brand/toggle at the start, footer at the end, and
+         the item list fills the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
             Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
             Classes.relocating="{Binding IsRelocating}"
-            Width="{Binding RailWidth}" Height="{Binding RailHeight}"
+            Width="{Binding RailWidth}"
+            SizeChanged="OnRailSizeChanged"
             Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
 
@@ -379,7 +382,7 @@
             <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help button.
                  One cluster serves every state — the avatar and the button bracket the running axis,
                  dropping into a column on a collapsed rail. -->
-            <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}" Padding="14,12"
+            <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}"
                     BorderBrush="{DynamicResource Hairline}">
                 <DockPanel LastChildFill="True" VerticalAlignment="Center">
 

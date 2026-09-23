@@ -63,6 +63,10 @@ public partial class NavigationView : UserControl {
 
     private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
 
+    // A horizontal bar sizes to its content, so the drop preview learns its height from the layout.
+    private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        _viewModel?.ReportBarHeight(e.NewSize.Height);
+
     // ----- Drag-to-dock -----
 
     private void OnBrandPointerPressed(object? sender, PointerPressedEventArgs e) {
