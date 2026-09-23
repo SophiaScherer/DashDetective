@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using DashDetective.Shared.Shortcuts;
 using System;
 
 namespace DashDetective.Tabs.Settings;
