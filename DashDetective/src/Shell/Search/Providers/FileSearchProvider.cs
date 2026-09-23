@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Search;
 using System;
 using System.Collections.Generic;
@@ -87,7 +88,10 @@ public sealed class FileSearchProvider : ISearchProvider {
         string term, IReadOnlyList<string> scopes, int limit, CancellationToken token) {
         try {
             return await _index.SearchAsync(term, scopes, limit, token).WaitAsync(IndexDeadline, token);
-        } catch (TimeoutException) {
+        } catch (TimeoutException e) {
+            // Logged here, not left to the aggregator: the scan answers, so its deadline never fires, and
+            // this line is the one a report of a stuck search box needs.
+            Log.Warn($"Windows index did not answer within {IndexDeadline.TotalSeconds:0.#}s; searching the folders instead", e);
             return null;
         }
     }

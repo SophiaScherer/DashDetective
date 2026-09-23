@@ -59,7 +59,7 @@ short of it, brought search back.
 - **Fix it in the aggregator, not in the index.** A deadline in `WindowsSearchIndex` would protect one
   provider. In the aggregator it protects all seven, including any added later.
 - **Not progressive results.** Showing fast categories first and merging slow ones in later would remove
-  even the 4-second wait. That is a bigger change to the dropdown, so I left it as a suggestion.
+  even the wait for a stalled provider. That is a bigger change to the dropdown, so I left it as a suggestion.
 
 ## How to verify
 
@@ -68,8 +68,8 @@ Not reproducible on demand. To exercise the path:
 1. Stop the Windows Search service (`services.msc` → Windows Search → Stop). The index then *fails*
    rather than stalls, so the fallback scan answers. Search should still work, as before this change.
 2. To simulate a stall, pause the service or break the index while a query is in flight. Pages,
-   settings and the other categories should show within about 4 seconds, and a new term should keep
+   settings and the other categories should show at once, files after about 2 seconds (from the scan), and a new term should keep
    working.
-3. The log (`%LocalAppData%\DashDetective\logs`) records "Search provider File did not answer within 4s"
+3. The log (`%LocalAppData%\DashDetective\logs`) records "Windows index did not answer within 2s; searching the folders instead"
    each time the deadline fires. **If the tester hits the original bug again, that line is the thing to
    look for:** it confirms or rules out this mechanism.
