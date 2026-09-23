@@ -268,6 +268,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Icons.Document, Icons.FileExplorer),
         ], _recents);
         _recents.Changed += Persist;
+
+        // The search dropdown is a popup, so it draws above the Help scrim and its results would still
+        // navigate the page behind the modal. Opening Help puts it away, keeping the term.
+        Help.PropertyChanged += (_, e) => {
+            if (e.PropertyName == nameof(HelpViewModel.IsOpen) && Help.IsOpen)
+                Search.Close();
+        };
         _toolkit.PinsChanged += Persist;
         _toolkit.CommandsChanged += Persist;
 
