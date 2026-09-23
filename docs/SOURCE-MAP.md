@@ -685,7 +685,7 @@ stays in its tab folder.
                                  templates their presenters and neither can host a ScaleHost.
                                  BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
                                  SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
-        TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
+        TextScale.cs            (every authored type size the text scale scales, keyed by resource
                                  name. Rebalanced once against File Explorer — every step ~1.12 bigger,
                                  rounded to 0.5, body 12.5 -> 14 — and strictly increasing, since rounding
                                  is how two steps merge onto one value. Mirrors the TextSize* defaults in

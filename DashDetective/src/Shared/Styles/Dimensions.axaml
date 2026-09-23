@@ -52,7 +52,6 @@
     <!-- The type ladder, smallest to largest, declared in ascending order and kept strictly increasing.
          Every FontSize in the app comes from here, so text scale is one rewrite of these keys. Values
          mirror TextScale.BaseSizes; a test pins them together. -->
-    <sys:Double x:Key="TextSizeNano">10</sys:Double>
     <sys:Double x:Key="TextSizeMicro">11</sys:Double>
     <sys:Double x:Key="TextSizeMini">11.5</sys:Double>
     <sys:Double x:Key="TextSizeCaption">12</sys:Double>

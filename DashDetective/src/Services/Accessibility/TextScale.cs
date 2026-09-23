@@ -15,7 +15,6 @@ internal static class TextScale {
     /// ~1.12 rounded to 0.5. Steps stay strictly increasing — a test pins that — since rounding two
     /// neighbours onto one value would flatten the hierarchy the ladder exists to carry.</summary>
     internal static readonly IReadOnlyDictionary<string, double> BaseSizes = new Dictionary<string, double> {
-        ["TextSizeNano"] = 10,
         ["TextSizeMicro"] = 11,
         ["TextSizeMini"] = 11.5,
         ["TextSizeCaption"] = 12,

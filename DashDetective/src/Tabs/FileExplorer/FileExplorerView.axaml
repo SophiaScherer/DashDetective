@@ -17,7 +17,7 @@
         <!-- Tree rows: tighten spacing and recolour selection/hover to match the design comp
              (AccentSoft selected, HoverOverlay hover) instead of the Fluent defaults. -->
         <Style Selector="TreeViewItem">
-            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="Padding" Value="4,5"/>
             <Setter Property="MinHeight" Value="0"/>
         </Style>
         <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
@@ -65,11 +65,11 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <!-- Filled, so Fill and not Stroke; Uniform scales the 18x18-authored caret into the 8px box
+        <!-- Filled, so Fill and not Stroke; Uniform scales the 18x18-authored caret into the box
              the tree row reads it against. -->
         <Style Selector="Path.treeCaret">
-            <Setter Property="Width" Value="8"/>
-            <Setter Property="Height" Value="8"/>
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Height" Value="11"/>
             <Setter Property="Stretch" Value="Uniform"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -87,7 +87,7 @@
         <!-- ===== File list ===== -->
         <!-- colHead / colHead.active / sortArrow are shared (src/Shared/Styles/SharedStyles.axaml). -->
         <Style Selector="Border.fileRow">
-            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Padding" Value="14,6"/>
             <Setter Property="BorderBrush" Value="{DynamicResource RowLine}"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -358,7 +358,8 @@
 
                 <!-- Column header. Each cell is a chrome-less button that sorts by its column;
                      the active column tints and shows a ↑/↓ arrow (bound to the SortColumn VMs). -->
-                <Border Grid.Row="0" Padding="14,10" BorderBrush="{DynamicResource Hairline}"
+                <!-- Vertical padding tracks Border.fileRow's, or the header band looms over the rows. -->
+                <Border Grid.Row="0" Padding="14,8" BorderBrush="{DynamicResource Hairline}"
                         BorderThickness="0,0,0,1">
                     <!-- This grid's width is exactly what the columns get, so it (not the outer panel)
                          is what the view model measures against when deciding how many still fit. -->

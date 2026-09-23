@@ -518,7 +518,7 @@ Interface size transforms the whole app; text size grows only the type. They mul
 gives text at 2.25x while the chrome grows 1.5x.
 
 **One ladder, swept across every view.** Every authored `FontSize` value is now
-`{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
+`{DynamicResource TextSize*}` against a step ladder in `Dimensions.axaml`, which
 `ThemeService.ApplyTextScale` rewrites. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins
 them together, as `SemanticBrushes` mirrors Palette.axaml.
 
@@ -950,6 +950,10 @@ tab-local except the shared refresh seam:
   `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
   active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
   adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
+- **Row pitch is set against File Explorer's, not by eye.** The list runs `fileRow` padding 14,6 around
+  an 18px glyph — about 32px a row, where Explorer is 28 around a 16px icon, so the same share of the row
+  is ink. The tree was the worst of it at 20px a row against Explorer's 32: it is `TreeViewItem` padding
+  4,5 now, near 30, and its caret is 11 rather than 8.
 - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
   `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
   between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
@@ -1249,8 +1253,10 @@ behind it that must not be quietly undone:
   both are usually a glance rather than a preference. Each reports a change only while its toggle is on,
   nothing is written for a toggle that is off, and seeding a saved value on startup is quiet so it does
   not write straight back. `PreferencesChanged` is the one event the shell hooks to `Persist`.
-- **Row density** was tightened (`procRow` padding 16,5). `Button.chev`'s negative margin must stay in
-  step with it, as its own comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
+- **Row density** is `procRow` padding 16,7. It was tightened to 16,5 once and that read squished beside
+  the app's own file rows, so the rebalance against File Explorer put it back: the row now sits at about
+  33px against the file list's 32. `Button.chev`'s negative margin must stay in step with it, as its own
+  comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
