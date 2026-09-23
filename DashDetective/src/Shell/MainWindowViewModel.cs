@@ -594,9 +594,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>Which set of bindings is live right now — the current page's, or Global for a page with
     /// no shortcuts of its own. Read by the window before resolving a key.</summary>
     public ShortcutScope ActiveScope =>
-        Help.IsOpen || AccentPicker.IsOpen ? ShortcutScope.Global
-        : Search.IsOpen ? Search.Scope
-        : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global;
+        ModalShortcuts.Scope(Help, AccentPicker,
+            Search.IsOpen ? Search.Scope : (CurrentPage as IShortcutTarget)?.Scope ?? ShortcutScope.Global);
 
     public bool HandleShortcut(ShortcutId id) {
         // A capture box on the Settings page is waiting for a key press. This listener tunnels from the
@@ -605,25 +604,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         if (_settings.IsCapturingShortcut)
             return false;
 
-        // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
-        // allowed to act on the page hidden behind the scrim. Enter falls through so a focused button in
-        // the card can still be pressed with it.
-        if (Help.IsOpen) {
-            if (id == ShortcutId.Activate)
-                return false;
-            if (id == ShortcutId.Escape)
-                Help.Close();
-            return true;
-        }
-
-        // The accent picker is modal the same way, Enter included; Esc discards its draft.
-        if (AccentPicker.IsOpen) {
-            if (id == ShortcutId.Activate)
-                return false;
-            if (id == ShortcutId.Escape)
-                AccentPicker.CancelCommand.Execute(null);
-            return true;
-        }
+        // An open modal (Help or the accent picker) swallows every shortcut but two: Esc dismisses it, and
+        // Enter falls through so a focused button in its card can still be pressed.
+        if (ModalShortcuts.Handle(id, Help, AccentPicker) is { } consumed)
+            return consumed;
 
         // The search dropdown sits between the modal and the page: while it is open the arrows walk the
         // results and Esc puts it away, but unlike Help it doesn't swallow the rest — Ctrl+1 still
