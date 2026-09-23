@@ -21,8 +21,11 @@ instead of a flat 820px:
 - **The breakpoint counts text size.** The old one didn't, so at 200% text the 472px rail kept its labels
   until the page was down to about 350px. That is the "cramped before the rail adapts" the item describes.
 - **A horizontal bar's breakpoint is measured.** Its labels overflow long before 1008px: nine labeled items
-  need roughly 1250px. The view reports the bar width minus the item strip's viewport plus the strip's
-  extent from `ScrollChanged`, and the bar folds when the window is narrower than that. This is what
+  need roughly 1250px. After each layout pass the view reports the bar width minus the item strip's
+  viewport plus the strip's *desired* width, and the bar folds when the window is narrower than that
+  (less one logical pixel of rounding slack). The scroller's `Extent` would be wrong here: Avalonia
+  stretches content to fill the viewport, so while the labels fit, the extent reads as the bar's own
+  width. The first draft used it, and review caught it: the bar folded after a one-pixel shrink. This is what
   "labels never clip before the switch" means for that orientation. A vertical rail's labels cannot clip,
   because the rail's width already grows with the text.
 - **The measurement only exists while the labels show.** Until an expanded horizontal bar has been laid

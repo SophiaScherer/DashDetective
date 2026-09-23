@@ -180,16 +180,17 @@ public class NavigationAutoCollapseTests {
     }
 
     /// <summary>A horizontal bar folds when its labeled items stop fitting, so labels never scroll out of
-    /// sight before the switch: the need is the bar less the strip's viewport plus the strip's extent.</summary>
+    /// sight before the switch: the need is the bar less the strip's viewport plus the strip's natural
+    /// width, less a pixel of layout slack.</summary>
     [Fact]
     public void ReportLabeledBarWidth_ItemsOverflow_FoldsTheBar() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
         Assert.False(bar.IsRailCollapsed);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 1170);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
 
-        Assert.Equal(1370, bar.AutoCollapseThreshold);
+        Assert.Equal(1370 - NavigationViewModel.LayoutSlack, bar.AutoCollapseThreshold);
         Assert.True(bar.IsRailCollapsed);
     }
 
@@ -198,9 +199,36 @@ public class NavigationAutoCollapseTests {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 700);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 700);
 
-        Assert.Equal(900, bar.AutoCollapseThreshold);
+        Assert.Equal(900 - NavigationViewModel.LayoutSlack, bar.AutoCollapseThreshold);
+        Assert.False(bar.IsRailCollapsed);
+    }
+
+    /// <summary>The bug this pins: the need was read off the scroller's extent, which is stretched to the
+    /// viewport while the labels fit, so the fold point became the bar's current width and the first
+    /// one-pixel shrink folded labels that had room to spare.</summary>
+    [Fact]
+    public void ReportLabeledBarWidth_FittingLabels_SurviveAOnePixelShrink() {
+        var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
+        bar.SetShellWidth(1100);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 700);
+
+        bar.SetShellWidth(1099);
+
+        Assert.False(bar.IsRailCollapsed);
+    }
+
+    // The scale host rounds its child up to whole logical pixels, so a bar that fits exactly can measure a
+    // fraction wider than the window that reports it.
+    [Fact]
+    public void ReportLabeledBarWidth_ExactFitRoundedUp_KeepsTheLabels() {
+        var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
+        bar.SetUiScale(1.25);
+        bar.SetShellWidth(1601);
+
+        bar.ReportLabeledBarWidth(barWidth: 1281, viewport: 1000, content: 1000);
+
         Assert.False(bar.IsRailCollapsed);
     }
 
@@ -209,7 +237,7 @@ public class NavigationAutoCollapseTests {
     public void ReportLabeledBarWidth_WhileCollapsed_IsIgnored() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top, IsCollapsed = true };
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 400);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 400);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
@@ -218,7 +246,7 @@ public class NavigationAutoCollapseTests {
     public void ReportLabeledBarWidth_VerticalRail_IsIgnored() {
         var bar = new NavigationViewModel();
 
-        bar.ReportLabeledBarWidth(barWidth: 236, viewport: 700, extent: 900);
+        bar.ReportLabeledBarWidth(barWidth: 236, viewport: 700, content: 900);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
@@ -226,10 +254,10 @@ public class NavigationAutoCollapseTests {
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
-    public void ReportLabeledBarWidth_UnusableMeasure_IsIgnored(double extent) {
+    public void ReportLabeledBarWidth_UnusableMeasure_IsIgnored(double content) {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: extent);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: content);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
@@ -239,9 +267,9 @@ public class NavigationAutoCollapseTests {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetUiScale(2);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 1170);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
 
-        Assert.Equal(2740, bar.AutoCollapseThreshold);
+        Assert.Equal((1370 - NavigationViewModel.LayoutSlack) * 2, bar.AutoCollapseThreshold);
     }
 
     // The labels change width with the text, so a measure taken at the old size no longer says where
@@ -249,7 +277,7 @@ public class NavigationAutoCollapseTests {
     [Fact]
     public void SetTextScale_ForgetsTheLabeledWidth() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 1170);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
 
         bar.SetTextScale(1.5);
 
@@ -261,7 +289,7 @@ public class NavigationAutoCollapseTests {
     public void Redocking_ReTestsTheBreakpointForTheNewEdge() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, extent: 1170);
+        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
         Assert.True(bar.IsRailCollapsed);
 
         bar.Orientation = NavOrientation.Left;

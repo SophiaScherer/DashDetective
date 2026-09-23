@@ -72,8 +72,13 @@ public partial class NavigationViewModel : ViewModelBase {
     /// width is reported from outside it.</summary>
     internal double AutoCollapseThreshold =>
         _uiScale * (IsHorizontal && _labeledBarWidth > 0
-            ? _labeledBarWidth
+            ? _labeledBarWidth - LayoutSlack
             : VerticalRailWidth(collapsed: false) + MinPageWidth);
+
+    /// <summary>One logical pixel given back from a measured need. The scale host rounds its child's size
+    /// up to whole logical pixels, so a bar whose labels fit exactly can measure a fraction wider than the
+    /// window reporting it, and would fold with nothing clipped.</summary>
+    internal const double LayoutSlack = 1;
 
     // The width a horizontal bar needs to show every item with its label. 0 until it has been laid out
     // expanded, and again after a text-scale change, since the labels change width with the text.
@@ -113,14 +118,16 @@ public partial class NavigationViewModel : ViewModelBase {
     }
 
     /// <summary>Records the width an expanded horizontal bar needs to show every label: its own width,
-    /// less the item strip's viewport, plus the strip's full extent. Ignored while the labels are hidden
-    /// or the bar is vertical, since neither lays the labels out along the window's width.</summary>
-    internal void ReportLabeledBarWidth(double barWidth, double viewport, double extent) {
+    /// less the item strip's viewport, plus the strip's natural width. That is the strip's desired width,
+    /// not the scroller's extent, which is stretched to at least the viewport and so would report the
+    /// bar's current width as its need whenever the labels fit. Ignored while the labels are hidden or the
+    /// bar is vertical, since neither lays the labels out along the window's width.</summary>
+    internal void ReportLabeledBarWidth(double barWidth, double viewport, double content) {
         if (!IsHorizontal || IsRailCollapsed)
             return;
 
-        var needed = barWidth - viewport + extent;
-        if (!double.IsFinite(needed) || needed <= 0)
+        var needed = barWidth - viewport + content;
+        if (!double.IsFinite(needed) || needed <= 0 || needed == _labeledBarWidth)
             return;
 
         _labeledBarWidth = needed;
