@@ -19,7 +19,7 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Width" Value="{x:Static controls:TitleBarRules.CaptionButtonWidth}"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
-        <!-- Native caption buttons are not in the tab order; the keyboard has Alt+Space and Win+arrows. -->
+        <!-- Native caption buttons are not in the tab order. -->
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="Template">
