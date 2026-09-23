@@ -83,6 +83,15 @@
          what makes a modal modal — it swallows pointer input bound for the window behind it. -->
     <SolidColorBrush x:Key="ScrimBackground" Color="{StaticResource ShadeColor}" Opacity="0.55"/>
 
+    <!-- ===== Window chrome =====
+         The close caption button's hover: Windows 11's own close red, in every theme and variant, since a
+         close that followed the theme or the accent would stop reading as close. White reads 5.7:1 on it.
+         The other caption buttons take the ordinary hover overlays and text ramp. -->
+    <Color x:Key="CaptionCloseColor">#C42B1C</Color>
+    <SolidColorBrush x:Key="CaptionCloseHover" Color="{StaticResource CaptionCloseColor}"/>
+    <SolidColorBrush x:Key="CaptionClosePressed" Color="{StaticResource CaptionCloseColor}" Opacity="0.9"/>
+    <SolidColorBrush x:Key="OnCaptionClose" Color="#FFFFFF"/>
+
     <!-- ===== Theme-invariant: accent set (swapped at runtime by ThemeService) =====
          Blue's shades, as AccentTone derives them, for the frame before ThemeService runs.
          AccentIdentityTests pins them against it. The graphic shades below are the same in both themes;
