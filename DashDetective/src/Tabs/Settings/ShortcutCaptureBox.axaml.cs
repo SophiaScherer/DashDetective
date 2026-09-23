@@ -18,7 +18,8 @@ namespace DashDetective.Tabs.Settings;
 /// is live.
 ///
 /// Modifier-only presses are ignored rather than captured, because a binding of "Ctrl" alone would fire
-/// the moment the key was touched. Escape abandons the capture.
+/// the moment the key was touched. Escape abandons the capture, and so does the Cancel button shown while
+/// it is armed — a click on empty page takes no focus, so without it a mouse user had no way out.
 /// </summary>
 public partial class ShortcutCaptureBox : UserControl {
     public static readonly StyledProperty<string> KeysProperty =
@@ -57,6 +58,7 @@ public partial class ShortcutCaptureBox : UserControl {
 
         Trigger.Click += (_, _) => StartCapture();
         Reset.Click += (_, _) => ResetRequested?.Invoke(this, EventArgs.Empty);
+        Cancel.Click += (_, _) => StopCapture();
 
         // Tunnelled and on the control itself: once armed, the press must not reach the button's own
         // key handling (Space and Enter would otherwise re-trigger the click).
@@ -95,17 +97,14 @@ public partial class ShortcutCaptureBox : UserControl {
         if (!IsCapturing)
             return;
 
-        // Held modifiers are how a gesture is built, not a gesture of their own.
-        if (GestureFormatter.IsModifierKey(e.Key)) {
-            e.Handled = true;
-            return;
-        }
-
         e.Handled = true;
 
-        if (e.Key == Key.Escape) {
-            StopCapture();
-            return;
+        switch (CaptureKeys.Classify(e.Key)) {
+            case CaptureKeyAction.Wait:
+                return;
+            case CaptureKeyAction.Cancel:
+                StopCapture();
+                return;
         }
 
         var gesture = new KeyGesture(e.Key, e.KeyModifiers);
@@ -117,5 +116,6 @@ public partial class ShortcutCaptureBox : UserControl {
         Label.Text = IsCapturing ? "Press keys…" : Keys;
         Box.Classes.Set("capturing", IsCapturing);
         Reset.IsVisible = IsCustom && !IsCapturing;
+        Cancel.IsVisible = IsCapturing;
     }
 }

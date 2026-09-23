@@ -1463,7 +1463,14 @@ stays in its tab folder.
                                                          listener tunnels from the window — so it raises
                                                          CapturingChanged for the view model to hold, and
                                                          the shell stands down on it. Modifier-only
-                                                         presses are ignored; Esc abandons)
+                                                         presses are ignored; Esc or the Cancel ×, shown
+                                                         only while armed, abandons. Cancel is NOT
+                                                         focusable, or pressing it would stand the capture
+                                                         down through LostFocus and hide itself mid-click)
+                                CaptureKeyAction.cs     (CaptureKeys.Classify: what an armed box does with a
+                                                         key — wait on a modifier, cancel on Esc, capture
+                                                         anything else. Out of the control so it is
+                                                         testable without a render backend)
                                 ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
                                                          whether it is custom, and the note explaining a
                                                          refused capture where it happened)

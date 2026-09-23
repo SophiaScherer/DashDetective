@@ -1545,6 +1545,13 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   window, so it sees the press *before* the capture box does — without this, arming a box and pressing
   Ctrl+1 would navigate away instead of capturing. `SettingsViewModel.IsCapturingShortcut` is what
   `HandleShortcut` checks first, returning false so the key continues down to the box.
+- **A capture always has a way out that writes nothing** (work item 55). `Esc` stands it down, and so
+  does a **Cancel ×** shown beside the box only while it is armed — a click on empty page takes no
+  focus, so `LostFocus` never fired and a mouse user was stuck until they assigned something. The
+  button is **not focusable**: pressing it would otherwise move focus off the box first, which stands
+  the capture down through `LostFocus` and hides the button mid-click. Either path skips
+  `GestureCaptured`, so nothing reaches `ShortcutOverrides`, and the box reverts to the current keys.
+  `Esc` cancels whatever modifiers are held with it, so it can never itself be bound (`CaptureKeys`).
 - **A clash is refused, not silently accepted**, and only **within one scope**. Cross-scope duplicates
   stay legal because they already are (`Alt+↑` on Processes and File Explorer), since only one tab is
   ever current. The capture box reports the conflict inline, naming the action that already holds the

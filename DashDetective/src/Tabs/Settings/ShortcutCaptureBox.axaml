@@ -21,6 +21,13 @@
             </Border>
         </Button>
 
+        <!-- Shown only while armed. Not focusable: pressing it must not take focus from the box first, which
+             would stand the capture down through LostFocus and hide this button mid-click. -->
+        <Button Name="Cancel" Classes="toolIcon" IsVisible="False" Focusable="False" ToolTip.Tip="Cancel (Esc)">
+            <Path Width="11" Height="11" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                  StrokeThickness="1.5" StrokeLineCap="Round" Data="M1,1 L10,10 M10,1 L1,10"/>
+        </Button>
+
         <!-- Only offered once there is something to undo, so an untouched row carries no extra chrome. -->
         <Button Name="Reset" Classes="toolIcon" IsVisible="False" ToolTip.Tip="Restore the default">
             <Path Width="14" Height="14" Stretch="None" Stroke="{DynamicResource TextTertiary}"
