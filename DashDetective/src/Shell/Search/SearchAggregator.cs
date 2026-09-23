@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -13,11 +14,30 @@ namespace DashDetective.Shell.Search;
 /// the rest of the app's providers keep. Cancellation is the aggregator's other job — the user types
 /// faster than the filesystem answers, so a result set for a superseded term is dropped rather than
 /// flashed on screen.
+///
+/// <b>A provider that never answers costs its own category too.</b> Every provider has
+/// <see cref="ProviderDeadline"/> to answer; past it, its category is left out of that result set. Without
+/// the deadline the merge waited on the slowest provider unconditionally, so one stalled source — a
+/// Windows index query, which has no timeout of its own and cannot be cancelled mid-call — held every
+/// category's results back, for that term and for every later one queued behind it.
 /// </summary>
 public sealed class SearchAggregator {
-    private readonly IReadOnlyList<ISearchProvider> _providers;
+    /// <summary>How long one provider may take before its category is left out. Far above what the
+    /// index or the capped fallback scan take when they are working, so only a stalled source hits it.
+    /// </summary>
+    internal static readonly TimeSpan ProviderDeadline = TimeSpan.FromSeconds(4);
 
-    public SearchAggregator(IReadOnlyList<ISearchProvider> providers) => _providers = providers;
+    private readonly IReadOnlyList<ISearchProvider> _providers;
+    private readonly TimeSpan _deadline;
+
+    public SearchAggregator(IReadOnlyList<ISearchProvider> providers) : this(providers, ProviderDeadline) { }
+
+    /// <summary>Test seam: takes the per-provider deadline explicitly, so a stalled provider can be
+    /// simulated without the tests waiting out the real one.</summary>
+    internal SearchAggregator(IReadOnlyList<ISearchProvider> providers, TimeSpan deadline) {
+        _providers = providers;
+        _deadline = deadline;
+    }
 
     /// <summary>Runs the query and returns the merged, capped, best-first results. An empty term (or a
     /// cancelled query) yields an empty list rather than everything.</summary>
@@ -27,7 +47,7 @@ public sealed class SearchAggregator {
 
         var pending = new Task<IReadOnlyList<SearchResult>>[_providers.Count];
         for (var i = 0; i < _providers.Count; i++)
-            pending[i] = SafeQueryAsync(_providers[i], query, token);
+            pending[i] = SafeQueryAsync(_providers[i], query, _deadline, token);
 
         var batches = await Task.WhenAll(pending);
 
@@ -79,9 +99,14 @@ public sealed class SearchAggregator {
     }
 
     private static async Task<IReadOnlyList<SearchResult>> SafeQueryAsync(
-        ISearchProvider provider, SearchQuery query, CancellationToken token) {
+        ISearchProvider provider, SearchQuery query, TimeSpan deadline, CancellationToken token) {
         try {
-            return await provider.QueryAsync(query, token);
+            // WaitAsync stops waiting; it cannot stop the provider. A stalled call carries on in the
+            // background and its answer, whenever it comes, is simply never read.
+            return await provider.QueryAsync(query, token).WaitAsync(deadline, token);
+        } catch (TimeoutException e) {
+            Log.Warn($"Search provider {provider.Category} did not answer within {deadline.TotalSeconds:0.#}s", e);
+            return [];
         } catch {
             // Includes the cancellation a provider raises when the term is superseded; QueryAsync
             // re-checks the token afterwards and discards the whole batch anyway.
