@@ -9,7 +9,7 @@ using System.Security.Principal;
 namespace DashDetective.Services.Identity;
 
 /// <summary>
-/// Reads the identity of the interactive Windows user backing the current process: the login name,
+/// Reads the identity of the interactive user backing the current process: the login name,
 /// a short initials badge derived from it, and whether the account is an administrator. Values are fixed
 /// for the lifetime of the session, so this is a plain static reader (matching
 /// <c>SystemInfoProvider</c>) with no observable state. Every source degrades independently and never

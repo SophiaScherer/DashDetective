@@ -738,7 +738,8 @@ stays in its tab folder.
 ```
       /Platform
         /Linux
-          IProcFileSystem.cs    (the /proc + /sys read seam — Exists/ReadAllText/ReadAllLines/
+          IProcFileSystem.cs    (the /proc + /sys read seam, also used for /etc/os-release and
+                                 /etc/group — Exists/ReadAllText/ReadAllLines/
                                  ListDirectory/ResolveLink, all never-throwing and empty-on-miss.
                                  Infrastructure, not a provider seam, so it sits in its own Services
                                  folder like IUiTimer. ProcFileSystem is the real one; the tests' fake
