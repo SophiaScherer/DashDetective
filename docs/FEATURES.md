@@ -81,7 +81,9 @@ label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, th
 alignment / rounding) are **computed properties on the VM — no value converters**. The rail
 thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth` delegates to and the
 drop preview measures against; it takes the axis as an argument because a drag previews edges the bar
-is not docked to yet.
+is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
+`Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
+*Persistence* below); this is shared shell work, not a tab-local change.
 
 **A horizontal bar is as tall as its content, not a fixed height.** It used to be 64px (54 collapsed)
 times the text scale, but on a top or bottom bar only the labels grow with the text — the icons, the
@@ -93,9 +95,7 @@ yet, so `RailThickness(horizontal: true)` answers the height the view last repor
 one. A text-scale or collapse change made while the bar is vertical discards the report, since the
 labels change height with both; a horizontal bar reports its new height itself. The estimate is a
 preview only — the bar itself never reads it. The band is multiplied by the interface size
-(`UiScale`), because the overlay it is drawn in sits outside the scale host. `MainWindowViewModel` owns page routing and delegates the bar to
-`Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
-*Persistence* below); this is shared shell work, not a tab-local change.
+(`UiScale`), because the overlay it is drawn in sits outside the scale host.
 
 - **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
 arrows** bracketing them. The arrows are **stable `[RelayCommand]`s on the view model, deliberately NOT
