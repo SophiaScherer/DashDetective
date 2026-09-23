@@ -11,6 +11,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 ## Contents
 
 - [Navigation bar (shell-level)](#navigation-bar-shell-level)
+- [Window chrome](#window-chrome)
 - [Dashboard](#dashboard)
 - [Universal search](#universal-search)
 - [Settings](#settings)
@@ -113,6 +114,68 @@ each needs the pending-slot treatment: `StorageViewModel._pendingReveal` is drai
 `LoadAdaptersAsync`. A name or disk that matches nothing **degrades to a plain navigate**, never a failed
 jump. The link is a new shared **`Button.link`** style (accent text + arrow) rather than a clickable title:
 a bare title offers no resting cue that it goes anywhere.
+
+## Window chrome
+
+On Windows the window draws its own title bar — the app mark and the title on the shell's sidebar
+surface — while Windows keeps owning everything a title bar *does*: drag, snap, the snap zones,
+Win+arrows, double-click to maximize and the Windows 11 snap flyout. Any window opts in with
+`WindowChrome.Custom="True"`, the `AppWindowDecorations` theme and a `TitleBar` at the top of its content
+(`src/Shared/Controls`, `src/Shared/Styles/WindowChrome.axaml`). The spec and the manual checklist are
+[specs/custom-title-bar.md](specs/custom-title-bar.md).
+
+**How Avalonia 12.1.2 does it, read from its source rather than remembered from 11:**
+- `ExtendClientAreaToDecorationsHint` is the switch; `ExtendClientAreaChromeHints` is gone. On Win32 an
+  extended window gets **Avalonia-drawn** caption buttons (`WindowDrawnDecorations`, themed through
+  `Window.WindowDecorationsTheme`), not DWM's: the frame is extended by 0–1 px only, and Close is greyed
+  in the system menu.
+- `WindowDecorationProperties.ElementRole` is what the OS sees. Avalonia answers `WM_NCHITTEST` by walking
+  up from the topmost hit visual to the first element with a role: `TitleBar` → `HTCAPTION`, the three
+  caption roles → `HTMINBUTTON` / `HTMAXBUTTON` / `HTCLOSE`. **An element with no role anywhere above it
+  answers `HTCLIENT`** (the Win32 fallback's default), so anything hit-testable in the caption band steals
+  the caption unless it or an ancestor is marked. That is why the whole bar carries the role.
+- `HTCAPTION` hands the gesture to `DefWindowProc`, which is what makes snap native. `BeginMoveDrag` from
+  a pointer handler is the approach this avoids: no double-click, and snap by imitation.
+- `WindowDecorationMargin.Top` is the drawn title bar's height (the theme's `DefaultTitleBarHeight`), and
+  the bar is sized from it. `OffScreenMargin` is always zero on Win32 in 12.x — `WM_NCCALCSIZE` already
+  pulls a maximized client area on screen — but the bar adds it anyway.
+
+**Decisions that must not be undone:**
+- **The bar sits outside the `ScaleHost`.** The caption buttons are drawn at the OS's scale; a bar that
+  followed the interface size would stop lining up with them. It is the one surface in the window that
+  interface size does not reach, and that is deliberate. Its text still follows text size, and the bar's
+  height is a minimum so larger text grows it rather than clipping.
+- **Windows only, and not under a Windows contrast theme.** Off Windows the hint is never set and the
+  bar hides, so Linux keeps its window manager's title bar. Under a Windows contrast theme the OS caption
+  comes back, drawn in the user's own contrast colors — re-decided on `ColorValuesChanged`. The app's
+  *own* high-contrast variants keep the custom bar, whose caption buttons take the palette's text ramp and
+  hover overlays.
+- **The theme replaces Fluent's.** Fluent's has no high-contrast colors and paints a second title over the
+  window content. Close turns Windows' own red in every theme.
+- **SC_CLOSE is honored by hand while extended.** Avalonia greys Close in the system menu, and Windows
+  ignores `SC_CLOSE` while that item is disabled — which is how the taskbar's "Close window", its
+  thumbnail × and Alt+F4 all arrive. A `Win32Properties.AddWndProcHookCallback` hook, which runs before
+  Avalonia's own window procedure, catches it, closes the window the ordinary way and swallows the command.
+  A bubbling Alt+F4 key handler backs it up for the case where Windows drops the key before it becomes
+  `SC_CLOSE`; it marks the key handled, so the two cannot both fire. `Win32Properties` is unannotated and
+  inert off Windows, so neither needs a platform attribute.
+- **The window minimum counts the bar.** It sits inside the client area, which is what `MinHeight`
+  bounds, so `MainWindow` reports `TitleBarRules.Reserved` to the view model and the minimum is the scaled
+  page height plus that — the real decoration margin, and 0 where the system title bar is outside.
+
+**Known gaps:**
+- **Alt+Space does not open the system menu.** Avalonia swallows keyboard `SC_KEYMENU` in its window
+  procedure (upstream issue 14545, open), extended or not.
+- **Right-clicking the bar does not open the system menu.** Upstream added that after 12.1.2 (PR 21630).
+- The system menu's Close stays greyed while extended, though every close path above works.
+- The nav bar's drag-to-dock band is measured against the whole window, so its Top band draws over the
+  title bar rather than beneath it.
+- A disabled caption button would read as enabled in the app's high-contrast variants, where `TextFaint`
+  equals `TextPrimary`. None is ever disabled today.
+- With the nav bar docked Left, the app mark and name now appear twice, in the title bar and the nav
+  brand — a judgment call left open.
+- There is no `PART_TitleBar` in the theme, so the "AvaloniaTitleBar" automation element Fluent's theme
+  exposes is gone.
 
 ## Dashboard
 
@@ -409,7 +472,8 @@ and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNot
 five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
 menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
 the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
-resource.
+resource. **The custom title bar sits outside `MainWindow`'s host on purpose**, beside caption buttons
+drawn at the OS's scale — see *Window chrome*.
 
 **The search dropdown's width moved inside its scale host.** It matches the search box, and
 `Bounds.Width` on a control inside the transform is *pre*-transform; sizing the popup to that content

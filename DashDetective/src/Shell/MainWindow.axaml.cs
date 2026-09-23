@@ -5,6 +5,7 @@ using Avalonia.VisualTree;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
 using DashDetective.Shared;
+using DashDetective.Shared.Controls;
 using DashDetective.Shared.Layout;
 using DashDetective.Shared.Shortcuts;
 using DashDetective.Shell.Shortcuts;
@@ -83,8 +84,25 @@ public partial class MainWindow : Window {
         if (_viewModel is not null) {
             _viewModel.ExportRequested += OnExportRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ReportCaptionHeight();
         }
     }
+
+    /// <summary>The custom title bar sits inside the client area, which is what MinHeight bounds, so the
+    /// view model's minimum has to sit on top of it. Reported from here because only the window knows its
+    /// decoration margin.</summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change) {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == IsExtendedIntoWindowDecorationsProperty ||
+            change.Property == WindowDecorationMarginProperty ||
+            change.Property == OffScreenMarginProperty)
+            ReportCaptionHeight();
+    }
+
+    private void ReportCaptionHeight() =>
+        _viewModel?.SetCaptionHeight(
+            TitleBarRules.Reserved(IsExtendedIntoWindowDecorations, WindowDecorationMargin, OffScreenMargin));
 
     /// <summary>Every scrolling page shares one scroller, so a new page would open at the last one's
     /// offset. Synchronous, so it lands before a search reveal's posted scroll.</summary>
@@ -107,11 +125,20 @@ public partial class MainWindow : Window {
             return;
 
         e.Cancel = true;
+
+        // The tray notice is already up. A taskbar close reaches this window even while the notice holds
+        // it modal, and a second notice stacked on the first could answer differently.
+        if (_askingAboutTray)
+            return;
+
         if (vm.NeedsTrayNotice)
             _ = ConfirmTrayAsync(vm);
         else
             HideToTray(vm);
     }
+
+    // Whether the one-time tray notice is waiting for an answer.
+    private bool _askingAboutTray;
 
     /// <summary>Shows the one-time tray notice and acts on the answer. Split out of
     /// <see cref="OnClosing"/> because a closing handler cannot await — the same split
@@ -119,7 +146,14 @@ public partial class MainWindow : Window {
     /// screen underneath the dialog, which is the whole point of asking before hiding rather than after.
     /// </summary>
     private async Task ConfirmTrayAsync(MainWindowViewModel vm) {
-        var keepRunning = await TrayNoticeWindow.AskAsync(this);
+        bool keepRunning;
+        _askingAboutTray = true;
+        try {
+            keepRunning = await TrayNoticeWindow.AskAsync(this);
+        } finally {
+            _askingAboutTray = false;
+        }
+
         vm.MarkTrayNoticeShown();
 
         if (keepRunning)

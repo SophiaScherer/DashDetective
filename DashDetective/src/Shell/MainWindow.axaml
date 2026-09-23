@@ -18,6 +18,8 @@
         Classes.reduceMotion="{Binding ReduceMotion}"
         Background="{DynamicResource AppBackground}"
         TransparencyLevelHint="None"
+        WindowDecorationsTheme="{StaticResource AppWindowDecorations}"
+        controls:WindowChrome.Custom="True"
         SizeChanged="OnShellSizeChanged">
 
     <Design.DataContext>
@@ -56,8 +58,15 @@
         </Style>
     </Window.Styles>
 
-    <!-- Everything the window draws sits inside the scale host, so the interface size reaches the nav
-         bar, the toolbar, the banners, the pages and the Help modal alike. Popups are their own visual
+    <!-- The custom title bar sits above everything, the nav bar included whichever edge it docks to, and
+         OUTSIDE the scale host: the caption buttons beside it are drawn at the OS's scale, and a bar that
+         grew with the interface size would stop lining up with them. It hides itself where the window
+         keeps the system title bar (off Windows, or under a Windows contrast theme). -->
+    <DockPanel>
+    <controls:TitleBar DockPanel.Dock="Top"/>
+
+    <!-- Everything else the window draws sits inside the scale host, so the interface size reaches the
+         nav bar, the toolbar, the banners, the pages and the Help modal alike. Popups are their own visual
          roots and each carry their own. -->
     <controls:ScaleHost Scale="{DynamicResource UiScale}">
 
@@ -215,4 +224,5 @@
     </Panel>
 
     </controls:ScaleHost>
+    </DockPanel>
 </Window>

@@ -51,6 +51,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly ThemeService _theme = new();
     private readonly AccessibilityService _accessibility;
     private readonly NoticeService _notices = new();
+    private double _captionHeight;
     private readonly DashboardViewModel _dashboard;
     private readonly FileExplorerViewModel _fileExplorer = new();
     private readonly ProcessesViewModel _processes;
@@ -163,7 +164,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// needs twice the room, and a window draggable below that would clip its content rather than
     /// reflow it.</summary>
     public double MinWindowWidth => BaseMinWindowWidth * _accessibility.ScaleFactor;
-    public double MinWindowHeight => BaseMinWindowHeight * _accessibility.ScaleFactor;
+
+    /// <summary>The height minimum, plus the custom title bar's, which sits inside the client area but
+    /// outside the interface scale — so it is added after scaling, never scaled.</summary>
+    public double MinWindowHeight => BaseMinWindowHeight * _accessibility.ScaleFactor + _captionHeight;
+
+    /// <summary>The custom title bar's height, or 0 where the system title bar sits outside the client
+    /// area. Reported by the view, the only place that knows the window's decoration margin.</summary>
+    public void SetCaptionHeight(double height) {
+        if (height == _captionHeight)
+            return;
+
+        _captionHeight = height;
+        OnPropertyChanged(nameof(MinWindowHeight));
+    }
 
     /// <summary>The toolbar clock's reserved width. Fixed so the ticking digits never reflow the
     /// toolbar, and scaled with the text, or at 200% the time was cut to "11:07:".</summary>

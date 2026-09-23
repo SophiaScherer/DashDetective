@@ -263,6 +263,19 @@ stays in its tab folder.
                                  touching Icons at all throws without a render backend, so a test could
                                  not reach the rule.
                                  which is what satisfies compiled bindings without an x:DataType)
+        WindowChrome.axaml      (AppWindowDecorations: the ControlTheme for Avalonia 12's
+                                 WindowDrawnDecorations, i.e. the caption buttons of a window that draws its
+                                 own title bar. Merged in App.axaml and set as the window's
+                                 WindowDecorationsTheme. It REPLACES Fluent's, which has no high-contrast
+                                 colors and paints a second title of its own over the window content. Three
+                                 things in it are load-bearing and pinned by WindowChromeThemeTests: each
+                                 button's PART_ name (Avalonia wires minimize/maximize/close by it), each
+                                 button's ElementRole (Avalonia answers WM_NCHITTEST with HTMINBUTTON /
+                                 HTMAXBUTTON / HTCLOSE by it — the maximize role is what brings up the
+                                 Windows 11 snap flyout), and the sizes taken from TitleBarRules by
+                                 x:Static. Each button surface has a non-null Background, or only the
+                                 glyph's stroke would be hit. The restore glyph's visibility is styled in
+                                 BOTH states: a local IsVisible would outrank the :maximized rule)
 ```
 
 ## `src/Shared/Layout`
@@ -383,6 +396,26 @@ stays in its tab folder.
                                         toolkit's. A surface the toolkit did NOT move is left alone —
                                         that is what an inner list at its end looks like, and stepping it
                                         anyway would break the hand-off to the page)
+        TitleBar.axaml(.cs), TitleBarRules.cs, WindowChrome.cs
+                                       (the custom window title bar. WindowChrome.Custom is set on a
+                                        Window and is the ONE place the platform is decided: it extends
+                                        into the title bar on Windows only, and not under a Windows
+                                        contrast theme — re-decided on ColorValuesChanged, so the OS
+                                        caption comes back in the user's contrast colors. It also honors
+                                        SC_CLOSE (taskbar close, thumbnail ×, Alt+F4) through a
+                                        Win32Properties WndProc hook, since Avalonia greys Close in the
+                                        system menu and Windows then ignores the command; an Alt+F4 key
+                                        handler backs it up. TitleBar is the strip itself, placed at the top of a
+                                        window's content: its Border carries ElementRole=TitleBar, which is
+                                        what makes Avalonia answer HTCAPTION so WINDOWS owns drag, snap and
+                                        double-click — never a BeginMoveDrag. It follows the window it sits
+                                        in, not a view model, and hides itself whenever that window is not
+                                        extended. It must sit OUTSIDE the ScaleHost: the caption buttons are
+                                        drawn at the OS's scale. Its height is the window's
+                                        WindowDecorationMargin.Top (plus OffScreenMargin.Top), as a
+                                        MinHeight so a larger text size grows the bar instead of clipping.
+                                        TitleBarRules holds the pure part — the platform decision, the
+                                        geometry, and the Windows 11 caption metrics the theme reads)
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
@@ -1144,7 +1177,14 @@ stays in its tab folder.
 ```
     /Shell                      (the app frame — the "default window")
       MainWindow.axaml(.cs), MainWindowViewModel.cs, ViewLocator.cs
-                                (MainWindow's root is a DockPanel hosting the NavigationView at the
+                                (MainWindow's content is the custom TitleBar docked on top, OUTSIDE the
+                                 ScaleHost, and the ScaleHost below it; the window opts in with
+                                 WindowChrome.Custom + WindowDecorationsTheme=AppWindowDecorations, the
+                                 theme set FIRST so the decorations are never built from Fluent's.
+                                 The bar sits inside the client area MinHeight bounds, so code-behind
+                                 reports TitleBarRules.Reserved to MainWindowViewModel.SetCaptionHeight
+                                 and MinWindowHeight adds it after scaling. MainWindowTests pins the wiring.
+                                 Inside the ScaleHost, a DockPanel hosts the NavigationView at the
                                  user-chosen edge (DockPanel.Dock bound to Nav.Dock) + the main area.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
