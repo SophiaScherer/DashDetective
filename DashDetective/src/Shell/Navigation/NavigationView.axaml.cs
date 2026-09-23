@@ -59,6 +59,11 @@ public partial class NavigationView : UserControl {
     private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>
         _viewModel?.ReportBarHeight(e.NewSize.Height);
 
+    // The item strip's extent is what a horizontal bar's labels need, so the fold point is measured, not
+    // guessed. Raised on extent and viewport changes as well as scrolling.
+    private void OnItemScrollChanged(object? sender, ScrollChangedEventArgs e) =>
+        _viewModel?.ReportLabeledBarWidth(RailBorder.Bounds.Width, ItemScroll.Viewport.Width, ItemScroll.Extent.Width);
+
     // ----- Drag-to-dock -----
 
     private void OnBrandPointerPressed(object? sender, PointerPressedEventArgs e) {

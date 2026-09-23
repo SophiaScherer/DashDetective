@@ -99,6 +99,19 @@ labels change height with both; a horizontal bar reports its new height itself. 
 preview only — the bar itself never reads it. The band is multiplied by the interface size
 (`UiScale`), because the overlay it is drawn in sits outside the scale host.
 
+**The bar folds to icons at one derived breakpoint, `AutoCollapseThreshold`** (work item 48). A
+vertical rail folds when the page beside it would drop under `MinPageWidth` (772), counting the rail
+at its text-scaled width: 1008px at 100 %, the width Fluent's NavigationView leaves its expanded mode
+at. It used to be a flat 820 that ignored text size, so at 200 % text a 472px rail kept its labels
+until the page was down to ~350px — the window felt cramped long before the rail adapted. A
+horizontal bar folds where its **labeled items stop fitting**, measured rather than guessed: the view
+reports the bar's width less the item strip's viewport plus the strip's extent from `ScrollChanged`
+(`ReportLabeledBarWidth`), so labels never scroll out of sight first. That can only be measured
+while the labels are showing, so until an expanded horizontal bar has been laid out — and after a
+text-scale change — it uses the vertical breakpoint. Both are multiplied by the interface size, and
+the threshold is re-tested on a width, interface-size, text-size or dock change; the crossing rule
+still lets an explicit toggle stick.
+
 - **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
 arrows** bracketing them. The arrows are **stable `[RelayCommand]`s on the view model, deliberately NOT
 `PageLinks` entries**: that collection is cleared and rebuilt on every 2.5s connections poll, so anything
@@ -902,7 +915,8 @@ were never shared.
   thumb, in every state). Fluent's hover and pressed states put its own accent on them, which
   outranks `Foreground`/`Background`, and aliasing its resource keys would not follow an accent picked
   at runtime — the accent brushes are replaced, not mutated.
-- **The rail's auto-collapse threshold is multiplied by the interface scale.** The width is reported
+- **The rail's auto-collapse threshold is multiplied by the interface scale** (and, since work item 48,
+  counts the rail at its text-scaled width — see *Navigation bar*). The width is reported
   from the `Window`, which sits outside the `ScaleHost`, while the rail it protects is drawn inside
   it. Compared raw, a 900px window at 200 % kept an expanded rail that left the page 214 logical
   pixels, and the 80 % floor folded a rail that would have fitted.

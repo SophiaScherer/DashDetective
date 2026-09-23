@@ -51,9 +51,33 @@ public partial class NavigationViewModel : ViewModelBase {
     /// it. Everything that lays the bar out reads this rather than either flag alone.</summary>
     public bool IsRailCollapsed => IsCollapsed || IsAutoCollapsed;
 
-    /// <summary>Shell width below which an expanded rail leaves too little for the page, at an
-    /// interface size of 100%.</summary>
-    internal const double AutoCollapseWidth = 820;
+    /// <summary>An expanded vertical rail's width at 100% text, and a collapsed one's.</summary>
+    internal const double ExpandedRailWidth = 236;
+    internal const double CollapsedRailWidth = 64;
+
+    /// <summary>The narrowest the page may get beside an expanded rail before the rail folds to icons.
+    /// With the rail, that puts the fold at 1008px, the width Fluent's NavigationView leaves its
+    /// expanded mode at.</summary>
+    internal const double MinPageWidth = 772;
+
+    /// <summary>The fold point at 100% interface and text size. <see cref="AutoCollapseThreshold"/> is
+    /// the one in force.</summary>
+    internal const double AutoCollapseWidth = ExpandedRailWidth + MinPageWidth;
+
+    /// <summary>The window width below which the bar folds to icons, in the window's own pixels — the
+    /// one place the breakpoint is decided. A vertical rail folds when the page beside it would drop
+    /// under <see cref="MinPageWidth"/>, counting the rail at its text-scaled width; a horizontal bar
+    /// folds when its labeled items no longer fit, once it has been laid out expanded to measure them.
+    /// Either is multiplied by the interface size, since the rail is drawn inside the scale host and the
+    /// width is reported from outside it.</summary>
+    internal double AutoCollapseThreshold =>
+        _uiScale * (IsHorizontal && _labeledBarWidth > 0
+            ? _labeledBarWidth
+            : VerticalRailWidth(collapsed: false) + MinPageWidth);
+
+    // The width a horizontal bar needs to show every item with its label. 0 until it has been laid out
+    // expanded, and again after a text-scale change, since the labels change width with the text.
+    private double _labeledBarWidth;
 
     // Tracks the last side of the threshold so auto-collapse fires on a crossing rather than on every
     // resize — that way an explicit toggle sticks until the window crosses back.
@@ -88,11 +112,26 @@ public partial class NavigationViewModel : ViewModelBase {
         UpdateAutoCollapse();
     }
 
+    /// <summary>Records the width an expanded horizontal bar needs to show every label: its own width,
+    /// less the item strip's viewport, plus the strip's full extent. Ignored while the labels are hidden
+    /// or the bar is vertical, since neither lays the labels out along the window's width.</summary>
+    internal void ReportLabeledBarWidth(double barWidth, double viewport, double extent) {
+        if (!IsHorizontal || IsRailCollapsed)
+            return;
+
+        var needed = barWidth - viewport + extent;
+        if (!double.IsFinite(needed) || needed <= 0)
+            return;
+
+        _labeledBarWidth = needed;
+        UpdateAutoCollapse();
+    }
+
     private void UpdateAutoCollapse() {
         if (_shellWidth <= 0)
             return;
 
-        var below = _shellWidth < AutoCollapseWidth * _uiScale;
+        var below = _shellWidth < AutoCollapseThreshold;
         if (below == _belowAutoCollapseWidth)
             return;
 
@@ -232,7 +271,11 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        horizontal ? HorizontalBarHeight : Math.Max(1, _textScale) * (IsRailCollapsed ? 64 : 236);
+        horizontal ? HorizontalBarHeight : VerticalRailWidth(IsRailCollapsed);
+
+    // Grows with text above 100% only: the icons do not shrink with smaller text.
+    private double VerticalRailWidth(bool collapsed) =>
+        Math.Max(1, _textScale) * (collapsed ? CollapsedRailWidth : ExpandedRailWidth);
 
     /// <summary>A horizontal bar's height before it has been laid out at the current text size and
     /// collapse state: the 36px item rows plus their 4px list margin and the hairline, at 100%. Only the
@@ -262,7 +305,9 @@ public partial class NavigationViewModel : ViewModelBase {
 
         _textScale = factor;
         ForgetBarHeight();
+        _labeledBarWidth = 0;
         OnPropertyChanged(nameof(RailWidth));
+        UpdateAutoCollapse();
     }
 
     /// <summary>The interface size, for sizing the drop preview: the rail is drawn inside the scale host
@@ -438,8 +483,13 @@ public partial class NavigationViewModel : ViewModelBase {
     }
 
     // The computed layout properties are fanned out via [NotifyPropertyChangedFor] on the source fields;
-    // this hook only carries the non-property side effect (keeping the position picker's selection in sync).
-    partial void OnOrientationChanged(NavOrientation value) => SyncPositions();
+    // this hook carries the side effects: the position picker's selection, and re-testing the fold point.
+    partial void OnOrientationChanged(NavOrientation value) {
+        SyncPositions();
+
+        // A horizontal bar and a vertical rail fold at different widths.
+        UpdateAutoCollapse();
+    }
 
     /// <summary>Populates the bar and selects the first item. Items must be created with
     /// <see cref="Navigate"/> as their select callback so clicks route back here.</summary>
