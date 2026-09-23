@@ -82,12 +82,12 @@
                     <Grid ColumnDefinitions="Auto,*" Margin="18,0">
 
                         <!-- Trimmed rather than pushed off: at the window's minimum the subtitle no
-                             longer fits beside the search field. -->
+                             longer fits beside the search field. Size, weight and color come from the
+                             shared classes only; a local setter here would silently outrank them. -->
                         <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Nav.SelectedNav.Title}" FontSize="{DynamicResource TextSizeTitleLarge}" FontWeight="SemiBold"
+                            <TextBlock Classes="shellTitle" Text="{Binding Nav.SelectedNav.Title}"
                                        TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Nav.SelectedNav.Subtitle}" FontSize="{DynamicResource TextSizeCaption}"
-                                       Foreground="{DynamicResource TextSubtle}"
+                            <TextBlock Classes="cardSub" Text="{Binding Nav.SelectedNav.Subtitle}"
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
 
