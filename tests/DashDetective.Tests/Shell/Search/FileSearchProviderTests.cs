@@ -146,4 +146,31 @@ public class FileSearchProviderTests {
         Assert.Equal(2, results.Count);
         Assert.All(results, r => Assert.Equal(SearchCategory.File, r.Category));
     }
+
+    /// <summary>An index whose call never completes, like an OLE DB query stuck on a wedged service.</summary>
+    private sealed class StalledSource : IFileSearch {
+        public Task<IReadOnlyList<FileHit>?> SearchAsync(
+            string term, IReadOnlyList<string> scopes, int limit, CancellationToken token) =>
+            new TaskCompletionSource<IReadOnlyList<FileHit>?>().Task;
+    }
+
+    /// <summary>A stalled index hands over to the scan within its own deadline, so the Files category still
+    /// answers instead of waiting out the aggregator's deadline and losing both.</summary>
+    [Fact]
+    public async Task QueryAsync_StalledIndex_FallsBackToTheScan() {
+        var fallback = new StubSource([Hit("report.txt")]);
+        var provider = new FileSearchProvider(new StalledSource(), fallback, () => null, _ => { }) {
+            IndexDeadline = TimeSpan.FromMilliseconds(50),
+        };
+
+        var results = await Query(provider, "report").WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal("report.txt", Assert.Single(results).Title);
+        Assert.Equal(1, fallback.Calls);
+    }
+
+    // The index's own deadline must leave the scan real time inside the aggregator's.
+    [Fact]
+    public void IndexDeadline_LeavesTheScanMostOfTheProviderDeadline() =>
+        Assert.True(FileSearchProvider.DefaultIndexDeadline * 2 <= SearchAggregator.ProviderDeadline);
 }
