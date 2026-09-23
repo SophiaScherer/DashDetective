@@ -13,8 +13,8 @@ namespace DashDetective.Tests.Services.Theming;
 /// accent reached only half the UI. Tokenising fixed that once; this keeps it fixed, because a hex
 /// literal costs nothing to add and nothing else would catch it.
 ///
-/// The theme files themselves are exempt: Palette.axaml is the source of truth, and the six C# files
-/// beside it in Services/Theming hold colors for code that cannot reach {StaticResource} — mirrors of
+/// The theme files themselves are exempt: Palette.axaml is the source of truth, and six C# files in
+/// Services/Theming hold colors for code that cannot reach {StaticResource} — mirrors of
 /// the palette, the surfaces AccentGuard measures against, and ColorVision's searched tables. The HTML
 /// report's formatter is exempt too, since it renders outside the app.
 /// </summary>

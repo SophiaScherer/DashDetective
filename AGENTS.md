@@ -843,7 +843,7 @@ temperature is the expected outcome, not a defect.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 - **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions
-  are the three C# mirrors beside it and **`ReportFormatters.cs`** — an exported HTML report is a
+  are the six C# theming files in `Services/Theming` and **`ReportFormatters.cs`** — an exported HTML report is a
   browser document with no access to the theme, and one that only looked right inside DashDetective
   would be the bug. That is the bar for a future exemption: rendered outside the app, not merely
   inconvenient to tokenise.
