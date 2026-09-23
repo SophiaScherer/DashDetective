@@ -401,7 +401,7 @@
 
             <!-- Navigation (fills the remaining space) -->
             <!-- Inset on the items, not ScrollViewer Padding, which the scroll extent leaves out. -->
-            <ScrollViewer x:Name="ItemScroll" ScrollChanged="OnItemScrollChanged"
+            <ScrollViewer x:Name="ItemScroll"
                           VerticalScrollBarVisibility="{Binding ScrollV}"
                           HorizontalScrollBarVisibility="{Binding ScrollH}">
                 <ItemsControl ItemsSource="{Binding NavItems}" Margin="12,4">

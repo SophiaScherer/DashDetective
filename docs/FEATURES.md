@@ -104,9 +104,14 @@ vertical rail folds when the page beside it would drop under `MinPageWidth` (772
 at its text-scaled width: 1008px at 100 %, the width Fluent's NavigationView leaves its expanded mode
 at. It used to be a flat 820 that ignored text size, so at 200 % text a 472px rail kept its labels
 until the page was down to ~350px — the window felt cramped long before the rail adapted. A
-horizontal bar folds where its **labeled items stop fitting**, measured rather than guessed: the view
-reports the bar's width less the item strip's viewport plus the strip's extent from `ScrollChanged`
-(`ReportLabeledBarWidth`), so labels never scroll out of sight first. That can only be measured
+horizontal bar folds where its **labeled items stop fitting**, measured rather than guessed: after each
+layout pass the view reports the bar's width less the item strip's viewport plus the strip's **desired**
+width (`ReportLabeledBarWidth`), so labels never scroll out of sight first. **Not the scroller's
+`Extent`:** Avalonia stretches the content to at least the viewport, so while the labels fit the extent
+equals the viewport, the need read back as the bar's current width, and the first one-pixel shrink
+folded labels with room to spare. Nor `ScrollChanged`, which does not fire while a pinned extent hides a
+change in the labels' width. One logical pixel (`LayoutSlack`) is given back from the need, because the
+scale host rounds its child up to whole logical pixels. That can only be measured
 while the labels are showing, so until an expanded horizontal bar has been laid out — and after a
 text-scale change — it uses the vertical breakpoint. Both are multiplied by the interface size, and
 the threshold is re-tested on a width, interface-size, text-size or dock change; the crossing rule
