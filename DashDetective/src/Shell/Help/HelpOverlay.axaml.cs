@@ -75,9 +75,11 @@ public partial class HelpOverlay : UserControl {
         _focusBeforeOpenWasVisible = _focusBeforeOpen is StyledElement { Classes: var classes } &&
                                      classes.Contains(":focus-visible");
 
+        // Ringed when focus arrived from the keyboard, so a keyboard user can see what Enter will press.
+        var method = _focusBeforeOpenWasVisible ? NavigationMethod.Tab : NavigationMethod.Pointer;
         Dispatcher.UIThread.Post(() => {
             if (_boundViewModel is { IsOpen: true })
-                CloseButton.Focus();
+                CloseButton.Focus(method);
         }, DispatcherPriority.Loaded);
     }
 
@@ -99,11 +101,16 @@ public partial class HelpOverlay : UserControl {
 
             if (previous is InputElement { IsEffectivelyVisible: true, IsEffectivelyEnabled: true, Focusable: true } target &&
                 target.IsAttachedToVisualTree())
-                target.Focus(ring ? NavigationMethod.Tab : NavigationMethod.Pointer);
+                target.Focus(RestoreMethod(target, ring));
             else if (current is not null)
                 focusManager?.Focus(null);
         });
     }
+
+    /// <summary>How to hand focus back. A text box is never given the keyboard route: focusing one that
+    /// way selects all its text, so the next key would wipe what the user was typing before F1.</summary>
+    internal static NavigationMethod RestoreMethod(IInputElement target, bool ring) =>
+        ring && target is not TextBox ? NavigationMethod.Tab : NavigationMethod.Pointer;
 
     /// <summary>
     /// Scrolls a topic into view and flashes it. Rows are found by the key in their <c>Tag</c> rather

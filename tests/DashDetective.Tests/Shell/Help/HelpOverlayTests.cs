@@ -1,12 +1,14 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using DashDetective.Shell.Help;
 using Xunit;
 
 namespace DashDetective.Tests.Shell.Help;
 
-/// <summary>Covers <see cref="HelpOverlay.IsInsideCard"/>: which presses on the scrim close Help. A press
-/// on the card, including an empty spot that reports the card itself, must leave it open. Constructing the
-/// controls needs no render pass.</summary>
+/// <summary>Covers <see cref="HelpOverlay.IsInsideCard"/> (which presses on the scrim close Help: a press on
+/// the card, including an empty spot that reports the card itself, must leave it open) and
+/// <see cref="HelpOverlay.RestoreMethod"/> (how focus is handed back on close). Constructing the controls
+/// needs no render pass.</summary>
 public class HelpOverlayTests {
     [Fact]
     public void IsInsideCard_TheCardItself_IsInside() {
@@ -46,4 +48,18 @@ public class HelpOverlayTests {
         var scrim = new Border { Child = card };
         return (scrim, card, content);
     }
+
+    [Fact]
+    public void RestoreMethod_RingedButton_KeepsItsRing() =>
+        Assert.Equal(NavigationMethod.Tab, HelpOverlay.RestoreMethod(new Button(), ring: true));
+
+    [Fact]
+    public void RestoreMethod_NoRing_StaysUnringed() =>
+        Assert.Equal(NavigationMethod.Pointer, HelpOverlay.RestoreMethod(new Button(), ring: false));
+
+    /// <summary>The bug this pins: a text box focused the keyboard way selects all its text, so pressing F1
+    /// mid-typing and closing Help left the next key to wipe the half-typed filter.</summary>
+    [Fact]
+    public void RestoreMethod_RingedTextBox_IsNotSelectedAll() =>
+        Assert.Equal(NavigationMethod.Pointer, HelpOverlay.RestoreMethod(new TextBox(), ring: true));
 }

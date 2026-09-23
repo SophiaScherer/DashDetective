@@ -37,8 +37,17 @@ and `tests/DashDetective.Tests/Shell/Help/HelpOverlayTests.cs`.
   where it is.
 - **A search hit is the one case that restores nothing.** Picking a Help result dismisses and collapses
   the search field before Help opens, so the box is hidden when Help closes and focus is cleared instead.
-  If Help was opened with F1 from an expanded search box, focus goes back to the box, which reopens its
-  dropdown. That is where the user was, so it is left that way.
+  If Help was opened with F1 from the search box, opening Help puts the dropdown away (see below), and
+  moving focus to the × lets an empty box collapse itself; focus then has nowhere to return to and is
+  cleared. A box that still holds a term stays expanded, gets focus back, and reopens its results.
+- **Opening Help closes the search dropdown.** The dropdown is a popup with light dismiss off, so it
+  draws above the scrim, and its results would still navigate the page behind the modal. The term is kept.
+- **A text box gets focus back without its text selected.** Focusing a `TextBox` the keyboard way selects
+  all of its text, so F1 pressed mid-typing and then Esc would have left the next key to wipe it. A text
+  box is restored the pointer way, which keeps the caret; everything else keeps its ring
+  (`HelpOverlay.RestoreMethod`).
+- **The × is ringed when Help was opened from a ringed control**, so a keyboard user can see what Enter
+  will press. After a mouse opening it takes focus quietly, as the picker's first control does.
 - **The helper stays on `HelpOverlay`.** The picker has the same inline check. Sharing one helper would
   mean editing the Settings folder, which this work item does not cover.
 
@@ -60,3 +69,11 @@ The app was not run for this change; the build and format gates were. These are 
    button has focus but no ring.
 7. Type in universal search, pick a Help result, then press Esc: Help closes and nothing reopens the
    search dropdown.
+8. Type "ab" in universal search so the dropdown is open, press F1: the dropdown closes and only Help
+   shows. Esc: Help closes and the box keeps "ab".
+9. Tab into the Processes filter, type "chr", press F1, then Esc: "chr" is still there and NOT selected.
+   Type one more letter: the filter reads "chrx", not "x".
+10. Open Help from a Shortcuts search result: it opens on the Shortcuts tab with focus on the ×.
+11. Tab onto the ×, press Space: Help closes.
+12. Start typing a number in a Settings numeric field, press F1: the field commits or reverts as it does
+    on a click away. Esc returns to it.
