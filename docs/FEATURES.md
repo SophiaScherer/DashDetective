@@ -1712,8 +1712,20 @@ was deliberately left alone, and **Processes no longer drops columns at all** â€
 the collapsing toolbar search, the Ping console filling its widget and keeping as much scrollback as fits,
 and `Dimensions.axaml`.
 
-**Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
-is doing design work first â€” do not start it without a task.
+**The toolbar title outranks a widget title** (work item 43). The toolbar's page name was 15 SemiBold
+and a widget's `panelTitle` 13.5 SemiBold, so a heading on the page could not be told from the shell's.
+`TextBlock.shellTitle` (`TextSizeDisplay`, 18, **Bold**, `TextStrong`) now sits beside `panelTitle`
+(unchanged, 13.5 SemiBold) in SharedStyles.axaml, so the gap is defined once, in size and weight both.
+Three decisions:
+
+- **Only the title carries the rank.** Both subtitles are `cardSub`; the toolbar's was already the same
+  size and brush, now by class rather than by restated setters.
+- **`panelTitle` did not move.** Changing it would restyle every widget in the app for a problem that
+  sits in one place, the toolbar.
+- **No tab heading was converted.** The survey found none drawn in the toolbar's look: Hardware's cards
+  match `panelTitle`, and Storage's drive names and File Explorer's detail name sit at 14 SemiBold,
+  4px and a weight under the new title. `HeaderHierarchyTests` keeps `shellTitle` out of
+  `src/Tabs` and the toolbar free of local setters, which would outrank the class.
 
 ## Drag to reorder
 

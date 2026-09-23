@@ -233,6 +233,11 @@ stays in its tab folder.
                                  binds the flag, which outranks the ScrollViewer rule. The pins live HERE
                                  and not in the view that owns the control: ScrollViewerInsetTests matches
                                  the selector in this file exactly.
+                                 HEADER HIERARCHY: shellTitle (the toolbar's page name, 18 Bold) and
+                                 panelTitle (a widget's heading, 13.5 SemiBold) sit side by side so the
+                                 rank is set once. shellTitle is the shell's alone and is kept out of
+                                 src/Tabs; HeaderHierarchyTests pins the gap and the toolbar's lack of
+                                 local setters, which would outrank the class.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
@@ -1149,7 +1154,10 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer. The scrolling host (PageScroll) is
+                                 the viewport — see File Explorer. The toolbar's page title and
+                                 subtitle are the shared shellTitle and cardSub classes with no local
+                                 size, weight or color, since a local setter would outrank the class.
+                                 The scrolling host (PageScroll) is
                                  SHARED by every scrolling page, so code-behind calls ScrollToHome on
                                  each CurrentPage change; without it a page opened at the last page's
                                  offset. Synchronous, so a reveal's posted BringIntoView still wins.
