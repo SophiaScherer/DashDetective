@@ -33,8 +33,8 @@ public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
-        nameof(ChevronPointing), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock))]
+        nameof(ChevronPointing), nameof(ChevronIcon), nameof(CollapseToolTip),
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock))]
     private bool _isCollapsed;
 
     /// <summary>Collapsed because the window is too narrow to spare 236px for an expanded rail. Not
@@ -43,8 +43,8 @@ public partial class NavigationViewModel : ViewModelBase {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
-        nameof(ChevronPointing), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock))]
+        nameof(ChevronPointing), nameof(ChevronIcon), nameof(CollapseToolTip),
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock))]
     private bool _isAutoCollapsed;
 
     /// <summary>Whether the rail actually renders collapsed — the user's choice or the window forcing
@@ -106,10 +106,8 @@ public partial class NavigationViewModel : ViewModelBase {
         nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
         nameof(ShowFullFooter), nameof(ChevronIcon),
-        nameof(ControlsDock), nameof(FooterAvatarDock),
-        nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
-        nameof(ChevronHAlign), nameof(ChevronVAlign),
-        nameof(ChevronCornerRadius))]
+        nameof(ControlsDock), nameof(ControlsOrientation), nameof(FooterAvatarDock),
+        nameof(ChevronPointing))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -132,18 +130,15 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>Whether a drag-to-dock gesture is in progress, which dims the bar in place so it reads
     /// as being moved. UI-only and never persisted — the view sets it around the gesture.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowChevron))]
-    private bool _isDragging;
+    [ObservableProperty] private bool _isDragging;
 
     public NavigationViewModel()
-        : this(new DispatcherTimerAdapter(), new DispatcherTimerAdapter(),
-               IUserPictureProvider.ForCurrentPlatform()) { }
+        : this(new DispatcherTimerAdapter(), IUserPictureProvider.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: takes the puck's hide timer, the re-dock fade timer and the account-picture
-    /// reader explicitly. A real <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is
-    /// pumping, so headless tests inject fakes and tick them by hand.</summary>
-    internal NavigationViewModel(IUiTimer chevronHide, IUiTimer relocate, IUserPictureProvider picture) {
+    /// <summary>Test seam: takes the re-dock fade timer and the account-picture reader explicitly. A real
+    /// <c>DispatcherTimer</c> only fires while an Avalonia dispatcher is pumping, so headless tests inject
+    /// fakes and tick them by hand.</summary>
+    internal NavigationViewModel(IUiTimer relocate, IUserPictureProvider picture) {
         Positions = new ObservableCollection<NavPositionOption> {
             new("Left", NavOrientation.Left, SelectPosition),
             new("Top", NavOrientation.Top, SelectPosition),
@@ -151,10 +146,6 @@ public partial class NavigationViewModel : ViewModelBase {
             new("Bottom", NavOrientation.Bottom, SelectPosition),
         };
         SyncPositions();
-
-        _chevronHide = chevronHide;
-        _chevronHide.Interval = ChevronHideDelay;
-        _chevronHide.Tick += OnChevronHideElapsed;
 
         _relocate = relocate;
         _relocate.Interval = RelocateFade;
@@ -319,61 +310,24 @@ public partial class NavigationViewModel : ViewModelBase {
     /// expanded vertical bar.</summary>
     public bool ShowFullFooter => !IsRailCollapsed && !IsHorizontal;
 
-    /// <summary>Where the footer's Help button sits relative to the avatar: beneath it on a collapsed
-    /// vertical rail (64px is too narrow to fit both side by side), to its right otherwise.</summary>
+    /// <summary>Where the footer's buttons (Help and the collapse toggle) sit relative to the avatar:
+    /// beneath it on a collapsed vertical rail (64px is too narrow to fit them side by side), to its right
+    /// otherwise.</summary>
     public Dock ControlsDock => IsRailCollapsed && !IsHorizontal ? Dock.Bottom : Dock.Right;
+
+    /// <summary>How the footer's buttons stack: in a column on a collapsed vertical rail, for the same
+    /// reason as <see cref="ControlsDock"/>, and in a row otherwise.</summary>
+    public Orientation ControlsOrientation =>
+        IsRailCollapsed && !IsHorizontal ? Avalonia.Layout.Orientation.Vertical : Avalonia.Layout.Orientation.Horizontal;
 
     /// <summary>Where the footer's avatar sits: the start of the same axis <see cref="ControlsDock"/>
     /// ends, so the two bracket the user's name when it is shown.</summary>
     public Dock FooterAvatarDock => IsRailCollapsed && !IsHorizontal ? Dock.Top : Dock.Left;
 
-    // ----- Collapse/expand puck (the hover-revealed semi-circle domed into the bar's content edge) -----
+    // ----- Collapse toggle (the caret button in the footer, beside Help) -----
 
-    /// <summary>The semi-circle's radius: how far the puck reaches into the bar from its edge, and half
-    /// the length of the flat side lying on it. Keeping it exactly half of <see cref="PuckLength"/> is
-    /// what makes the corner radius describe a true half-disc rather than a rounded tab.</summary>
-    private const double PuckRadius = 20;
-
-    /// <summary>The flat side lying along the bar's edge — the semi-circle's diameter.</summary>
-    private const double PuckLength = PuckRadius * 2;
-
-    /// <summary>How long the puck lingers after the pointer leaves the bar, so a moment's wobble on the
-    /// way to it does not snatch it away mid-reach.</summary>
-    private static readonly TimeSpan ChevronHideDelay = TimeSpan.FromMilliseconds(600);
-
-    private readonly IUiTimer _chevronHide;
-
-    /// <summary>Whether the pointer currently counts as over the bar. Hover sets it at once; leaving clears
-    /// it only after <see cref="ChevronHideDelay"/>. UI-only, never persisted.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowChevron))]
-    private bool _isChevronVisible;
-
-    /// <summary>Whether the puck draws. A drag masks it without disturbing the hover state, so a gesture that
-    /// ends with the pointer still on the bar brings it straight back. The view binds this, not the flag:
-    /// a style setter cannot override a local binding, so the drag rule has to live here.</summary>
-    public bool ShowChevron => IsChevronVisible && !IsDragging;
-
-    /// <summary>The pointer entered the bar: show the puck and cancel any pending hide.</summary>
-    internal void PointerEnteredBar() {
-        _chevronHide.Stop();
-        IsChevronVisible = true;
-    }
-
-    /// <summary>The pointer left the bar: hide the puck once the grace period elapses. Restarting the timer
-    /// from scratch is what lets a re-entry cancel the pending hide.</summary>
-    internal void PointerExitedBar() {
-        _chevronHide.Stop();
-        _chevronHide.Start();
-    }
-
-    private void OnChevronHideElapsed(object? sender, EventArgs e) {
-        _chevronHide.Stop();
-        IsChevronVisible = false;
-    }
-
-    /// <summary>Which way the puck's chevron points: toward the docked edge when the bar is expanded (it
-    /// will collapse), away from it when collapsed (it will expand).</summary>
+    /// <summary>Which way the collapse toggle's caret points: toward the docked edge when the bar is
+    /// expanded (it will collapse), away from it when collapsed (it will expand).</summary>
     public ChevronDirection ChevronPointing => Orientation switch {
         NavOrientation.Left => IsRailCollapsed ? ChevronDirection.Right : ChevronDirection.Left,
         NavOrientation.Right => IsRailCollapsed ? ChevronDirection.Left : ChevronDirection.Right,
@@ -381,37 +335,12 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => IsRailCollapsed ? ChevronDirection.Up : ChevronDirection.Down,
     };
 
-    /// <summary>The caret glyph shown on the puck. Filled, so the view sets Fill rather than Stroke.</summary>
+    /// <summary>The caret glyph shown on the toggle. Filled, so the view sets Fill rather than Stroke.</summary>
     public Geometry ChevronIcon => Icons.Caret(ChevronPointing);
 
-    /// <summary>Puck width: the stand-off axis on a vertical rail, the flat side on a horizontal bar.</summary>
-    public double ChevronWidth => IsHorizontal ? PuckLength : PuckRadius;
-
-    /// <summary>Puck height: the flat side on a vertical rail, the stand-off axis on a horizontal bar.</summary>
-    public double ChevronHeight => IsHorizontal ? PuckRadius : PuckLength;
-
-    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
-    public HorizontalAlignment ChevronHAlign => Orientation switch {
-        NavOrientation.Left => HorizontalAlignment.Right,
-        NavOrientation.Right => HorizontalAlignment.Left,
-        _ => HorizontalAlignment.Center,
-    };
-
-    /// <summary>Pins the puck to the bar's content-facing edge, centred on the other axis.</summary>
-    public VerticalAlignment ChevronVAlign => Orientation switch {
-        NavOrientation.Top => VerticalAlignment.Bottom,
-        NavOrientation.Bottom => VerticalAlignment.Top,
-        _ => VerticalAlignment.Center,
-    };
-
-    /// <summary>Rounds the two corners facing into the bar by the full radius. On a box one radius deep
-    /// and two long that is exactly a half-disc — domed inward, flat side flush on the content edge.</summary>
-    public CornerRadius ChevronCornerRadius => Orientation switch {
-        NavOrientation.Left => new CornerRadius(PuckRadius, 0, 0, PuckRadius),
-        NavOrientation.Right => new CornerRadius(0, PuckRadius, PuckRadius, 0),
-        NavOrientation.Top => new CornerRadius(PuckRadius, PuckRadius, 0, 0),
-        _ => new CornerRadius(0, 0, PuckRadius, PuckRadius),
-    };
+    /// <summary>What the toggle will do, which is also its accessible name: the shared Button style names a
+    /// button after its tooltip.</summary>
+    public string CollapseToolTip => IsRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
     /// <summary>Toggles the collapsed (icons-only) state of the bar.</summary>
     [RelayCommand]
