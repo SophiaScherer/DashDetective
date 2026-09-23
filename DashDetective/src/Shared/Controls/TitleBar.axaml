@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.TitleBar"
+             IsVisible="False">
+
+    <!-- The whole bar carries the TitleBar role, so Avalonia answers WM_NCHITTEST over it with HTCAPTION
+         and Windows owns the gesture: drag, snap, the snap zones and double-click to maximize. Its
+         non-null Background is what makes the empty stretch hit-testable at all. The caption buttons are
+         not here: Avalonia draws them above the window content, from the AppWindowDecorations theme. -->
+    <Border x:Name="Bar"
+            Background="{DynamicResource SidebarBackground}"
+            BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,0,1"
+            WindowDecorationProperties.ElementRole="TitleBar">
+        <DockPanel Margin="12,0,0,0">
+            <!-- The navigation bar's mark at caption size. -->
+            <Border DockPanel.Dock="Left" Width="16" Height="16" CornerRadius="4" VerticalAlignment="Center">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                        <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
+                        <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Viewbox Width="9" Height="9">
+                    <Path Fill="White"
+                          Data="M2,2 H8 V8 H2 Z M10,2 H16 V8 H10 Z M2,10 H8 V16 H2 Z M10,10 H16 V16 H10 Z"/>
+                </Viewbox>
+            </Border>
+            <TextBlock x:Name="TitleText" Margin="8,0,0,0" VerticalAlignment="Center"
+                       FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSecondary}"
+                       TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+    </Border>
+</UserControl>
