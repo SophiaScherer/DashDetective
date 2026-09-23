@@ -61,8 +61,37 @@ public class TitleBarRulesTests {
         Assert.Equal(new Thickness(8, 8, 8 + TitleBarRules.CaptionReserve, 0),
                      TitleBarRules.Padding(new Thickness(8)));
 
-    /// <summary>Windows 11's own metrics: three 46px buttons in a 32px band.</summary>
+    /// <summary>The bar's height comes out of the client area only while it is drawn.</summary>
     [Fact]
-    public void CaptionReserve_IsThreeButtonsWide() =>
-        Assert.Equal(138, TitleBarRules.CaptionReserve);
+    public void Reserved_Shown_IsTheBarsHeight() =>
+        Assert.Equal(32, TitleBarRules.Reserved(extended: true, new Thickness(0, 32, 0, 0), default));
+
+    /// <summary>Off Windows the system title bar sits outside the client area, so reserving room for a bar
+    /// there would raise the window minimum for nothing.</summary>
+    [Fact]
+    public void Reserved_NotExtended_IsNothing() =>
+        Assert.Equal(0, TitleBarRules.Reserved(extended: false, new Thickness(0, 32, 0, 0), default));
+
+    /// <summary>The taskbar's "Close window", its thumbnail × and Alt+F4 all arrive as this.</summary>
+    [Fact]
+    public void IsSystemClose_ScClose_IsClose() =>
+        Assert.True(TitleBarRules.IsSystemClose(0x0112, 0xF060));
+
+    /// <summary>The low four bits are the system's own and are masked off, as Windows says to.</summary>
+    [Fact]
+    public void IsSystemClose_ScCloseWithLowBitsSet_IsClose() =>
+        Assert.True(TitleBarRules.IsSystemClose(0x0112, 0xF063));
+
+    /// <summary>Every other system command — minimize, maximize, the keyboard menu — is left alone.</summary>
+    [Theory]
+    [InlineData(0xF020)]
+    [InlineData(0xF030)]
+    [InlineData(0xF100)]
+    public void IsSystemClose_OtherCommand_IsNotClose(int command) =>
+        Assert.False(TitleBarRules.IsSystemClose(0x0112, command));
+
+    /// <summary>The same number in another message is not a command at all.</summary>
+    [Fact]
+    public void IsSystemClose_OtherMessage_IsNotClose() =>
+        Assert.False(TitleBarRules.IsSystemClose(0x0010, 0xF060));
 }

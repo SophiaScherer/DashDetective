@@ -21,6 +21,9 @@ public static class TitleBarRules {
     /// <summary>The room the caption buttons take at the bar's trailing edge.</summary>
     public const double CaptionReserve = CaptionButtonWidth * CaptionButtonCount;
 
+    private const uint WmSysCommand = 0x0112;
+    private const nint ScClose = 0xF060;
+
     /// <summary>Whether a window should extend into its title bar at all. Windows only: other platforms
     /// keep their own title bar. And not under a Windows contrast theme, where the OS-drawn caption
     /// follows the user's contrast colors and ours would not.</summary>
@@ -36,6 +39,16 @@ public static class TitleBarRules {
     /// sits off screen above it when maximized.</summary>
     public static double Height(Thickness decorationMargin, Thickness offScreen) =>
         decorationMargin.Top + offScreen.Top;
+
+    /// <summary>The room the bar takes from the window's client area: its height while it is shown, and
+    /// nothing where the system title bar sits outside the client area instead.</summary>
+    public static double Reserved(bool extended, Thickness decorationMargin, Thickness offScreen) =>
+        IsShown(extended, decorationMargin) ? Height(decorationMargin, offScreen) : 0;
+
+    /// <summary>Whether a window message is the system Close command — the taskbar's "Close window", its
+    /// thumbnail ×, and Alt+F4 all arrive as one. The low four bits of the command are the system's own.</summary>
+    public static bool IsSystemClose(uint message, nint wParam) =>
+        message == WmSysCommand && (wParam & 0xFFF0) == ScClose;
 
     /// <summary>Keeps the bar's content on screen and clear of the caption buttons.</summary>
     public static Thickness Padding(Thickness offScreen) =>
