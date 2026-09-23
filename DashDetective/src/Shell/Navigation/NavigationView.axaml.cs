@@ -55,13 +55,9 @@ public partial class NavigationView : UserControl {
 
     private void CloseDockMenu() => RailBorder.ContextFlyout?.Hide();
 
-    // ----- Collapse puck reveal -----
-    // Hover is tracked on the whole host panel, so the items, footer and empty space all count. The hide
-    // itself is the view model's (it owns the grace period); this only reports the pointer.
-
-    private void OnRailPointerEntered(object? sender, PointerEventArgs e) => _viewModel?.PointerEnteredBar();
-
-    private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
+    // A horizontal bar sizes to its content, so the drop preview learns its height from the layout.
+    private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>
+        _viewModel?.ReportBarHeight(e.NewSize.Height);
 
     // ----- Drag-to-dock -----
 
@@ -186,8 +182,10 @@ public partial class NavigationView : UserControl {
         if (_dropHint is null || _viewModel is null)
             return;
 
-        double vertical = _viewModel.RailThickness(horizontal: false);   // rail width on a Left/Right dock
-        double horizontal = _viewModel.RailThickness(horizontal: true);  // bar height on a Top/Bottom dock
+        // The thickness is in the rail's own units, inside the scale host; the overlay is outside it.
+        double scale = _viewModel.UiScale;
+        double vertical = _viewModel.RailThickness(horizontal: false) * scale;   // rail width on a Left/Right dock
+        double horizontal = _viewModel.RailThickness(horizontal: true) * scale;  // bar height on a Top/Bottom dock
 
         double left, top, width, height;
         switch (edge) {

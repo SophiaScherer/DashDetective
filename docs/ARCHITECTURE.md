@@ -61,9 +61,9 @@ tab's view and view-model must share a namespace.
 
 The **navigation bar** (`src/Shell/Navigation`) is self-contained, dockable and collapsible. Its
 view-model exposes every derived layout value (dock edge, rail thickness, item axis, label visibility,
-puck geometry) as computed properties, with no value converters. Four entry points drive it: a
-hover-revealed chevron puck, a right-click dock menu, dragging the brand area to a window edge, and
-Settings → Appearance.
+the collapse toggle's caret) as computed properties, with no value converters. Its entry points are a
+collapse toggle in the footer beside Help (and `Ctrl+B`), a right-click dock menu, dragging the brand
+area to a window edge, and Settings → Appearance.
 
 **Universal search** (`src/Shell/Search`) fans out across providers — pages, settings, processes,
 files, Help's own copy — with no routing layer; each target exposes a `Reveal()` seam for jumping to a

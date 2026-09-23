@@ -30,11 +30,11 @@
 
         <!-- Motion. The rail is the one place in this app that animates, and only for its own two moves:
              a collapse that snaps 236px to 64px and a bar that teleports between window edges both read as
-             glitches rather than gestures. The size transition is declared PER AXIS because RailWidth and
-             RailHeight are NaN on whichever axis stretches, and NaN is not worth interpolating — a vertical
-             rail tweens Width only, a horizontal one Height only. A dock change cannot be tweened at all
-             (a DockPanel offers no path between edges), so it fades instead: out, relayout while
-             invisible, back in. Both live on the rail Border, which carries no :pointerover of its own. -->
+             glitches rather than gestures. Only a vertical rail tweens its size: RailWidth is NaN on a
+             horizontal bar, whose height follows its content, and NaN is not worth interpolating. A dock
+             change cannot be tweened at all (a DockPanel offers no path between edges), so it fades
+             instead: out, relayout while invisible, back in. Both live on the rail Border, which carries no
+             :pointerover of its own. -->
         <Style Selector="Border.rail:not(.horizontal)">
             <Setter Property="Transitions">
                 <Transitions>
@@ -46,7 +46,6 @@
         <Style Selector="Border.rail.horizontal">
             <Setter Property="Transitions">
                 <Transitions>
-                    <DoubleTransition Property="Height" Duration="0:0:0.15" Easing="CubicEaseOut"/>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
                 </Transitions>
             </Setter>
@@ -145,16 +144,18 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- Footer separator sits on the edge facing the content. -->
+        <!-- Footer separator sits on the edge facing the content. A horizontal bar is as tall as its
+             tallest part, so its footer keeps to the item rows' height rather than setting its own. -->
         <Style Selector="Border.rail Border.footer">
             <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Padding" Value="14,12"/>
         </Style>
         <Style Selector="Border.rail.horizontal Border.footer">
             <Setter Property="BorderThickness" Value="1,0,0,0"/>
+            <Setter Property="Padding" Value="14,6"/>
         </Style>
 
-        <!-- On-bar control buttons: the collapse toggle beside the logo, and the Help + orientation
-             pair in the footer. -->
+        <!-- On-bar control buttons: Help and the collapse toggle, side by side in the footer. -->
         <Style Selector="Button.navCtl">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -221,50 +222,20 @@
             <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
         </Style>
 
-        <!-- Collapse/expand puck: a semi-circle domed into the bar with its flat side flush on the
-             content-facing edge, revealed while the pointer is over the bar and for a grace period after
-             it leaves (NavigationViewModel.PointerEnteredBar/PointerExitedBar) — a bare :pointerover rule
-             snatched it away the moment the pointer wobbled off the rail. A chrome-less button wrapping a
-             styled Border, the same split as the dock menu's `pickTile`/`posTile` pair. -->
-        <Style Selector="Button.railChevron">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-        </Style>
-        <Style Selector="Button.railChevron /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent"/>
-        </Style>
-        <!-- Raised one step off the rail's own surface so it reads as sitting on the edge, in both themes. -->
-        <Style Selector="Border.puck">
-            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Hairline}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style Selector="Panel.railHost Path.chevronGlyph">
-            <Setter Property="Fill" Value="{DynamicResource TextSecondary}"/>
-        </Style>
-        <!-- Hover picks up the accent rather than a fill overlay: the puck is opaque, so a translucent
-             overlay would let the content behind it show through. -->
-        <Style Selector="Button.railChevron:pointerover Border.puck">
-            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
-        </Style>
-        <Style Selector="Button.railChevron:pointerover Path.chevronGlyph">
-            <Setter Property="Fill" Value="{DynamicResource Accent}"/>
+        <!-- The collapse toggle's caret is filled, where Help's glyph is stroked; both use the same ink. -->
+        <Style Selector="Button.navCtl Path.toggleGlyph">
+            <Setter Property="Fill" Value="{DynamicResource TextTertiary}"/>
         </Style>
 
         <!-- Drag-to-dock: dim the bar where it still sits so it reads as picked up, while the overlay's
-             drop band previews the edge it will land on. The puck is kept out of a moving cursor's way by
-             ShowChevron, not by a style — a setter cannot override the local IsVisible binding. -->
+             drop band previews the edge it will land on. -->
         <Style Selector="Panel.railHost.dragging Border.rail">
             <Setter Property="Opacity" Value="0.4"/>
         </Style>
         <!-- Declared after the drag dim so it wins the overlap: a dropped drag re-docks before EndDrag
              clears the dim, and the arriving bar must be fully out, not four-tenths in. Dropping the size
-             transition for the duration is the other half: a dock change flips which axis is NaN, and NaN
-             is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
+             transition for the duration is the other half: a dock change moves Width between a number and
+             NaN, and NaN is not an endpoint worth interpolating from. The fade hides the relayout either way, so this
              is insurance rather than a fix for something visible. Opacity keeps its transition here, or
              there would be no fade at all. -->
         <Style Selector="Border.rail.relocating">
@@ -286,22 +257,17 @@
     </UserControl.Styles>
 
     <!-- ================= SIDEBAR ================= -->
-    <!-- The rail plus its edge puck. The puck is a sibling of the rail, not a child, so its rounding and
-         alignment are its own, but it now sits INSIDE the bar's bounds — domed inward from the
-         content-facing edge. That is what makes it reliably clickable: reaching for it never leaves the
-         rail, so the hover that reveals it cannot lapse on the way. It also means the view needs no
-         ClipToBounds and the shell no ZIndex, both of which existed only to let it draw outside. -->
     <Panel x:Name="RailHost" Classes="railHost"
-           Classes.dragging="{Binding IsDragging}"
-           PointerEntered="OnRailPointerEntered" PointerExited="OnRailPointerExited">
+           Classes.dragging="{Binding IsDragging}">
 
-    <!-- The rail sizes itself on its docked axis (fixed thickness) and stretches on the other; the
-         inner DockPanel lays brand/toggle at the start, footer at the end, and the item list fills
-         the middle, with the dock edges flipped for a horizontal bar. -->
+    <!-- A vertical rail has a fixed width; a horizontal bar is as tall as its content. Either stretches
+         along the docked edge. The inner DockPanel lays the brand at the start, the footer at the end, and
+         the item list fills the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
             Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
             Classes.relocating="{Binding IsRelocating}"
-            Width="{Binding RailWidth}" Height="{Binding RailHeight}"
+            Width="{Binding RailWidth}"
+            SizeChanged="OnRailSizeChanged"
             Background="{DynamicResource SidebarBackground}"
             BorderBrush="{DynamicResource Hairline}" BorderThickness="{Binding HairlineThickness}">
 
@@ -376,10 +342,10 @@
                 </StackPanel>
             </Panel>
 
-            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help button.
-                 One cluster serves every state — the avatar and the button bracket the running axis,
+            <!-- User footer: avatar, the user's name (expanded vertical rail only), and the Help and collapse
+                 buttons. One cluster serves every state — the avatar and the buttons bracket the running axis,
                  dropping into a column on a collapsed rail. -->
-            <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}" Padding="14,12"
+            <Border Classes="footer" DockPanel.Dock="{Binding FooterDock}"
                     BorderBrush="{DynamicResource Hairline}">
                 <DockPanel LastChildFill="True" VerticalAlignment="Center">
 
@@ -406,13 +372,24 @@
                         </Panel>
                     </Border>
 
-                    <Button Classes="navCtl" DockPanel.Dock="{Binding ControlsDock}"
-                            Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help (F1)"
-                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
-                              StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
-                              Data="{x:Static nav:Icons.Help}"/>
-                    </Button>
+                    <!-- Help and the collapse toggle travel together, stacking the way the footer does. -->
+                    <StackPanel DockPanel.Dock="{Binding ControlsDock}" Orientation="{Binding ControlsOrientation}"
+                                Spacing="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button Classes="navCtl" Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help (F1)">
+                            <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                                  StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Data="{x:Static nav:Icons.Help}"/>
+                        </Button>
+
+                        <!-- Collapse/expand. A plain button rather than a hover-revealed control, so it is
+                             always findable and a Tab stop; its tooltip says which way it will go and names
+                             it for a screen reader. The caret points the way the bar will move. -->
+                        <Button Classes="navCtl" Command="{Binding ToggleCollapseCommand}"
+                                ToolTip.Tip="{Binding CollapseToolTip}">
+                            <Path Classes="toggleGlyph" Width="18" Height="18" Stretch="None"
+                                  Data="{Binding ChevronIcon}"/>
+                        </Button>
+                    </StackPanel>
 
                     <StackPanel Spacing="1" Margin="10,0" VerticalAlignment="Center"
                                 IsVisible="{Binding ShowFullFooter}">
@@ -468,21 +445,5 @@
         </DockPanel>
     </Border>
 
-        <!-- Collapse/expand puck. Every dimension comes from the view model so the semi-circle follows
-             the docked edge with no converters, and it reuses the same ToggleCollapse command as the
-             Settings control. -->
-        <Button Classes="railChevron" Command="{Binding ToggleCollapseCommand}"
-                IsVisible="{Binding ShowChevron}"
-                Width="{Binding ChevronWidth}" Height="{Binding ChevronHeight}"
-                HorizontalAlignment="{Binding ChevronHAlign}" VerticalAlignment="{Binding ChevronVAlign}"
-                ToolTip.Tip="Collapse or expand navigation">
-            <Border Classes="puck" CornerRadius="{Binding ChevronCornerRadius}">
-                <!-- Filled, not stroked: ChevronIcon is one of the Icons.Caret* triangles, the app's
-                     one disclosure glyph. Stretch="None" keeps it at its authored 8x5. -->
-                <Path Classes="chevronGlyph" Width="18" Height="18" Stretch="None"
-                      HorizontalAlignment="Center" VerticalAlignment="Center"
-                      Data="{Binding ChevronIcon}"/>
-            </Border>
-        </Button>
     </Panel>
 </UserControl>
