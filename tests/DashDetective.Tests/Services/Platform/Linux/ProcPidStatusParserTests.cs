@@ -54,4 +54,21 @@ public class ProcPidStatusParserTests {
         Assert.Equal(uid, status.Uid);
         Assert.Equal(resident, status.ResidentBytes);
     }
+
+    /// <summary>The kernel writes the <c>Groups</c> values space-separated after a tab, with a trailing space.</summary>
+    [Fact]
+    public void ParseGroups_ReadsEverySupplementaryGid() {
+        var groups = ProcPidStatusParser.ParseGroups(["Uid:\t1000\t1000\t1000\t1000", "Groups:\t4 24 27 1000 "]);
+
+        Assert.Equal([4, 24, 27, 1000], groups);
+    }
+
+    // A user in no supplementary group still has the line, just empty — which is not the same as unknown.
+    [Fact]
+    public void ParseGroups_EmptyLine_IsAnEmptyList() =>
+        Assert.Empty(ProcPidStatusParser.ParseGroups(["Groups:\t"])!);
+
+    [Fact]
+    public void ParseGroups_NoLine_IsUnknown() =>
+        Assert.Null(ProcPidStatusParser.ParseGroups(["Uid:\t1000\t1000\t1000\t1000"]));
 }

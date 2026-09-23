@@ -507,8 +507,12 @@ stays in its tab folder.
 
 ```
       /Identity
-        CurrentUserProvider.cs  (the interactive user's login name, initials badge and real privilege
-                                 level, read once. Every source degrades independently — a denied token
+        CurrentUserProvider.cs  (the interactive user's login name, initials badge and whether the ACCOUNT is
+                                 an administrator — not whether the process is elevated: UAC gives an
+                                 administrator's apps a filtered token where the Administrators group is
+                                 deny-only, so a bare IsInRole read everyone as "Standard User"; the
+                                 DenyOnlySid claim finds it. Linux: root, or a sudo/wheel/admin group.
+                                 Read once. Every source degrades independently — a denied token
                                  read reports the neutral "User" rather than guessing "Standard User",
                                  which would be a near-miss)
         IUserPictureProvider.cs (the seam + ForCurrentPlatform(); see Provider seams below. Returns the
@@ -788,7 +792,9 @@ stays in its tab folder.
                                  and only the first is the owner. An unknown uid is null, NOT 0: 0 is root,
                                  and a denied read must never promote a user process into the System group.
                                  A missing VmRSS is 0 bytes — a kernel thread has no address space, and
-                                 requiring the field would drop every kworker from the list)
+                                 requiring the field would drop every kworker from the list. ParseGroups
+                                 reads the Groups line for the current user's role, separately from Parse,
+                                 which stops early on the per-process hot path)
           ProcPidIoParser.cs    (/proc/[pid]/io, for the Disk column. rchar + wchar, NOT read_bytes +
                                  write_bytes: the Windows column is ReadTransferCount + WriteTransferCount,
                                  which counts bytes through the syscall layer including cache, and rchar/
@@ -889,6 +895,8 @@ stays in its tab folder.
                                  a shell fragment, so the same body mixes quoted and bare values — one
                                  MATCHED pair of surrounding quotes is stripped and an unbalanced one is
                                  left alone. Splits on the first = only. Absent key → "")
+          EtcGroupParser.cs     (/etc/group: name → gid only. The member list is NOT used — it omits each
+                                 user's primary group — so membership comes from /proc/self/status)
           DmiIdReader.cs        (the one-line files under /sys/class/dmi/id, shared by the Dashboard's
                                  System Information panel and the Hardware tab's Motherboard card.
                                  EXPOSES ONLY THE WORLD-READABLE KEYS as named properties —
