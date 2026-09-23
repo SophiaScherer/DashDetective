@@ -1161,6 +1161,12 @@ stays in its tab folder.
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
                                  code-behind calls — MainWindow's own Export among them)
+      ModalShortcuts.cs         (the MODAL step of HandleShortcut and ActiveScope: while Help or the
+                                 accent picker is open, Esc dismisses it, Enter falls through to the
+                                 focused button, everything else is swallowed, and keys resolve in
+                                 Global. Split out, like RefreshHint, because MainWindowViewModel
+                                 builds every page and its samplers and cannot be constructed in a
+                                 test; it takes the two modal view models, which can)
 ```
 
 ## `src/Shell/TrayNotice`
