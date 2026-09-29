@@ -59,7 +59,7 @@ short of it, brought search back.
 - **Fix it in the aggregator, not in the index.** A deadline in `WindowsSearchIndex` would protect one
   provider. In the aggregator it protects all seven, including any added later.
 - **Not progressive results.** Showing fast categories first and merging slow ones in later would remove
-  even the wait for a stalled provider. That is a bigger change to the dropdown, so I left it as a suggestion.
+  even the wait for a stalled provider. It is a bigger change to the dropdown and is left for a follow-up.
 
 ## How to verify
 
