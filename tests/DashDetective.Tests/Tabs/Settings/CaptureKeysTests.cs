@@ -44,4 +44,18 @@ public class CaptureKeysTests {
         Assert.Equal("False", (string?)cancel.Attribute("Focusable"));
         Assert.Equal("Cancel (Esc)", (string?)cancel.Attribute("ToolTip.Tip"));
     }
+
+    /// <summary>Cancel and Reset share one reserved slot, so arming the box or customizing a binding never
+    /// moves the box: it jumped about 40px under the pointer when the Cancel button first appeared.</summary>
+    [Fact]
+    public void Markup_CancelAndResetShareOneReservedSlot() {
+        var file = Path.Combine(PaletteFile.SourceRoot(), "src/Tabs/Settings/ShortcutCaptureBox.axaml");
+        var buttons = XDocument.Load(file).Root!.Descendants().Where(e => e.Name.LocalName == "Button").ToList();
+        var cancel = buttons.Single(e => (string?)e.Attribute("Name") == "Cancel");
+        var reset = buttons.Single(e => (string?)e.Attribute("Name") == "Reset");
+
+        Assert.Same(cancel.Parent, reset.Parent);
+        Assert.Equal("Panel", cancel.Parent!.Name.LocalName);
+        Assert.Equal("{Binding #Cancel.Width}", (string?)cancel.Parent.Attribute("MinWidth"));
+    }
 }
