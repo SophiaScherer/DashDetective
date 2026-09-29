@@ -29,7 +29,7 @@ So unless DashDetective was started with "Run as administrator", the check faile
 - **One label for elevated and unelevated administrators.** The AC asks the footer to "report administrator
   when the account is elevated or in the admin group". The token's elevation state is still read and kept
   apart (`AdminStatus.Elevated` vs `Member`), so a later change could show it, for example in the tooltip.
-  I didn't add that here, to keep the footer's layout untouched.
+  It is not shown yet, which keeps the footer's layout unchanged.
 - **A deny-only claim rather than `GetTokenInformation(TokenElevationType)`.** It is managed, needs no new
   P/Invoke surface for CA1416 to miss, and the claim is exactly the filtered Administrators group.
 - **Unknown stays unknown.** A missing status file, a missing `Groups` line or an unreadable
