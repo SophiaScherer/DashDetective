@@ -45,8 +45,10 @@ public partial class SearchField : UserControl {
     public static readonly StyledProperty<bool> ClearToolTipEnabledProperty =
         AvaloniaProperty.Register<SearchField, bool>(nameof(ClearToolTipEnabled), defaultValue: true);
 
+    /// <summary>Every call site passes an icon token; the fallback is the inline size, since a field
+    /// that says nothing is a list filter rather than the toolbar's.</summary>
     public static readonly StyledProperty<double> IconSizeProperty =
-        AvaloniaProperty.Register<SearchField, double>(nameof(IconSize), defaultValue: 14);
+        AvaloniaProperty.Register<SearchField, double>(nameof(IconSize), defaultValue: 16);
 
     /// <summary>Defaulted from the TextSize ladder in the control's own markup, never from a literal
     /// here — a literal is a size the Text size setting cannot reach.</summary>
