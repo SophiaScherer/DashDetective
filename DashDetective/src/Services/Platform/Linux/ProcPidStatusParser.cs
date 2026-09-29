@@ -44,6 +44,24 @@ internal static class ProcPidStatusParser {
         return new ProcPidStatus(uid, resident);
     }
 
+    /// <summary>The <c>Groups</c> line's supplementary group ids, or <c>null</c> when the file has no such
+    /// line. Kept apart from <see cref="Parse"/>, which runs once per process per poll and stops early; this
+    /// is read once, for the current process.</summary>
+    internal static IReadOnlyList<int>? ParseGroups(IReadOnlyList<string> lines) {
+        foreach (var line in lines) {
+            if (!line.StartsWith("Groups:", StringComparison.Ordinal))
+                continue;
+
+            var groups = new List<int>();
+            foreach (var token in line["Groups:".Length..].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                if (int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out var gid))
+                    groups.Add(gid);
+            return groups;
+        }
+
+        return null;
+    }
+
     /// <summary>The <b>first</b> of the line's four values. The kernel writes real, effective, saved-set and
     /// filesystem uids on one line; the real uid is the process's owner.</summary>
     private static int? ParseRealUid(ReadOnlySpan<char> rest) {

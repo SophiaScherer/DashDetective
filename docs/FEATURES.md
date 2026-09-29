@@ -74,7 +74,13 @@ The footer avatar shows the **device's own account picture** when the OS has one
 on Windows, `~/.face` / AccountsService on Linux. The reader returns encoded bytes rather than a decoded
 image, so it holds no UI type; `NavigationViewModel` decodes once and falls back to the accent-gradient
 **initials badge** whenever there is no picture, the read is denied, or the file will not decode. The
-gradient stays the backdrop either way, so it still re-tints with the accent.
+gradient stays the backdrop either way, so it still re-tints with the accent. The **role line under the
+name describes the account, not the process** (work item 70): an administrator reads "Administrator"
+whether or not the app runs elevated. A plain `IsInRole(Administrator)` read every administrator as a
+standard user, because UAC runs their apps with a filtered token whose Administrators group is
+deny-only; the filtered group still shows as a `DenyOnlySid` claim, which is what marks the account. On
+Linux, root or membership of `sudo`, `wheel` or `admin` (from `/proc/self/status`'s `Groups`, matched by
+gid against `/etc/group`) is an administrator; an unreadable file is the neutral "User", never a guess.
 
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
 label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
