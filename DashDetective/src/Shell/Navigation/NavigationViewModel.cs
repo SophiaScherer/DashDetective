@@ -66,23 +66,18 @@ public partial class NavigationViewModel : ViewModelBase {
 
     /// <summary>The window width below which the bar folds to icons, in the window's own pixels — the
     /// one place the breakpoint is decided. A vertical rail folds when the page beside it would drop
-    /// under <see cref="MinPageWidth"/>, counting the rail at its text-scaled width; a horizontal bar
-    /// folds when its labeled items no longer fit, once it has been laid out expanded to measure them.
-    /// Either is multiplied by the interface size, since the rail is drawn inside the scale host and the
-    /// width is reported from outside it.</summary>
+    /// under <see cref="MinPageWidth"/>, counting the rail at its text-scaled width and the interface
+    /// size, since the rail is drawn inside the scale host and the width is reported from outside it. A
+    /// horizontal bar folds at the window width where its labeled items stop fitting, once it has been
+    /// laid out expanded to measure them.</summary>
     internal double AutoCollapseThreshold =>
-        _uiScale * (IsHorizontal && _labeledBarWidth > 0
-            ? _labeledBarWidth - LayoutSlack
-            : VerticalRailWidth(collapsed: false) + MinPageWidth);
+        IsHorizontal && _labeledShellWidth > 0
+            ? _labeledShellWidth
+            : _uiScale * (VerticalRailWidth(collapsed: false) + MinPageWidth);
 
-    /// <summary>One logical pixel given back from a measured need. The scale host rounds its child's size
-    /// up to whole logical pixels, so a bar whose labels fit exactly can measure a fraction wider than the
-    /// window reporting it, and would fold with nothing clipped.</summary>
-    internal const double LayoutSlack = 1;
-
-    // The width a horizontal bar needs to show every item with its label. 0 until it has been laid out
-    // expanded, and again after a text-scale change, since the labels change width with the text.
-    private double _labeledBarWidth;
+    // The window width at which a horizontal bar's labels exactly fit, in the window's own pixels. 0 until
+    // it has been laid out expanded, and again after a text-size or interface-size change.
+    private double _labeledShellWidth;
 
     // Tracks the last side of the threshold so auto-collapse fires on a crossing rather than on every
     // resize — that way an explicit toggle sticks until the window crosses back.
@@ -114,23 +109,26 @@ public partial class NavigationViewModel : ViewModelBase {
             return;
 
         _uiScale = factor;
+        _labeledShellWidth = 0;
         UpdateAutoCollapse();
     }
 
-    /// <summary>Records the width an expanded horizontal bar needs to show every label: its own width,
-    /// less the item strip's viewport, plus the strip's natural width. That is the strip's desired width,
-    /// not the scroller's extent, which is stretched to at least the viewport and so would report the
-    /// bar's current width as its need whenever the labels fit. Ignored while the labels are hidden or the
-    /// bar is vertical, since neither lays the labels out along the window's width.</summary>
-    internal void ReportLabeledBarWidth(double barWidth, double viewport, double content) {
-        if (!IsHorizontal || IsRailCollapsed)
+    /// <summary>Records how far an expanded horizontal bar's labeled items overrun (or undershoot) the
+    /// strip they sit in, and from that the window width at which they exactly fit: the current width plus
+    /// the overrun, scaled out of the scale host. Measured against the window's own width rather than the
+    /// bar's, which the window's frame keeps a few pixels narrower, so the fold lands where the strip's
+    /// scroll bar would appear. <paramref name="content"/> is the strip's desired width, not the scroller's
+    /// extent, which is stretched to at least the viewport. Ignored while the labels are hidden or the bar
+    /// is vertical, since neither lays the labels out along the window's width.</summary>
+    internal void ReportLabelOverflow(double viewport, double content) {
+        if (!IsHorizontal || IsRailCollapsed || _shellWidth <= 0)
             return;
 
-        var needed = barWidth - viewport + content;
-        if (!double.IsFinite(needed) || needed <= 0 || needed == _labeledBarWidth)
+        var needed = _shellWidth + (content - viewport) * _uiScale;
+        if (!double.IsFinite(needed) || needed <= 0 || needed == _labeledShellWidth)
             return;
 
-        _labeledBarWidth = needed;
+        _labeledShellWidth = needed;
         UpdateAutoCollapse();
     }
 
@@ -321,7 +319,7 @@ public partial class NavigationViewModel : ViewModelBase {
 
         _textScale = factor;
         ForgetBarHeight();
-        _labeledBarWidth = 0;
+        _labeledShellWidth = 0;
         OnPropertyChanged(nameof(RailWidth));
         UpdateAutoCollapse();
     }
