@@ -39,7 +39,7 @@ namespace DashDetective.Shell;
 public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>The window minimum at 100%: the width an expanded nav bar plus a usable page needs.</summary>
     private const double BaseMinWindowWidth = 640;
-    private const double BaseClockWidth = 76;
+    private const double BaseClockWidth = 85;
     private const double BaseMinWindowHeight = 480;
 
     private static readonly IBrush LiveDot = SemanticBrushes.StatusGood;

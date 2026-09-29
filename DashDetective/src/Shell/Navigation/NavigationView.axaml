@@ -409,7 +409,7 @@
                     <Button Classes="navCtl" DockPanel.Dock="{Binding ControlsDock}"
                             Command="{Binding ShowHelpCommand}" ToolTip.Tip="Help (F1)"
                             HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Path Width="18" Height="18" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+                        <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                               StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                               Data="{x:Static nav:Icons.Help}"/>
                     </Button>
@@ -452,7 +452,7 @@
                                                    RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                                         <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
-                                            <Path Classes="navIcon" Width="18" Height="18" Stretch="None"
+                                            <Path Classes="navIcon" Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform"
                                                   Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
                                                   StrokeJoin="Round" VerticalAlignment="Center"/>
                                             <TextBlock Classes="navLabel" Text="{Binding Label}"
