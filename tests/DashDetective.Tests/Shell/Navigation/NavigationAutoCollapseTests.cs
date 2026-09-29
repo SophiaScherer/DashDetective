@@ -180,73 +180,85 @@ public class NavigationAutoCollapseTests {
     }
 
     /// <summary>A horizontal bar folds when its labeled items stop fitting, so labels never scroll out of
-    /// sight before the switch: the need is the bar less the strip's viewport plus the strip's natural
-    /// width, less a pixel of layout slack.</summary>
+    /// sight before the switch: the fold point is the window width plus the strip's overrun.</summary>
     [Fact]
-    public void ReportLabeledBarWidth_ItemsOverflow_FoldsTheBar() {
+    public void ReportLabelOverflow_ItemsOverflow_FoldsTheBar() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
         Assert.False(bar.IsRailCollapsed);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
 
-        Assert.Equal(1370 - NavigationViewModel.LayoutSlack, bar.AutoCollapseThreshold);
+        Assert.Equal(1370, bar.AutoCollapseThreshold);
         Assert.True(bar.IsRailCollapsed);
     }
 
     [Fact]
-    public void ReportLabeledBarWidth_ItemsFitWithRoomToSpare_KeepsTheLabels() {
+    public void ReportLabelOverflow_ItemsFitWithRoomToSpare_KeepsTheLabels() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 700);
+        bar.ReportLabelOverflow(viewport: 900, content: 700);
 
-        Assert.Equal(900 - NavigationViewModel.LayoutSlack, bar.AutoCollapseThreshold);
+        Assert.Equal(900, bar.AutoCollapseThreshold);
         Assert.False(bar.IsRailCollapsed);
     }
 
-    /// <summary>The bug this pins: the need was read off the scroller's extent, which is stretched to the
-    /// viewport while the labels fit, so the fold point became the bar's current width and the first
-    /// one-pixel shrink folded labels that had room to spare.</summary>
+    /// <summary>An exact fit keeps the labels, and the first pixel of overrun folds them: that pixel is
+    /// where the strip's scroll bar would appear.</summary>
     [Fact]
-    public void ReportLabeledBarWidth_FittingLabels_SurviveAOnePixelShrink() {
+    public void ReportLabelOverflow_ExactFit_KeepsTheLabels_AndOnePixelOverFolds() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 700);
+        bar.ReportLabelOverflow(viewport: 900, content: 900);
+        Assert.False(bar.IsRailCollapsed);
 
         bar.SetShellWidth(1099);
 
-        Assert.False(bar.IsRailCollapsed);
+        Assert.True(bar.IsRailCollapsed);
     }
 
-    // The scale host rounds its child up to whole logical pixels, so a bar that fits exactly can measure a
-    // fraction wider than the window that reports it.
+    /// <summary>The bug this pins: the need was taken from the bar's own width, which the window's frame
+    /// keeps narrower than the window width it is compared with, so the labels overflowed into a scroll
+    /// bar for several pixels before the fold. Measured as an overrun, the frame cancels out.</summary>
     [Fact]
-    public void ReportLabeledBarWidth_ExactFitRoundedUp_KeepsTheLabels() {
+    public void ReportLabelOverflow_IsMeasuredAgainstTheWindowNotTheBar() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
-        bar.SetUiScale(1.25);
-        bar.SetShellWidth(1601);
+        bar.SetShellWidth(1560);
 
-        bar.ReportLabeledBarWidth(barWidth: 1281, viewport: 1000, content: 1000);
+        bar.ReportLabelOverflow(viewport: 1180, content: 1184);
 
-        Assert.False(bar.IsRailCollapsed);
+        Assert.Equal(1564, bar.AutoCollapseThreshold);
+        Assert.True(bar.IsRailCollapsed);
     }
 
-    // With the labels hidden the strip's extent is the icons', which would claim the labels fit.
+    // With the labels hidden the strip holds only icons, which would claim the labels fit.
     [Fact]
-    public void ReportLabeledBarWidth_WhileCollapsed_IsIgnored() {
+    public void ReportLabelOverflow_WhileCollapsed_IsIgnored() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top, IsCollapsed = true };
+        bar.SetShellWidth(1100);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 400);
+        bar.ReportLabelOverflow(viewport: 900, content: 400);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
 
     [Fact]
-    public void ReportLabeledBarWidth_VerticalRail_IsIgnored() {
+    public void ReportLabelOverflow_VerticalRail_IsIgnored() {
         var bar = new NavigationViewModel();
+        bar.SetShellWidth(1100);
 
-        bar.ReportLabeledBarWidth(barWidth: 236, viewport: 700, content: 900);
+        bar.ReportLabelOverflow(viewport: 700, content: 900);
+
+        Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
+    }
+
+    // Before any window width is known there is nothing to add the overrun to.
+    [Fact]
+    public void ReportLabelOverflow_BeforeAnyWidth_IsIgnored() {
+        var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
+
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
@@ -254,22 +266,37 @@ public class NavigationAutoCollapseTests {
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
-    public void ReportLabeledBarWidth_UnusableMeasure_IsIgnored(double content) {
+    public void ReportLabelOverflow_UnusableMeasure_IsIgnored(double content) {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
+        bar.SetShellWidth(1100);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: content);
+        bar.ReportLabelOverflow(viewport: 900, content: content);
 
         Assert.Equal(NavigationViewModel.AutoCollapseWidth, bar.AutoCollapseThreshold);
     }
 
+    // The strip is drawn inside the scale host, so each logical pixel of overrun costs that many window pixels.
     [Fact]
-    public void ReportLabeledBarWidth_FollowsTheInterfaceSize() {
+    public void ReportLabelOverflow_ScalesTheOverrunByTheInterfaceSize() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetUiScale(2);
+        bar.SetShellWidth(2200);
 
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
 
-        Assert.Equal((1370 - NavigationViewModel.LayoutSlack) * 2, bar.AutoCollapseThreshold);
+        Assert.Equal(2740, bar.AutoCollapseThreshold);
+    }
+
+    // A measurement in window pixels is only good for the interface size it was taken at.
+    [Fact]
+    public void SetUiScale_ForgetsTheLabeledWidth() {
+        var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
+        bar.SetShellWidth(1100);
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
+
+        bar.SetUiScale(1.5);
+
+        Assert.Equal(NavigationViewModel.AutoCollapseWidth * 1.5, bar.AutoCollapseThreshold);
     }
 
     // The labels change width with the text, so a measure taken at the old size no longer says where
@@ -277,7 +304,8 @@ public class NavigationAutoCollapseTests {
     [Fact]
     public void SetTextScale_ForgetsTheLabeledWidth() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
+        bar.SetShellWidth(1100);
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
 
         bar.SetTextScale(1.5);
 
@@ -289,7 +317,7 @@ public class NavigationAutoCollapseTests {
     public void Redocking_ReTestsTheBreakpointForTheNewEdge() {
         var bar = new NavigationViewModel { Orientation = NavOrientation.Top };
         bar.SetShellWidth(1100);
-        bar.ReportLabeledBarWidth(barWidth: 1100, viewport: 900, content: 1170);
+        bar.ReportLabelOverflow(viewport: 900, content: 1170);
         Assert.True(bar.IsRailCollapsed);
 
         bar.Orientation = NavOrientation.Left;

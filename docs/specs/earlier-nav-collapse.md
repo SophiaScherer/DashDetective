@@ -20,16 +20,20 @@ instead of a flat 820px:
   than chosen separately. This is a judgment call: if the rail folds too early now, lower `MinPageWidth`.
 - **The breakpoint counts text size.** The old one didn't, so at 200% text the 472px rail kept its labels
   until the page was down to about 350px. That is the "cramped before the rail adapts" the item describes.
-- **A horizontal bar's breakpoint is measured.** Its labels overflow long before 1008px: nine labeled items
-  need roughly 1250px. After each layout pass the view reports the bar width minus the item strip's
-  viewport plus the strip's *desired* width, and the bar folds when the window is narrower than that
-  (less one logical pixel of rounding slack). The scroller's `Extent` would be wrong here: Avalonia
-  stretches content to fill the viewport, so while the labels fit, the extent reads as the bar's own
-  width. The first draft used it, and review caught it: the bar folded after a one-pixel shrink. This is what
-  "labels never clip before the switch" means for that orientation. A vertical rail's labels cannot clip,
-  because the rail's width already grows with the text.
+- **A horizontal bar's breakpoint is measured.** Its labels overflow long before 1008px: at 100% the nine
+  labeled items, the logo and the footer need roughly 1560px. After each layout pass the view reports how
+  far the item strip's *desired* width overruns its viewport, and the bar folds when the window is
+  narrower than its current width plus that overrun, which is where the strip's scroll bar would appear.
+  Two measurements were tried first and rejected:
+  - The scroller's `Extent`: Avalonia stretches content to fill the viewport, so while the labels fit the
+    extent reads as the viewport, and the bar folded after a one-pixel shrink.
+  - The bar's own width: the window's frame keeps the bar a few pixels narrower than the window width it
+    is compared with, so the labels overflowed into a scroll bar for about 5px before the fold. The
+    overrun, added to the window's own width, cancels the frame out.
+  This is what "labels never clip before the switch" means for that orientation. A vertical rail's labels
+  cannot clip, because the rail's width already grows with the text.
 - **The measurement only exists while the labels show.** Until an expanded horizontal bar has been laid
-  out, and after any text-size change, the vertical breakpoint stands in. That can't cause oscillation:
+  out, and after any text-size or interface-size change, the vertical breakpoint stands in. That can't cause oscillation:
   once measured, the fold point is stable, and a collapsed bar ignores reports.
 - **One place.** Every re-test (width, interface size, text size, dock edge, a new measurement) goes
   through `UpdateAutoCollapse`, which reads `AutoCollapseThreshold`. The crossing rule is unchanged,

@@ -65,7 +65,7 @@ public partial class NavigationView : UserControl {
     // text-size change that widens them raises nothing there. The view model ignores an unchanged need.
     private void OnItemScrollLayoutUpdated(object? sender, EventArgs e) {
         if (ItemScroll.Content is Control strip)
-            _viewModel?.ReportLabeledBarWidth(RailBorder.Bounds.Width, ItemScroll.Viewport.Width, strip.DesiredSize.Width);
+            _viewModel?.ReportLabelOverflow(ItemScroll.Viewport.Width, strip.DesiredSize.Width);
     }
 
     // ----- Drag-to-dock -----

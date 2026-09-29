@@ -105,16 +105,17 @@ at its text-scaled width: 1008px at 100 %, the width Fluent's NavigationView lea
 at. It used to be a flat 820 that ignored text size, so at 200 % text a 472px rail kept its labels
 until the page was down to ~350px — the window felt cramped long before the rail adapted. A
 horizontal bar folds where its **labeled items stop fitting**, measured rather than guessed: after each
-layout pass the view reports the bar's width less the item strip's viewport plus the strip's **desired**
-width (`ReportLabeledBarWidth`), so labels never scroll out of sight first. **Not the scroller's
-`Extent`:** Avalonia stretches the content to at least the viewport, so while the labels fit the extent
-equals the viewport, the need read back as the bar's current width, and the first one-pixel shrink
-folded labels with room to spare. Nor `ScrollChanged`, which does not fire while a pinned extent hides a
-change in the labels' width. One logical pixel (`LayoutSlack`) is given back from the need, because the
-scale host rounds its child up to whole logical pixels. That can only be measured
-while the labels are showing, so until an expanded horizontal bar has been laid out — and after a
-text-scale change — it uses the vertical breakpoint. Both are multiplied by the interface size, and
-the threshold is re-tested on a width, interface-size, text-size or dock change; the crossing rule
+layout pass the view reports how far the strip's **desired** width overruns its viewport
+(`ReportLabelOverflow`), and the fold point is the window's current width plus that overrun — the width
+at which the strip's scroll bar would appear. **Measured as an overrun against the window, not as the
+bar's own width:** the window's frame keeps the bar a few pixels narrower than the window width the
+threshold is compared with, and a first version built the need from the bar and let the labels
+overflow into a scroll bar for ~5px before the fold. **Not the scroller's `Extent` either:** Avalonia
+stretches the content to at least the viewport, so while the labels fit the extent equals the
+viewport. Nor `ScrollChanged`, which does not fire while a pinned extent hides a change in the labels'
+width. That can only be measured while the labels are showing, so until an expanded horizontal bar has
+been laid out — and after a text-size or interface-size change — it uses the vertical breakpoint. The
+threshold is re-tested on a width, interface-size, text-size or dock change; the crossing rule
 still lets an explicit toggle stick.
 
 - **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
