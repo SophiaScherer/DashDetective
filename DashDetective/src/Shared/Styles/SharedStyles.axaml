@@ -101,6 +101,15 @@
     </Style>
 
     <!-- ===== Typography ===== -->
+    <!-- Header hierarchy: shellTitle is the toolbar's page name, panelTitle heads a widget on the page.
+         Defined side by side so the gap is set once, in size AND weight — 15 against 13.5 at one weight
+         read as the same level. Both take cardSub below, so the title alone carries the rank.
+         HeaderHierarchyTests pins it. -->
+    <Style Selector="TextBlock.shellTitle">
+        <Setter Property="FontSize" Value="{DynamicResource TextSizeDisplay}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextStrong}"/>
+    </Style>
     <Style Selector="TextBlock.panelTitle">
         <Setter Property="FontSize" Value="{DynamicResource TextSizeSubhead}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
