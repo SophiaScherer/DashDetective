@@ -14,7 +14,7 @@ namespace DashDetective.Tests.Shell.Navigation;
 public class NavigationDockingTests {
     private static (NavigationViewModel Bar, FakeUiTimer Relocate) Bar() {
         var relocate = new FakeUiTimer();
-        return (new NavigationViewModel(new FakeUiTimer(), relocate, new UnsupportedUserPictureProvider()), relocate);
+        return (new NavigationViewModel(relocate, new UnsupportedUserPictureProvider()), relocate);
     }
 
     private static NavPositionOption Option(NavigationViewModel bar, NavOrientation orientation) =>
