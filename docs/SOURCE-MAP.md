@@ -431,6 +431,8 @@ stays in its tab folder.
                                         no room, so the same control serves a single-series chart.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal.
+                                        KeyValueGap separates key and value, as in ExpandablePathRow;
+                                        without it a long key touched a value that wrapped.
                                         Its Mono and Flush variants back the Network tab's IP config)
 ```
 

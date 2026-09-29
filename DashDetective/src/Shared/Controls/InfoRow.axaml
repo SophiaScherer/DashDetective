@@ -6,7 +6,8 @@
          Mono and Flush are forwarded onto the inner Border as classes, so the variants are styled in
          SharedStyles beside the base row rather than re-declared per tab. -->
     <Border Classes="infoRow" Classes.mono="{Binding #Root.Mono}" Classes.flush="{Binding #Root.Flush}">
-        <Grid ColumnDefinitions="Auto,*">
+        <!-- The gap keeps a long key off a value that wraps: "Motherboard" ran straight into its value. -->
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource KeyValueGap}">
             <TextBlock Classes="infoKey" Text="{Binding #Root.Key}"/>
             <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding #Root.Value}"/>
         </Grid>
