@@ -23,7 +23,7 @@
 
         <!-- Only offered once there is something to undo, so an untouched row carries no extra chrome. -->
         <Button Name="Reset" Classes="toolIcon" IsVisible="False" ToolTip.Tip="Restore the default">
-            <Path Width="14" Height="14" Stretch="None" Stroke="{DynamicResource TextTertiary}"
+            <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform" Stroke="{DynamicResource TextTertiary}"
                   StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
                   Data="M3,7 A4,4 0 1 1 4.2,9.9 M3,4 V7 H6"/>
         </Button>

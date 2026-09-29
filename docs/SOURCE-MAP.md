@@ -233,6 +233,11 @@ stays in its tab folder.
                                  binds the flag, which outranks the ScrollViewer rule. The pins live HERE
                                  and not in the view that owns the control: ScrollViewerInsetTests matches
                                  the selector in this file exactly.
+                                 HEADER HIERARCHY: shellTitle (the toolbar's page name, 18 Bold) and
+                                 panelTitle (a widget's heading, 13.5 SemiBold) sit side by side so the
+                                 rank is set once. shellTitle is the shell's alone and is kept out of
+                                 src/Tabs; HeaderHierarchyTests pins the gap and the toolbar's lack of
+                                 local setters, which would outrank the class.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
@@ -247,7 +252,16 @@ stays in its tab folder.
                                  first apply. TEXT SCALE: the ladder is every font size in the app,
                                  TextScale.BaseSizes mirrors it, and a test fails on any authored
                                  FontSize literal. A token with no call site should not exist — the
-                                 ladder is the one authorized sweep, see AGENTS.md.
+                                 ladder is the one authorized sweep, see AGENTS.md. The ladder's values
+                                 were rebalanced once (~1.12, rounded to 0.5) after measuring against
+                                 File Explorer; they must stay strictly increasing, which a test pins.
+                                 ICON SIZES: IconSize (an icon that identifies something or fills a
+                                 chrome button) and IconSizeSmall (inside a row button, a field or a
+                                 tinted tile). The nav geometries are authored on an 18x18 grid whose ink
+                                 fills ~78%, so a site must take Stretch="Uniform" — with "None" the box
+                                 grows and the ink does not, which is how an icon "resized" and did not
+                                 change. The Caret* set is the exception: it is authored 8x5 and stays
+                                 Stretch="None", or Uniform blows it up to fill the box.
                                  ScrollGutter is the gap between a scroller's content and its bar, set as
                                  the content's Margin (or a ListBox/TreeView's Padding, which its template
                                  applies as the presenter's Margin). Never ScrollViewer Padding: the scroll
@@ -680,10 +694,10 @@ stays in its tab folder.
                                  templates their presenters and neither can host a ScaleHost.
                                  BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
                                  SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
-        TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
-                                 name. They are the sizes the app already shipped, not a redesign: a tidier
-                                 ladder would change how the app looks at 100%, which is the one thing every
-                                 option on this card must not do. Mirrors the TextSize* defaults in
+        TextScale.cs            (every authored type size the text scale scales, keyed by resource
+                                 name. Rebalanced once against File Explorer — every step ~1.12 bigger,
+                                 rounded to 0.5, body 12.5 -> 14 — and strictly increasing, since rounding
+                                 is how two steps merge onto one value. Mirrors the TextSize* defaults in
                                  Dimensions.axaml, pinned both ways by a test)
 ```
 
@@ -1158,7 +1172,10 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer. The scrolling host (PageScroll) is
+                                 the viewport — see File Explorer. The toolbar's page title and
+                                 subtitle are the shared shellTitle and cardSub classes with no local
+                                 size, weight or color, since a local setter would outrank the class.
+                                 The scrolling host (PageScroll) is
                                  SHARED by every scrolling page, so code-behind calls ScrollToHome on
                                  each CurrentPage change; without it a page opened at the last page's
                                  offset. Synchronous, so a reveal's posted BringIntoView still wins.
