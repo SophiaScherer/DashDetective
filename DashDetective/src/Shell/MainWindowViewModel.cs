@@ -268,6 +268,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                 Icons.Document, Icons.FileExplorer),
         ], _recents);
         _recents.Changed += Persist;
+
+        // The search dropdown is a popup, so it draws above the Help scrim and its results would still
+        // navigate the page behind the modal. Opening Help puts it away, keeping the term.
+        Help.PropertyChanged += (_, e) => {
+            if (e.PropertyName == nameof(HelpViewModel.IsOpen) && Help.IsOpen)
+                Search.Close();
+        };
         _toolkit.PinsChanged += Persist;
         _toolkit.CommandsChanged += Persist;
 
@@ -606,15 +613,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             return false;
 
         // While the Help modal is up it swallows every shortcut — Esc closes it, and nothing else is
-        // allowed to act on the page hidden behind the scrim.
+        // allowed to act on the page hidden behind the scrim. Enter falls through so a focused button in
+        // the card can still be pressed with it.
         if (Help.IsOpen) {
+            if (id == ShortcutId.Activate)
+                return false;
             if (id == ShortcutId.Escape)
                 Help.Close();
             return true;
         }
 
-        // The accent picker is modal the same way; Esc discards its draft. Enter falls through so a
-        // focused button in the picker can still be pressed with it.
+        // The accent picker is modal the same way, Enter included; Esc discards its draft.
         if (AccentPicker.IsOpen) {
             if (id == ShortcutId.Activate)
                 return false;
