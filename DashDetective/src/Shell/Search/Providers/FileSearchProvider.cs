@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Search;
 using System;
 using System.Collections.Generic;
@@ -42,6 +43,14 @@ public sealed class FileSearchProvider : ISearchProvider {
 
     public SearchCategory Category => SearchCategory.File;
 
+    /// <summary>How long the index gets before the scan is asked instead. The aggregator's deadline covers
+    /// this provider as a whole, index and scan in turn, so a stalled index must hand over well before it,
+    /// or it would cost the scan's answer too.</summary>
+    internal static readonly TimeSpan DefaultIndexDeadline = TimeSpan.FromSeconds(2);
+
+    /// <summary>Test seam for <see cref="DefaultIndexDeadline"/>.</summary>
+    internal TimeSpan IndexDeadline { get; init; } = DefaultIndexDeadline;
+
     public async Task<IReadOnlyList<SearchResult>> QueryAsync(SearchQuery query, CancellationToken token) {
         var scopes = SearchScopes.For(_currentFolder());
         if (scopes.Count == 0)
@@ -51,7 +60,7 @@ public sealed class FileSearchProvider : ISearchProvider {
         // are not necessarily its first rows, and ranking needs something to choose between.
         var limit = query.PerCategoryLimit * 4;
 
-        var hits = await _index.SearchAsync(query.Term, scopes, limit, token)
+        var hits = await AskIndexAsync(query.Term, scopes, limit, token)
                    ?? await _fallback.SearchAsync(query.Term, scopes, limit, token)
                    ?? [];
 
@@ -71,5 +80,19 @@ public sealed class FileSearchProvider : ISearchProvider {
         }
 
         return results;
+    }
+
+    // A stalled index is one that cannot answer, which is what null already means here. The call itself
+    // cannot be stopped — the OLE DB read blocks — so it is left to finish on its own and never read.
+    private async Task<IReadOnlyList<FileHit>?> AskIndexAsync(
+        string term, IReadOnlyList<string> scopes, int limit, CancellationToken token) {
+        try {
+            return await _index.SearchAsync(term, scopes, limit, token).WaitAsync(IndexDeadline, token);
+        } catch (TimeoutException e) {
+            // Logged here, not left to the aggregator: the scan answers, so its deadline never fires, and
+            // this line is the one a report of a stuck search box needs.
+            Log.Warn($"Windows index did not answer within {IndexDeadline.TotalSeconds:0.#}s; searching the folders instead", e);
+            return null;
+        }
     }
 }

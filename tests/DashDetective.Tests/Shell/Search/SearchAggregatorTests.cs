@@ -158,4 +158,69 @@ public class SearchAggregatorTests {
 
         Assert.Empty(await aggregator.QueryAsync(new SearchQuery("x"), CancellationToken.None));
     }
+
+    /// <summary>A provider whose call never completes, like a Windows index query that has stalled: it has
+    /// no timeout and ignores the token.</summary>
+    private sealed class StalledProvider(SearchCategory category) : ISearchProvider {
+        public SearchCategory Category { get; } = category;
+
+        public int Calls { get; private set; }
+
+        public Task<IReadOnlyList<SearchResult>> QueryAsync(SearchQuery query, CancellationToken token) {
+            Calls++;
+            return new TaskCompletionSource<IReadOnlyList<SearchResult>>().Task;
+        }
+    }
+
+    private static readonly TimeSpan ShortDeadline = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>The failure this pins: the merge waited on every provider with no deadline, so one stalled
+    /// source held back every other category's results.</summary>
+    [Fact]
+    public async Task QueryAsync_AStalledProviderCostsOnlyItsOwnCategory() {
+        var aggregator = new SearchAggregator([
+            new StalledProvider(SearchCategory.File),
+            new FakeProvider(SearchCategory.Page, Result(SearchCategory.Page, "dashboard", 900)),
+        ], ShortDeadline);
+
+        var results = await aggregator.QueryAsync(new SearchQuery("dash"), CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(["dashboard"], results.Select(r => r.Title));
+    }
+
+    /// <summary>The reported sequence: a search runs against a stalled source, then the user types a new
+    /// term. The new term must still get answers from everything that is working, rather than queue
+    /// behind the stall until a restart.</summary>
+    [Fact]
+    public async Task QueryAsync_ANewTermAfterAStalledOne_StillAnswers() {
+        var stalled = new StalledProvider(SearchCategory.File);
+        var aggregator = new SearchAggregator([
+            stalled,
+            new FakeProvider(SearchCategory.Setting, Result(SearchCategory.Setting, "Theme", 900)),
+        ], ShortDeadline);
+
+        using var first = new CancellationTokenSource();
+        var abandoned = aggregator.QueryAsync(new SearchQuery("the"), first.Token);
+        first.Cancel();
+        Assert.Empty(await abandoned.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        var results = await aggregator.QueryAsync(new SearchQuery("theme"), CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(["Theme"], results.Select(r => r.Title));
+        Assert.Equal(2, stalled.Calls);
+    }
+
+    // Cancelling must not wait out the deadline either: a superseded term is dropped at once.
+    [Fact]
+    public async Task QueryAsync_CancelledWhileAProviderStalls_ReturnsWithoutWaitingForTheDeadline() {
+        var aggregator = new SearchAggregator([new StalledProvider(SearchCategory.File)], TimeSpan.FromMinutes(5));
+        using var cts = new CancellationTokenSource();
+
+        var query = aggregator.QueryAsync(new SearchQuery("x"), cts.Token);
+        cts.Cancel();
+
+        Assert.Empty(await query.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
 }
