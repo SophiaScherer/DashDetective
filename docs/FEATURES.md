@@ -58,9 +58,9 @@ point drives the **same shared** `NavigationViewModel`:
 - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
   in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
 - **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
-  **collapse tweens the rail's size** (~150ms, `CubicEaseOut`); the transition is declared **per axis**
-  (`Border.rail:not(.horizontal)` → `Width`, `.horizontal` → `Height`) because `RailWidth`/`RailHeight`
-  are `NaN` on whichever axis stretches. A **re-dock fades** — out 120ms, change edge, back in — because
+  **collapse tweens a vertical rail's width** (~150ms, `CubicEaseOut`), on `Border.rail:not(.horizontal)`
+  only: a horizontal bar's height follows its content, so there is no fixed value to tween between, and
+  `RailWidth` is `NaN` on that axis. A **re-dock fades** — out 120ms, change edge, back in — because
   a `DockPanel` offers no path between edges to slide along. Every re-dock path (command, picker, drag)
   funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
   changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
@@ -74,16 +74,34 @@ The footer avatar shows the **device's own account picture** when the OS has one
 on Windows, `~/.face` / AccountsService on Linux. The reader returns encoded bytes rather than a decoded
 image, so it holds no UI type; `NavigationViewModel` decodes once and falls back to the accent-gradient
 **initials badge** whenever there is no picture, the read is denied, or the file will not decode. The
-gradient stays the backdrop either way, so it still re-tints with the accent.
+gradient stays the backdrop either way, so it still re-tints with the accent. The **role line under the
+name describes the account, not the process** (work item 70): an administrator reads "Administrator"
+whether or not the app runs elevated. A plain `IsInRole(Administrator)` read every administrator as a
+standard user, because UAC runs their apps with a filtered token whose Administrators group is
+deny-only; the filtered group still shows as a `DenyOnlySid` claim, which is what marks the account. On
+Linux, root or membership of `sudo`, `wheel` or `admin` (from `/proc/self/status`'s `Groups`, matched by
+gid against `/etc/group`) is an administrator; an unreadable file is the neutral "User", never a guess.
 
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
 label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
 alignment / rounding) are **computed properties on the VM — no value converters**. The rail
-thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`/`RailHeight` delegate
-to and the drop preview measures against; it takes the axis as an argument because a drag previews
-edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
+thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth` delegates to and the
+drop preview measures against; it takes the axis as an argument because a drag previews edges the bar
+is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
 `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
 *Persistence* below); this is shared shell work, not a tab-local change.
+
+**A horizontal bar is as tall as its content, not a fixed height.** It used to be 64px (54 collapsed)
+times the text scale, but on a top or bottom bar only the labels grow with the text — the icons, the
+avatar and the logo do not — so at 150 % a ~96px bar held ~50px of content and read as an empty band
+above and below it. It now has no `Height` at all, and its footer drops to `14,6` padding so the
+avatar does not out-grow the item rows. The drop preview cannot measure a bar that is not horizontal
+yet, so `RailThickness(horizontal: true)` answers the height the view last reported
+(`ReportBarHeight`, from the rail's `SizeChanged`), and `HorizontalBarEstimate` (45) until there is
+one. A text-scale or collapse change made while the bar is vertical discards the report, since the
+labels change height with both; a horizontal bar reports its new height itself. The estimate is a
+preview only — the bar itself never reads it. The band is multiplied by the interface size
+(`UiScale`), because the overlay it is drawn in sits outside the scale host.
 
 - **Active Connections pager.** `« ‹ 1 2 3 4 › »` — the numbered `PageLink`s with **first/prev/next/last
 arrows** bracketing them. The arrows are **stable `[RelayCommand]`s on the view model, deliberately NOT
@@ -518,11 +536,17 @@ Interface size transforms the whole app; text size grows only the type. They mul
 gives text at 2.25x while the chrome grows 1.5x.
 
 **One ladder, swept across every view.** Every authored `FontSize` value is now
-`{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
-`ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
-rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
-option on this card must not do. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins them
-together, as `SemanticBrushes` mirrors Palette.axaml.
+`{DynamicResource TextSize*}` against a step ladder in `Dimensions.axaml`, which
+`ThemeService.ApplyTextScale` rewrites. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins
+them together, as `SemanticBrushes` mirrors Palette.axaml.
+
+**The 100 % baseline was raised once, on purpose.** Measured against File Explorer at the same DPI, the
+app's body type matched Explorer's glyph for glyph (Inter 12.5 and Segoe UI 12 both cap 9, x-height 6) —
+what read small was everything around it: secondary text a step below Explorer's flat 12, and a line box
+of 14.1 px against 16. So each step grew by ~1.12 rounded to 0.5, body 12.5 → 14, which puts Inter's line
+box at 15.8. The ladder is **strictly increasing and a test says so**: rounding is exactly how two
+neighbouring steps land on one value and flatten the hierarchy. Raising the baseline is a *rebalance of
+the default*, not a scale — 100 % is still the default and a saved scale still means what it did.
 
 **This is a deliberate exception to the adopt-by-contact rule** for dimensions. The feature *is* the
 sweep: a literal left behind would not grow, and would fail invisibly on one page. A test fails on any
@@ -535,8 +559,9 @@ reading:
   carrying both scales itself.
 - **Fixed containers holding scaled text.** The toolbar was a fixed 54px row and the navigation rail a
   fixed 236px, so at 200 % the page subtitle was cut off and the brand read "DashDetectiv". The toolbar
-  row is now `Auto` with a 54px minimum, and `NavigationViewModel.RailThickness` multiplies by the text
-  scale — above 100 % only: the rail's icons do not shrink with smaller text, and a collapsed rail
+  row is now `Auto` with a 54px minimum, and a vertical rail's `NavigationViewModel.RailThickness`
+  multiplies by the text scale (a horizontal bar sizes to its content instead — see *Navigation bar*) —
+  above 100 % only: the rail's icons do not shrink with smaller text, and a collapsed rail
   narrowed to 80 % let its scroll bar cover half of every icon. The toolbar clock's reserved width
   (`MainWindowViewModel.ClockWidth`) scales with the text across the whole range, since it holds
   nothing but text, or at 200 % the time was cut to "11:07:". **This is where the feature breaks next:** any new pixel dimension around text needs the
@@ -944,6 +969,10 @@ tab-local except the shared refresh seam:
   `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
   active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
   adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
+- **Row pitch is set against File Explorer's, not by eye.** The list runs `fileRow` padding 14,6 around
+  an 18px glyph — about 32px a row, where Explorer is 28 around a 16px icon, so the same share of the row
+  is ink. The tree was the worst of it at 20px a row against Explorer's 32: it is `TreeViewItem` padding
+  4,5 now, near 30, and its caret is 11 rather than 8.
 - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
   `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
   between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
@@ -1243,8 +1272,10 @@ behind it that must not be quietly undone:
   both are usually a glance rather than a preference. Each reports a change only while its toggle is on,
   nothing is written for a toggle that is off, and seeding a saved value on startup is quiet so it does
   not write straight back. `PreferencesChanged` is the one event the shell hooks to `Persist`.
-- **Row density** was tightened (`procRow` padding 16,5). `Button.chev`'s negative margin must stay in
-  step with it, as its own comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
+- **Row density** is `procRow` padding 16,7. It was tightened to 16,5 once and that read squished beside
+  the app's own file rows, so the rebalance against File Explorer put it back: the row now sits at about
+  33px against the file list's 32. `Button.chev`'s negative margin must stay in step with it, as its own
+  comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
@@ -1545,6 +1576,13 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   window, so it sees the press *before* the capture box does — without this, arming a box and pressing
   Ctrl+1 would navigate away instead of capturing. `SettingsViewModel.IsCapturingShortcut` is what
   `HandleShortcut` checks first, returning false so the key continues down to the box.
+- **A capture always has a way out that writes nothing** (work item 55). `Esc` stands it down, and so
+  does a **Cancel ×** shown beside the box only while it is armed — a click on empty page takes no
+  focus, so `LostFocus` never fired and a mouse user was stuck until they assigned something. The
+  button is **not focusable**: pressing it would otherwise move focus off the box first, which stands
+  the capture down through `LostFocus` and hides the button mid-click. Either path skips
+  `GestureCaptured`, so nothing reaches `ShortcutOverrides`, and the box reverts to the current keys.
+  `Esc` cancels whatever modifiers are held with it, so it can never itself be bound (`CaptureKeys`).
 - **A clash is refused, not silently accepted**, and only **within one scope**. Cross-scope duplicates
   stay legal because they already are (`Alt+↑` on Processes and File Explorer), since only one tab is
   ever current. The capture box reports the conflict inline, naming the action that already holds the
@@ -1719,8 +1757,20 @@ was deliberately left alone, and **Processes no longer drops columns at all** �
 the collapsing toolbar search, the Ping console filling its widget and keeping as much scrollback as fits,
 and `Dimensions.axaml`.
 
-**Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
-is doing design work first — do not start it without a task.
+**The toolbar title outranks a widget title** (work item 43). The toolbar's page name was 15 SemiBold
+and a widget's `panelTitle` 13.5 SemiBold, so a heading on the page could not be told from the shell's.
+`TextBlock.shellTitle` (`TextSizeDisplay`, 18, **Bold**, `TextStrong`) now sits beside `panelTitle`
+(unchanged, 13.5 SemiBold) in SharedStyles.axaml, so the gap is defined once, in size and weight both.
+Three decisions:
+
+- **Only the title carries the rank.** Both subtitles are `cardSub`; the toolbar's was already the same
+  size and brush, now by class rather than by restated setters.
+- **`panelTitle` did not move.** Changing it would restyle every widget in the app for a problem that
+  sits in one place, the toolbar.
+- **No tab heading was converted.** The survey found none drawn in the toolbar's look: Hardware's cards
+  match `panelTitle`, and Storage's drive names and File Explorer's detail name sit at 14 SemiBold,
+  4px and a weight under the new title. `HeaderHierarchyTests` keeps `shellTitle` out of
+  `src/Tabs` and the toolbar free of local setters, which would outrank the class.
 
 ## Drag to reorder
 

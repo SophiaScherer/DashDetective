@@ -31,7 +31,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>The user's collapse preference. Persisted. Layout reads <see cref="IsRailCollapsed"/>
     /// instead, so a narrow window can force the rail in without overwriting this.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
         nameof(ChevronPointing), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock))]
@@ -41,7 +41,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// persisted, and deliberately separate from <see cref="IsCollapsed"/> so widening the window
     /// restores whatever the user actually chose.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(RailHeight), nameof(ShowLabels),
+    [NotifyPropertyChangedFor(nameof(IsRailCollapsed), nameof(RailWidth), nameof(ShowLabels),
         nameof(ShowBrandText), nameof(ShowFullFooter),
         nameof(ChevronPointing), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock))]
@@ -103,7 +103,7 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>Which window edge the bar docks to. Persisted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHorizontal), nameof(Dock), nameof(BrandDock), nameof(FooterDock),
-        nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth), nameof(RailHeight),
+        nameof(ItemsOrientation), nameof(ItemsVAlign), nameof(RailWidth),
         nameof(HairlineThickness), nameof(ScrollV), nameof(ScrollH), nameof(ShowBrandText),
         nameof(ShowFullFooter), nameof(ChevronIcon),
         nameof(ControlsDock), nameof(FooterAvatarDock),
@@ -241,27 +241,58 @@ public partial class NavigationViewModel : ViewModelBase {
     /// Takes the axis as an argument rather than reading <see cref="IsHorizontal"/> so the drag preview
     /// can size a drop band for an edge the bar is not on yet.</summary>
     public double RailThickness(bool horizontal) =>
-        Math.Max(1, _textScale) * (horizontal ? (IsRailCollapsed ? 54 : 64) : (IsRailCollapsed ? 64 : 236));
+        horizontal ? HorizontalBarHeight : Math.Max(1, _textScale) * (IsRailCollapsed ? 64 : 236);
 
-    /// <summary>Grows the bar with the text scale. The rail is the one surface sized in pixels that has
-    /// to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped both.
-    /// </summary>
+    /// <summary>A horizontal bar's height before it has been laid out at the current text size and
+    /// collapse state: the 36px item rows plus their 4px list margin and the hairline, at 100%. Only the
+    /// drag preview reads it; the bar itself is as tall as its content.</summary>
+    internal const double HorizontalBarEstimate = 45;
+
+    // The last height a horizontal bar was laid out at. 0 until then, and again whenever something the
+    // bar's height depends on changes while it is not horizontal to report the new one.
+    private double _measuredBarHeight;
+
+    private double HorizontalBarHeight => _measuredBarHeight > 0 ? _measuredBarHeight : HorizontalBarEstimate;
+
+    /// <summary>Records the height a horizontal bar was laid out at, so the drop preview matches it. A
+    /// fixed height scaled with the text left an empty band above and below the items, since only the
+    /// labels grow.</summary>
+    internal void ReportBarHeight(double height) {
+        if (IsHorizontal && double.IsFinite(height) && height > 0)
+            _measuredBarHeight = height;
+    }
+
+    /// <summary>Grows a vertical rail with the text scale. The rail is the one surface sized in pixels
+    /// that has to hold scaled text — the brand and the item labels — so at 200% a fixed 236px clipped
+    /// both. A horizontal bar needs no help: it sizes to its content.</summary>
     public void SetTextScale(double factor) {
         if (!double.IsFinite(factor) || factor <= 0 || factor == _textScale)
             return;
 
         _textScale = factor;
+        ForgetBarHeight();
         OnPropertyChanged(nameof(RailWidth));
-        OnPropertyChanged(nameof(RailHeight));
     }
 
-    /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
-    /// docked edge; a fixed rail (full or collapsed) when vertical.</summary>
-    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
+    /// <summary>The interface size, for sizing the drop preview: the rail is drawn inside the scale host
+    /// and the preview in the window's overlay, which is outside it.</summary>
+    internal double UiScale => _uiScale;
 
-    /// <summary>Rail height. A fixed bar (full or collapsed) when horizontal; <see cref="double.NaN"/>
-    /// (auto) when vertical so it stretches to the docked edge.</summary>
-    public double RailHeight => IsHorizontal ? RailThickness(horizontal: true) : double.NaN;
+    // A horizontal bar reports its own height on every change, so only a vertical one holds a stale report.
+    private void ForgetBarHeight() {
+        if (!IsHorizontal)
+            _measuredBarHeight = 0;
+    }
+
+    // Collapsing hides the labels, which at large text are taller than the icons beside them.
+    partial void OnIsCollapsedChanged(bool value) => ForgetBarHeight();
+
+    partial void OnIsAutoCollapsedChanged(bool value) => ForgetBarHeight();
+
+    /// <summary>Rail width. <see cref="double.NaN"/> (auto) when horizontal so it stretches to the
+    /// docked edge; a fixed rail (full or collapsed) when vertical. There is no height counterpart: a
+    /// vertical rail stretches and a horizontal bar is as tall as its content.</summary>
+    public double RailWidth => IsHorizontal ? double.NaN : RailThickness(horizontal: false);
 
     /// <summary>The bar's separator hairline, drawn only on the edge that faces the content area.</summary>
     public Thickness HairlineThickness => Orientation switch {
