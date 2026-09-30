@@ -249,7 +249,8 @@ Overrides persist as one encoded string, ids and keys by name.
 `ShellShortcutHandler` (`src/Shell/Shortcuts`) attaches one tunneling `KeyDown` handler to the window.
 Dispatch is a priority chain on `MainWindowViewModel.HandleShortcut` — a capture in progress, then an
 open modal, then the search dropdown, then the current page's scope, then global — so it is testable
-without a UI. **The capture check has to come first**: the handler tunnels from the window and so sees
+without a UI. The modal step is `ModalShortcuts`, split out because the shell view model builds every
+page and cannot itself be constructed in a test. **The capture check has to come first**: the handler tunnels from the window and so sees
 a press before the Settings capture box does, and would otherwise run the shortcut being rebound.
 
 ## Cross-platform seams
