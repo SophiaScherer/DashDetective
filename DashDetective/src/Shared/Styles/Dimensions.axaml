@@ -40,6 +40,8 @@
     <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
     <sys:Double x:Key="FieldHeight">32</sys:Double>
     <sys:Double x:Key="TableRowHeight">30</sys:Double>
+    <!-- Between a key/value row's key and its value, so a wrapped value never runs into its key. -->
+    <sys:Double x:Key="KeyValueGap">8</sys:Double>
 
     <!-- ===== Runtime-swapped values (rewritten by ThemeService) =====
          The only keys here that change while the app runs, so the only ones needing {DynamicResource}.
