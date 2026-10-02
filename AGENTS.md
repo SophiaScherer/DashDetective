@@ -66,8 +66,8 @@ and the Settings **Layout card**, whose "Reset widget placements" clears every `
 [docs/FEATURES.md](docs/FEATURES.md) carrying the decisions inside it.
 
 A **UI-affordance pass** is also complete, across four small changes: the widget fold chevron got the
-Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's edge
-puck moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
+Processes table's stretched hit target and a bigger glyph; the File Explorer tree and the nav bar's
+collapse control moved to the app's **one filled disclosure caret** (`Icons.Caret*`), leaving the Network pager's
 stroked arrows alone; a `WidgetPanel` header now **folds on a double-click**; and every Settings action
 plus all four exports **confirm** through `NoticeService` (`src/Services/Notifications`) in a green
 banner below the resource alert's. Their decisions are in
@@ -844,7 +844,7 @@ temperature is the expected outcome, not a defect.
   Explorer: every icon size was a literal, so there was nothing to adopt by contact and no way to raise
   them all coherently. Two tokens, because the app has two jobs for an icon — one that identifies
   something or fills a chrome button, one inside a row-level button, a field or a tinted tile. A mark
-  that is deliberately smaller than either (a clear X, a status dot, a drag grip, the puck's caret) is
+  that is deliberately smaller than either (a clear X, a status dot, a drag grip, a disclosure caret) is
   not an icon and stays a literal. **Unlike the type ladder, no test gates this one** — which mark counts
   as an icon is a judgement call, so it is a convention and a stray literal will not fail the build.
   Nothing else earns this.

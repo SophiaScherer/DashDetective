@@ -45,7 +45,7 @@ public static class HelpContent {
         new("shell.toolbar", "The toolbar",
             "The Live pill shows whether sampling is running, Refresh re-reads the current page, Export saves a system report, and the clock follows the format you chose."),
         new("shell.navigation", "The navigation bar",
-            "Drag it by the logo to dock it to any window edge, or collapse it to a slim icon rail."),
+            "Drag it by the logo to dock it to any window edge, or collapse it to a slim icon rail with the arrow beside Help."),
     ];
 
     /// <summary>Short orientation tips, in display order.</summary>

@@ -42,7 +42,7 @@ tall around ~50px of content, and at 200% ~128px around ~60px. That surplus was 
 3. For each edge, set Settings → Accessibility interface size and text size to 80%, 100%, 150% and
    200%. The bar should grow only as much as the labels do. Nothing should clip: labels, the selected
    item's underline, the avatar and the Help button.
-4. Collapse the bar (hover puck or Settings). The labels hide, and the height stays the same or shrinks
+4. Collapse the bar (the footer toggle, Ctrl+B or Settings). The labels hide, and the height stays the same or shrinks
    slightly.
 5. Drag the brand logo toward the top edge while docked left. The accent drop band should match the
    height the bar lands at.
