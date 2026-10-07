@@ -71,10 +71,6 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     protected static Control Inner(Control child) =>
         child is ContentPresenter { Child: Control content } ? content : child;
 
-    public int SlotAt(Point point) =>
-        WidgetBoardLayout.SlotAt(_slotRects.AsSpan(0, _visible.Count),
-                                 CollectionsMarshal.AsSpan(RowEnds), point.X, point.Y);
-
     public void BeginPreview() => _childOrder.BeginPreview();
 
     public bool PreviewMove(Control item, int target) =>
@@ -149,6 +145,10 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     Panel IReorderablePanel.Surface => this;
 
     IReadOnlyList<Control> IReorderablePanel.Items => _visible;
+
+    ReadOnlySpan<Rect2> IReorderablePanel.SlotRects => _slotRects.AsSpan(0, _visible.Count);
+
+    ReadOnlySpan<int> IReorderablePanel.SlotRowEnds => CollectionsMarshal.AsSpan(RowEnds);
 
     /// <summary>Rebuilds <see cref="Visible"/> in the order to lay out; call it first thing in measure.
     /// Collapsed children are skipped, so a hidden one never takes a slot.</summary>

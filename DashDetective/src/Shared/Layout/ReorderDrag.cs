@@ -19,6 +19,7 @@ public sealed class ReorderDrag {
     private static readonly Cursor GripCursor = new(StandardCursorType.Hand);
 
     private readonly IReorderablePanel _host;
+    private readonly DropTarget _target = new();
 
     private bool _pending;              // pointer is down on a handle, not yet past the threshold
     private bool _dragging;             // past it: previewing a reorder
@@ -111,6 +112,7 @@ public sealed class ReorderDrag {
             // press, which would take this one straight back off us. Taking it on the first move
             // past the threshold instead cancels that click, which is what a drag should do.
             _dragging = true;
+            _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
             e.Pointer.Capture(_host.Surface);
             _host.BeginPreview();
             _lifted?.Classes.Add("dragging");
@@ -120,15 +122,29 @@ public sealed class ReorderDrag {
         }
 
         // Re-pack under the order being tried, so the others shift as the drag moves.
-        if (_host.PreviewMove(_item, DropTarget()))
+        if (_host.PreviewMove(_item, TargetSlot()))
             _host.Surface.InvalidateMeasure();
         _host.Surface.InvalidateArrange();
     }
 
     /// <summary>Where the dragged item belongs: the slot it is covering, which is where it already
-    /// looks like it will land.</summary>
-    private int DropTarget() =>
-        Math.Clamp(_host.SlotAt(Centre(DragBox())), 0, Math.Max(0, _host.Items.Count - 1));
+    /// looks like it will land. Measured against the slots as they were when the drag began, so the
+    /// preview cannot move the answer under a still pointer.</summary>
+    private int TargetSlot() {
+        // A generator that rebuilt mid-drag has changed what the indices mean, so start over from now.
+        if (_target.SlotCount != _host.Items.Count)
+            _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
+
+        var center = Centre(DragBox());
+        return Math.Clamp(_target.Update(center.X, center.Y), 0, Math.Max(0, _host.Items.Count - 1));
+    }
+
+    private int IndexOfItem() {
+        for (var i = 0; i < _host.Items.Count; i++)
+            if (ReferenceEquals(_host.Items[i], _item))
+                return i;
+        return -1;
+    }
 
     // The middle of the item as drawn, not the pointer inside it. The pointer can be anywhere in the
     // item — half a card's width from its middle — so a card grabbed by its right edge and dragged

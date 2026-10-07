@@ -1835,6 +1835,24 @@ shape now exists once. Five rules, all load-bearing:
    every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
    screenshots all clean. Only a drag that actually took the capture may release it.
 
+**A widget held between two slots settles on one.** It used to flicker on every page with a board,
+worst on Network: the drop target was measured against the live slots, which include the preview, so
+moving the widget shifted the slots under a still pointer, which flipped the target back, which shifted
+them again. A narrow widget held over a wide one is over the wide one's slot in *both* orders, so there
+was no stable answer at all. `DropTarget` (`src/Shared/Layout`) fixes it in the drag model, not with a
+redraw delay, by two rules applied together:
+
+- **The target is measured against the slots frozen when the drag began**, which nothing during the
+  drag can move. The preview still re-packs live; only the question "which slot is this over" reads
+  the snapshot. A generator rebuilding mid-drag changes the slot count, and that alone re-snapshots.
+- **Hysteresis: the target changes only once the dragged box's center is 0.2 of the smaller slot past
+  the boundary** (`DropTarget.Hysteresis`), on each axis. A fraction rather than a DIP margin, so it
+  scales with the interface size; under a half, so every slot stays reachable. Straight down into the
+  next row still works — it just has to be a fifth of a row into it.
+
+The keyboard path never asks a drop target anything: `TryMoveFocused` moves by one index, so it is
+unchanged.
+
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
 was deliberately left alone, and **Processes no longer drops columns at all** — see its own section below),
@@ -1900,7 +1918,8 @@ load-bearing:
 7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
-   landed one slot short — in two columns, the slot up and to the right.
+   landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
+   from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.
