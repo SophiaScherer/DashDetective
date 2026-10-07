@@ -25,6 +25,10 @@ public class ByteRateFormatterTests {
         Assert.Equal("0 KB/s", ByteRateFormatter.Format(bytesPerSec));
 
     [Fact]
+    public void Format_TrickleThatWouldReadZeroPointZero_ReadsPlainZero() =>
+        Assert.Equal("0 KB/s", ByteRateFormatter.Format(40));
+
+    [Fact]
     public void Format_BelowOneKilobyte_ShowsOneDecimalOfAKilobyte() =>
         Assert.Equal("0.5 KB/s", ByteRateFormatter.Format(512));
 

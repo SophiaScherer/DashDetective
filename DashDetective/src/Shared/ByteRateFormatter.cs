@@ -12,12 +12,13 @@ public static class ByteRateFormatter {
 
     /// <summary>Formats a rate as "value unit". The unit is chosen from the value as it will be displayed,
     /// so a rate that would round to "1024 KB/s" reads "1.0 MB/s" and the number never jumps at the step.
-    /// Negative, NaN and infinite input read as zero.</summary>
+    /// Negative, NaN and infinite input, and a trickle that would display as "0.0", read as a plain zero.</summary>
     public static string Format(double bytesPerSec) {
-        if (!double.IsFinite(bytesPerSec) || bytesPerSec <= 0)
+        var value = double.IsFinite(bytesPerSec) ? bytesPerSec / 1024 : 0;
+        // Below 0.05 KB/s FormatValue prints "0.0"; a near-idle disk would flicker between that and "0".
+        if (value < 0.05)
             return $"0 {Labels[0]}";
 
-        var value = bytesPerSec / 1024;
         var unit = 0;
         // Math.Round mirrors FormatValue's whole-number rounding, which is what the reader sees at ≥ 10.
         while (unit < Labels.Length - 1 && Math.Round(value) >= 1024) {

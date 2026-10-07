@@ -391,8 +391,8 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>Samples every disk once and updates each card's Read/Write readouts in place (bytes/sec
-    /// formatted like "48 MB/s", or "12 KB/s" below 1 MB/s), appending each disk's active time to its own rolling history so any drive
-    /// the user switches to already has a minute behind it. Ends by redrawing the Disk Activity surface for
+    /// formatted like "48 MB/s", or "12 KB/s" below 1 MB/s), appending each disk's active time to its own
+    /// rolling history so any drive the user switches to already has a minute behind it. Ends by redrawing the Disk Activity surface for
     /// the selected disk. Disks without a current reading are left unchanged.</summary>
     private void UpdateThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
