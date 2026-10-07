@@ -128,4 +128,25 @@ public class PerformanceGpuRowTests {
         Assert.Equal(45, folded["compute"]);
         Assert.Equal(20, folded["3d"]);
     }
+
+    [Fact]
+    public void ThreeDReading_BusierOtherEngine_ReadsTheThreeDEngineNotTheOverall() {
+        var sample = new GpuAdapterSample(64, new Dictionary<string, double> { ["3D"] = 15, ["Video Codec 0"] = 64 });
+
+        Assert.Equal(15, PerformanceViewModel.ThreeDReading(sample, 64));
+    }
+
+    [Fact]
+    public void ThreeDReading_NoEngineMap_FallsBackToTheOverall() {
+        var sample = new GpuAdapterSample(40, new Dictionary<string, double>());
+
+        Assert.Equal(40, PerformanceViewModel.ThreeDReading(sample, 40));
+    }
+
+    [Fact]
+    public void ThreeDReading_EngineMapWithoutThreeD_ReadsZero() {
+        var sample = new GpuAdapterSample(30, new Dictionary<string, double> { ["Copy"] = 30 });
+
+        Assert.Equal(0, PerformanceViewModel.ThreeDReading(sample, 30));
+    }
 }

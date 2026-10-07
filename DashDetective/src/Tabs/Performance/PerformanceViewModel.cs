@@ -902,13 +902,14 @@ public partial class PerformanceViewModel : ViewModelBase,
             gpu.Row.Unit = "%";
             gpu.Row.Points = gpu.History.Points(100);
             gpu.Row.ChartStatus = ChartStatus.For(gpu.History);
-            gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+            var threeD = Math.Round(Math.Clamp(ThreeDReading(sample, overall), 0, 100));
+            gpu.ThreeDTile.Value = $"{threeD.ToString(CultureInfo.InvariantCulture)} %";
             UpdateGpuEngines(gpu, sample.Engines);
         }
     }
 
     /// <summary>
-    /// Rebuilds one GPU's per-engine mini charts from its raw engtype map. Drivers expose different,
+    /// Rebuilds one GPU's per-engine mini charts from its engtype map (each type's busiest engine). Drivers expose different,
     /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
     /// are discovered dynamically rather than hardcoded: raw engtype instances are folded by base engine
     /// (see <see cref="FoldEngines"/>), and a chart is added the first time each engine reports. Sampled every
@@ -928,6 +929,15 @@ public partial class PerformanceViewModel : ViewModelBase,
             engine.History.Push(Math.Clamp(value, 0, 100));
             engine.Chart.Points = engine.History.Points(100);
         }
+    }
+
+    /// <summary>The "3D" tile's figure: the adapter's 3D engine, as Task Manager's 3D graph reads it, falling
+    /// back to the overall figure where a platform publishes no per-engine map.</summary>
+    internal static double ThreeDReading(GpuAdapterSample sample, double overall) {
+        foreach (var (type, value) in sample.Engines)
+            if (string.Equals(type, "3D", StringComparison.OrdinalIgnoreCase))
+                return value;
+        return sample.Engines.Count == 0 ? overall : 0;
     }
 
     /// <summary>Folds engine types that differ only by a trailing index ("compute 0", "compute 1") into one base
