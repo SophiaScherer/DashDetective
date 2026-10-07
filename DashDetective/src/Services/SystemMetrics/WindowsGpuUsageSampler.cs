@@ -5,15 +5,19 @@ using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
-/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine
-/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).
+/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine,
+/// 0–100) and a per-engine-type map whose value for each type is the busiest engine of that type, 0–100.
 ///
 /// <b><see cref="Overall"/> is null when the adapter exists but its utilisation cannot be read</b> — the
 /// state Linux needs for a card whose driver publishes no figure (the proprietary NVIDIA blob, Intel's
 /// i915). It is not the same as absent: the inventory builds a GPU card only for an adapter this sampler
 /// reports at all, so returning nothing hides the hardware, while returning 0 would show a real GPU as
-/// permanently idle. Windows always fills it.</summary>
-public sealed record GpuAdapterSample(double? Overall, IReadOnlyDictionary<string, double> Engines);
+/// permanently idle. Windows always fills it.
+///
+/// <see cref="DedicatedUsedBytes"/> is the adapter's dedicated video memory in use, or null when the
+/// platform or driver reports none — never 0 for "unknown", since 0 is a real reading.</summary>
+public sealed record GpuAdapterSample(
+    double? Overall, IReadOnlyDictionary<string, double> Engines, ulong? DedicatedUsedBytes = null);
 
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>
@@ -64,9 +68,12 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     private static extern uint PdhCloseQuery(IntPtr query);
 
     private const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
+    private const string MemoryCounterPath = @"\GPU Adapter Memory(*)\Dedicated Usage";
 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
+    // Zero when the memory counter could not be added: utilization then samples alone and usage stays null.
+    private readonly IntPtr _memoryCounter;
     private readonly bool _ready;
     private bool _disposed;
 
@@ -84,6 +91,10 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
                 _query = IntPtr.Zero;
                 return;
             }
+
+            // A second counter on the same query, so one collect serves both. Its failure is not fatal.
+            if (PdhAddEnglishCounter(_query, MemoryCounterPath, IntPtr.Zero, out _memoryCounter) != ErrorSuccess)
+                _memoryCounter = IntPtr.Zero;
 
             // Seed one collect so the first sample reflects a real interval. The utilisation counter
             // is a rate that needs two data points, so priming here mirrors CpuUsageSampler seeding
@@ -103,7 +114,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     /// <summary>
     /// Returns per-physical-GPU utilisation at the moment of the call, keyed by adapter LUID token
     /// (<c>luid_0x{High:x8}_0x{Low:x8}</c>, matching <see cref="WindowsGpuAdapterProvider"/>). Each
-    /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine type) and its
+    /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine) and its
     /// per-engine-type map. Callers join the LUID keys against the inventory to attribute each reading to a
     /// named GPU. Any failure yields an empty map.
     /// </summary>
@@ -114,18 +125,31 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
         if (_disposed || !_ready || PdhCollectQueryData(_query) != ErrorSuccess)
             return EmptyAdapters;
 
+        var engines = ReadCounter(_counter);
+        if (engines is null)
+            return EmptyAdapters;
+
+        var samples = AggregateAdapters(engines);
+        if (_memoryCounter == IntPtr.Zero || ReadCounter(_memoryCounter) is not { } memory)
+            return samples;
+
+        return GpuMemoryUsage.Join(samples, GpuMemoryUsage.ByAdapter(memory));
+    }
+
+    /// <summary>Reads every instance of one counter on the collected query, or null when PDH refuses.</summary>
+    private static List<(string? Name, double Value)>? ReadCounter(IntPtr counter) {
         // First call sizes the buffer (returns PDH_MORE_DATA); the second fills it.
         uint bufferSize = 0;
-        var status = PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out _, IntPtr.Zero);
+        var status = PdhGetFormattedCounterArray(counter, PdhFmtDouble, ref bufferSize, out _, IntPtr.Zero);
         if (status != PdhMoreData || bufferSize == 0)
-            return EmptyAdapters;
+            return null;
 
         var buffer = Marshal.AllocHGlobal((int)bufferSize);
         try {
-            if (PdhGetFormattedCounterArray(_counter, PdhFmtDouble, ref bufferSize, out var itemCount, buffer) != ErrorSuccess)
-                return EmptyAdapters;
+            if (PdhGetFormattedCounterArray(counter, PdhFmtDouble, ref bufferSize, out var itemCount, buffer) != ErrorSuccess)
+                return null;
 
-            return AggregateAdapters(ReadItems(buffer, itemCount));
+            return ReadItems(buffer, itemCount);
         } finally {
             Marshal.FreeHGlobal(buffer);
         }
@@ -147,65 +171,10 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
         return items;
     }
 
-    /// <summary>
-    /// Groups counter instances by adapter LUID then engine type, summing within each engine and taking the
-    /// busiest engine type as the adapter's overall % (clamped 0–100). Pure (no PDH/marshalling) so it is
-    /// unit-tested directly. Instances that carry no LUID or engine token are skipped.
-    /// </summary>
+    /// <summary>Applies Task Manager's per-engine rule (<see cref="GpuEngineLoad.ByAdapter"/>) to one
+    /// read. Instances whose name does not parse are skipped.</summary>
     internal static IReadOnlyDictionary<string, GpuAdapterSample> AggregateAdapters(
-        IEnumerable<(string? Name, double Value)> items) {
-        var perAdapter = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
-
-        foreach (var (name, value) in items) {
-            var luid = ParseLuidToken(name);
-            var engine = EngineType(name);
-            if (luid is null || engine is null)
-                continue;
-
-            if (!perAdapter.TryGetValue(luid, out var engines))
-                perAdapter[luid] = engines = new Dictionary<string, double>(StringComparer.Ordinal);
-            engines.TryGetValue(engine, out var running);
-            engines[engine] = running + value;
-        }
-
-        var result = new Dictionary<string, GpuAdapterSample>(StringComparer.Ordinal);
-        foreach (var (luid, engines) in perAdapter) {
-            double max = 0;
-            foreach (var total in engines.Values)
-                if (total > max)
-                    max = total;
-            result[luid] = new GpuAdapterSample(max < 0 ? 0 : max > 100 ? 100 : max, engines);
-        }
-        return result;
-    }
-
-    /// <summary>Extracts the adapter LUID token (<c>luid_0x…_0x…</c>, lower-cased) from an instance name like
-    /// <c>pid_1234_luid_0x00000000_0x0000e54b_phys_0_eng_0_engtype_3D</c>, or null when absent.</summary>
-    internal static string? ParseLuidToken(string? instanceName) {
-        if (string.IsNullOrEmpty(instanceName))
-            return null;
-
-        const string token = "luid_";
-        var start = instanceName.IndexOf(token, StringComparison.OrdinalIgnoreCase);
-        if (start < 0)
-            return null;
-
-        // The LUID token is followed by the "_phys" segment; slice between them (falling back to end of
-        // string) and normalise casing so it joins the DXGI-formatted token regardless of PDH's casing.
-        var phys = instanceName.IndexOf("_phys", start, StringComparison.OrdinalIgnoreCase);
-        var end = phys > start ? phys : instanceName.Length;
-        return instanceName[start..end].ToLowerInvariant();
-    }
-
-    /// <summary>Extracts the engine type after the trailing <c>engtype_</c> token, or null.</summary>
-    private static string? EngineType(string? instanceName) {
-        if (string.IsNullOrEmpty(instanceName))
-            return null;
-
-        const string token = "engtype_";
-        var idx = instanceName.LastIndexOf(token, StringComparison.Ordinal);
-        return idx < 0 ? null : instanceName[(idx + token.Length)..];
-    }
+        IEnumerable<(string? Name, double Value)> items) => GpuEngineLoad.ByAdapter(items);
 
     /// <summary>Closes the PDH query handle and leaves the sampler inert. Safe to call more than once — the
     /// flag also stops a second close on the same handle.</summary>

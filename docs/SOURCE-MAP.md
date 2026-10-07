@@ -1025,14 +1025,33 @@ stays in its tab folder.
                                  SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
-                                 Performance rows each own one)
+                                 Performance rows each own one. A SECOND COUNTER on the same PDH query,
+                                 \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
+                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
+                                 still samples and usage stays null)
+        GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
+                                 token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
+                                 it joins the inventory key), and Join() onto the engine samples. A
+                                 memory-only LUID is dropped — the inventory keys GPUs off the engine
+                                 counter — and a missing reading stays null, never 0)
+        GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
+                                 eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
+                                 adapter carries several engines of a type (six Copy on an RTX 3060). The
+                                 LUID is re-formatted through GpuAdapter.FormatLuidToken so it joins the
+                                 inventory. Pure, so it runs on every CI leg)
+        GpuEngineLoad.cs        (Task Manager's rule over those instances: an engine's load = the SUM of its
+                                 process instances, clamped; adapter = busiest engine; a type = its busiest
+                                 engine; a process = its busiest engine. SAME-TYPE ENGINES ARE NEVER SUMMED —
+                                 keying by type inflated Copy past any one engine's load)
         LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
                                  EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
                                  no figure — omitting one would delete its card entirely, and a 0 would show
                                  real hardware as permanently idle. NO ENGINE BREAKDOWN: sysfs has one
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
-                                 construction; only the utilisation file is re-read per tick)
+                                 construction; only the utilization file and amdgpu's mem_info_vram_used
+                                 (dedicated VRAM in use; null for a driver that publishes none) are re-read
+                                 per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
                                  publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
@@ -1899,6 +1918,9 @@ stays in its tab folder.
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
+                                GpuMemoryFormatter.cs   (VRAM in use tile: "used / total", Memory-caption
+                                                         style; MB under 1 GiB; "— / 12 GB" for an
+                                                         unknown usage, a bare "—" for an unknown total)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
                                 WindowsGpuSensorProvider.cs OPPOSITE SHAPES. Windows has no in-box sensor
                                 IGpuSensorReader.cs      API, so it fans out to one reader per vendor SDK:
