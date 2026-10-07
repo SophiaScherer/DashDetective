@@ -391,15 +391,15 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>Samples every disk once and updates each card's Read/Write readouts in place (bytes/sec
-    /// formatted like "48 MB/s"), appending each disk's active time to its own rolling history so any drive
+    /// formatted like "48 MB/s", or "12 KB/s" below 1 MB/s), appending each disk's active time to its own rolling history so any drive
     /// the user switches to already has a minute behind it. Ends by redrawing the Disk Activity surface for
     /// the selected disk. Disks without a current reading are left unchanged.</summary>
     private void UpdateThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_cardsByDisk.TryGetValue(sample.DiskNumber, out var card))
                 continue;
-            card.Read = FormatRate(sample.ReadBytesPerSec);
-            card.Write = FormatRate(sample.WriteBytesPerSec);
+            card.Read = ByteRateFormatter.Format(sample.ReadBytesPerSec);
+            card.Write = ByteRateFormatter.Format(sample.WriteBytesPerSec);
 
             if (!_historiesByDisk.TryGetValue(sample.DiskNumber, out var history))
                 _historiesByDisk[sample.DiskNumber] = history = new MetricHistory(WindowSeconds);
@@ -409,11 +409,6 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
         UpdateActivity();
     }
-
-    /// <summary>Formats a byte-per-second rate as "&lt;size&gt;/s" (e.g. "48 MB/s"), reusing the shared
-    /// binary size formatter.</summary>
-    private static string FormatRate(double bytesPerSec) =>
-        FileSizeFormatter.Format((long)bytesPerSec) + "/s";
 
     /// <summary>Maps composed drive data to a summary card: the health pill + usage-bar brushes are the
     /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are

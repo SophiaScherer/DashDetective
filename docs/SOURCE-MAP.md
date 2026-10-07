@@ -126,6 +126,10 @@ stays in its tab folder.
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
                                 single unit from the shared peak via UnitFor)
+      ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
+                                Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
+                                KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
+                                stays MB/s on purpose, as Task Manager's does)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
       TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
