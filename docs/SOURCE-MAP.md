@@ -241,8 +241,11 @@ stays in its tab folder.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
-                                 selection ring, promoted from Settings) and modalClose (a modal card's ×,
-                                 promoted from the Help overlay), both once the accent picker wanted them…)
+                                 selection ring, promoted from Settings), modalClose (a modal card's ×,
+                                 promoted from the Help overlay), both once the accent picker wanted
+                                 them, and modalCard (centered + a 24 margin that bounds a modal card
+                                 inside its window; the card sets MaxWidth/MaxHeight, never a Width.
+                                 ModalCardTests pins it on every *Overlay.axaml)…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource} — EXCEPT the runtime-swapped block at the
                                  bottom: UiScale, PopupFontSize and the TextSize* ladder, which
@@ -1275,7 +1278,10 @@ stays in its tab folder.
                                      ShortcutBindings, not the catalog, so the table lists the keys the
                                      user actually chose, and re-announces its groups on a rebind.
                                      The accent picker is the second overlay on this shape; see
-                                     AccentPickerOverlay under src/Tabs/Settings)
+                                     AccentPickerOverlay under src/Tabs/Settings. The Card takes the
+                                     shared modalCard class with MaxWidth 660 / MaxHeight 640 and
+                                     Stretch, NEVER a Width: a fixed 660 overflowed a narrow window
+                                     and, unbounded by height, left the body's end off screen)
         HelpContent.cs              (the CURATED copy — the description, the page tour, the tips. A
                                      static table like HardwareCatalog, so it is testable with no UI.
                                      The shortcut table is NOT here: it is generated from
@@ -1494,7 +1500,8 @@ stays in its tab folder.
                                                          counts as inside — IsVisualAncestorOf is false for
                                                          the element, and an empty spot reports the card — and
                                                          Tab cycles in the card. The body scrolls so the footer
-                                                         survives 200 % in a short window. Esc is the shell's;
+                                                         survives 200 % in a short window; the Card's margin and
+                                                         centering come from the shared modalCard class. Esc is the shell's;
                                                          Enter falls through its modal swallow so buttons press)
                                 AccentPreviewScope.cs   (a ThemeVariantScope writing the draft into its OWN
                                                          Resources through AccentResources — the accent keys

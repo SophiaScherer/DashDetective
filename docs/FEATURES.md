@@ -350,7 +350,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
     cannot scroll it away. The shortcut chain treats it as modal — every shortcut is swallowed and Esc
     cancels — **except Enter**, which falls through so a focused button still presses. Tab cycles inside
     the card; the wheel takes focus on open and the row's swatch gets it back on close. The body scrolls,
-    so the footer stays reachable at 200 % in a short window.
+    so the footer stays reachable at 200 % in a short window. **The card fits its window by the shared
+    `modalCard` style**, the same one Help uses (see *Help*).
   - **The strips are the real shared styles**, not imitations. `AccentPreviewScope` is a
     `ThemeVariantScope` that writes the draft into its own `Resources` through `AccentResources`, the same
     key list `ThemeService` writes to the application; the accent keys are top-level, so a subtree can
@@ -1720,6 +1721,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   rank every tip below the tour. The shortcut table is deliberately **not** indexed here, since
   `ShortcutSearchProvider` already covers it and a binding listed twice under two tags only crowds the
   dropdown.
+- **The card fits its window.** Both modals share `Border.modalCard` (centered, a 24 margin on every side)
+  and set only a `MaxWidth` / `MaxHeight`: Help's are 660 and 640, with `HorizontalAlignment="Stretch"` so
+  it fills up to 660 in a roomy window. **Never a fixed `Width`.** Help's was 660, so below ~708 wide the
+  card overflowed the window, and with no margin a short window left it taller than itself: the end of the
+  body was cut off and unreachable, which read as the dialog being stuck after a resize. The body is the
+  `*` row, so it is what shrinks and scrolls while the header and tabs stay. The scrim is a stretched
+  `Border` in the shell's `Panel`, inside the `ScaleHost`, so nothing in the layer holds a size and the
+  card recenters on maximize, restore and edge drags. `ModalCardTests` pins the class and the missing Width.
 
 ## Storage
 
