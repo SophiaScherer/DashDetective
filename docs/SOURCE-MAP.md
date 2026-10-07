@@ -1768,6 +1768,11 @@ stays in its tab folder.
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
+                                MeasureCap.cs           (Decorator: caps what its child ASKS for when measured,
+                                                         then arranges it into the full slot. Wraps the Adapters
+                                                         list. A MaxHeight on the scroller instead clamps the
+                                                         arrange too, and a clamped Stretch child is CENTERED in
+                                                         a card stretched to its row: a gap above and below)
                                 PingMonitor.cs          (reused in-box Ping; rolling avg/loss + last-3
                                                          lines; soft-fails to a timeout. NO DEFAULT TARGET:
                                                          Target starts EMPTY. It used to default to 8.8.8.8,
