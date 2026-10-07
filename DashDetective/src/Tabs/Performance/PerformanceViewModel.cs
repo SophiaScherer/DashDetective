@@ -248,7 +248,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// the rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
-    /// and the inventory load disposes one of its own. <paramref name="throughputSampler"/> stages the per-disk readings.</summary>
+    /// and the inventory load disposes one of its own.
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
         Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
