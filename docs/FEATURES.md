@@ -1425,7 +1425,7 @@ holds; only the names and the folder changed.) Unlike the Speed tile it is read 
 so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
 blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM in use** tile reads
 **"used / total"**, the same convention as the Memory rail caption ("19.5 / 32 GB": used to one decimal,
-total whole), so the label states which quantity it shows and both numbers appear. The total is static
+total whole from 10 GB up and to one decimal below, so a small total never reads under its usage), so the label states which quantity it shows and both numbers appear. The total is static
 (DXGI's dedicated video memory, carried on `DeviceInstance.VramBytes` from the inventory); the usage is
 sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
 Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both

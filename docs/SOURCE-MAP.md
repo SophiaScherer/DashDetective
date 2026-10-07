@@ -1027,7 +1027,7 @@ stays in its tab folder.
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
                                  Performance rows each own one. A SECOND COUNTER on the same PDH query,
                                  \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
-                                 DedicatedUsedBytes from the same collect; if it fails to add, utilisation
+                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
                                  still samples and usage stays null)
         GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
                                  token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
@@ -1049,7 +1049,7 @@ stays in its tab folder.
                                  real hardware as permanently idle. NO ENGINE BREAKDOWN: sysfs has one
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
-                                 construction; only the utilisation file and amdgpu's mem_info_vram_used
+                                 construction; only the utilization file and amdgpu's mem_info_vram_used
                                  (dedicated VRAM in use; null for a driver that publishes none) are re-read
                                  per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver

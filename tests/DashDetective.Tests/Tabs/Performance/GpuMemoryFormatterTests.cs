@@ -23,7 +23,7 @@ public class GpuMemoryFormatterTests {
 
     [Fact]
     public void Format_ExactlyOneGib_ReadsGb() {
-        Assert.Equal("0.5 / 1 GB", GpuMemoryFormatter.Format(Gib / 2, Gib));
+        Assert.Equal("0.5 / 1.0 GB", GpuMemoryFormatter.Format(Gib / 2, Gib));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class GpuMemoryFormatterTests {
 
     [Fact]
     public void Format_ZeroUsage_IsARealReading() {
-        Assert.Equal("0.0 / 8 GB", GpuMemoryFormatter.Format(0, 8 * Gib));
+        Assert.Equal("0.0 / 8.0 GB", GpuMemoryFormatter.Format(0, 8 * Gib));
     }
 
     [Theory]
@@ -51,4 +51,8 @@ public class GpuMemoryFormatterTests {
         Assert.Equal("1.3 / 12 GB", GpuMemoryFormatter.Format((ulong)(1.26 * Gib), (ulong)(11.8 * Gib)));
         Assert.Equal("1.2 / 12 GB", GpuMemoryFormatter.Format((ulong)(1.24 * Gib), (ulong)(11.8 * Gib)));
     }
+
+    [Fact]
+    public void Format_TotalUnderTenGb_KeepsADecimalSoItNeverReadsBelowUsage() =>
+        Assert.Equal("1.4 / 1.5 GB", GpuMemoryFormatter.Format((ulong)(1.4 * Gib), (ulong)(1.49 * Gib)));
 }

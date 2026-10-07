@@ -105,10 +105,10 @@ public class PerformanceGpuRowTests {
         Assert.Contains(row.Stats, t => t.Label == "VRAM in use" && t.Value == "— / 12 GB");
     }
 
-    /// <summary>An adapter with no utilisation figure can still report memory, so the tile updates ahead of
-    /// the utilisation guard.</summary>
+    /// <summary>An adapter with no utilization figure can still report memory, so the tile updates ahead of
+    /// the utilization guard.</summary>
     [Fact]
-    public async Task VramTile_AdapterWithNoUtilisation_StillShowsUsage() {
+    public async Task VramTile_AdapterWithNoUtilization_StillShowsUsage() {
         var (viewModel, _) = await LoadedAsync(
             () => new FakeGpuUsageSampler().Silent(Amd, 2UL << 30),
             new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 8UL << 30));
@@ -116,7 +116,7 @@ public class PerformanceGpuRowTests {
         viewModel.UpdateGpuAdapters();
 
         var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
-        Assert.Contains(row.Stats, t => t.Label == "VRAM in use" && t.Value == "2.0 / 8 GB");
+        Assert.Contains(row.Stats, t => t.Label == "VRAM in use" && t.Value == "2.0 / 8.0 GB");
     }
 
     /// <summary>An adapter whose driver publishes no figure keeps the placeholder rather than a confident

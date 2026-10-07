@@ -17,7 +17,7 @@ namespace DashDetective.Tabs.Hardware;
 /// ids, not its marketing model, so <see cref="HardwareCatalog.LookupGpu"/> has nothing to match on and
 /// core counts, boost clocks and bus widths have no source — the lookup is still attempted, so a richer
 /// name source would light those rows up for free. VRAM is the exception: amdgpu publishes it exactly, and
-/// it is formatted with the same humanizer as the Performance tab's VRAM tile.
+/// it is formatted with the shared byte humanizer.
 ///
 /// Stateless and never throws: any failure yields <see cref="GraphicsInfo.Unknown"/>.
 /// </summary>
@@ -58,8 +58,7 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
     }
 
     /// <summary>The adapter's VRAM, or <c>null</c> when the driver publishes none so the caller can fall
-    /// back. Shares <see cref="FileSizeFormatter"/> with the Performance tab's VRAM tile, so the same card
-    /// reads the same on both pages.</summary>
+    /// back.</summary>
     private static string? FormatVram(ulong bytes) =>
         bytes > 0 ? FileSizeFormatter.Format((long)bytes) : null;
 

@@ -879,7 +879,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             if (!_gpusByLuid.TryGetValue(luid, out var gpu))
                 continue;
 
-            // Before the utilisation guard: an adapter with no utilisation figure can still report memory.
+            // Before the utilization guard: an adapter with no utilization figure can still report memory.
             gpu.VramTile.Value = GpuMemoryFormatter.Format(sample.DedicatedUsedBytes, gpu.VramBytes);
 
             if (sample.Overall is not { } reading) {

@@ -72,7 +72,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
-    // Zero when the memory counter could not be added: utilisation then samples alone and usage stays null.
+    // Zero when the memory counter could not be added: utilization then samples alone and usage stays null.
     private readonly IntPtr _memoryCounter;
     private readonly bool _ready;
     private bool _disposed;
