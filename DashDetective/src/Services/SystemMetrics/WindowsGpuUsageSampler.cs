@@ -5,8 +5,8 @@ using System.Runtime.Versioning;
 
 namespace DashDetective.Services.SystemMetrics;
 
-/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine
-/// type, 0–100) and the per-engine-type map behind it (raw sums, clamped by the caller for display).
+/// <summary>One physical GPU's reading, keyed by adapter token: its overall utilisation (the busiest engine,
+/// 0–100) and a per-engine-type map whose value for each type is the busiest engine of that type, 0–100.
 ///
 /// <b><see cref="Overall"/> is null when the adapter exists but its utilisation cannot be read</b> — the
 /// state Linux needs for a card whose driver publishes no figure (the proprietary NVIDIA blob, Intel's
@@ -63,7 +63,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     [DllImport("pdh.dll")]
     private static extern uint PdhCloseQuery(IntPtr query);
 
-    private const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
+    internal const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
@@ -103,7 +103,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     /// <summary>
     /// Returns per-physical-GPU utilisation at the moment of the call, keyed by adapter LUID token
     /// (<c>luid_0x{High:x8}_0x{Low:x8}</c>, matching <see cref="WindowsGpuAdapterProvider"/>). Each
-    /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine type) and its
+    /// <see cref="GpuAdapterSample"/> carries that adapter's overall % (busiest engine) and its
     /// per-engine-type map. Callers join the LUID keys against the inventory to attribute each reading to a
     /// named GPU. Any failure yields an empty map.
     /// </summary>
@@ -147,65 +147,10 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
         return items;
     }
 
-    /// <summary>
-    /// Groups counter instances by adapter LUID then engine type, summing within each engine and taking the
-    /// busiest engine type as the adapter's overall % (clamped 0–100). Pure (no PDH/marshalling) so it is
-    /// unit-tested directly. Instances that carry no LUID or engine token are skipped.
-    /// </summary>
+    /// <summary>Applies Task Manager's per-engine rule (<see cref="GpuEngineLoad.ByAdapter"/>) to one
+    /// read. Instances whose name does not parse are skipped.</summary>
     internal static IReadOnlyDictionary<string, GpuAdapterSample> AggregateAdapters(
-        IEnumerable<(string? Name, double Value)> items) {
-        var perAdapter = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
-
-        foreach (var (name, value) in items) {
-            var luid = ParseLuidToken(name);
-            var engine = EngineType(name);
-            if (luid is null || engine is null)
-                continue;
-
-            if (!perAdapter.TryGetValue(luid, out var engines))
-                perAdapter[luid] = engines = new Dictionary<string, double>(StringComparer.Ordinal);
-            engines.TryGetValue(engine, out var running);
-            engines[engine] = running + value;
-        }
-
-        var result = new Dictionary<string, GpuAdapterSample>(StringComparer.Ordinal);
-        foreach (var (luid, engines) in perAdapter) {
-            double max = 0;
-            foreach (var total in engines.Values)
-                if (total > max)
-                    max = total;
-            result[luid] = new GpuAdapterSample(max < 0 ? 0 : max > 100 ? 100 : max, engines);
-        }
-        return result;
-    }
-
-    /// <summary>Extracts the adapter LUID token (<c>luid_0x…_0x…</c>, lower-cased) from an instance name like
-    /// <c>pid_1234_luid_0x00000000_0x0000e54b_phys_0_eng_0_engtype_3D</c>, or null when absent.</summary>
-    internal static string? ParseLuidToken(string? instanceName) {
-        if (string.IsNullOrEmpty(instanceName))
-            return null;
-
-        const string token = "luid_";
-        var start = instanceName.IndexOf(token, StringComparison.OrdinalIgnoreCase);
-        if (start < 0)
-            return null;
-
-        // The LUID token is followed by the "_phys" segment; slice between them (falling back to end of
-        // string) and normalise casing so it joins the DXGI-formatted token regardless of PDH's casing.
-        var phys = instanceName.IndexOf("_phys", start, StringComparison.OrdinalIgnoreCase);
-        var end = phys > start ? phys : instanceName.Length;
-        return instanceName[start..end].ToLowerInvariant();
-    }
-
-    /// <summary>Extracts the engine type after the trailing <c>engtype_</c> token, or null.</summary>
-    private static string? EngineType(string? instanceName) {
-        if (string.IsNullOrEmpty(instanceName))
-            return null;
-
-        const string token = "engtype_";
-        var idx = instanceName.LastIndexOf(token, StringComparison.Ordinal);
-        return idx < 0 ? null : instanceName[(idx + token.Length)..];
-    }
+        IEnumerable<(string? Name, double Value)> items) => GpuEngineLoad.ByAdapter(items);
 
     /// <summary>Closes the PDH query handle and leaves the sampler inert. Safe to call more than once — the
     /// flag also stops a second close on the same handle.</summary>

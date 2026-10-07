@@ -1026,6 +1026,18 @@ stays in its tab folder.
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
                                  Performance rows each own one)
+        GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
+                                 eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
+                                 adapter carries several engines of a type (six Copy on an RTX 3060). The
+                                 LUID is re-formatted through GpuAdapter.FormatLuidToken so it joins the
+                                 inventory. Pure, so it runs on every CI leg. THE ONE PARSER: the
+                                 Processes tab's ProcessGpuSampler reads the same names through it)
+        GpuEngineLoad.cs        (Task Manager's rule over those instances: an engine's load = the SUM of its
+                                 process instances, clamped; adapter = busiest engine; a type = its busiest
+                                 engine; a process = its busiest engine. SAME-TYPE ENGINES ARE NEVER SUMMED —
+                                 keying by type inflated Copy past any one engine's load. ByProcess is
+                                 the Processes tab's GPU column, so a row and the adapter total it sits
+                                 under cannot follow different rules)
         LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
                                  EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
                                  no figure — omitting one would delete its card entirely, and a 0 would show
@@ -1981,6 +1993,10 @@ stays in its tab folder.
                                                          rows. Process.Kill only requests termination, so
                                                          a row used to go on the request alone and come
                                                          back on the next poll)
+                                ProcessGpuSampler.cs    (per-process GPU % from PDH \GPU Engine(*), Task
+                                                         Manager's counter, pinned by a test. PDH only: the
+                                                         parse and the per-engine rule are the shared
+                                                         GpuEngineInstance / GpuEngineLoad.ByProcess)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.

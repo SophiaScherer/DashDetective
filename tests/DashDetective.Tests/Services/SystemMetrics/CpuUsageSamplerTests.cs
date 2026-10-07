@@ -58,6 +58,38 @@ public class CpuUsageSamplerTests {
             Assert.True(sampler.Inner is ProcessorUtilityCpuSampler or SystemTimesCpuSampler);
     }
 
+    [Fact]
+    public void UtilityIfReady_Ready_KeepsTheUtilityCounter() {
+        var utility = new StubCpuSampler(10);
+
+        Assert.Same(utility, CpuUsageSampler.UtilityIfReady(utility, ready: true));
+        Assert.False(utility.Disposed);
+    }
+
+    /// <summary>A counter that did not stand up is released and the caller takes the fallback.</summary>
+    [Fact]
+    public void UtilityIfReady_NotReady_DisposesItAndFallsBack() {
+        var utility = new StubCpuSampler(10);
+
+        Assert.Null(CpuUsageSampler.UtilityIfReady(utility, ready: false));
+        Assert.True(utility.Disposed);
+    }
+
+    /// <summary>On Windows the public constructor keeps the utility counter whenever it stands up on this
+    /// host, and only otherwise reads <c>GetSystemTimes</c>.</summary>
+    [Fact]
+    public void PublicConstructor_OnWindows_PrefersTheUtilityCounterWhenItStandsUp() {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        bool ready;
+        using (var probe = new ProcessorUtilityCpuSampler())
+            ready = probe.Ready;
+        using var sampler = new CpuUsageSampler();
+
+        Assert.IsType(ready ? typeof(ProcessorUtilityCpuSampler) : typeof(SystemTimesCpuSampler), sampler.Inner);
+    }
+
     /// <summary>Zero is the no-data contract every arm shares, so the Dashboard degrades to a flat line
     /// rather than failing on a platform whose milestone has not landed.</summary>
     [Fact]
@@ -67,7 +99,11 @@ public class CpuUsageSamplerTests {
 
     /// <summary>Fake <see cref="ICpuSampler"/> — stands in for the utility counter or the fallback so the
     /// coordinator's delegation can be verified without real hardware counters.</summary>
-    private sealed class StubCpuSampler(double value) : ICpuSampler {
+    private sealed class StubCpuSampler(double value) : ICpuSampler, IDisposable {
+        public bool Disposed { get; private set; }
+
         public double Sample() => value;
+
+        public void Dispose() => Disposed = true;
     }
 }
