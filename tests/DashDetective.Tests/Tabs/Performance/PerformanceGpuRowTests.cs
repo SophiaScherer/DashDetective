@@ -3,6 +3,7 @@ using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Performance;
 using DashDetective.Tests.Fakes;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -116,5 +117,15 @@ public class PerformanceGpuRowTests {
         Assert.False(row.HasNote);
         Assert.Equal("", row.Note);
         Assert.Null(row.NoteTip);
+    }
+
+    [Fact]
+    public void FoldEngines_NumberedEnginesOfOneBase_KeepsTheBusiestRatherThanTheSum() {
+        var folded = PerformanceViewModel.FoldEngines(new Dictionary<string, double> {
+            ["Compute 0"] = 30, ["Compute 1"] = 45, ["3D"] = 20,
+        });
+
+        Assert.Equal(45, folded["compute"]);
+        Assert.Equal(20, folded["3d"]);
     }
 }

@@ -910,19 +910,15 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>
     /// Rebuilds one GPU's per-engine mini charts from its raw engtype map. Drivers expose different,
     /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
-    /// are discovered dynamically rather than hardcoded: raw engtype instances are aggregated by base engine
-    /// (dropping a trailing instance index, so "compute 0" + "compute 1" fold into "Compute"), and a chart is
-    /// added the first time each engine reports. Sampled every tick so the Detailed view is warm when opened.
+    /// are discovered dynamically rather than hardcoded: raw engtype instances are folded by base engine
+    /// (see <see cref="FoldEngines"/>), and a chart is added the first time each engine reports. Sampled every
+    /// tick so the Detailed view is warm when opened.
     /// </summary>
     private static void UpdateGpuEngines(GpuResource gpu, IReadOnlyDictionary<string, double> rawEngines) {
         if (rawEngines.Count == 0)
             return;
 
-        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
-        foreach (var (token, value) in rawEngines) {
-            var key = NormalizeEngine(token);
-            byEngine[key] = byEngine.GetValueOrDefault(key) + value;
-        }
+        var byEngine = FoldEngines(rawEngines);
 
         if (AddNewEngines(gpu, byEngine.Keys))
             PublishGpuEngines(gpu);
@@ -932,6 +928,17 @@ public partial class PerformanceViewModel : ViewModelBase,
             engine.History.Push(Math.Clamp(value, 0, 100));
             engine.Chart.Points = engine.History.Points(100);
         }
+    }
+
+    /// <summary>Folds engine types that differ only by a trailing index ("compute 0", "compute 1") into one base
+    /// engine. The fold keeps the busiest, never a sum: each is a separate engine, as in Task Manager.</summary>
+    internal static Dictionary<string, double> FoldEngines(IReadOnlyDictionary<string, double> rawEngines) {
+        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var (token, value) in rawEngines) {
+            var key = NormalizeEngine(token);
+            byEngine[key] = Math.Max(byEngine.GetValueOrDefault(key), value);
+        }
+        return byEngine;
     }
 
     /// <summary>Adds a mini chart for any base engine this GPU hasn't shown before; returns whether the set
