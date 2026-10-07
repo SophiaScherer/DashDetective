@@ -233,6 +233,11 @@ stays in its tab folder.
                                  binds the flag, which outranks the ScrollViewer rule. The pins live HERE
                                  and not in the view that owns the control: ScrollViewerInsetTests matches
                                  the selector in this file exactly.
+                                 HEADER HIERARCHY: shellTitle (the toolbar's page name, 18 Bold) and
+                                 panelTitle (a widget's heading, 13.5 SemiBold) sit side by side so the
+                                 rank is set once. shellTitle is the shell's alone and is kept out of
+                                 src/Tabs; HeaderHierarchyTests pins the gap and the toolbar's lack of
+                                 local setters, which would outrank the class.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
@@ -247,7 +252,16 @@ stays in its tab folder.
                                  first apply. TEXT SCALE: the ladder is every font size in the app,
                                  TextScale.BaseSizes mirrors it, and a test fails on any authored
                                  FontSize literal. A token with no call site should not exist — the
-                                 ladder is the one authorized sweep, see AGENTS.md.
+                                 ladder is the one authorized sweep, see AGENTS.md. The ladder's values
+                                 were rebalanced once (~1.12, rounded to 0.5) after measuring against
+                                 File Explorer; they must stay strictly increasing, which a test pins.
+                                 ICON SIZES: IconSize (an icon that identifies something or fills a
+                                 chrome button) and IconSizeSmall (inside a row button, a field or a
+                                 tinted tile). The nav geometries are authored on an 18x18 grid whose ink
+                                 fills ~78%, so a site must take Stretch="Uniform" — with "None" the box
+                                 grows and the ink does not, which is how an icon "resized" and did not
+                                 change. The Caret* set is the exception: it is authored 8x5 and stays
+                                 Stretch="None", or Uniform blows it up to fill the box.
                                  ScrollGutter is the gap between a scroller's content and its bar, set as
                                  the content's Margin (or a ListBox/TreeView's Padding, which its template
                                  applies as the presenter's Margin). Never ScrollViewer Padding: the scroll
@@ -426,6 +440,8 @@ stays in its tab folder.
                                         no room, so the same control serves a single-series chart.
                                         InfoRow is a key/value row; long values wrap to multiple
                                         lines (flush-right) instead of clipping — see SharedStyles infoVal.
+                                        KeyValueGap separates key and value, as in ExpandablePathRow;
+                                        without it a long key touched a value that wrapped.
                                         Its Mono and Flush variants back the Network tab's IP config)
 ```
 
@@ -507,8 +523,12 @@ stays in its tab folder.
 
 ```
       /Identity
-        CurrentUserProvider.cs  (the interactive user's login name, initials badge and real privilege
-                                 level, read once. Every source degrades independently — a denied token
+        CurrentUserProvider.cs  (the interactive user's login name, initials badge and whether the ACCOUNT is
+                                 an administrator — not whether the process is elevated: UAC gives an
+                                 administrator's apps a filtered token where the Administrators group is
+                                 deny-only, so a bare IsInRole read everyone as "Standard User"; the
+                                 DenyOnlySid claim finds it. Linux: root, or a sudo/wheel/admin group.
+                                 Read once. Every source degrades independently — a denied token
                                  read reports the neutral "User" rather than guessing "Standard User",
                                  which would be a near-miss)
         IUserPictureProvider.cs (the seam + ForCurrentPlatform(); see Provider seams below. Returns the
@@ -676,10 +696,10 @@ stays in its tab folder.
                                  templates their presenters and neither can host a ScaleHost.
                                  BasePopupFontSize is a C# mirror of Dimensions.axaml's PopupFontSize, as
                                  SemanticBrushes mirrors Palette.axaml, and a test pins the two together)
-        TextScale.cs            (the sixteen authored type sizes the text scale scales, keyed by resource
-                                 name. They are the sizes the app already shipped, not a redesign: a tidier
-                                 ladder would change how the app looks at 100%, which is the one thing every
-                                 option on this card must not do. Mirrors the TextSize* defaults in
+        TextScale.cs            (every authored type size the text scale scales, keyed by resource
+                                 name. Rebalanced once against File Explorer — every step ~1.12 bigger,
+                                 rounded to 0.5, body 12.5 -> 14 — and strictly increasing, since rounding
+                                 is how two steps merge onto one value. Mirrors the TextSize* defaults in
                                  Dimensions.axaml, pinned both ways by a test)
 ```
 
@@ -734,7 +754,8 @@ stays in its tab folder.
 ```
       /Platform
         /Linux
-          IProcFileSystem.cs    (the /proc + /sys read seam — Exists/ReadAllText/ReadAllLines/
+          IProcFileSystem.cs    (the /proc + /sys read seam, also used for /etc/os-release and
+                                 /etc/group — Exists/ReadAllText/ReadAllLines/
                                  ListDirectory/ResolveLink, all never-throwing and empty-on-miss.
                                  Infrastructure, not a provider seam, so it sits in its own Services
                                  folder like IUiTimer. ProcFileSystem is the real one; the tests' fake
@@ -788,7 +809,9 @@ stays in its tab folder.
                                  and only the first is the owner. An unknown uid is null, NOT 0: 0 is root,
                                  and a denied read must never promote a user process into the System group.
                                  A missing VmRSS is 0 bytes — a kernel thread has no address space, and
-                                 requiring the field would drop every kworker from the list)
+                                 requiring the field would drop every kworker from the list. ParseGroups
+                                 reads the Groups line for the current user's role, separately from Parse,
+                                 which stops early on the per-process hot path)
           ProcPidIoParser.cs    (/proc/[pid]/io, for the Disk column. rchar + wchar, NOT read_bytes +
                                  write_bytes: the Windows column is ReadTransferCount + WriteTransferCount,
                                  which counts bytes through the syscall layer including cache, and rchar/
@@ -889,6 +912,8 @@ stays in its tab folder.
                                  a shell fragment, so the same body mixes quoted and bare values — one
                                  MATCHED pair of surrounding quotes is stripped and an unbalanced one is
                                  left alone. Splits on the first = only. Absent key → "")
+          EtcGroupParser.cs     (/etc/group: name → gid only. The member list is NOT used — it omits each
+                                 user's primary group — so membership comes from /proc/self/status)
           DmiIdReader.cs        (the one-line files under /sys/class/dmi/id, shared by the Dashboard's
                                  System Information panel and the Hardware tab's Motherboard card.
                                  EXPOSES ONLY THE WORLD-READABLE KEYS as named properties —
@@ -1149,7 +1174,10 @@ stays in its tab folder.
                                  MainWindow's page-host is a Panel with two mutually-exclusive hosts:
                                  a scrolling ScrollViewer (ScrollingPage) and a bounded ContentControl
                                  (SelfScrollingPage), so ISelfScrollingPage pages self-scroll within
-                                 the viewport — see File Explorer. The scrolling host (PageScroll) is
+                                 the viewport — see File Explorer. The toolbar's page title and
+                                 subtitle are the shared shellTitle and cardSub classes with no local
+                                 size, weight or color, since a local setter would outrank the class.
+                                 The scrolling host (PageScroll) is
                                  SHARED by every scrolling page, so code-behind calls ScrollToHome on
                                  each CurrentPage change; without it a page opened at the last page's
                                  offset. Synchronous, so a reveal's posted BringIntoView still wins.
@@ -1161,6 +1189,12 @@ stays in its tab folder.
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
                                  code-behind calls — MainWindow's own Export among them)
+      ModalShortcuts.cs         (the MODAL step of HandleShortcut and ActiveScope: while Help or the
+                                 accent picker is open, Esc dismisses it, Enter falls through to the
+                                 focused button, everything else is swallowed, and keys resolve in
+                                 Global. Split out, like RefreshHint, because MainWindowViewModel
+                                 builds every page and its samplers and cannot be constructed in a
+                                 test; it takes the two modal view models, which can)
 ```
 
 ## `src/Shell/TrayNotice`
@@ -1189,7 +1223,15 @@ stays in its tab folder.
                                      no NavItem, no ViewLocator entry. The scrim's non-null Background
                                      is what makes it modal — it swallows pointer input bound for the
                                      window behind it. Esc is NOT handled in the code-behind: the
-                                     shell's shortcut chain owns the key app-wide. The VM takes
+                                     shell's shortcut chain owns the key app-wide, and lets Enter
+                                     fall through its modal swallow so a focused button presses.
+                                     Modal for the KEYBOARD too: Tab cycles in the card, the × takes
+                                     focus on open, and closing hands focus back to what held it
+                                     (ring included) or clears it. Without that, Tab walked out to
+                                     the page behind and could open the accent picker ON TOP of
+                                     Help. A press on the Card ITSELF counts as inside
+                                     (IsInsideCard): IsVisualAncestorOf is false for the element,
+                                     and an empty spot on the card reports the card. The VM takes
                                      ShortcutBindings, not the catalog, so the table lists the keys the
                                      user actually chose, and re-announces its groups on a rebind.
                                      The accent picker is the second overlay on this shape; see
@@ -1215,14 +1257,14 @@ stays in its tab folder.
 ```
       /Navigation
         NavigationView.axaml(.cs)   (the collapsible/dockable nav-bar component; brand + item list +
-        NavigationViewModel.cs       footer. Collapse is the caret button beside Help in the footer
-                                     (and Ctrl+B); re-docking is the right-click menu or the drag
-                                     gesture. The VM owns Orientation + IsCollapsed and exposes all
-                                     layout as computed properties — Dock, Rail sizes, ItemsOrientation,
-                                     Hairline edge, scroll axis, footer-control stacking, the toggle's
-                                     caret and tooltip — no converters. AutoCollapseThreshold is the ONE
-                                     place the fold-to-icons width is decided: rail + MinPageWidth for a
-                                     vertical rail, the measured labeled width for a horizontal bar. Selection/layout visuals
+        NavigationViewModel.cs       footer, with no permanent control chrome — collapse is the hover
+                                     puck, re-docking is the right-click menu or the drag gesture. The
+                                     VM owns Orientation + IsCollapsed and exposes all layout as computed
+                                     properties — Dock, Rail sizes, ItemsOrientation, Hairline edge,
+                                     scroll axis, puck geometry — no converters. AutoCollapseThreshold is
+                                     the ONE place the fold-to-icons width is decided: rail +
+                                     MinPageWidth for a vertical rail, the measured labeled width for a
+                                     horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
         NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all
@@ -1234,7 +1276,7 @@ stays in its tab folder.
                                      navigation rather than disclosure, and a stop bar only reads against a
                                      stroked arrow)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
-        ChevronDirection.cs         (enum: which way the collapse toggle's caret points. Split from the geometry
+        ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
                                      which the unit tests do not have, so touching Icons at all throws)
         NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
@@ -1408,7 +1450,7 @@ stays in its tab folder.
                                 AccentPickerOverlay.axaml(.cs)
                                                         (its view, on HelpOverlay's shape and HOSTED BY THE
                                                          SHELL beside it, so the scrim covers the nav bar.
-                                                         Two differences from Help: a press on the Card ITSELF
+                                                         Same modal rules as Help: a press on the Card ITSELF
                                                          counts as inside — IsVisualAncestorOf is false for
                                                          the element, and an empty spot reports the card — and
                                                          Tab cycles in the card. The body scrolls so the footer
@@ -1466,7 +1508,14 @@ stays in its tab folder.
                                                          listener tunnels from the window — so it raises
                                                          CapturingChanged for the view model to hold, and
                                                          the shell stands down on it. Modifier-only
-                                                         presses are ignored; Esc abandons)
+                                                         presses are ignored; Esc or the Cancel ×, shown
+                                                         only while armed, abandons. Cancel is NOT
+                                                         focusable, or pressing it would stand the capture
+                                                         down through LostFocus and hide itself mid-click)
+                                CaptureKeyAction.cs     (CaptureKeys.Classify: what an armed box does with a
+                                                         key — wait on a modifier, cancel on Esc, capture
+                                                         anything else. Out of the control so it is
+                                                         testable without a render backend)
                                 ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
                                                          whether it is custom, and the note explaining a
                                                          refused capture where it happened)

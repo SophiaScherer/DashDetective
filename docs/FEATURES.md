@@ -37,23 +37,21 @@ The sidebar is a self-contained, **collapsible and dockable**
 component — `NavigationView` + `NavigationViewModel` under `src/Shell/Navigation/`. The shell root
 (`MainWindow.axaml`) is a `DockPanel` that hosts the bar via `DockPanel.Dock="{Binding Nav.Dock}"`,
 so the user can dock it to any edge — **left, right, top, or bottom** — and **collapse it to an
-icons-only rail**, in any orientation. Its only permanent control chrome is the two buttons in the footer,
-Help and the collapse toggle; every entry point drives the **same shared** `NavigationViewModel`:
-- **Collapse/expand** — a **caret button in the footer, beside Help** (`Button.navCtl`, the same
-  control as Help), plus `Ctrl+B` and Settings. Its caret points the way the bar will move (at the docked
-  edge when expanded, away from it when collapsed) and its tooltip — which the shared Button style also
-  makes its accessible name — says "Collapse navigation" or "Expand navigation". On a collapsed vertical
-  rail the two buttons stack in a column (`ControlsOrientation`), since 64px will not hold them side by
-  side. **It replaced a hover-revealed half-disc puck on the content edge** (work item 47), chosen over a
-  toggle beside the logo, a thin full-length edge strip, and no on-bar control at all. The puck appeared
-  only on hover, so it could not be found without knowing it was there and was never a Tab stop; it sat
-  over the middle item of a horizontal bar; and its half-disc shape, drawn nowhere else in the app, read
-  as out of place. The footer was already the bar's control cluster in every orientation, and the logo
-  strip is the drag handle, which a button there would crowd. **The cost is permanent chrome**, which the
-  puck existed to avoid — two 30px buttons in place of one. The reveal machinery (`ShowChevron`, the
-  600 ms grace timer, the pointer tracking on `RailHost`) went with the puck. **Known limitation:** a
-  press does not announce the toggle's new name to a screen reader, since Avalonia 12.1.2's automation
-  peer raises no NameChanged on a property change; it is read on the next focus.
+icons-only rail**, in any orientation. The bar carries **no permanent control chrome**; every entry
+point drives the **same shared** `NavigationViewModel`:
+- **Collapse/expand** — a **semi-circular puck domed INTO the bar**, its flat side flush on the
+  content-facing edge, revealed while the pointer is over the bar **and for a 600 ms grace period after
+  it leaves**. It is a true half-disc: one radius deep, two long, both **inward** corners rounded by the
+  full radius (no clamping). Its chevron points the way the bar will move (at the docked edge when
+  expanded, away from it when collapsed). It is a sibling of the rail, not a child, so its rounding and
+  alignment stay its own. **It used to stand outside the bar and that was the bug**: a hidden control is
+  not hit-testable, so reaching for it left the rail, dropped `:pointerover`, and took the puck away
+  mid-reach. Inside the bounds, reaching for it never leaves the rail. Two consequences: the view needs
+  no `ClipToBounds` and the shell no `ZIndex` (both existed only to let it draw outside), and the
+  reveal is a **bound flag, not a style** — `ShowChevron` (`IsChevronVisible && !IsDragging`), because a
+  style setter cannot override a local `IsVisible` binding, so the drag rule had to move to the VM. The
+  grace period is an `IUiTimer` on the `UniversalSearchViewModel` debounce shape (internal ctor +
+  `FakeUiTimer`), which is what makes it testable headlessly.
 - **Re-dock** — **right-click anywhere on the bar** for a "Dock navigation" menu at the pointer. The
   `ContextFlyout` is declared once on the rail `Border`: `ContextRequested` bubbles, so the brand, the
   items, the footer and any empty space all reach it.
@@ -76,14 +74,20 @@ The footer avatar shows the **device's own account picture** when the OS has one
 on Windows, `~/.face` / AccountsService on Linux. The reader returns encoded bytes rather than a decoded
 image, so it holds no UI type; `NavigationViewModel` decodes once and falls back to the accent-gradient
 **initials badge** whenever there is no picture, the read is denied, or the file will not decode. The
-gradient stays the backdrop either way, so it still re-tints with the accent.
+gradient stays the backdrop either way, so it still re-tints with the accent. The **role line under the
+name describes the account, not the process** (work item 70): an administrator reads "Administrator"
+whether or not the app runs elevated. A plain `IsInRole(Administrator)` read every administrator as a
+standard user, because UAC runs their apps with a filtered token whose Administrators group is
+deny-only; the filtered group still shows as a `DenyOnlySid` claim, which is what marks the account. On
+Linux, root or membership of `sudo`, `wheel` or `admin` (from `/proc/self/status`'s `Groups`, matched by
+gid against `/etc/group`) is an administrator; an unreadable file is the neutral "User", never a guess.
 
 Orientation/collapse and every derived layout value (dock edge, rail thickness, item axis,
-label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the footer controls'
-stacking and the collapse toggle's caret and tooltip) are **computed properties on the VM — no value
-converters**. The rail thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth`
-delegates to and the drop preview measures against; it takes the axis as an argument because a drag
-previews edges the bar is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
+label/brand/footer visibility, accent-indicator bar↔underline, scroll axis, the puck's size /
+alignment / rounding) are **computed properties on the VM — no value converters**. The rail
+thickness has a **single owner**, `RailThickness(horizontal)`, which `RailWidth` delegates to and the
+drop preview measures against; it takes the axis as an argument because a drag previews edges the bar
+is not docked to yet. `MainWindowViewModel` owns page routing and delegates the bar to
 `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
 *Persistence* below); this is shared shell work, not a tab-local change.
 
@@ -551,11 +555,17 @@ Interface size transforms the whole app; text size grows only the type. They mul
 gives text at 2.25x while the chrome grows 1.5x.
 
 **One ladder, swept across every view.** Every authored `FontSize` value is now
-`{DynamicResource TextSize*}` against a sixteen-step ladder in `Dimensions.axaml`, which
-`ThemeService.ApplyTextScale` rewrites. The steps are the sizes the app already had, not a redesign —
-rounding them to a tidier ladder would change how the app looks at 100 %, which is the one thing every
-option on this card must not do. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins them
-together, as `SemanticBrushes` mirrors Palette.axaml.
+`{DynamicResource TextSize*}` against a step ladder in `Dimensions.axaml`, which
+`ThemeService.ApplyTextScale` rewrites. `TextScale.BaseSizes` mirrors the XAML defaults and a test pins
+them together, as `SemanticBrushes` mirrors Palette.axaml.
+
+**The 100 % baseline was raised once, on purpose.** Measured against File Explorer at the same DPI, the
+app's body type matched Explorer's glyph for glyph (Inter 12.5 and Segoe UI 12 both cap 9, x-height 6) —
+what read small was everything around it: secondary text a step below Explorer's flat 12, and a line box
+of 14.1 px against 16. So each step grew by ~1.12 rounded to 0.5, body 12.5 → 14, which puts Inter's line
+box at 15.8. The ladder is **strictly increasing and a test says so**: rounding is exactly how two
+neighbouring steps land on one value and flatten the hierarchy. Raising the baseline is a *rebalance of
+the default*, not a scale — 100 % is still the default and a saved scale still means what it did.
 
 **This is a deliberate exception to the adopt-by-contact rule** for dimensions. The feature *is* the
 sweep: a literal left behind would not grow, and would fail invisibly on one page. A test fails on any
@@ -979,6 +989,10 @@ tab-local except the shared refresh seam:
   `Compare` keeps **folders grouped above files** (grouping never inverts with direction), orders by the
   active `FileSortKey`, and breaks ties by name. Clicking a column flips its direction; a new column
   adopts an **Explorer-style default** (Name/Type ascending, Modified/Size descending).
+- **Row pitch is set against File Explorer's, not by eye.** The list runs `fileRow` padding 14,6 around
+  an 18px glyph — about 32px a row, where Explorer is 28 around a 16px icon, so the same share of the row
+  is ink. The tree was the worst of it at 20px a row against Explorer's 32: it is `TreeViewItem` padding
+  4,5 now, near 30, and its caret is 11 rather than 8.
 - **Show hidden.** A themed `CheckBox` (in the **Options** flyout) bound to
   `FileExplorerViewModel.ShowHidden`. `DirectoryService` takes a `bool includeHidden` (picking
   between two `EnumerationOptions`); the tree threads it as a `Func<bool>` into each `FileSystemNode`
@@ -1278,8 +1292,10 @@ behind it that must not be quietly undone:
   both are usually a glance rather than a preference. Each reports a change only while its toggle is on,
   nothing is written for a toggle that is off, and seeding a saved value on startup is quiet so it does
   not write straight back. `PreferencesChanged` is the one event the shell hooks to `Persist`.
-- **Row density** was tightened (`procRow` padding 16,5). `Button.chev`'s negative margin must stay in
-  step with it, as its own comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
+- **Row density** is `procRow` padding 16,7. It was tightened to 16,5 once and that read squished beside
+  the app's own file rows, so the rebalance against File Explorer put it back: the row now sits at about
+  33px against the file list's 32. `Button.chev`'s negative margin must stay in step with it, as its own
+  comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
@@ -1580,6 +1596,13 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   window, so it sees the press *before* the capture box does — without this, arming a box and pressing
   Ctrl+1 would navigate away instead of capturing. `SettingsViewModel.IsCapturingShortcut` is what
   `HandleShortcut` checks first, returning false so the key continues down to the box.
+- **A capture always has a way out that writes nothing** (work item 55). `Esc` stands it down, and so
+  does a **Cancel ×** shown beside the box only while it is armed — a click on empty page takes no
+  focus, so `LostFocus` never fired and a mouse user was stuck until they assigned something. The
+  button is **not focusable**: pressing it would otherwise move focus off the box first, which stands
+  the capture down through `LostFocus` and hides the button mid-click. Either path skips
+  `GestureCaptured`, so nothing reaches `ShortcutOverrides`, and the box reverts to the current keys.
+  `Esc` cancels whatever modifiers are held with it, so it can never itself be bound (`CaptureKeys`).
 - **A clash is refused, not silently accepted**, and only **within one scope**. Cross-scope duplicates
   stay legal because they already are (`Alt+↑` on Processes and File Explorer), since only one tab is
   ever current. The capture box reports the conflict inline, naming the action that already holds the
@@ -1609,6 +1632,13 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **Help** — **fully live**. A modal overlay (`F1` / `Ctrl+/` / the nav bar's button), **not a page**:
   no `NavItem`, no `ViewLocator` entry, so it can sit above every surface including the nav bar and
   needs no slot in the `Ctrl+1 … Ctrl+9` numbering.
+- **Modal for the keyboard as well as the pointer**, on the same rules as the accent picker. The shortcut
+  chain swallows every shortcut while it is open, Esc closes it, and **Enter falls through** so a focused
+  button presses. Tab cycles inside the card; the × takes focus on open, and closing hands focus back to
+  whatever held it, ring included, or clears it if that is gone. **The keyboard half is not cosmetic:**
+  without it, Tab walked out to the page behind the scrim, a Settings control could open the accent
+  picker on top of Help, and Esc then closed the hidden Help first. A click on empty space inside the card
+  leaves it open, because an empty spot reports the card itself as the source, and that counts as inside.
 - **Two kinds of content, one of them generated.** The keyboard table is built from
   `ShortcutBindings.HelpGroups` — the same object the key handler resolves against — so it lists the
   keys currently bound, rebinds included, and cannot describe a binding that is not live. Everything
@@ -1747,8 +1777,20 @@ was deliberately left alone, and **Processes no longer drops columns at all** �
 the collapsing toolbar search, the Ping console filling its widget and keeping as much scrollback as fits,
 and `Dimensions.axaml`.
 
-**Deferred on this branch:** differentiating the tab header from the universal toolbar header. The user
-is doing design work first — do not start it without a task.
+**The toolbar title outranks a widget title** (work item 43). The toolbar's page name was 15 SemiBold
+and a widget's `panelTitle` 13.5 SemiBold, so a heading on the page could not be told from the shell's.
+`TextBlock.shellTitle` (`TextSizeDisplay`, 18, **Bold**, `TextStrong`) now sits beside `panelTitle`
+(unchanged, 13.5 SemiBold) in SharedStyles.axaml, so the gap is defined once, in size and weight both.
+Three decisions:
+
+- **Only the title carries the rank.** Both subtitles are `cardSub`; the toolbar's was already the same
+  size and brush, now by class rather than by restated setters.
+- **`panelTitle` did not move.** Changing it would restyle every widget in the app for a problem that
+  sits in one place, the toolbar.
+- **No tab heading was converted.** The survey found none drawn in the toolbar's look: Hardware's cards
+  match `panelTitle`, and Storage's drive names and File Explorer's detail name sit at 14 SemiBold,
+  4px and a weight under the new title. `HeaderHierarchyTests` keeps `shellTitle` out of
+  `src/Tabs` and the toolbar free of local setters, which would outrank the class.
 
 ## Drag to reorder
 

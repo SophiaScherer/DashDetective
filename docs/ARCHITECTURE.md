@@ -61,9 +61,9 @@ tab's view and view-model must share a namespace.
 
 The **navigation bar** (`src/Shell/Navigation`) is self-contained, dockable and collapsible. Its
 view-model exposes every derived layout value (dock edge, rail thickness, item axis, label visibility,
-the collapse toggle's caret) as computed properties, with no value converters. Its entry points are a
-collapse toggle in the footer beside Help (and `Ctrl+B`), a right-click dock menu, dragging the brand
-area to a window edge, and Settings → Appearance.
+puck geometry) as computed properties, with no value converters. Four entry points drive it: a
+hover-revealed chevron puck, a right-click dock menu, dragging the brand area to a window edge, and
+Settings → Appearance.
 
 **Universal search** (`src/Shell/Search`) fans out across providers — pages, settings, processes,
 files, Help's own copy — with no routing layer; each target exposes a `Reveal()` seam for jumping to a
@@ -249,7 +249,8 @@ Overrides persist as one encoded string, ids and keys by name.
 `ShellShortcutHandler` (`src/Shell/Shortcuts`) attaches one tunneling `KeyDown` handler to the window.
 Dispatch is a priority chain on `MainWindowViewModel.HandleShortcut` — a capture in progress, then an
 open modal, then the search dropdown, then the current page's scope, then global — so it is testable
-without a UI. **The capture check has to come first**: the handler tunnels from the window and so sees
+without a UI. The modal step is `ModalShortcuts`, split out because the shell view model builds every
+page and cannot itself be constructed in a test. **The capture check has to come first**: the handler tunnels from the window and so sees
 a press before the Settings capture box does, and would otherwise run the shortcut being rebound.
 
 ## Cross-platform seams

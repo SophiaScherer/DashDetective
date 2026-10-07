@@ -1,7 +1,7 @@
 # Earlier switch to the icons-only rail
 
-Work item 48, Sprint 3, *Switch to small icons earlier when shrinking the window.* It follows work item
-47, which replaced the collapse puck with a footer toggle, and is stacked on that branch.
+Work item 48, Sprint 3, *Switch to small icons earlier when shrinking the window.* It changes only where
+the bar folds; the collapse control itself is unchanged.
 
 ## What was built
 
@@ -48,5 +48,5 @@ instead of a flat 820px:
    maximized window shows the icons-only rail. Widening past the threshold restores labels.
 4. Dock the bar top. Narrow the window: the bar should switch to icons at the point its labels would
    start to scroll out of view, with no horizontal scroll bar ever shown over labeled items.
-5. Click the footer toggle while the window is narrow: it expands, and stays expanded until the window
+5. Expand the bar with the collapse puck (or Ctrl+B) while the window is narrow: it expands, and stays expanded until the window
    is widened past the fold point and narrowed again.

@@ -6,7 +6,7 @@
          reveals the full value wrapped onto its own line. Mirrors InfoRow's key column + hairline,
          but keeps its own expand state so it can live next to plain InfoRows. -->
     <Border Classes="infoRow">
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource KeyValueGap}">
             <TextBlock Classes="infoKey" Text="{Binding #Root.Key}" VerticalAlignment="Top"/>
             <Panel Grid.Column="1">
                 <!-- Collapsed: single truncated line + the "…" affordance. -->
