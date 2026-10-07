@@ -1931,6 +1931,13 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
+- **Decision — utilization follows Task Manager's per-engine rule** (`GpuEngineLoad`). PDH reports one
+  instance per (process, physical engine); an engine's load is the sum over its instances, an adapter reads
+  its busiest engine, and a type ("3D", "Copy") reads its busiest engine of that type. **Engines of one type
+  are never summed**: the RTX 3060 has six Copy engines, and keying by type added them into a Copy figure no
+  engine was doing, which then competed for the adapter's headline. Evidence: under a ~50 % 3D load the
+  headline already matched Task Manager (48–52 vs 52, one 3D engine), so the inflation was in multi-engine
+  types.
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
