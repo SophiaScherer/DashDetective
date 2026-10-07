@@ -116,7 +116,7 @@ Three rules came out of it:
   so both clear 3:1; `Hairline`/`RowLine` sit at a stated floor below it and `ChartGrid` a step lighter
   than those, because a separator repeats what spacing already says and the grid must stay under the trace
   drawn over it. `PaletteLineTests` pins the floor, the ceiling and that ordering.
-- **Judge small text by what renders, not by its nominal colour.** Antialiased 10–11.5px text reads about
+- **Judge small text by what renders, not by its nominal colour.** Antialiased 11–12.5px text reads about
   twice as light as its token — a rung measuring 4.7:1 still looked washed out — so the light ramp is
   authored darker than contrast alone asks for, and chart axis text (the smallest in the app) takes its
   own `ChartAxisText` key a rung heavier. Verify a change here with a screenshot, not a ratio.
@@ -155,6 +155,13 @@ to come: the Processes table's names and making the accent follow a color-vision
 add one that is always on. Read the *Accessibility* entry in [docs/FEATURES.md](docs/FEATURES.md) before
 touching it; two things there are easy to undo by accident — `ThemeService` is still the only code that
 writes to `Application.Current`, and each visual root needs its own `ScaleHost`.
+
+A **default-sizing rebalance** is complete, measured against Windows File Explorer at the same DPI. The
+type ladder grew ~1.12 (body 12.5 → 14) and must stay strictly increasing; icons took the new `IconSize` /
+`IconSizeSmall` tokens and the 18-grid sites `Stretch="Uniform"`; and row pitch was set by measurement
+(Processes 16,7, the File Explorer tree 4,5 with an 11px caret, file rows 14,6 with their header in step).
+**100 % stays the default** — this changed what 100 % looks like, not the scale. Its decisions are in
+[docs/FEATURES.md](docs/FEATURES.md) under *Text size*, *File Explorer* and *Processes*.
 
 A **cross-page linking pass** is complete, in two halves. The Ping and DNS panels' fields each carry a
 link icon opening the typed host in the browser, over a new `IWebLinkOpener` seam (`src/Services/Links`) —
@@ -223,10 +230,6 @@ Before performing any of the following, stop and ask first:
 
 ## Folder Structure
 
-Source lives under `DashDetective/src/`, split into three areas: shared building blocks,
-the application shell, and one folder per feature ("tab"). All nine tabs exist — Dashboard,
-File Explorer, Processes, Performance, Network, Storage, Hardware, Toolkit and Settings.
-
 Source lives under `DashDetective/src/`, split into three areas: shared building blocks
 (`Shared`), the application shell (`Shell`), and one folder per feature (`Tabs/<Feature>`), with
 `Services` for anything more than one tab needs. Namespaces follow folders.
@@ -274,10 +277,6 @@ where it matters, the trap it exists to avoid. Jump straight to the folder you a
   [Hardware](docs/SOURCE-MAP.md#srctabshardware) ·
   [Toolkit](docs/SOURCE-MAP.md#srctabstoolkit) ·
   [Settings](docs/SOURCE-MAP.md#srctabssettings)
-
-Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
-until a second feature needs them.
-
 
 Feature-specific *providers* (static WMI/registry reads) live in the tab folder, not `src/Shared`,
 until a second feature needs them (per the "keep each tab self-contained" rule). Live **sampling**,
@@ -840,7 +839,15 @@ temperature is the expected outcome, not a defect.
   **The one authorized exception is the `TextSize*` ladder**, which was swept across every view at once
   in phase 10. That was decided, not overlooked: text scale rewrites those keys at runtime, so a size
   left as a literal simply would not grow — and would fail silently on one page. A test now fails on any
-  authored `FontSize` literal, which is what keeps the sweep swept. Nothing else earns this.
+  authored `FontSize` literal, which is what keeps the sweep swept.
+  **`IconSize` / `IconSizeSmall` were swept once too**, when the defaults were rebalanced against File
+  Explorer: every icon size was a literal, so there was nothing to adopt by contact and no way to raise
+  them all coherently. Two tokens, because the app has two jobs for an icon — one that identifies
+  something or fills a chrome button, one inside a row-level button, a field or a tinted tile. A mark
+  that is deliberately smaller than either (a clear X, a status dot, a drag grip, the puck's caret) is
+  not an icon and stays a literal. **Unlike the type ladder, no test gates this one** — which mark counts
+  as an icon is a judgement call, so it is a convention and a stray literal will not fail the build.
+  Nothing else earns this.
 - **A scroller's content keeps `ScrollGutter` from the bar, as a Margin.** Auto-hide is pinned off, so
   content sits beside the bar and touches it without one. Never `ScrollViewer` Padding, which the scroll
   extent leaves out. A control that template-binds its scroller's `AllowAutoHide` (TreeView, ListBox)
@@ -851,7 +858,7 @@ temperature is the expected outcome, not a defect.
 - A control or style used by one tab stays tab-local. A panel repeated within a single feature stays in
   that feature (the Network tab's `ConsolePanel`).
 - **`Palette.axaml` owns every colour in the app**, pinned by `PaletteOwnershipTests`. The exemptions
-  are the three C# mirrors beside it and **`ReportFormatters.cs`** — an exported HTML report is a
+  are the six C# theming files in `Services/Theming` and **`ReportFormatters.cs`** — an exported HTML report is a
   browser document with no access to the theme, and one that only looked right inside DashDetective
   would be the bug. That is the bar for a future exemption: rendered outside the app, not merely
   inconvenient to tokenise.
