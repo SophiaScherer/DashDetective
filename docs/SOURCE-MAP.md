@@ -1261,7 +1261,10 @@ stays in its tab folder.
                                      puck, re-docking is the right-click menu or the drag gesture. The
                                      VM owns Orientation + IsCollapsed and exposes all layout as computed
                                      properties — Dock, Rail sizes, ItemsOrientation, Hairline edge,
-                                     scroll axis, puck geometry — no converters. Selection/layout visuals
+                                     scroll axis, puck geometry — no converters. AutoCollapseThreshold is
+                                     the ONE place the fold-to-icons width is decided: rail +
+                                     MinPageWidth for a vertical rail, the measured labeled width for a
+                                     horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
         NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all

@@ -38,6 +38,7 @@ public partial class NavigationView : UserControl {
     public NavigationView() {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        ItemScroll.LayoutUpdated += OnItemScrollLayoutUpdated;
     }
 
     // Bridge the view model's UI-only PositionPicked signal to dismissing the dock menu: selecting a
@@ -66,6 +67,14 @@ public partial class NavigationView : UserControl {
     // A horizontal bar sizes to its content, so the drop preview learns its height from the layout.
     private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>
         _viewModel?.ReportBarHeight(e.NewSize.Height);
+
+    // What a horizontal bar's labels need is measured, not guessed. Checked after every layout pass rather
+    // than on ScrollChanged: while the labels fit, the scroller's extent is pinned to its viewport, so a
+    // text-size change that widens them raises nothing there. The view model ignores an unchanged need.
+    private void OnItemScrollLayoutUpdated(object? sender, EventArgs e) {
+        if (ItemScroll.Content is Control strip)
+            _viewModel?.ReportLabelOverflow(ItemScroll.Viewport.Width, strip.DesiredSize.Width);
+    }
 
     // ----- Drag-to-dock -----
 
