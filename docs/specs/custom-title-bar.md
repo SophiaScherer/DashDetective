@@ -55,61 +55,63 @@ A second window (work item 45) opts in with the same three lines: `WindowDecorat
 
 ## Manual verification
 
-None of this was observed while it was built — the app was not run. Check each on Windows 11 unless the
-line says otherwise. Back up `%AppData%/DashDetective/settings.json` first if you change settings.
+Checked on Windows 11 at 125 % display scaling against Avalonia 12.1.3, by driving the app with
+synthesized input. A ticked item passed, and a note on one names a part left unchecked; an unticked item
+was not checked, and its note says what is left.
+Back up `%AppData%/DashDetective/settings.json` first if you change settings.
 
 ### Drag and snap
-- [ ] Drag the bar: the window moves, with the OS's own drag (no lag behind the pointer).
-- [ ] Drag the bar to the top edge of the screen: the maximize preview shows; release maximizes.
-- [ ] Drag to the left and right edges: half-screen snap previews and snaps. Snap Assist offers the other
-      windows afterwards.
-- [ ] Drag to each of the four corners: quarter-screen snap.
-- [ ] Windows 11: drag towards the top centre: the snap-layouts drop zone appears.
-- [ ] Drag a maximized window's bar down: it restores under the pointer and follows it.
-- [ ] Win+← / Win+→ snap left and right; Win+↑ maximizes; Win+↓ restores, then minimizes.
-- [ ] The top edge above the bar (the first few pixels) still resizes the window; the side and bottom
+- [x] Drag the bar: the window moves, with the OS's own drag (no lag behind the pointer).
+- [x] Drag the bar to the top edge of the screen: the maximize preview shows; release maximizes.
+- [x] Drag to the left and right edges: half-screen snap previews and snaps. Snap Assist offers the other
+      windows afterwards. *(Snap Assist not checked.)*
+- [x] Drag to each of the four corners: quarter-screen snap.
+- [x] Windows 11: drag towards the top centre: the snap-layouts drop zone appears.
+- [x] Drag a maximized window's bar down: it restores under the pointer and follows it.
+- [x] Win+← / Win+→ snap left and right; Win+↑ maximizes; Win+↓ restores, then minimizes.
+- [x] The top edge above the bar (the first few pixels) still resizes the window; the side and bottom
       edges and all corners resize.
 
 ### Double-click
-- [ ] Double-click the empty part of the bar: maximizes. Again: restores.
-- [ ] Double-click the title text and the app mark: same (they are part of the caption).
+- [x] Double-click the empty part of the bar: maximizes. Again: restores.
+- [x] Double-click the title text and the app mark: same (they are part of the caption).
 
 ### Caption buttons
 - [ ] Hover the maximize button: after a moment the Windows 11 snap-layouts flyout appears; picking a
-      layout places the window.
-- [ ] Minimize, maximize, restore (the glyph switches to the double square when maximized), close. Close
+      layout places the window. *(The flyout appears; picking a layout with synthesized input never landed, so placing the window is unchecked.)*
+- [x] Minimize, maximize, restore (the glyph switches to the double square when maximized), close. Close
       honors "Show in system tray" exactly as the old title bar's close did.
-- [ ] Hover each: a light overlay; close turns red with a white glyph. Pressing darkens.
-- [ ] Maximized: moving the pointer to the top-right corner of the screen lands on close.
-- [ ] Tab through the window: focus never lands on a caption button.
-- [ ] Alt+F4 closes (to the tray when that setting is on), with focus in the page and with a flyout open.
-- [ ] Taskbar: right-click the button → "Close window" closes; hover it and click the thumbnail's × —
-      closes. Both honor "Show in system tray".
-- [ ] Accessibility Insights / Inspect: the three buttons are named Minimize, Maximize, Close.
+- [x] Hover each: a light overlay; close turns red with a white glyph. Pressing darkens.
+- [x] Maximized: moving the pointer to the top-right corner of the screen lands on close.
+- [x] Tab through the window: focus never lands on a caption button.
+- [x] Alt+F4 closes (to the tray when that setting is on), with focus in the page and with a flyout open.
+- [x] Taskbar: right-click the button → "Close window" closes; hover it and click the thumbnail's × —
+      closes. Both honor "Show in system tray". *(Checked by posting the `SC_CLOSE` the taskbar sends, not through the taskbar itself.)*
+- [x] Accessibility Insights / Inspect: the three buttons are named Minimize, Maximize, Close. *(Checked through UI Automation.)*
 
 ### High contrast
-- [ ] Settings → Accessibility → High contrast, in Dark and in Light: the bar is flat black / white with a
+- [x] Settings → Accessibility → High contrast, in Dark and in Light: the bar is flat black / white with a
       solid hairline; the caption glyphs are pure white / black; hover and press are visible.
 - [ ] Windows Settings → Accessibility → Contrast themes → Aquatic (and Desert): the custom bar disappears
       and the native Windows caption returns in the contrast colors, with native buttons. Switching the
       contrast theme off brings the custom bar back **without restarting the app**.
-- [ ] Dark and Light themes, and a custom accent: the app mark follows the accent; nothing else does.
+- [x] Dark and Light themes, and a custom accent: the app mark follows the accent; nothing else does.
 
 ### Interface and text size
-- [ ] Interface size 80 %, 100 %, 200 %: the bar stays 32 px and lined up with the caption buttons; the
+- [x] Interface size 80 %, 100 %, 200 %: the bar stays 32 px and lined up with the caption buttons; the
       content below scales.
-- [ ] Text size 200 %: the title grows and the bar grows with it; nothing is clipped; the buttons stay at
+- [x] Text size 200 %: the title grows and the bar grows with it; nothing is clipped; the buttons stay at
       the top.
-- [ ] Drag the bottom edge up as far as it goes, at 100 % and 200 % interface size: the page area below
+- [x] Drag the bottom edge up as far as it goes, at 100 % and 200 % interface size: the page area below
       the bar stops at the same height it did before this change.
 - [ ] Display scaling 125 % / 150 % (Windows setting): bar and buttons still line up, glyphs are crisp
-      enough.
+      enough. *(125 % passes, as the machine runs at it; 150 % needs a Windows setting changed.)*
 
 ### Navigation bar
-- [ ] Dock the nav bar Top (right-click → Dock navigation → Top): it sits below the title bar.
+- [x] Dock the nav bar Top (right-click → Dock navigation → Top): it sits below the title bar.
 - [ ] Right-click the nav bar: the dock menu still opens. Drag the brand area to each edge: re-docks.
-      (Known: the drop band for Top is drawn over the title bar rather than beneath it.)
-- [ ] With Help or the accent picker open, the title bar is not dimmed and the caption buttons work.
+      (Known: the drop band for Top is drawn over the title bar rather than beneath it.) *(The menu opens, and dragging the brand docks Top and back to Left; Right and Bottom unchecked.)*
+- [x] With Help or the accent picker open, the title bar is not dimmed and the caption buttons work.
 
 ### Linux
 - [ ] Ubuntu VM: the window has the desktop's normal title bar, no custom strip, and moves, maximizes and
