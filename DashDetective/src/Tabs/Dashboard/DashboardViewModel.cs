@@ -70,8 +70,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     // its caption shows capacity used.
     private readonly Dictionary<int, DashboardCard> _diskCards = new();
     private readonly Dictionary<int, MetricHistory> _diskHistories = new();
-    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
-        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler;
     private readonly DispatcherTimer _throughputTimer;
 
     /// <summary>Physical disk hosting Windows, resolved with the drive cards; −1 until then. The report and
@@ -181,11 +180,13 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// the cards' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
-    /// and the inventory load disposes one of its own.</summary>
+    /// and the inventory load disposes one of its own. <paramref name="throughputSampler"/> stages the per-disk readings.</summary>
     internal DashboardViewModel(
         SystemMetricsService service, HardwareProviders providers,
-        Func<IGpuUsageSampler>? gpuSamplerFactory = null) {
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null,
+        IPhysicalDiskThroughputSampler? throughputSampler = null) {
         _providers = providers;
+        _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         _gpuSamplerFactory = gpuSamplerFactory ?? IGpuUsageSampler.ForCurrentPlatform;
         _gpuSampler = _gpuSamplerFactory();
 
@@ -400,13 +401,17 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // "leave the existing GPU cards in place" on a failure, and it could not keep that promise while
         // the clear came first: a throw partway through the loop left the old cards gone, the new ones
         // half-inserted, and _gpuCards/_gpuHistories/_gpuVendors out of step with Cards.
-        var rebuilt = new List<(string Key, DashboardCard Card, uint? Vendor)>(gpus.Count);
-        foreach (var gpu in gpus)
+        var rebuilt = new List<(string Key, DashboardCard Card, uint? Vendor, MetricHistory History)>(gpus.Count);
+        foreach (var gpu in gpus) {
+            var key = gpu.GpuLuid ?? gpu.Id;
+            // A refresh re-enumerates the same adapters; one still present keeps its accumulated trace.
             rebuilt.Add((
-                gpu.GpuLuid ?? gpu.Id,
+                key,
                 new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "%",
                                   OpenInPerformance) { Sub = gpu.Sub },
-                gpu.GpuPci?.VendorId));
+                gpu.GpuPci?.VendorId,
+                _gpuHistories.TryGetValue(key, out var previous) ? previous : new MetricHistory(WindowSeconds)));
+        }
 
         var modelText = gpus.Count > 0
             ? string.Join(" / ", gpus.Select(g => g.Spec))
@@ -420,11 +425,12 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _gpuVendors.Clear();
 
         var insertAt = Cards.IndexOf(_memoryCard) + 1;
-        foreach (var (key, card, vendor) in rebuilt) {
+        foreach (var (key, card, vendor, history) in rebuilt) {
             Cards.Insert(insertAt++, card);
             _gpuCards[key] = card;
-            _gpuHistories[key] = new MetricHistory(WindowSeconds);
+            _gpuHistories[key] = history;
             _gpuVendors[key] = vendor;
+            card.Points = history.Points(100);
         }
 
         GpuModelText = modelText;
@@ -707,14 +713,18 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // Built before anything on screen is touched, for the same reason as RebuildGpuCards: the
         // caller's soft-fail promises to leave the existing cards in place, which it cannot do if the
         // clear has already run.
-        var rebuilt = new List<(int DiskNumber, DashboardCard Card)>(drives.Count);
+        var rebuilt = new List<(int DiskNumber, DashboardCard Card, MetricHistory History)>(drives.Count);
         foreach (var drive in drives)
+            // A refresh re-enumerates the same disks; one still present keeps its accumulated trace.
             rebuilt.Add((
                 drive.DiskNumber,
                 new DashboardCard(DeviceCategory.Disk, DeviceIds.Disk(drive.DiskNumber),
                                   drive.Name.ToUpperInvariant(), "%", OpenInPerformance) {
                     Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
-                }));
+                },
+                _diskHistories.TryGetValue(drive.DiskNumber, out var previous)
+                    ? previous
+                    : new MetricHistory(WindowSeconds)));
 
         foreach (var card in _diskCards.Values)
             Cards.Remove(card);
@@ -722,10 +732,11 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         _diskHistories.Clear();
 
         var insertAt = Cards.IndexOf(_networkCard);
-        foreach (var (diskNumber, card) in rebuilt) {
+        foreach (var (diskNumber, card, history) in rebuilt) {
             Cards.Insert(insertAt++, card);
             _diskCards[diskNumber] = card;
-            _diskHistories[diskNumber] = new MetricHistory(WindowSeconds);
+            _diskHistories[diskNumber] = history;
+            card.Points = history.Points(100);
         }
 
         // Seed the new cards' value + charts once so they aren't blank until the next throughput tick.
