@@ -33,12 +33,16 @@ public sealed class CpuUsageSampler : IDisposable {
 
         // Prefer the Task-Manager-matching counter; fall back to GetSystemTimes if it isn't available.
         var utility = new ProcessorUtilityCpuSampler();
-        if (utility.Ready) {
-            _inner = utility;
-        } else {
-            utility.Dispose();
-            _inner = new SystemTimesCpuSampler();
-        }
+        _inner = UtilityIfReady(utility, utility.Ready) ?? new SystemTimesCpuSampler();
+    }
+
+    /// <summary>The utility counter when it stood up; otherwise disposes it and returns null so the caller
+    /// takes the fallback. Split out so the choice is testable on every platform.</summary>
+    internal static ICpuSampler? UtilityIfReady(ICpuSampler utility, bool ready) {
+        if (ready)
+            return utility;
+        (utility as IDisposable)?.Dispose();
+        return null;
     }
 
     /// <summary>Test seam: injects the underlying sampler so fallback selection can be exercised

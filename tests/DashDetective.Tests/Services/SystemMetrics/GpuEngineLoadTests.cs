@@ -109,6 +109,27 @@ public class GpuEngineLoadTests {
         Assert.Equal(25, result[Nvidia].Overall);
     }
 
+    /// <summary>One process drawing on 3D on both cards reads its busier card, not their sum.</summary>
+    [Fact]
+    public void ByProcess_OnePidOn3DAcrossTwoAdapters_ReadsTheMax() {
+        var readings = new (string?, double)[] {
+            ("pid_100_luid_0x00000000_0x0000E7BE_phys_0_eng_0_engtype_3D", 35),
+            ("pid_100_luid_0x00000000_0x0000F83D_phys_0_eng_0_engtype_3D", 25),
+        };
+
+        Assert.Equal(35, GpuEngineLoad.ByProcess(readings)[100]);
+    }
+
+    [Fact]
+    public void ByProcess_OnePidOnTwoCopyEngines_ReadsTheMax() {
+        var readings = new (string?, double)[] {
+            ("pid_100_luid_0x00000000_0x0000E7BE_phys_0_eng_3_engtype_Copy", 12),
+            ("pid_100_luid_0x00000000_0x0000E7BE_phys_0_eng_4_engtype_Copy", 9),
+        };
+
+        Assert.Equal(12, GpuEngineLoad.ByProcess(readings)[100]);
+    }
+
     /// <summary>A process's figure is its own share of an engine, summed over duplicate instances of that
     /// engine and clamped; an instance with no PID belongs to no row.</summary>
     [Fact]
