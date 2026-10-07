@@ -103,11 +103,13 @@
              takes focus, which would stop the user typing. Close-on-outside-click is emulated in the
              code-behind, the same trade the File Explorer's Options menu makes.
              Aligned to the box's RIGHT edge: the popup is wider than the box on a narrow window, and
-             growing rightwards would lay it over the toolbar actions beside it. -->
+             growing rightwards would lay it over the toolbar actions beside it.
+             IsOpen is TwoWay because the popup can close itself (SetCurrentValue), which a OneWay
+             binding never reports, leaving the view model "open" and every later open a no-op. -->
         <Popup x:Name="ResultsPopup" PlacementTarget="{Binding #SearchBox}"
                Placement="BottomEdgeAlignedRight" VerticalOffset="6"
                IsLightDismissEnabled="False" Focusable="False"
-               IsOpen="{Binding IsOpen}">
+               IsOpen="{Binding IsOpen, Mode=TwoWay}">
             <!-- A popup is its own visual root, so it carries the interface scale itself. -->
             <controls:ScaleHost Scale="{DynamicResource UiScale}">
                 <!-- Width matched inside the scale host rather than on the Popup: the search box's
