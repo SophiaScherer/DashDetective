@@ -1616,6 +1616,10 @@ stays in its tab folder.
                                                          selector compiles and matches nothing.
                                                          Both carets sit on one Panel with exactly one
                                                          visible, for the same reason.
+                                                         The address field holds an invisible line of crumb
+                                                         text, so with no folder open (no crumbs) it keeps
+                                                         its height and the toolbar never jumps on first
+                                                         open; a fixed Height would not follow text scale.
                                                          VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
