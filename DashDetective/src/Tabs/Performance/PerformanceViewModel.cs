@@ -699,23 +699,23 @@ public partial class PerformanceViewModel : ViewModelBase,
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
             var threeDTile = new StatTile("3D", Placeholders.NoReading);
-            // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
-            // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
-            // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            // VRAM in use reads "used / total": the total is static (the inventory's dedicated memory), the
+            // usage arrives per tick, so it is seeded total-only. Temp / Power are sampled per tick from the
+            // vendor SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            var vramTile = new StatTile("VRAM in use", GpuMemoryFormatter.Format(null, gpu.VramBytes));
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
                                       history.Points(100),
                                       new[] {
-                                          threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
-                                          tempTile, powerTile,
+                                          threeDTile, vramTile, tempTile, powerTile,
                                       }, Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
                 Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
-                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
+                VramTile = vramTile, VramBytes = gpu.VramBytes, TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             rebuilt.Add(resource);
         }
@@ -747,12 +747,6 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     private ResourceLink HardwareLink() =>
         new("View in Hardware", () => HardwareRevealRequested?.Invoke());
-
-    /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
-    /// shared-memory adapter, or a failed read). Reuses the shared byte humanizer, so a small integrated
-    /// GPU reads "128 MB" rather than "0.1 GB".</summary>
-    private static string FormatVram(ulong? bytes) =>
-        bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
 
     /// <summary>Follows the Settings refresh interval: retimes the page-local samplers so their charts stay
     /// in step with the shared feeds', and restates the window every caption claims.</summary>
@@ -884,6 +878,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var (luid, sample) in adapters) {
             if (!_gpusByLuid.TryGetValue(luid, out var gpu))
                 continue;
+
+            // Before the utilisation guard: an adapter with no utilisation figure can still report memory.
+            gpu.VramTile.Value = GpuMemoryFormatter.Format(sample.DedicatedUsedBytes, gpu.VramBytes);
 
             if (sample.Overall is not { } reading) {
                 // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
@@ -1199,6 +1196,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required ResourceRow Row { get; init; }
         public required MetricHistory History { get; init; }
         public required StatTile ThreeDTile { get; init; }
+        public required StatTile VramTile { get; init; }
+        /// <summary>The adapter's dedicated total from the inventory; null or 0 when unknown.</summary>
+        public ulong? VramBytes { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }
         public GpuPciId? Pci { get; init; }

@@ -29,6 +29,10 @@ namespace DashDetective.Services.SystemMetrics;
 internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
     private const string BusyFile = "/gpu_busy_percent";
 
+    // amdgpu's dedicated-VRAM counter, beside the mem_info_vram_total that DrmCardFacts reads. Other
+    // drivers publish none, so usage stays null for them.
+    private const string VramUsedFile = "/mem_info_vram_used";
+
     private static readonly IReadOnlyDictionary<string, GpuAdapterSample> Empty =
         new Dictionary<string, GpuAdapterSample>();
 
@@ -41,9 +45,9 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
     private readonly IProcFileSystem _proc;
     private readonly NvidiaSmiReader? _nvidiaSmi;
 
-    // Key → the one file this sampler re-reads per tick, or null for a card that publishes none. Cards
+    // Key → the files this sampler re-reads per tick, or null for one the card does not publish. Cards
     // with no source are kept so the adapter still appears, reporting a null utilisation.
-    private readonly List<(string Key, string? BusyPath)> _cards = [];
+    private readonly List<(string Key, string? BusyPath, string? VramUsedPath)> _cards = [];
 
     private bool _hasNvidiaCard;
 
@@ -58,7 +62,8 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         try {
             foreach (var card in DrmCardFacts.Read(proc)) {
                 var path = card.DevicePath + BusyFile;
-                _cards.Add((card.Key, proc.Exists(path) ? path : null));
+                var vramPath = card.DevicePath + VramUsedFile;
+                _cards.Add((card.Key, proc.Exists(path) ? path : null, proc.Exists(vramPath) ? vramPath : null));
                 _hasNvidiaCard |= card.VendorId == NvidiaVendorId;
             }
         } catch (Exception e) {
@@ -78,11 +83,12 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         var nvidia = NvidiaReadings();
 
         var samples = new Dictionary<string, GpuAdapterSample>(_cards.Count, StringComparer.Ordinal);
-        foreach (var (key, path) in _cards) {
+        foreach (var (key, path, vramPath) in _cards) {
             // sysfs first: it is free, current, and the only source for AMD. nvidia-smi fills in only the
             // cards sysfs cannot answer for.
             var percent = path is null ? null : ParsePercent(_proc.ReadAllText(path));
-            samples[key] = new GpuAdapterSample(percent ?? nvidia?.Utilisation(key), NoEngines);
+            var vramUsed = vramPath is null ? null : ParseBytes(_proc.ReadAllText(vramPath));
+            samples[key] = new GpuAdapterSample(percent ?? nvidia?.Utilisation(key), NoEngines, vramUsed);
         }
 
         return samples;
@@ -110,6 +116,14 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
 
         return Math.Clamp(value, 0, 100);
     }
+
+    /// <summary>Parses a <c>mem_info_vram_used</c> body (plain bytes) or <c>null</c> when the file has gone
+    /// away or holds something else — never 0, which would claim an empty card. Pure; unit-tested.</summary>
+    internal static ulong? ParseBytes(string? text) =>
+        text is not null
+        && ulong.TryParse(text.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
 
     /// <summary>Nothing to release: sysfs reads open and close per call, unlike a PDH query handle.</summary>
     public void Dispose() { }

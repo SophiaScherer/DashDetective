@@ -27,9 +27,15 @@ internal sealed class FakeGpuUsageSampler : IGpuUsageSampler {
         return this;
     }
 
+    /// <summary>Stages an adapter reporting a utilisation figure and its dedicated memory in use.</summary>
+    public FakeGpuUsageSampler ReportingMemory(string adapterKey, double overall, ulong usedBytes) {
+        _samples[adapterKey] = new GpuAdapterSample(overall, new Dictionary<string, double>(), usedBytes);
+        return this;
+    }
+
     /// <summary>Stages an adapter that exists but cannot report one — the NVIDIA/Intel case on Linux.</summary>
-    public FakeGpuUsageSampler Silent(string adapterKey) {
-        _samples[adapterKey] = new GpuAdapterSample(null, new Dictionary<string, double>());
+    public FakeGpuUsageSampler Silent(string adapterKey, ulong? usedBytes = null) {
+        _samples[adapterKey] = new GpuAdapterSample(null, new Dictionary<string, double>(), usedBytes);
         return this;
     }
 

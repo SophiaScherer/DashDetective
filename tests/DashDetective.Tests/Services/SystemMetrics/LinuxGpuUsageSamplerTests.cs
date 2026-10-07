@@ -150,6 +150,47 @@ public class LinuxGpuUsageSamplerTests {
     }
 
     [Fact]
+    public void SampleAdapters_AmdCard_ReadsDedicatedVramUsed() {
+        using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem().WithAmdgpuCard());
+
+        Assert.Equal(1073741824UL, Assert.Single(sampler.SampleAdapters()).Value.DedicatedUsedBytes);
+    }
+
+    /// <summary>The proprietary NVIDIA blob publishes no <c>mem_info_vram_used</c>; usage must stay null
+    /// rather than read 0 and claim an empty card.</summary>
+    [Fact]
+    public void SampleAdapters_CardWithoutVramUsedFile_ReportsNullUsage() {
+        using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem().WithNvidiaCard());
+
+        Assert.Null(Assert.Single(sampler.SampleAdapters()).Value.DedicatedUsedBytes);
+    }
+
+    [Fact]
+    public void SampleAdapters_UnreadableVramUsed_ReportsNullUsage() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard()
+            .WithFile("/sys/class/drm/card0/device/mem_info_vram_used", "N/A\n");
+        using var sampler = new LinuxGpuUsageSampler(proc);
+
+        Assert.Null(Assert.Single(sampler.SampleAdapters()).Value.DedicatedUsedBytes);
+    }
+
+    [Theory]
+    [InlineData("1073741824\n", 1073741824UL)]
+    [InlineData("0", 0UL)]
+    public void ParseBytes_PlainDecimal_Parses(string text, ulong expected) {
+        Assert.Equal(expected, LinuxGpuUsageSampler.ParseBytes(text));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("-5\n")]
+    [InlineData("N/A\n")]
+    public void ParseBytes_Unreadable_IsNull(string? text) {
+        Assert.Null(LinuxGpuUsageSampler.ParseBytes(text));
+    }
+
+    [Fact]
     public void SampleAdapters_NoDrmTree_ReturnsEmptyForever() {
         using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem());
 
