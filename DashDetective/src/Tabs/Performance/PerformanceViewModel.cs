@@ -204,8 +204,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // number. This is the multi-instance category the Primary/All toggle expands or collapses.
     private readonly List<DiskResource> _disks = new();
     private readonly Dictionary<int, DiskResource> _disksByNumber = new();
-    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
-        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler;
     private readonly DispatcherTimer _throughputTimer;
 
     // ---- GPUs (live, one row per physical adapter) ----
@@ -249,10 +248,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// the rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
-    /// and the inventory load disposes one of its own.</summary>
+    /// and the inventory load disposes one of its own.
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
-        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null) {
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
+        IPhysicalDiskThroughputSampler? throughputSampler = null) {
+        _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
         // unshared instance simply never hears an accent change.
         _theme = theme ?? new ThemeService();
@@ -656,7 +658,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         // GPUs missing — which is neither the old state nor the new one.
         var rebuilt = new List<DiskResource>(disks.Count);
         foreach (var disk in disks) {
-            var history = new MetricHistory(WindowSeconds);
+            // A refresh re-enumerates the same disks; the one still present keeps its accumulated trace.
+            var number = disk.DiskNumber ?? -1;
+            var history = _disksByNumber.TryGetValue(number, out var previous)
+                ? previous.History
+                : new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
             var readTile = new StatTile("Read", "0 MB/s");
             var writeTile = new StatTile("Write", "0 MB/s");
@@ -668,7 +674,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                 StatOrder = StatOrderFor(ChartSeries.Storage),
             };
             var resource = new DiskResource {
-                DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
+                DiskNumber = number, Row = row, History = history,
                 ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
             };
             rebuilt.Add(resource);
@@ -694,7 +700,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Built into a local before the rail is touched — see BuildDiskRows.
         var rebuilt = new List<GpuResource>(gpus.Count);
         foreach (var gpu in gpus) {
-            var history = new MetricHistory(WindowSeconds);
+            // A refresh re-enumerates the same adapters; the one still present keeps its overall history
+            // and its per-engine charts, so neither restarts from empty.
+            var luid = gpu.GpuLuid ?? gpu.Id;
+            _gpusByLuid.TryGetValue(luid, out var previous);
+            var history = previous?.History ?? new MetricHistory(WindowSeconds);
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
@@ -714,9 +724,16 @@ public partial class PerformanceViewModel : ViewModelBase,
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
-                Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
+                Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
+            if (previous is { Engines.Count: > 0 }) {
+                foreach (var engine in previous.Engines) {
+                    resource.Engines.Add(engine);
+                    resource.EnginesByBase[engine.Key] = engine;
+                }
+                PublishGpuEngines(resource);
+            }
             rebuilt.Add(resource);
         }
 

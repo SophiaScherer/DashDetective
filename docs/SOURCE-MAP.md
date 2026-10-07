@@ -1326,6 +1326,8 @@ stays in its tab folder.
 
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
+                                (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
+                                 its MetricHistory, keyed by LUID / disk number.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
@@ -1894,7 +1896,9 @@ stays in its tab folder.
                                  since disk and GPU rows arrive with an async inventory load.
                                  RebuildResources matches the surviving selection BY DEVICE ID, not by
                                  reference: a rebuilt disk or GPU row is a new object, so the toolbar
-                                 Refresh used to drop the selection back to the CPU.)
+                                 Refresh used to drop the selection back to the CPU. The rebuild also
+                                 carries each surviving disk's and GPU's MetricHistory (and the GPU's
+                                 per-engine charts) over, keyed by disk number / LUID.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
