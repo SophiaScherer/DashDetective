@@ -31,6 +31,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Palette.axaml"/>
                 <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/Dimensions.axaml"/>
+                <ResourceInclude Source="avares://DashDetective/src/Shared/Styles/WindowChrome.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

@@ -53,7 +53,8 @@ stays in its tab folder.
 ## The shell
 
 `MainWindow` is a `DockPanel`: the navigation bar at the user-chosen edge, then a toolbar and the page
-host. `MainWindowViewModel` owns page routing, the toolbar (clock, Live pill, Refresh, Export) and the
+host. Above all of it, on Windows, sits the custom title bar (`WindowChrome` + `TitleBar` in
+`src/Shared/Controls`), outside the interface-size transform; Windows still owns every gesture on it. `MainWindowViewModel` owns page routing, the toolbar (clock, Live pill, Refresh, Export) and the
 composition root for services.
 
 `ViewLocator` maps a `*ViewModel` to its `*View` through an explicit switch — no reflection — so a
