@@ -308,7 +308,18 @@ stays in its tab folder.
                                  panel is in a board, and one that could not advertised a drag on three
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
-                                 it a whole column sideways the moment a reorder committed)
+                                 it a whole column sideways the moment a reorder committed. The drop
+                                 target goes through DropTarget, snapshotted as the drag begins; reading
+                                 the panel's live slots instead is the flicker loop. Press/MoveTo are
+                                 the pointer handlers' bodies, internal so ReorderDragTests can drive a
+                                 real board through re-layouts and catch a revert to live slots)
+        DropTarget.cs           (which slot a drag takes, against the slots FROZEN when it began, with
+                                 hysteresis: the target changes only once the dragged box's center is
+                                 Hysteresis (0.2) of the smaller slot past the boundary. The live layout
+                                 includes the preview, so moving the item shifted the slots under a
+                                 still pointer and flipped the answer back — a narrow widget held over a
+                                 wide one is over the wide one's slot in BOTH orders. Relative, not a
+                                 DIP constant, so it holds at every interface size)
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
                                  a drag does, so both persist through one path. It also makes every
                                  item it lays out a tab stop — a card is usually a plain Border, and
@@ -322,11 +333,12 @@ stays in its tab folder.
                                  Order is a reset, not "nothing saved": it routes to ChildOrder.Reset, and
                                  it deliberately does not write Order back, so the two-way binding cannot
                                  echo the reset into the page that asked for it)
-        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
-                                 handle is, and the previewed order. Reorder is always a permutation of
-                                 the panel's own index list — a panel that reordered Children instead
-                                 would re-enter its layout and, under an ItemsControl, fight the
-                                 generator)
+        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their arranged boxes and
+                                 row ends (SlotRects / SlotRowEnds — raw geometry, not a SlotAt, so the
+                                 drag can snapshot it), what a handle is, and the previewed order.
+                                 Reorder is always a permutation of the panel's own index list — a
+                                 panel that reordered Children instead would re-enter its layout and,
+                                 under an ItemsControl, fight the generator)
         WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
                                  without layout. SlotAt is what a drag TAKES, not a gap it is inserted
                                  into: the row whose band holds the point, then the slot in that row it

@@ -297,6 +297,18 @@ public class WidgetBoardLayoutTests {
         Assert.Equal(3, WidgetBoardLayout.SlotAt(grid, GridRows, 150, 166));
     }
 
+    /// <summary>Why a drag measures against a snapshot: a narrow widget held over a wide one is over
+    /// the wide one's slot in BOTH orders, so the live layout has no stable answer.</summary>
+    [Fact]
+    public void SlotAt_LiveLayoutOfANarrowWidgetOverAWideOne_FlipsWithTheOrder() {
+        Rect2[] narrowFirst = { new(0, 0, 300, 100), new(316, 0, 600, 100) };
+        Rect2[] wideFirst = { new(0, 0, 600, 100), new(616, 0, 300, 100) };
+        int[] oneRow = { 2 };
+
+        Assert.Equal(1, WidgetBoardLayout.SlotAt(narrowFirst, oneRow, 450, 50));
+        Assert.Equal(0, WidgetBoardLayout.SlotAt(wideFirst, oneRow, 450, 50));
+    }
+
     [Fact]
     public void SlotAt_InAGutter_KeepsTheSlotBeforeIt() {
         Assert.Equal(0, WidgetBoardLayout.SlotAt(Grid(), GridRows, 308, 50));

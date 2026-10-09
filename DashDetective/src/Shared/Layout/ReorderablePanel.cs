@@ -45,7 +45,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
     /// <summary>The pointer half of the drag, which a subclass reads as it lays out: the dragged item
     /// is measured at the size it was picked up at and arranged where it is being held.</summary>
-    protected ReorderDrag Drag { get; }
+    protected internal ReorderDrag Drag { get; }
 
     /// <summary>The children on screen, in the order to lay them out in.</summary>
     protected IReadOnlyList<Control> Visible => _visible;
@@ -70,10 +70,6 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     /// picked-up look — belongs to what is inside the wrapper.</summary>
     protected static Control Inner(Control child) =>
         child is ContentPresenter { Child: Control content } ? content : child;
-
-    public int SlotAt(Point point) =>
-        WidgetBoardLayout.SlotAt(_slotRects.AsSpan(0, _visible.Count),
-                                 CollectionsMarshal.AsSpan(RowEnds), point.X, point.Y);
 
     public void BeginPreview() => _childOrder.BeginPreview();
 
@@ -149,6 +145,10 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     Panel IReorderablePanel.Surface => this;
 
     IReadOnlyList<Control> IReorderablePanel.Items => _visible;
+
+    ReadOnlySpan<Rect2> IReorderablePanel.SlotRects => _slotRects.AsSpan(0, _visible.Count);
+
+    ReadOnlySpan<int> IReorderablePanel.SlotRowEnds => CollectionsMarshal.AsSpan(RowEnds);
 
     /// <summary>Rebuilds <see cref="Visible"/> in the order to lay out; call it first thing in measure.
     /// Collapsed children are skipped, so a hidden one never takes a slot.</summary>
