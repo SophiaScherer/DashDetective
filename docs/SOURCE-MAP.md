@@ -310,7 +310,9 @@ stays in its tab folder.
                                  frozen at its pickup size — offsetting it from its previewed slot threw
                                  it a whole column sideways the moment a reorder committed. The drop
                                  target goes through DropTarget, snapshotted as the drag begins; reading
-                                 the panel's live slots instead is the flicker loop)
+                                 the panel's live slots instead is the flicker loop. Press/MoveTo are
+                                 the pointer handlers' bodies, internal so ReorderDragTests can drive a
+                                 real board through re-layouts and catch a revert to live slots)
         DropTarget.cs           (which slot a drag takes, against the slots FROZEN when it began, with
                                  hysteresis: the target changes only once the dragged box's center is
                                  Hysteresis (0.2) of the smaller slot past the boundary. The live layout
@@ -333,10 +335,10 @@ stays in its tab folder.
                                  echo the reset into the page that asked for it)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their arranged boxes and
                                  row ends (SlotRects / SlotRowEnds — raw geometry, not a SlotAt, so the
-                                 drag can snapshot it), what a handle is, and the previewed order. Reorder is always a permutation of
-                                 the panel's own index list — a panel that reordered Children instead
-                                 would re-enter its layout and, under an ItemsControl, fight the
-                                 generator)
+                                 drag can snapshot it), what a handle is, and the previewed order.
+                                 Reorder is always a permutation of the panel's own index list — a
+                                 panel that reordered Children instead would re-enter its layout and,
+                                 under an ItemsControl, fight the generator)
         WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
                                  without layout. SlotAt is what a drag TAKES, not a gap it is inserted
                                  into: the row whose band holds the point, then the slot in that row it

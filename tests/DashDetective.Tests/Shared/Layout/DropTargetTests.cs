@@ -1,5 +1,3 @@
-using Avalonia;
-using Avalonia.Controls;
 using DashDetective.Shared.Layout;
 using System;
 using System.Collections.Generic;
@@ -7,9 +5,8 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Layout;
 
-/// <summary>Covers <see cref="DropTarget"/>: a widget held between two slots settles on one, the target
-/// changes only once the drag is a margin past the boundary, and the preview moving cannot feed back
-/// into the answer, which is what made a held widget flicker.</summary>
+/// <summary>Covers <see cref="DropTarget"/>: a widget held between two slots settles on one, and the
+/// target changes only once the drag is a margin past the boundary, at any scale and across rows.</summary>
 public class DropTargetTests {
     private const double Gutter = 16;
 
@@ -45,22 +42,10 @@ public class DropTargetTests {
         return target;
     }
 
-    // ===== The loop it breaks =====
+    // ===== A held widget =====
 
-    /// <summary>The mechanism behind the flicker, pinned so it is not reintroduced: a narrow widget
-    /// held over a wide one is over the wide one's slot in BOTH orders, so measuring against the live
-    /// layout has no stable answer and every pointer move flipped it.</summary>
-    [Fact]
-    public void SlotAt_LiveLayoutOfANarrowWidgetOverAWideOne_FlipsWithTheOrder() {
-        var narrowFirst = Row(300, 600);
-        var wideFirst = Row(600, 300);
-
-        Assert.Equal(1, WidgetBoardLayout.SlotAt(narrowFirst, new[] { 2 }, 450, 50));
-        Assert.Equal(0, WidgetBoardLayout.SlotAt(wideFirst, new[] { 2 }, 450, 50));
-    }
-
-    /// <summary>The regression itself: held where the live layout oscillated, jittering, while the
-    /// preview is moved after every reading exactly as a drag moves it. It moves once and settles.</summary>
+    /// <summary>Held where the live layout oscillated, jittering, while the preview is moved after
+    /// every reading. Against a snapshot it moves once and settles.</summary>
     [Fact]
     public void Update_HeldBetweenTwoSlotsWhileThePreviewMoves_SettlesOnOne() {
         var target = Started(Row(300, 600), new[] { 2 }, 0);
@@ -190,29 +175,5 @@ public class DropTargetTests {
         slots[1] = new Rect2(5000, 0, 10, 100);
 
         Assert.Equal(1, target.Update(450, 50));
-    }
-
-    // ===== Keyboard reordering =====
-
-    /// <summary>The keyboard path does not go through a drop target at all: one press still moves the
-    /// focused item exactly one slot and persists through the same commit a drag does.</summary>
-    [Fact]
-    public void TryMoveFocused_OneSlotRight_CommitsTheNeighboringOrder() {
-        var board = new WidgetBoard();
-        var items = new List<Border>();
-        foreach (var id in new[] { "a", "b", "c" }) {
-            var item = new Border { MinWidth = 100 };
-            Reorder.SetId(item, id);
-            board.Children.Add(item);
-            items.Add(item);
-        }
-        board.Measure(new Size(1000, double.PositiveInfinity));
-        board.Arrange(new Rect(0, 0, 1000, 100));
-
-        IReadOnlyList<string>? committed = null;
-        board.OrderChanged += ids => committed = ids;
-
-        Assert.True(board.TryMoveFocused(items[0], 1));
-        Assert.Equal(new[] { "b", "a", "c" }, committed);
     }
 }

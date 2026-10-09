@@ -1844,11 +1844,18 @@ redraw delay, by two rules applied together:
 
 - **The target is measured against the slots frozen when the drag began**, which nothing during the
   drag can move. The preview still re-packs live; only the question "which slot is this over" reads
-  the snapshot. A generator rebuilding mid-drag changes the slot count, and that alone re-snapshots.
+  the snapshot. It is retaken only when the slot count changes mid-drag — a child hidden, shown or
+  removed. A generator *adding* a child does not change it: the preview order never takes new ones in.
 - **Hysteresis: the target changes only once the dragged box's center is 0.2 of the smaller slot past
   the boundary** (`DropTarget.Hysteresis`), on each axis. A fraction rather than a DIP margin, so it
-  scales with the interface size; under a half, so every slot stays reachable. Straight down into the
-  next row still works — it just has to be a fifth of a row into it.
+  scales with the interface size. Any fraction under 1 leaves every slot reachable; a fifth swallows a
+  hand's jitter while a swap still lands near the boundary the user sees. Straight down into the next
+  row still works — it just has to be a fifth of a row into it.
+
+**A known trade-off.** With unequal widths, the frozen slots no longer match the preview after the first
+swap, so the drop hint can sit away from the dragged box: a narrow widget swapped past a wide one is drawn
+over the wide one's new place while the hint marks its own. Rule 7's "where it already looks like it will
+land" holds at drag start. Equal-width slots are unaffected, since their geometry does not change.
 
 The keyboard path never asks a drop target anything: `TryMoveFocused` moves by one index, so it is
 unchanged.

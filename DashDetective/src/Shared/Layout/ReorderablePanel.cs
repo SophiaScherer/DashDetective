@@ -45,7 +45,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
     /// <summary>The pointer half of the drag, which a subclass reads as it lays out: the dragged item
     /// is measured at the size it was picked up at and arranged where it is being held.</summary>
-    protected ReorderDrag Drag { get; }
+    protected internal ReorderDrag Drag { get; }
 
     /// <summary>The children on screen, in the order to lay them out in.</summary>
     protected IReadOnlyList<Control> Visible => _visible;

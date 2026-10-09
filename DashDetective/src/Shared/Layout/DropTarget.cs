@@ -3,18 +3,13 @@ using System;
 namespace DashDetective.Shared.Layout;
 
 /// <summary>
-/// Which slot a drag is over, decided against the slots as they were laid out when it began.
-///
-/// Reading the live layout fed the preview back into its own input: moving the dragged item re-packs
-/// the slots under a still pointer, which could flip the answer back, which re-packed them again — a
-/// widget held between a narrow and a wide neighbor flickered between the two. The snapshot cannot
-/// move, and <see cref="Hysteresis"/> keeps a pointer jittering on a boundary from flipping it either.
-/// No Avalonia types, so it tests without a layout pass.
+/// Which slot a drag is over, measured against the slots frozen when it began plus a hysteresis margin.
+/// The live slots include the preview, so measuring against them flipped a held widget back and forth.
 /// </summary>
 public sealed class DropTarget {
     /// <summary>How far past a boundary the drag must go before the target changes, as a fraction of
-    /// the smaller of the two slots on that axis. Relative, so it scales with the interface size, and
-    /// under a half, so every slot can still be reached.</summary>
+    /// the smaller of the two slots on that axis. Relative, so it scales with the interface size; a fifth
+    /// swallows jitter while a swap still lands near the boundary the user sees.</summary>
     public const double Hysteresis = 0.2;
 
     private Rect2[] _slots = Array.Empty<Rect2>();

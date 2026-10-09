@@ -82,8 +82,14 @@ public sealed class ReorderDrag {
         if (e.Source is not Visual source || !_host.TryGetHandle(source, out var handle))
             return;
 
+        Press(handle, e.GetPosition(_host.Surface));
+    }
+
+    /// <summary>Picks the item up at this point, pending the movement threshold. Internal so tests can
+    /// drive a drag without a pointer device.</summary>
+    internal void Press(ReorderHandle handle, Point press) {
         (_item, _lifted, _) = handle;
-        _press = e.GetPosition(_host.Surface);
+        _press = press;
         _size = handle.Item.Bounds.Size;
         _grabX = Fraction(_press.X - handle.Item.Bounds.X, _size.Width);
         _grabY = Fraction(_press.Y - handle.Item.Bounds.Y, _size.Height);
@@ -101,7 +107,16 @@ public sealed class ReorderDrag {
             return;
         }
 
-        _pointer = e.GetPosition(_host.Surface);
+        MoveTo(e.GetPosition(_host.Surface), e.Pointer);
+    }
+
+    /// <summary>Follows the pointer here: starts the drag once past the threshold, then previews the
+    /// slot it covers. <paramref name="device"/> is null only from tests, which have nothing to capture.</summary>
+    internal void MoveTo(Point pointer, IPointer? device) {
+        if (!_pending || _item is null)
+            return;
+
+        _pointer = pointer;
         if (!_dragging) {
             var delta = _pointer - _press;
             if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
@@ -113,7 +128,7 @@ public sealed class ReorderDrag {
             // past the threshold instead cancels that click, which is what a drag should do.
             _dragging = true;
             _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
-            e.Pointer.Capture(_host.Surface);
+            device?.Capture(_host.Surface);
             _host.BeginPreview();
             _lifted?.Classes.Add("dragging");
             _item.ZIndex = 10;
@@ -131,7 +146,8 @@ public sealed class ReorderDrag {
     /// looks like it will land. Measured against the slots as they were when the drag began, so the
     /// preview cannot move the answer under a still pointer.</summary>
     private int TargetSlot() {
-        // A generator that rebuilt mid-drag has changed what the indices mean, so start over from now.
+        // A child hidden, shown or removed mid-drag changes what the indices mean, so start over from
+        // now. A generator adding one does not: the preview order never takes in new children.
         if (_target.SlotCount != _host.Items.Count)
             _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
 
