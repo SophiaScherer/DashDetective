@@ -1,6 +1,7 @@
 using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Tabs.Processes;
 using DashDetective.Tests.Fakes;
 using System;
@@ -437,6 +438,39 @@ public class ProcessesViewModelTests {
         Assert.Equal(0, viewModel.SelectionCount);
         Assert.Null(viewModel.SelectedRow);
         Assert.False(Row(viewModel, 100).IsSelected);
+    }
+
+    [Fact]
+    public async Task ClearSelection_DisablesWhatDependsOnIt() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.ClearSelection();
+
+        // End task opens nothing and the shortcut is left for the shell rather than swallowed.
+        viewModel.RequestEndTaskCommand.Execute(null);
+        var handled = viewModel.HandleShortcut(ShortcutId.EndTask);
+
+        Assert.False(viewModel.HasSelection);
+        Assert.Equal("0 selected", viewModel.SelectionText);
+        Assert.False(viewModel.SelectedHasChildren);
+        Assert.False(viewModel.ConfirmVisible);
+        Assert.False(handled);
+    }
+
+    [Fact]
+    public async Task IsOnlySelection_TrueOnlyForTheSoleSelectedRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+
+        Assert.False(viewModel.IsOnlySelection(Row(viewModel, 100)));
+
+        viewModel.SelectRow(Row(viewModel, 100));
+        Assert.True(viewModel.IsOnlySelection(Row(viewModel, 100)));
+        Assert.False(viewModel.IsOnlySelection(Row(viewModel, 200)));
+
+        viewModel.SelectRow(Row(viewModel, 200), extend: true, range: false);
+        Assert.False(viewModel.IsOnlySelection(Row(viewModel, 100)));
     }
 
     // ----- End task -----

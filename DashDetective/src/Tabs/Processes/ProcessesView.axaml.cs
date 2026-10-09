@@ -168,11 +168,26 @@ public partial class ProcessesView : UserControl {
         // a tap that started in either must not also re-select the row.
         if (OwnsItsOwnGesture(e.Source as Visual))
             return;
-        if (sender is Control { DataContext: ProcessRow row } && DataContext is ProcessesViewModel vm)
-            vm.SelectRow(row,
-                         extend: e.KeyModifiers.HasFlag(KeyModifiers.Control),
-                         range: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        if (sender is not Control { DataContext: ProcessRow row } || DataContext is not ProcessesViewModel vm)
+            return;
+
+        // The press decided this was a deselect; the tap carries it out, so a drag (which cancels the
+        // tap) never clears anything.
+        if (_deselectPid == row.Pid) {
+            _deselectPid = null;
+            vm.ClearSelection();
+            return;
+        }
+
+        vm.SelectRow(row,
+                     extend: e.KeyModifiers.HasFlag(KeyModifiers.Control),
+                     range: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
     }
+
+    // The PID of a row whose press qualified as a deselecting click, until its tap lands. Decided on the
+    // press because by the tap the first click of a double-click has already changed the state. Null, not 0,
+    // means none: 0 is the System Idle Process.
+    private int? _deselectPid;
 
     // The row's checkbox adds or removes just that row. The view model decides and the binding pushes
     // the answer back, so the box's own toggle never becomes the truth.
@@ -219,6 +234,7 @@ public partial class ProcessesView : UserControl {
     private bool _rangeDragging;
 
     private void OnListPressed(object? sender, PointerPressedEventArgs e) {
+        _deselectPid = null;
         if (DataContext is not ProcessesViewModel vm)
             return;
         if (OwnsItsOwnGesture(e.Source as Visual) || RowAt(e.Source as Visual) is not { } row)
@@ -239,6 +255,10 @@ public partial class ProcessesView : UserControl {
         if (!point.Properties.IsLeftButtonPressed)
             return;
 
+        if (ProcessRowClick.ShouldDeselect(vm.IsOnlySelection(row), e.KeyModifiers, e.ClickCount,
+                                           point.Properties.PointerUpdateKind.GetMouseButton()))
+            _deselectPid = row.Pid;
+
         _rangePressPid = row.Pid;
         _rangePressPoint = point.Position;
         _rangePending = true;
@@ -255,6 +275,7 @@ public partial class ProcessesView : UserControl {
 
             // Taking the capture here cancels the row's own tap, which is what a drag should do.
             _rangeDragging = true;
+            _deselectPid = null;
             e.Pointer.Capture(ProcessListScroll);
         }
 

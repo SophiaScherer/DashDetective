@@ -1343,6 +1343,10 @@ behind it that must not be quietly undone:
   thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
   into the selection first, **on the tunneling press**, so it lands before the flyout opens.
   `ContextRequested` was tried for that and silently never fired.
+- **A plain click on the row that is the whole selection deselects it** (`ProcessRowClick`). It is
+  decided on the tunneling press (click count 1, no modifier, left button) and carried out by the row's
+  tap, since by the tap a double-click's first click has already changed the state; a drag cancels the
+  tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes

@@ -1981,6 +1981,10 @@ stays in its tab folder.
                                                          rows. Process.Kill only requests termination, so
                                                          a row used to go on the request alone and come
                                                          back on the next poll)
+                                ProcessRowClick.cs      (pure rule: does a click deselect? Plain single left
+                                                         click on the sole selected row only. Decided on the
+                                                         press and applied on the tap, so a double-click's
+                                                         first click or a drag never clears the selection)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.
