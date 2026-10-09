@@ -132,8 +132,14 @@ public class UniformFlowPanel : ReorderablePanel {
             var child = Visible[i];
 
             // The dragged item keeps the width it was picked up at, so its content cannot re-wrap
-            // under the cursor while the columns behind it reflow.
-            var childWidth = ReferenceEquals(child, Drag.Dragged) ? Drag.DragSize.Width : measureWidth;
+            // under the cursor while the columns behind it reflow. The rest measure at the
+            // pixel-snapped width their column will be arranged at.
+            var childWidth = ReferenceEquals(child, Drag.Dragged)
+                ? Drag.DragSize.Width
+                : unconstrained
+                    ? measureWidth
+                    : SnappedWidth(child, i % _columns * (itemWidth + ColumnSpacing), itemWidth,
+                                   availableSize.Width);
             child.Measure(new Size(childWidth, double.PositiveInfinity));
             rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
             widest = Math.Max(widest, child.DesiredSize.Width);
@@ -177,7 +183,7 @@ public class UniformFlowPanel : ReorderablePanel {
                     break;
 
                 var x = column * (itemWidth + ColumnSpacing);
-                Visible[index].Arrange(Placed(index, new Rect(x, y, itemWidth, rowHeight)));
+                Visible[index].Arrange(Placed(index, new Rect(x, y, itemWidth, rowHeight), finalSize));
             }
             y += rowHeight + RowSpacing;
         }
