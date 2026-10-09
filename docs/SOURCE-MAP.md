@@ -321,7 +321,16 @@ stays in its tab folder.
                                  to live anywhere else. Layout vocabulary stays with the panels. An EMPTY
                                  Order is a reset, not "nothing saved": it routes to ChildOrder.Reset, and
                                  it deliberately does not write Order back, so the two-way binding cannot
-                                 echo the reset into the page that asked for it)
+                                 echo the reset into the page that asked for it.
+                                 PIXEL SNAP: Placed snaps every slot to whole pixels before arranging, and
+                                 SnappedWidth gives both panels the same width to MEASURE at. Without it a
+                                 fractional slot ended a pixel past the panel and a clipping ancestor cut
+                                 the card's right border off — work item 89)
+        PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half AWAY
+                                 from zero so a moved span keeps its length; a span snapped under its
+                                 child's MinWidth grows to it away from the panel's edge; the length is
+                                 kept 1e-4 px short so the framework's round-up cannot add a pixel by a
+                                 floating-point error. The tests mirror Avalonia's arrange rounding)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
                                  handle is, and the previewed order. Reorder is always a permutation of
                                  the panel's own index list — a panel that reordered Children instead

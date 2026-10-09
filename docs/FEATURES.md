@@ -1804,7 +1804,7 @@ single to read and no Linux arm — it takes `Unsupported*` and the default.
 
 **A widget is a `WidgetPanel`, and a page's widgets are children of one `WidgetBoard`.** Nineteen
 widgets across seven tabs were hand-rolled `Border Classes="panel"` + `StackPanel` + `panelTitle`; that
-shape now exists once. Five rules, all load-bearing:
+shape now exists once. Six rules, all load-bearing:
 
 1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
    `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
@@ -1834,6 +1834,21 @@ shape now exists once. Five rules, all load-bearing:
    the pointer capture on *any* release, which stripped the capture a button took on its own press —
    every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
    screenshots all clean. Only a drag that actually took the capture may release it.
+6. **A reorderable panel arranges every child on whole device pixels** (work item 89). Avalonia's
+   arrange rounds a child's origin to the nearest pixel and its size *up*, separately, so a slot with
+   fractional edges could end one pixel past its panel — and the nearest clipping ancestor (a
+   `UserControl`, an `ItemsControl`, `WidgetPanel` itself, all of which clip to their bounds by
+   default) cut off the card's right border and the bottom of its top-right corner. It showed at 125 %
+   display scale and High contrast, on roughly two window widths in three. `ReorderablePanel.Placed`
+   now snaps both edges of every slot through `PixelSnap` with the framework's own layout scale, so its
+   rounding is a no-op, and both panels measure at the snapped width they will arrange at. Three
+   decisions: the edges round **half away from zero**, not to even, so a span moved by whole pixels
+   keeps its length; a span that would snap under its child's `MinWidth` grows to it **away from the
+   panel's edge**, since the arrange would otherwise center the overflow across both sides; and the
+   length is kept a hair (1e-4 px) short, so the framework's round-up cannot add a pixel through a
+   floating-point error, which at 110 % it does for about one width in a hundred. The snap is in local
+   units, so inside a `ScaleHost` edges land on the layout grid rather than on device pixels; it still
+   keeps every child inside its panel, which is what the clip needs.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
