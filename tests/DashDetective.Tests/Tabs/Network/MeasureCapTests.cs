@@ -24,4 +24,8 @@ public class MeasureCapTests {
         Assert.Equal(300, MeasureCap.CappedHeight(300, double.NaN));
         Assert.True(double.IsPositiveInfinity(MeasureCap.CappedHeight(double.PositiveInfinity, double.NaN)));
     }
+
+    [Fact]
+    public void CappedHeight_NegativeCap_OffersNothing() =>
+        Assert.Equal(0, MeasureCap.CappedHeight(300, -5));
 }

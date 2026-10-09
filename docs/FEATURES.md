@@ -1177,8 +1177,9 @@ and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File
 Settings. Panels:
 - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
   (green connected / blue virtual / grey disconnected), status and link speed, via
-  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
-  asks for a capped height (`MeasureCap`) and scrolls, so many adapters don't push the page down, then fills the card the row gives it. A `MaxHeight` on the scroller would center it in the card with a gap above and below.
+  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list
+  asks for a capped height (`MeasureCap`) and scrolls, so many adapters don't push the page down,
+  then fills the card the row gives it. A `MaxHeight` on the scroller would center it in the card with a gap above and below.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic

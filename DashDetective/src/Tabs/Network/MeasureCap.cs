@@ -23,15 +23,17 @@ internal sealed class MeasureCap : Decorator {
     }
 
     /// <summary>The height offered to the child: the available height, held to the cap. An unset
-    /// (NaN) cap leaves it alone.</summary>
+    /// (NaN) cap leaves it alone; a negative one offers nothing.</summary>
     internal static double CappedHeight(double available, double cap) =>
-        double.IsNaN(cap) ? available : Math.Min(available, cap);
+        double.IsNaN(cap) ? available : Math.Min(available, Math.Max(0, cap));
 
     protected override Size MeasureOverride(Size availableSize) {
         if (Child is null)
             return default;
 
-        Child.Measure(new Size(availableSize.Width, CappedHeight(availableSize.Height, HeightCap)));
-        return Child.DesiredSize;
+        // Measured through Padding, as the inherited arrange deflates by it.
+        var inner = availableSize.Deflate(Padding);
+        Child.Measure(new Size(inner.Width, CappedHeight(inner.Height, HeightCap)));
+        return Child.DesiredSize.Inflate(Padding);
     }
 }
