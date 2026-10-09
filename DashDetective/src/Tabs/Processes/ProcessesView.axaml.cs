@@ -174,7 +174,7 @@ public partial class ProcessesView : UserControl {
         // The press decided this was a deselect; the tap carries it out, so a drag (which cancels the
         // tap) never clears anything.
         if (_deselectPid == row.Pid) {
-            _deselectPid = 0;
+            _deselectPid = null;
             vm.ClearSelection();
             return;
         }
@@ -185,8 +185,9 @@ public partial class ProcessesView : UserControl {
     }
 
     // The PID of a row whose press qualified as a deselecting click, until its tap lands. Decided on the
-    // press because by the tap the first click of a double-click has already changed the state.
-    private int _deselectPid;
+    // press because by the tap the first click of a double-click has already changed the state. Null, not 0,
+    // means none: 0 is the System Idle Process.
+    private int? _deselectPid;
 
     // The row's checkbox adds or removes just that row. The view model decides and the binding pushes
     // the answer back, so the box's own toggle never becomes the truth.
@@ -233,7 +234,7 @@ public partial class ProcessesView : UserControl {
     private bool _rangeDragging;
 
     private void OnListPressed(object? sender, PointerPressedEventArgs e) {
-        _deselectPid = 0;
+        _deselectPid = null;
         if (DataContext is not ProcessesViewModel vm)
             return;
         if (OwnsItsOwnGesture(e.Source as Visual) || RowAt(e.Source as Visual) is not { } row)
@@ -274,7 +275,7 @@ public partial class ProcessesView : UserControl {
 
             // Taking the capture here cancels the row's own tap, which is what a drag should do.
             _rangeDragging = true;
-            _deselectPid = 0;
+            _deselectPid = null;
             e.Pointer.Capture(ProcessListScroll);
         }
 
