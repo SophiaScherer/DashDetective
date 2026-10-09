@@ -313,6 +313,13 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
   itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
   showing, since they open directly beneath a pointer the expand button has already left there.
+- **The dropdown's open state has one source of truth.** `Popup.IsOpen` is bound **TwoWay** because
+  Avalonia 12 binds it OneWay by default and the popup can close itself, which a OneWay binding never
+  reports: the view model stayed "open" and every later open was a no-op until a restart (work item 66).
+  Picking a recent triggered it — focus sat in the popup, was restored to the box during the close, and
+  the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
+  that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
+  from a focus handler without that guard.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.

@@ -1235,6 +1235,15 @@ stays in its tab folder.
                                  Global. Split out, like RefreshHint, because MainWindowViewModel
                                  builds every page and its samplers and cannot be constructed in a
                                  test; it takes the two modal view models, which can)
+      Search/UniversalSearchView.axaml(.cs), UniversalSearchViewModel.cs
+                                (the toolbar search box and its dropdown. The Popup's IsOpen is TWO-WAY:
+                                 Avalonia 12 binds it OneWay by default and the popup closes itself with
+                                 SetCurrentValue, which the view model never hears, so IsOpen stayed true
+                                 and every later open was a no-op (work item 66). The view model also
+                                 ignores NotifyFocused while it is writing IsOpen false, because the popup
+                                 restores focus to the box inside that write and the box's GotFocus would
+                                 re-open the dropdown mid-close. Every false write goes through
+                                 CloseDropdown, which holds that guard)
 ```
 
 ## `src/Shell/TrayNotice`
