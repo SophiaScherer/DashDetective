@@ -10,17 +10,26 @@ namespace DashDetective.Tests.Shared.Layout;
 public class PixelSnapTests {
     private const double Tolerance = 1e-6;
 
-    /// <summary>What Avalonia's arrange does to a child's box when layout rounding is on: the origin to
-    /// the nearest pixel (to even at a midpoint), the size up to a whole pixel after an 8-digit
-    /// truncation. Mirrored here so the rounding the fix has to survive is pinned beside it.</summary>
-    private static (double Start, double End) FrameworkRounds(double start, double length, double scale) {
-        var origin = Math.Round(start * scale) / scale;
-        var size = Math.Ceiling(Math.Round(length, 8, MidpointRounding.ToZero) * scale) / scale;
+    /// <summary>What Avalonia's arrange does to a stretched child's box when layout rounding is on:
+    /// clamp to the minimum, round both the slot and the clamped size up to whole pixels, center the
+    /// difference, then round the origin to the nearest pixel (to even at a midpoint). Mirrored here so
+    /// the rounding the fix has to survive is pinned beside it.</summary>
+    private static (double Start, double End) FrameworkRounds(double start, double length, double scale,
+                                                               double minimum = 0) {
+        var slot = RoundUp(length, scale);
+        var size = RoundUp(Math.Max(length, minimum), scale);
+        var origin = Math.Round((start + (slot - size) / 2) * scale) / scale;
         return (origin, origin + size);
     }
 
+    // The framework skips the 8-digit truncation at a scale of exactly 1.
+    private static double RoundUp(double length, double scale) =>
+        scale == 1
+            ? Math.Ceiling(length)
+            : Math.Ceiling(Math.Round(length, 8, MidpointRounding.ToZero) * scale) / scale;
+
     [Fact]
-    public void FrameworkRounding_FractionalSlot_EndsPastThePanel() {
+    public void ArrangeRounding_UnsnappedFractionalSlot_EndsPastThePanel() {
         // The Dashboard at 125%: a 1080.8 board split into two slots with a 16 gutter.
         var (_, end) = FrameworkRounds(548.4, 532.4, 1.25);
 
@@ -74,9 +83,9 @@ public class PixelSnapTests {
 
     [Fact]
     public void Span_MovedByWholePixels_KeepsItsLength() {
-        // Rounding half to even would send 1.5 and 2.5 to the same pixel and change the length.
-        var (_, first) = PixelSnap.Span(1.5, 10, 0, double.PositiveInfinity, 1);
-        var (_, moved) = PixelSnap.Span(2.5, 10, 0, double.PositiveInfinity, 1);
+        // Rounding half to even would snap these to 8 and 10 pixels; half up keeps both at 9.
+        var (_, first) = PixelSnap.Span(1.5, 9, 0, double.PositiveInfinity, 1);
+        var (_, moved) = PixelSnap.Span(2.5, 9, 0, double.PositiveInfinity, 1);
 
         Assert.Equal(first, moved, 6);
     }
@@ -96,10 +105,25 @@ public class PixelSnapTests {
         // The same slot ending on the panel's edge takes its missing pixel from the gutter instead.
         const double panel = 680;
         var (start, length) = PixelSnap.Span(panel - 150, 150, 150, panel, 1.25);
-        var (_, end) = FrameworkRounds(start, length, 1.25);
+        var (_, end) = FrameworkRounds(start, length, 1.25, minimum: 150);
 
         Assert.True(end <= panel + Tolerance);
         Assert.Equal(188, length * 1.25, 3);
+    }
+
+    [Theory]
+    [InlineData(112.0 / 96, 420)]
+    [InlineData(1.1, 420)]
+    [InlineData(1.1, 440)]
+    [InlineData(224.0 / 96, 420)]
+    public void Span_MinimumAtAnInexactScale_StaysInsideThePanelAfterTheClamp(double scale, double minimum) {
+        // 420 at 112 DPI is a hair over 490px, so the clamp makes it 491; a snap counting 490 ends a
+        // pixel past the panel once the clamp centers the extra pixel.
+        var panel = 1000 / scale;
+        var (start, length) = PixelSnap.Span(panel - minimum, minimum, minimum, panel, scale);
+        var (_, end) = FrameworkRounds(start, length, scale, minimum);
+
+        Assert.True(end <= panel + Tolerance);
     }
 
     [Theory]

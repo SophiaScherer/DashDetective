@@ -1842,13 +1842,15 @@ shape now exists once. Six rules, all load-bearing:
    display scale and High contrast, on roughly two window widths in three. `ReorderablePanel.Placed`
    now snaps both edges of every slot through `PixelSnap` with the framework's own layout scale, so its
    rounding is a no-op, and both panels measure at the snapped width they will arrange at. Three
-   decisions: the edges round **half away from zero**, not to even, so a span moved by whole pixels
-   keeps its length; a span that would snap under its child's `MinWidth` grows to it **away from the
-   panel's edge**, since the arrange would otherwise center the overflow across both sides; and the
-   length is kept a hair (1e-4 px) short, so the framework's round-up cannot add a pixel through a
-   floating-point error, which at 110 % it does for about one width in a hundred. The snap is in local
-   units, so inside a `ScaleHost` edges land on the layout grid rather than on device pixels; it still
-   keeps every child inside its panel, which is what the clip needs.
+   decisions: the edges round **half up**, not to even, so a span moved by whole pixels keeps its
+   length; a span that would snap under its child's `MinWidth` grows to it **away from the panel's
+   edge**, since the arrange would otherwise center the overflow across both sides, and that minimum is
+   counted in pixels **the framework's way** (truncated to 8 digits, then rounded up), or at a scale
+   such as 110 % its clamp adds back the pixel the snap left out; and the length is kept a hair
+   (1e-4 px) short, so the framework's round-up cannot add a pixel through a floating-point error,
+   which at 110 % it does for about one width in a hundred. The snap is in local units, so inside a
+   `ScaleHost` edges land on the layout grid rather than on device pixels; it still keeps every child
+   inside its panel, which is what the clip needs.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and

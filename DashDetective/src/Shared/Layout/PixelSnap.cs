@@ -14,8 +14,6 @@ public static class PixelSnap {
     // a floating-point error; far below anything that renders.
     private const double Shave = 1e-4;
 
-    private const double Epsilon = 1e-6;
-
     /// <summary>
     /// The span along one axis whose two edges land on whole device pixels at
     /// <paramref name="scale"/>: each edge goes to its nearest pixel, so neighbors keep the gap
@@ -36,7 +34,7 @@ public static class PixelSnap {
 
         var near = Round(start * scale);
         var far = Math.Max(near, Round((start + length) * scale));
-        var least = minimum > 0 && double.IsFinite(minimum) ? Math.Ceiling(minimum * scale - Epsilon) : 0;
+        var least = minimum > 0 && double.IsFinite(minimum) ? MinimumPixels(minimum, scale) : 0;
 
         if (far - near < least) {
             var edge = double.IsFinite(limit) ? Round(limit * scale) : double.PositiveInfinity;
@@ -51,7 +49,14 @@ public static class PixelSnap {
         return (near / scale, Math.Max(0, far - near - Shave) / scale);
     }
 
-    // Half away from zero rather than to even, so moving a span by whole pixels never changes its
-    // length: banker's rounding sends 1.5 and 2.5 both to 2.
+    // Half up rather than to even, so moving a span by whole pixels never changes its length:
+    // banker's rounding sends 1.5 and 2.5 both to 2.
     private static double Round(double pixels) => Math.Floor(pixels + 0.5);
+
+    // The pixels the framework clamps a child to, counted its way: anything less and the clamp would
+    // still add one, and the span would end past the panel.
+    private static double MinimumPixels(double minimum, double scale) =>
+        scale == 1
+            ? Math.Ceiling(minimum)
+            : Math.Ceiling(Math.Round(minimum, 8, MidpointRounding.ToZero) * scale);
 }

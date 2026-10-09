@@ -184,12 +184,8 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     protected double SnappedWidth(Control child, double x, double width, double panelWidth) =>
         PixelSnap.Span(x, width, Math.Max(child.MinWidth, Inner(child).MinWidth), panelWidth, SnapScale).Length;
 
-    /// <summary>Records where a slot was arranged — which is what a drop is measured against — and
-    /// gives back the box to arrange that child at. Normally its own slot; for the one being dragged,
-    /// wherever it is being held, with the slot it would land in outlined behind it.
-    ///
-    /// Every slot is snapped to whole pixels first: the framework rounds a child's origin and size
-    /// separately, which can push a fractional slot a pixel past the panel and clip its border.</summary>
+    /// <summary>Snaps a slot to whole pixels, records it for drops, and gives back the box to arrange
+    /// that child at: its slot, or for a dragged child wherever it is being held.</summary>
     protected Rect Placed(int index, Rect slot, Size panel) {
         var child = _visible[index];
         var inner = Inner(child);

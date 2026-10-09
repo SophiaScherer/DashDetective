@@ -326,9 +326,10 @@ stays in its tab folder.
                                  SnappedWidth gives both panels the same width to MEASURE at. Without it a
                                  fractional slot ended a pixel past the panel and a clipping ancestor cut
                                  the card's right border off — work item 89)
-        PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half AWAY
-                                 from zero so a moved span keeps its length; a span snapped under its
-                                 child's MinWidth grows to it away from the panel's edge; the length is
+        PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half UP
+                                 so a moved span keeps its length; a span snapped under its child's
+                                 MinWidth grows to it away from the panel's edge, with the minimum
+                                 counted in pixels exactly as the framework's clamp counts it; the length is
                                  kept 1e-4 px short so the framework's round-up cannot add a pixel by a
                                  floating-point error. The tests mirror Avalonia's arrange rounding)
         IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
