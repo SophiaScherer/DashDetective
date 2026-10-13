@@ -535,7 +535,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private async Task LoadDnsAsync() {
         _dnsResolved = true;
         var generation = ++_dnsGeneration;
-        var host = DnsHost;
+        var host = DnsHost.Trim();
         try {
             var result = await _providers.Dns.GetAsync(host);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.

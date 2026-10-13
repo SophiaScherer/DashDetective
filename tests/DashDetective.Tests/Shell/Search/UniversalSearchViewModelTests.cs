@@ -395,6 +395,93 @@ public class UniversalSearchViewModelTests {
         Assert.Equal(["clicked"], echo.Activated);
     }
 
+    private static (UniversalSearchViewModel Vm, EchoProvider Echo, FakeUiTimer Timer, RecentSearches Recents)
+        BuildStale() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Toolkit", "", 500, () => { }));
+        var echo = new EchoProvider();
+        var timer = new FakeUiTimer();
+        var vm = new UniversalSearchViewModel([echo], recents, timer);
+        vm.Focus();
+        return (vm, echo, timer, recents);
+    }
+
+    /// <summary>Esc during the debounce left the timer counting and the old list behind, so Enter opened
+    /// the stale selected row of a dropdown that was no longer showing.</summary>
+    [Fact]
+    public async Task Close_DuringTheDebounce_StopsItAndEnterOpensNothing() {
+        var (vm, echo, timer, recents) = BuildStale();
+        vm.Text = "storage";
+
+        vm.Close();
+        Assert.False(timer.IsRunning);
+        vm.ActivateSelected();
+        await Task.Yield();
+
+        Assert.Empty(echo.Activated);
+        // Opening the stale recent would have re-run its search and forgotten it as unmatched.
+        Assert.Single(recents.Entries);
+    }
+
+    [Fact]
+    public async Task Focus_AfterEscDuringTheDebounce_RerunsTheTypedTerm() {
+        var (vm, echo, timer, _) = BuildStale();
+        vm.Text = "storage";
+        vm.Close();
+
+        vm.Focus();
+        Assert.True(vm.IsSearching);
+        timer.RaiseTick();
+        await vm.InFlightQuery;
+
+        Assert.Equal("storage", Assert.Single(vm.Results).Title);
+        vm.ActivateSelected();
+        Assert.Equal(["storage"], echo.Activated);
+    }
+
+    [Fact]
+    public async Task Clear_AfterAnEarlyEnter_DropsThePendingActivation() {
+        var activated = 0;
+        var provider = new GatedProvider(() => activated++);
+        var vm = new UniversalSearchViewModel([provider], new RecentSearches(), new FakeUiTimer());
+        vm.Text = "n";
+        vm.ActivateSelected();
+        var flushed = vm.InFlightQuery;
+
+        vm.ClearCommand.Execute(null);
+        provider.Release();
+        await flushed;
+
+        Assert.Equal(0, activated);
+    }
+
+    [Fact]
+    public async Task Cancel_AfterAnEarlyEnter_DropsThePendingActivation() {
+        var activated = 0;
+        var provider = new GatedProvider(() => activated++);
+        var vm = new UniversalSearchViewModel([provider], new RecentSearches(), new FakeUiTimer());
+        vm.Text = "n";
+        vm.ActivateSelected();
+        var flushed = vm.InFlightQuery;
+
+        vm.Cancel();
+        provider.Release();
+        await flushed;
+
+        Assert.Equal(0, activated);
+    }
+
+    [Fact]
+    public async Task ActivateSelected_FlushedTopResult_IsRemembered() {
+        var (vm, _, _, recents) = BuildStale();
+        vm.Text = "storage";
+
+        vm.ActivateSelected();
+        await vm.InFlightQuery;
+
+        Assert.Equal("storage", recents.Entries[0].Title);
+    }
+
     [Fact]
     public void ActivateSelected_DoesNothingWithNoSelection() {
         var activated = 0;

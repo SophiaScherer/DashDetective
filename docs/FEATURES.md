@@ -318,6 +318,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   recent). Enter with a pending term runs the query for the typed text at once and opens that run's top
   result when it lands; a further keystroke, `Close`, `Clear` or a dismissal drops the pending open, and
   a run with no results opens nothing. Enter on a settled list, and a click on a row, are unchanged.
+  Esc stops the debounce too, and Enter on a closed dropdown opens nothing; reopening the box (Ctrl+F
+  or a click) reruns a term Esc cut short rather than showing the older rows.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.

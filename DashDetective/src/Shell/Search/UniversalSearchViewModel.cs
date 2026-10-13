@@ -39,6 +39,9 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // they do. Every route that cancels the run (typing, Close, Clear, Dismiss) clears it with the run.
     private bool _activateOnResults;
 
+    // Esc cut a pending query short, so the rows still held answer an older term; reopening reruns it.
+    private bool _needsQuery;
+
     /// <summary>The current results, best first. Grouping is a view concern; the order here is the
     /// order the keyboard walks them in.</summary>
     public ObservableCollection<SearchResult> Results { get; } = new();
@@ -106,6 +109,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // there is nothing to search for, so there is nothing to wait for either.
     partial void OnTextChanged(string value) {
         _debounce.Stop();
+        _needsQuery = false;
 
         if (value.Trim().Length == 0) {
             CancelRunning();
@@ -213,9 +217,14 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
 
     // An empty box offers the recents; one that still holds a term brings its results back.
     private void OpenDropdown() {
-        if (Text.Trim().Length > 0)
+        if (Text.Trim().Length > 0) {
             IsOpen = true;
-        else
+            if (_needsQuery) {
+                _needsQuery = false;
+                IsSearching = true;
+                _debounce.Start();
+            }
+        } else
             ShowRecents();
     }
 
@@ -279,6 +288,10 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// (the shortcut layer deliberately leaves Enter to whatever text box has focus).</summary>
     [RelayCommand]
     public void ActivateSelected() {
+        // A dropdown that is closed (Esc) shows nothing to open, and its rows may answer an older term.
+        if (!IsOpen)
+            return;
+
         // The list on screen still answers an older term while the typed one is pending, so its
         // highlighted row is the wrong thing to open. Run the typed term now and open its top result.
         if (IsSearching && Text.Trim().Length > 0) {
@@ -320,7 +333,10 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// <summary>Hides the dropdown but leaves the term in place, so Ctrl+F brings the same results
     /// straight back.</summary>
     public void Close() {
+        // A debounce still counting would otherwise fire into the closed box.
+        _debounce.Stop();
         CancelRunning();
+        _needsQuery |= IsSearching;
         IsSearching = false;
         IsOpen = false;
     }

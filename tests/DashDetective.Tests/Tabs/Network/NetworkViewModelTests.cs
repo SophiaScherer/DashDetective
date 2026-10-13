@@ -218,6 +218,33 @@ public class NetworkViewModelTests {
         Assert.Equal("Resolved github.com", vm.DnsFooter);
     }
 
+    [Fact]
+    public void LookupDns_HostWithPaddingFailing_NamesTheTrimmedHost() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "  first.invalid  ";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Fail("first.invalid");
+
+        Assert.Equal("Could not resolve first.invalid", vm.DnsFooter);
+    }
+
+    /// <summary>A toolbar Refresh starts a newer lookup, so a user lookup still out must not land over it.</summary>
+    [Fact]
+    public void Refresh_SupersedingAnInFlightLookup_DropsTheOlderAnswer() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "older.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "newer.test";
+        vm.Refresh();
+
+        dns.Complete("older.test");
+        Assert.Equal("Resolving older.test…", vm.DnsFooter);
+
+        dns.Complete("newer.test");
+        Assert.Equal("Resolved newer.test", vm.DnsFooter);
+    }
+
     // ---- Soft-fail ----
 
     /// <summary>A failed connections read empties the table and says so, rather than leaving the last
