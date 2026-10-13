@@ -126,6 +126,98 @@ public class NetworkViewModelTests {
         Assert.Equal("Start", vm.PingButtonText);
     }
 
+    // ---- DNS: the latest submit wins ----
+
+    private static (NetworkViewModel Vm, FakeDnsLookupProvider Dns) CreateWithPendingDns() {
+        var dns = new FakeDnsLookupProvider();
+        return (new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener())), dns);
+    }
+
+    /// <summary>The bug: a single-label name takes seconds to fail, so replacing it with a real host and
+    /// pressing Enter again let the older answer land last and overwrite the newer one.</summary>
+    [Fact]
+    public void LookupDns_OlderLookupFinishingLast_DoesNotOverwriteTheNewerOne() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("github.com");
+        dns.Complete("slow.invalid");
+
+        Assert.Contains("github.com", vm.DnsConsole);
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_LookupsFinishingInOrder_ShowTheLatest() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("slow.invalid");
+        // The superseded answer is dropped; the pending line for the newer one stays until it lands.
+        Assert.Equal("Resolving github.com…", vm.DnsFooter);
+
+        dns.Complete("github.com");
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_OlderLookupFailingLast_DoesNotOverwriteTheNewerOne() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("github.com");
+        dns.Fail("slow.invalid");
+
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_LatestLookupFailing_NamesTheHostItWasStartedWith() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "first.invalid";
+        vm.LookupDnsCommand.Execute(null);
+
+        // Editing the field mid-flight must not change which name the failure blames.
+        vm.DnsHost = "typing-something-else";
+        dns.Fail("first.invalid");
+
+        Assert.Equal("Could not resolve first.invalid", vm.DnsFooter);
+        Assert.Contains("first.invalid", vm.DnsConsole);
+    }
+
+    [Fact]
+    public void LookupDns_ShowsAPendingFooterAtOnce() {
+        var (vm, _) = CreateWithPendingDns();
+        vm.DnsHost = "github.com";
+
+        vm.LookupDnsCommand.Execute(null);
+
+        Assert.Equal("Resolving github.com…", vm.DnsFooter);
+        Assert.Contains("github.com", vm.DnsConsole);
+    }
+
+    [Fact]
+    public void Refresh_ReResolvingAfterALookup_DoesNotShowThePendingFooter() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+        dns.Complete("github.com");
+
+        vm.Refresh();
+
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
     // ---- Soft-fail ----
 
     /// <summary>A failed connections read empties the table and says so, rather than leaving the last
