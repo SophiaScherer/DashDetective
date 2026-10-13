@@ -188,7 +188,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // ---- Disks (live, one row per physical disk) ----
     // Rows are built from the DeviceInventory; each disk's active-time / read / write / response come from the
     // page-local per-disk sampler (the shared storage feed is _Total-only) on its own timer, keyed by disk
-    // number. This is the multi-instance category the Primary/All toggle expands or collapses.
+    // number. Every disk gets a row.
     private readonly List<DiskResource> _disks = new();
     private readonly Dictionary<int, DiskResource> _disksByNumber = new();
     private readonly IPhysicalDiskThroughputSampler _throughputSampler;
@@ -197,8 +197,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     // ---- GPUs (live, one row per physical adapter) ----
     // Rows are built from the DeviceInventory; each GPU's overall busiest-engine % + per-engine Detailed charts
     // come from the page-local per-adapter sampler (the shared GPU feed reports only one combined figure) on the
-    // throughput timer, keyed by adapter LUID. Like disks, this is a multi-instance category the Primary/All
-    // toggle expands or collapses; the Detailed flag is shared across every GPU row.
+    // throughput timer, keyed by adapter LUID. Like disks, every adapter gets a row; the Detailed flag is
+    // shared across every GPU row.
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler;
