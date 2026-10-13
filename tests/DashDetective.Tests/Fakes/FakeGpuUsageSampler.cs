@@ -21,9 +21,10 @@ internal sealed class FakeGpuUsageSampler : IGpuUsageSampler {
     /// consulted from one that was consulted and had nothing to say.</summary>
     public int SampleCount { get; private set; }
 
-    /// <summary>Stages an adapter reporting a utilisation figure.</summary>
-    public FakeGpuUsageSampler Reporting(string adapterKey, double overall) {
-        _samples[adapterKey] = new GpuAdapterSample(overall, new Dictionary<string, double>());
+    /// <summary>Stages an adapter reporting a utilisation figure, and optionally its per-engine readings.</summary>
+    public FakeGpuUsageSampler Reporting(
+        string adapterKey, double overall, IReadOnlyDictionary<string, double>? engines = null) {
+        _samples[adapterKey] = new GpuAdapterSample(overall, engines ?? new Dictionary<string, double>());
         return this;
     }
 

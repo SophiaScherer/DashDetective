@@ -59,10 +59,10 @@ public sealed partial class DriveCard : ObservableObject, IWidgetIdentity {
     /// <summary>Free capacity, formatted (e.g. "640 GB").</summary>
     [ObservableProperty] private string _free = "";
 
-    /// <summary>Current read throughput (e.g. "48 MB/s").</summary>
+    /// <summary>Current read throughput (e.g. "48 MB/s", "12 KB/s").</summary>
     [ObservableProperty] private string _read = "";
 
-    /// <summary>Current write throughput (e.g. "12 MB/s").</summary>
+    /// <summary>Current write throughput (e.g. "12 MB/s", "512 KB/s").</summary>
     [ObservableProperty] private string _write = "";
 
     /// <summary>Current drive temperature (e.g. "41°C").</summary>
