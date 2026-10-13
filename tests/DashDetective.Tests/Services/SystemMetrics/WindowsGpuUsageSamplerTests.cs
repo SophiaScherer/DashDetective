@@ -11,6 +11,12 @@ public class WindowsGpuUsageSamplerTests {
     private const string Nvidia = "luid_0x00000000_0x0000e54b";
     private const string Amd = "luid_0x00000000_0x0000f83d";
 
+    /// <summary>Task Manager's source for GPU utilization.</summary>
+    [Fact]
+    public void CounterPath_IsTaskManagersGpuEngineCounter() {
+        Assert.Equal(@"\GPU Engine(*)\Utilization Percentage", WindowsGpuUsageSampler.CounterPath);
+    }
+
     [Fact]
     public void AggregateAdapters_GroupsByLuid_SumsWithinAnEngine_AndTakesBusiestEngineAsOverall() {
         var items = new (string?, double)[] {

@@ -28,6 +28,8 @@ public class GpuEngineInstanceTests {
     [InlineData("pid_4_luid_0x00000000_0x0000e7be_phys_0_eng_7_engtype_Compute 1", 7, "Compute 1")]
     [InlineData("pid_4_luid_0x00000000_0x0000e7be_phys_0_eng_14_engtype_OFA_0", 14, "OFA_0")]
     [InlineData("pid_4_luid_0x00000000_0x0000e7be_phys_0_eng_0_engtype_3D", 0, "3D")]
+    [InlineData("pid_65535_luid_0x0_0x1_phys_0_eng_2_engtype_VideoDecode", 2, "VideoDecode")]
+    [InlineData("pid_900_luid_0x0_0x1_phys_1_eng_3_engtype_VideoProcessing", 3, "VideoProcessing")]
     public void TryParse_MultiWordAndNumberedTypes_AreCarriedWhole(string name, int engine, string type) {
         Assert.True(GpuEngineInstance.TryParse(name, out var instance));
 
@@ -93,6 +95,7 @@ public class GpuEngineInstanceTests {
     [InlineData("pid_1_luid_0x100000000_0x0000e7be_phys_0_eng_0_engtype_3D")]      // luid half too wide
     [InlineData("pid_notanumber_luid_0x00000000_0x0000e7be_phys_0_eng_0_engtype_3D")]
     [InlineData("pid__luid_0x00000000_0x0000e7be_phys_0_eng_0_engtype_3D")]        // empty pid
+    [InlineData("pid_")]                                                            // truncated
     [InlineData("pid_-1_luid_0x00000000_0x0000e7be_phys_0_eng_0_engtype_3D")]      // signed pid
     [InlineData("xyz_1_luid_0x00000000_0x0000e7be_phys_0_eng_0_engtype_3D")]       // unknown prefix
     public void TryParse_MalformedName_IsRejected(string? name) {

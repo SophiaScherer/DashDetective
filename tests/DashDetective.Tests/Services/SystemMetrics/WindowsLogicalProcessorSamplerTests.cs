@@ -6,6 +6,12 @@ namespace DashDetective.Tests.Services.SystemMetrics;
 /// <summary>Covers <see cref="WindowsLogicalProcessorSampler.TryParseInstance"/>: parsing "group,core" PDH instance
 /// names into their numeric parts and rejecting the "_Total" roll-ups and malformed names.</summary>
 public class LogicalProcessorSamplerTests {
+    /// <summary>Task Manager's source for per-core utilization.</summary>
+    [Fact]
+    public void CounterPath_IsTaskManagersPerCoreUtilityCounter() {
+        Assert.Equal(@"\Processor Information(*)\% Processor Utility", WindowsLogicalProcessorSampler.CounterPath);
+    }
+
     [Theory]
     [InlineData("0,0", 0, 0)]
     [InlineData("0,3", 0, 3)]

@@ -23,7 +23,7 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
     private const uint PdhCstatusValidData = 0x00000000;
     private const uint PdhCstatusNewData = 0x00000001;
 
-    private const string CounterPath = @"\Processor Information(*)\% Processor Utility";
+    internal const string CounterPath = @"\Processor Information(*)\% Processor Utility";
 
     /// <summary>
     /// One item of a formatted counter array — a <c>PDH_FMT_COUNTERVALUE_ITEM</c>: the instance name pointer

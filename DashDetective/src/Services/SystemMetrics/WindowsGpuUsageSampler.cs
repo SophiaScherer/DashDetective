@@ -63,7 +63,7 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
     [DllImport("pdh.dll")]
     private static extern uint PdhCloseQuery(IntPtr query);
 
-    private const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
+    internal const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
