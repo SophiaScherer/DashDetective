@@ -1247,8 +1247,7 @@ process under its parent only when the parent is in the snapshot **and shares th
 so Edge's ~27 `msedge.exe` helpers fold into one Edge row while unrelated apps aren't swallowed under
 `explorer.exe`. Data is **in-box, no new dependencies, no admin**: `System.Diagnostics.Process`
 (CPU % via `TotalProcessorTime` diff, memory, threads, status, exe path), a feature-local
-`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` grouped by the `pid_` token for
-GPU %, and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
+`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` for GPU % (see the note below), and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
 enumeration can't report: **parent PIDs** (a Toolhelp32 snapshot) and the **category** — the classic
 "alt-tab window" test via `EnumWindows` marks an **App** (UWP frames re-attributed from
 `ApplicationFrameHost.exe` to the hosted process), Session 0 isolation via `ProcessIdToSessionId`
@@ -1274,6 +1273,10 @@ address space too, but it is the corpse of a user process and its cgroup still p
 `ProcessCategory.Windows` means "Windows process" on one platform and "system process" on the other; the
 enum member keeps its name because only the display strings differ. **Permanent gap:** per-process GPU has
 no rootless Linux source, so that column is always 0 — not a TODO.
+**The GPU column follows Task Manager's per-engine rule**, the same `GpuEngineLoad` the adapter totals use
+(see *Multi-GPU*): a process's figure is its busiest physical engine across every adapter, its instances on
+one engine summed. It used to sum by (PID, engine type) with no adapter, so a process on both GPUs, or on
+several Copy engines, read their total.
 **The per-process Network ("NET") column was REMOVED BY DESIGN** (2026-07, branch
 `processesRemoveNET`) — there is no in-box, non-admin per-process network-rate API on Windows (Task
 Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a
