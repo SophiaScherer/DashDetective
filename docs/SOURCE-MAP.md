@@ -605,7 +605,9 @@ stays in its tab folder.
                                  byte by a test — a saved report and a new one still have to diff
                                  cleanly. Each escapes what its own syntax reserves, which is not
                                  hypothetical: every DNS list holds a comma and a machine name is
-                                 user-controlled text. EXEMPT from the palette-ownership rule, since an
+                                 user-controlled text. Markdown also turns a newline into <br> (a raw
+                                 one ends the table row — the Toolkit log's multi-line output) and
+                                 entity-escapes "<" so a "<DIR>" is not read as a tag. EXEMPT from the palette-ownership rule, since an
                                  exported page is a browser document with no access to the theme)
         DiagnosticsJsonContext.cs
                                 (source-gen context for the JSON export, like SettingsJsonContext — it
@@ -1417,6 +1419,12 @@ stays in its tab folder.
                                                          the formatted Time: the clock-format preference can
                                                          change while rows are on screen, and a row storing
                                                          only its pre-formatted string could not be re-stamped)
+                                ToolkitLogExport.cs     (the log as a DiagnosticsReport — one "Run n"
+                                                         section per stanza in panel order, rows Started /
+                                                         Command / Output — so every non-text format reuses
+                                                         the shared renderers. Text is NOT rendered from it:
+                                                         ToolkitViewModel.BuildLog sends Text to the
+                                                         BuildLogText transcript, which users rely on)
                                 ToolkitCatalog.cs       (static COPY table only — categories, section
                                                          headers, badge labels. Reads the same on every
                                                          platform, which is why it stayed static when the

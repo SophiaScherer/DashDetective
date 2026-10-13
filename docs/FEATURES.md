@@ -1562,9 +1562,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   collapses it back to the one section asked for. Two consequences: `RebuildGroups` counts **distinct rows**
   for the count label, and `ToolkitView.FindRows` flashes **every** row carrying a revealed command rather
   than the first. Pinning still lifts rather than copies, so a pinned labelled row leaves both sections.
-- The Execution Log **exports** to a text file (`BuildLogText` + a save picker in the view code-behind,
-  the `SettingsView.SaveAsync` flow). Stanzas keep the order they are shown in — newest first — so the
-  file reads as what was on screen.
+- The Execution Log **exports** in the same five formats as the system report (`DiagnosticsFormats.Offered`,
+  never a second list) through the shared `FileSave` dialog. **Text is still the `BuildLogText` transcript**,
+  untouched, because users rely on its layout; every other format renders `ToolkitLogExport.BuildReport` —
+  a `DiagnosticsReport` with one "Run n" section per stanza and Started / Command / Output rows — through
+  the shared renderers, and `ToolkitViewModel.BuildLog(format)` is the one place that choice is made.
+  Stanzas keep the order they are shown in — newest first — so the file reads as what was on screen. The
+  Markdown renderer turns a newline into `<br>` so multi-line output stays inside its table cell. No exit
+  code row: a `ToolkitLogEntry` does not carry one.
 - **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
   opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
   text, not by index**, so a list that gains or loses a row between sessions cannot silently re-point

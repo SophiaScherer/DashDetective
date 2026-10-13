@@ -85,6 +85,25 @@ public class ReportFormatterTests {
         Assert.DoesNotContain("\"2\" | <script>", markdown, StringComparison.Ordinal);
     }
 
+    /// <summary>A newline ends a Markdown table row, so a multi-line value has to stay in its one cell.</summary>
+    [Fact]
+    public void Markdown_ValueWithNewlines_StaysOnOneTableRow() {
+        var report = Report(new ReportSection("Run", [new ReportRow("Output", "a\r\nb\nc")]));
+
+        var markdown = MarkdownReportFormatter.Format(report);
+
+        Assert.Contains("| Output | a<br>b<br>c |", markdown, StringComparison.Ordinal);
+    }
+
+    /// <summary>A literal "&lt;DIR&gt;" would be read as an HTML tag and vanish from the rendered table.</summary>
+    [Fact]
+    public void Markdown_AngleBracketInAValue_IsEntityEscaped() {
+        var markdown = MarkdownReportFormatter.Format(Hostile());
+
+        Assert.DoesNotContain("<script>", markdown, StringComparison.Ordinal);
+        Assert.Contains("&lt;script>", markdown, StringComparison.Ordinal);
+    }
+
     // ----- HTML -----
 
     [Fact]
