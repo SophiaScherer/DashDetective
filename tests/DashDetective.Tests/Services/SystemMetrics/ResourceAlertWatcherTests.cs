@@ -1,4 +1,5 @@
 using DashDetective.Services.Network;
+using DashDetective.Services.Settings;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Tests.Fakes;
 using System;
@@ -244,6 +245,51 @@ public class ResourceAlertWatcherTests {
         Assert.Null(harness.Watcher.Current);
         Assert.Equal(2, harness.Changes.Count);
         Assert.Null(harness.Changes[1]);
+    }
+
+    // ----- A bell flipped on a page, folded the way the shell folds it -----
+
+    private static ResourceAlertOptions Fold(AlertSwitches switches) =>
+        ResourceAlertOptions.From(switches.CaptureInto(AppSettings.Defaults with { ResourceAlerts = true }));
+
+    /// <summary>Switching a resource off from its bell clears its banner at once, with no restart.</summary>
+    [Fact]
+    public void BellSwitchedOff_DuringABreach_ClearsTheAlert() {
+        var switches = new AlertSwitches();
+        var harness = Create(Fold(switches));
+        switches.Changed += () => harness.Watcher.Options = Fold(switches);
+
+        harness.Samplers.Cpu = 95;
+        for (var i = 0; i < 10; i++)
+            harness.Metrics.RefreshAll();
+        Assert.NotNull(harness.Watcher.Current);
+
+        switches.Cpu.IsOn = false;
+
+        Assert.Null(harness.Watcher.Current);
+        for (var i = 0; i < 20; i++)
+            harness.Metrics.RefreshAll();
+        Assert.Null(harness.Watcher.Current);
+    }
+
+    /// <summary>And back on, it watches again from a fresh streak.</summary>
+    [Fact]
+    public void BellSwitchedOn_StartsWatchingWithoutARestart() {
+        var switches = new AlertSwitches();
+        switches.Cpu.IsOn = false;
+        var harness = Create(Fold(switches));
+        switches.Changed += () => harness.Watcher.Options = Fold(switches);
+
+        harness.Samplers.Cpu = 95;
+        for (var i = 0; i < 10; i++)
+            harness.Metrics.RefreshAll();
+        Assert.Empty(harness.Changes);
+
+        switches.Cpu.IsOn = true;
+        for (var i = 0; i < 10; i++)
+            harness.Metrics.RefreshAll();
+
+        Assert.Equal(AlertMetric.Cpu, Assert.Single(harness.Changes)!.Metric);
     }
 
     // ----- Multi-device: the worst one wins, and it is named -----

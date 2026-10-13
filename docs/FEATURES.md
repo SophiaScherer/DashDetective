@@ -223,7 +223,8 @@ Information **RAM** row all read the real machine. GPU: one live GPU `StatCard` 
 adapter** (utilisation % + sparkline via PDH `\GPU Engine`, attributed by adapter LUID; adapters named
 via DXGI in `GpuAdapterProvider`) and the System Information **GPU** row listing every adapter. GPU
 **temperature** is now read live, but on the **Performance** tab only — appending it to this card's
-caption is unbuilt Dashboard UI work (see *Deferred work* above).
+caption is unbuilt Dashboard UI work (see *Deferred work* above). The cards carry **no alert bell**, on
+purpose: they are entry points into Performance, where the bells are (see *Settings → Alert bells*).
 Storage: the Storage `StatCard` shows live disk
 **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
 as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
@@ -374,23 +375,25 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   coarse timers stay coarse (Dashboard uptime 30 s; Network adapters 5 s / connections 2.5 s /
   ping 2 s are NOT retimed). The three toggles are real templated `ToggleButton`s (shared
   `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
-  alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
+  alerts** (the master switch for the Alerts card below and every alert bell), **Show in system tray**, **Launch at startup**.
   **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
   (`src/Services/Startup`, soft-failing).
 - **Keyboard.** The rebinding list for every shortcut, rendered from the live bindings. Written up
   under *Keyboard shortcuts* below, since the behaviour is the shortcut layer's rather than this
   page's.
 - **Alerts.** Six rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space threshold, and
-  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`),
-  plus a per-row switch. Runs of preset segments were tried first and pushed the description text into a
-  narrow column that truncated it; a threshold is also a number people want to state rather than pick
-  from a shortlist. **The switch and the number are separate values on purpose**: the service encodes
-  "not watched" as `0`, and a row storing only that would forget its threshold the moment it was switched
-  off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was chosen. The
-  shell folds the pair back into the zero-means-off contract, so the watcher never learns that a page has
-  two controls. "Warn after" has no switch (it is the wait before a warning, not a warning) and reserves
-  the switch column so every number still lines up. Every row is disabled on the whole `Border` while the
-  master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
+  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`).
+  **Thresholds only:** whether each resource is watched is switched by an **alert bell on the resource
+  itself** (see *Alert bells* below), so turning one off never means leaving what you were looking at, and
+  each row's description says where its bell is. Runs of preset segments were tried first and pushed the
+  description text into a narrow column that truncated it; a threshold is also a number people want to
+  state rather than pick from a shortlist. **The switch and the number are separate values on purpose**:
+  the service encodes "not watched" as `0`, and storing only that would forget a threshold the moment it
+  was switched off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was
+  chosen. The number stays editable whether or not its bell is on, so it can be tuned before switching
+  the alert on. `ResourceAlertOptions.From` folds the pair back into the zero-means-off contract, so the
+  watcher never learns that there are two controls. Every row is disabled on the whole `Border` while
+  the master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
   (`src/Services/SystemMetrics`) owns the logic, deliberately **outside** `SystemMetricsService`, which stays
   a pure fan-out of the three shared feeds: GPU and disk have no shared feed there because an aggregate
   across devices would report an average under one device's name. The watcher reads them anyway without
@@ -402,6 +405,23 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   Recovery/EFI partitions sit near-full by design and alerting on them is a banner that never clears. The
   shell shows the inline warning below the toolbar, with copy built from the breach (`×` dismisses the
   current one; a different resource taking over clears the dismissal).
+- **Alert bells.** The five per-resource on/off flags (`AlertCpuEnabled` … `AlertLowDiskFreeEnabled`, the
+  existing keys) are one `AlertSwitches` instance (`src/Services/SystemMetrics`) that the shell builds and
+  hands to the pages, so a flip anywhere is the state it persists and re-arms the watcher from — at once,
+  with no restart. Drawn by the shared `AlertBell` control (`src/Shared/Controls`): a filled bell when on,
+  an outlined bell struck through when off, so the state is in the shape rather than in a color. Placement:
+  - **Performance** — in the detail header beside the device's name: CPU, Memory, every GPU (one shared
+    GPU flag) and every disk (one shared disk-activity flag). The network adapter has no alert, so no bell.
+  - **Storage** — on every drive card's header, beside the health pill: the low-free-space flag, shared
+    by every drive, since it sits over the usage bar it is about.
+  - **Dashboard — none, deliberately.** Its cards are entry points into Performance, and a bell on each
+    would clutter the one page meant to be read at a glance.
+  - The **tooltip is the accessible name** and states the state, the live rule (threshold and wait, from
+    the current settings) and what a click does; "any GPU" / "any drive" says the one flag covers them all.
+    Set on the control itself, because the app's tooltip-as-name style matches the exact type `Button` and
+    never reaches a `ToggleButton`.
+  - **Master switch off** (Resource alerts, under Monitoring) disables every bell, which keeps showing its
+    state and says in its tooltip, shown on a disabled control, that alerts are off in Settings.
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.
@@ -1475,6 +1495,11 @@ the Network tab already uses for an early adapter reveal. That second one needed
 matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
 toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
+**The detail header carries the resource's alert bell**, beside its name and before the jump link: each
+`ResourceRow` holds the shared `AlertSwitch` for its kind (`Alert`), so every disk shows the one
+disk-activity switch and every GPU the one GPU switch, exactly as the watcher reads them; the adapter row
+holds none and the bell takes no room. Written up under *Settings → Alert bells*.
+
 ## Toolkit
 
 Designed as a **"Commands"** tab and shipped as **Toolkit** (nav label, folder, namespace and type
@@ -1742,6 +1767,9 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   `ILiveSamplingPage` / `IActivatablePage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
   (needs admin or vendor SDKs). No new packages, no new shared controls. (**GPU** temperature is no longer
   deferred — it is live on the Performance tab via per-vendor SDKs; see the write-up in the Appendix.)
+  Each drive card's header carries the **low-free-space alert bell** beside its health pill — one shared
+  flag (`StorageViewModel.LowDiskSpaceAlert`, handed to every `DriveCard`), placed on the drive because
+  the alert is about the usage bar beneath it. See *Settings → Alert bells*.
 
 ## Page lifecycle
 

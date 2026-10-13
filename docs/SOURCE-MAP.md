@@ -434,6 +434,13 @@ stays in its tab folder.
                                         MinHeight so a larger text size grows the bar instead of clipping.
                                         TitleBarRules holds the pure part — the platform decision, the
                                         geometry, and the Windows 11 caption metrics the theme reads)
+        AlertBell.axaml(.cs)           (one resource's alert switch as a bell, bound to a shared AlertSwitch:
+                                        filled when on, outlined and struck through when off, so the state
+                                        is in the shape. Takes no room when Switch is null. A ToggleButton
+                                        with its Fluent template replaced, and its accessible name set HERE
+                                        from the tooltip, since the app-wide tooltip-as-name rule matches the
+                                        exact type Button. Its tooltip shows while disabled, the state that
+                                        most needs explaining — the master switch off)
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
@@ -1169,9 +1176,19 @@ stays in its tab folder.
                                  threshold. Named because "a GPU is busy" on a two-GPU machine is not
                                  actionable)
         ResourceAlertOptions.cs (the user's thresholds. ZERO MEANS OFF, which collapses "enabled" into the
-                                 value — one control per row, one check in the watcher. GPU and disk
-                                 activity default off: sustained saturation of either is what legitimate
-                                 heavy work looks like)
+                                 value — one check in the watcher. GPU and disk activity default off:
+                                 sustained saturation of either is what legitimate heavy work looks like.
+                                 From(AppSettings) is the ONE fold of the persisted switch + threshold
+                                 pairs into that shape, so it is testable without the shell)
+        AlertSwitch.cs, AlertSwitches.cs
+                                (the five per-resource alert on/off flags, ONE instance built by the shell
+                                 and handed to Performance and Storage, so a bell flipped on either page is
+                                 the state the shell persists and re-arms the watcher from. Load sets the
+                                 flags silently; a user flip raises Changed. Reflect mirrors the master
+                                 switch, thresholds and wait onto the switches ONLY so each bell's
+                                 Description (its tooltip and accessible name) states the live rule — it
+                                 never moves a flag. CaptureInto writes the flags under the existing
+                                 AppSettings keys)
         ResourceAlertWatcher.cs (watches CPU/memory (shared feeds) plus GPU, disk activity and free space
                                  against those thresholds. Owns its OWN GPU + disk samplers, which their
                                  contracts require, and never aggregates — it takes the WORST device and
@@ -1587,11 +1604,11 @@ stays in its tab folder.
                                 ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
                                                          whether it is custom, and the note explaining a
                                                          refused capture where it happened)
-                                AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
-                                                         switched-off row remembers its number. The
-                                                         settings layer encodes "not watched" as 0, which
-                                                         alone would forget it, so GPU could not ship
-                                                         "off, defaulted to 90")
+                                AlertThresholdRow.cs    (one Alerts row: the threshold ONLY. Whether the
+                                                         resource is watched is its bell's AlertSwitch,
+                                                         so the number stays editable and is kept while
+                                                         the resource is off — GPU ships "off, defaulted
+                                                         to 90")
                                 GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
                                                          helper process here. LINUX ONLY: there the figure
                                                          exists solely through nvidia-smi, which is why the
