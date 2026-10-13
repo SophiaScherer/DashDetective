@@ -39,7 +39,7 @@ incrementally, one feature at a time, in a modular style. Each feature lives in 
 is largely isolated from the others.
 
 The nine top-level features — Dashboard, File Explorer, Processes, Performance, Network, Storage,
-Hardware, Toolkit and Settings — are **all built**. Keep changes inside the one a task names.
+Hardware, Toolkit (shown as Utilities) and Settings — are **all built**. Keep changes inside the one a task names.
 
 ## Current Scope — READ THIS FIRST
 
@@ -47,7 +47,7 @@ Hardware, Toolkit and Settings — are **all built**. Keep changes inside the on
 new task explicitly assigns, and do not modify a live feature without an explicit scope expansion.
 
 The nine tabs — Dashboard, File Explorer, Processes, Performance, Network, Storage, Hardware,
-**Toolkit** and Settings — plus the shell **Navigation bar**, **universal search**, **keyboard
+**Toolkit** (shown as Utilities) and Settings — plus the shell **Navigation bar**, **universal search**, **keyboard
 shortcuts**, the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
 passes (repo-hygiene / portfolio; de-duplication / composition). **Read
 [docs/FEATURES.md](docs/FEATURES.md) before touching any of them** — it holds the write-up for each,

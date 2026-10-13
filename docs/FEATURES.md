@@ -20,7 +20,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Network](#network)
 - [Processes](#processes)
 - [Performance](#performance)
-- [Toolkit](#toolkit)
+- [Toolkit (shown as Utilities)](#toolkit-shown-as-utilities)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Help](#help)
 - [Storage](#storage)
@@ -1475,11 +1475,21 @@ the Network tab already uses for an early adapter reveal. That second one needed
 matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
 toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
-## Toolkit
+## Toolkit (shown as Utilities)
 
-Designed as a **"Commands"** tab and shipped as **Toolkit** (nav label, folder, namespace and type
-names). "Commands" survives only in older discussion; nothing in the repo uses it, so **always write
-Toolkit**. It is the **ninth** tab, sitting between Hardware and Settings, which is why the
+Designed as a **"Commands"** tab, built as **Toolkit**, and renamed **Utilities** in the UI (work item
+33): Toolkit sat badly beside the plain-noun page names. **The UI name is Utilities** — nav label, page
+header, Help copy and the Help shortcuts group — while code, folders, namespaces, type names,
+`ShortcutScope.Toolkit`, widget ids (`toolkit.form`, `toolkit.log`) and the persisted settings
+(`PinnedCommands`, `CustomCommands`) all keep **Toolkit**, so no saved state moves. Write "Utilities"
+in anything a user reads and "Toolkit" for the code.
+- **The old name still finds the page.** `NavItem.Keywords` carries aliases (`Toolkit`, `Tools`,
+  `Commands`) and `PageSearchProvider` scores them after the subtitle, so a current name always outranks
+  an alias. Because the page results are read from the nav list, a future rename needs only a keyword.
+- The Execution Log export suggests `DashDetective-utilities-log-…`, and its text header reads
+  "Utilities execution log". The Help topic key `page.toolkit` is an internal identity and stays.
+
+It is the **ninth** tab, sitting between Hardware and Settings, which is why the
 Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
