@@ -436,7 +436,9 @@ stays in its tab folder.
                                         geometry, and the Windows 11 caption metrics the theme reads)
         AlertBell.axaml(.cs)           (one resource's alert switch as a bell, bound to a shared AlertSwitch:
                                         filled when on, outlined and struck through when off, so the state
-                                        is in the shape. Takes no room when Switch is null. A ToggleButton
+                                        is in the shape. HIDES ITSELF when Switch is null — hiding only the
+                                        inner button left a zero-size child a panel's Spacing still counted.
+                                        A ToggleButton
                                         with its Fluent template replaced, and its accessible name set HERE
                                         from the tooltip, since the app-wide tooltip-as-name rule matches the
                                         exact type Button. Its tooltip shows while disabled, the state that
@@ -1192,7 +1194,12 @@ stays in its tab folder.
         ResourceAlertWatcher.cs (watches CPU/memory (shared feeds) plus GPU, disk activity and free space
                                  against those thresholds. Owns its OWN GPU + disk samplers, which their
                                  contracts require, and never aggregates — it takes the WORST device and
-                                 names it, so the no-shared-aggregate rule above still holds. Sustain is
+                                 names it, so the no-shared-aggregate rule above still holds. Setting
+                                 Options clears ONLY the metrics whose threshold changed (all usage streaks
+                                 if the wait did): every Settings edit and every bell flip re-applies the
+                                 whole set, and clearing all five made one bell retract another resource's
+                                 banner — and its dismissal. Free space switched on is read AT ONCE, not on
+                                 the minute timer. Apply(AppSettings) is the shell's one entry. Sustain is
                                  SECONDS converted against the live interval, not a sample count, which
                                  used to mean 5 s at the 0.5 s cadence and 50 s at the 5 s one. Free space
                                  skips UNLETTERED volumes: Recovery/EFI sit near-full by design, so

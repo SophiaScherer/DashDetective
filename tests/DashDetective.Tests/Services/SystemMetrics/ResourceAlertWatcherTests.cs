@@ -247,17 +247,43 @@ public class ResourceAlertWatcherTests {
         Assert.Null(harness.Changes[1]);
     }
 
-    // ----- A bell flipped on a page, folded the way the shell folds it -----
+    // ----- A bell flipped on a page, applied the way the shell applies it -----
 
-    private static ResourceAlertOptions Fold(AlertSwitches switches) =>
-        ResourceAlertOptions.From(switches.CaptureInto(AppSettings.Defaults with { ResourceAlerts = true }));
+    // The shell's bell path minus the save: capture the switches into the settings, then Apply them.
+    private static AppSettings Captured(AlertSwitches switches) =>
+        switches.CaptureInto(AppSettings.Defaults with { ResourceAlerts = true });
+
+    private static Harness Wired(AlertSwitches switches, HardwareProviders? hardware = null) {
+        var harness = Create(ResourceAlertOptions.From(Captured(switches)), hardware: hardware);
+        switches.Changed += () => harness.Watcher.Apply(Captured(switches));
+        return harness;
+    }
+
+    private static HardwareProviders NearlyFullDrive() => StubHardwareProviders.With(volumes: [
+        new VolumeInfo(0, 'C', "System", "NTFS", 1000, 40),    // 4% free
+    ]);
+
+    [Fact]
+    public void Apply_PutsTheThresholdsAndTheMasterSwitchIntoForce() {
+        var harness = Create(enabled: false);
+
+        harness.Watcher.Apply(AppSettings.Defaults with {
+            ResourceAlerts = true,
+            AlertGpuEnabled = true,
+            AlertGpuPercent = 70,
+            AlertCpuEnabled = false,
+        });
+
+        Assert.True(harness.Watcher.Enabled);
+        Assert.Equal(70, harness.Watcher.Options.GpuPercent);
+        Assert.Equal(0, harness.Watcher.Options.CpuPercent);
+    }
 
     /// <summary>Switching a resource off from its bell clears its banner at once, with no restart.</summary>
     [Fact]
     public void BellSwitchedOff_DuringABreach_ClearsTheAlert() {
         var switches = new AlertSwitches();
-        var harness = Create(Fold(switches));
-        switches.Changed += () => harness.Watcher.Options = Fold(switches);
+        var harness = Wired(switches);
 
         harness.Samplers.Cpu = 95;
         for (var i = 0; i < 10; i++)
@@ -277,8 +303,7 @@ public class ResourceAlertWatcherTests {
     public void BellSwitchedOn_StartsWatchingWithoutARestart() {
         var switches = new AlertSwitches();
         switches.Cpu.IsOn = false;
-        var harness = Create(Fold(switches));
-        switches.Changed += () => harness.Watcher.Options = Fold(switches);
+        var harness = Wired(switches);
 
         harness.Samplers.Cpu = 95;
         for (var i = 0; i < 10; i++)
@@ -290,6 +315,69 @@ public class ResourceAlertWatcherTests {
             harness.Metrics.RefreshAll();
 
         Assert.Equal(AlertMetric.Cpu, Assert.Single(harness.Changes)!.Metric);
+    }
+
+    /// <summary>A flip touches only its own metric: the low-space banner on screen survives the GPU bell.</summary>
+    [Fact]
+    public async System.Threading.Tasks.Task UnrelatedBell_WhileLowSpaceShows_KeepsTheBanner() {
+        var switches = new AlertSwitches();
+        var harness = Wired(switches, NearlyFullDrive());
+        harness.SpaceTimer.RaiseTick();
+        await System.Threading.Tasks.Task.Yield();
+        Assert.Equal(AlertMetric.DiskSpace, harness.Watcher.Current?.Metric);
+
+        switches.Gpu.IsOn = true;
+        switches.Gpu.IsOn = false;
+
+        Assert.Equal(AlertMetric.DiskSpace, harness.Watcher.Current?.Metric);
+        Assert.Single(harness.Changes);
+    }
+
+    /// <summary>The shell un-dismisses its banner on every <see cref="ResourceAlertWatcher.AlertChanged"/>,
+    /// so a dismissal survives an unrelated flip exactly when no event is raised for it — mid-streak too.</summary>
+    [Fact]
+    public void UnrelatedBell_DuringABreach_RaisesNoChange_SoADismissalStands() {
+        var switches = new AlertSwitches();
+        var harness = Wired(switches);
+        harness.Samplers.Cpu = 95;
+        for (var i = 0; i < 10; i++)
+            harness.Metrics.RefreshAll();
+        Assert.Single(harness.Changes);
+
+        switches.DiskActivity.IsOn = true;
+        harness.Metrics.RefreshAll();
+
+        Assert.Single(harness.Changes);
+        Assert.Equal(AlertMetric.Cpu, harness.Watcher.Current?.Metric);
+    }
+
+    /// <summary>The CPU streak in flight is not restarted by another resource's bell.</summary>
+    [Fact]
+    public void UnrelatedBell_KeepsAStreakInFlight() {
+        var switches = new AlertSwitches();
+        var harness = Wired(switches);
+        harness.Samplers.Cpu = 95;
+        for (var i = 0; i < 9; i++)
+            harness.Metrics.RefreshAll();
+
+        switches.Gpu.IsOn = true;
+        harness.Metrics.RefreshAll();   // the tenth sample, not the first of a new run
+
+        Assert.Equal(AlertMetric.Cpu, Assert.Single(harness.Changes)!.Metric);
+    }
+
+    /// <summary>Switching low space on reads the volumes at once rather than on the minute timer.</summary>
+    [Fact]
+    public async System.Threading.Tasks.Task LowSpaceBellSwitchedOn_ReportsWithoutWaitingForTheTimer() {
+        var switches = new AlertSwitches();
+        switches.DiskSpace.IsOn = false;
+        var harness = Wired(switches, NearlyFullDrive());
+        Assert.Empty(harness.Changes);
+
+        switches.DiskSpace.IsOn = true;
+        await System.Threading.Tasks.Task.Yield();
+
+        Assert.Equal(AlertMetric.DiskSpace, Assert.Single(harness.Changes)!.Metric);
     }
 
     // ----- Multi-device: the worst one wins, and it is named -----

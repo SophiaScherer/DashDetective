@@ -155,29 +155,29 @@ public sealed class SettingCatalog {
     // number, so each description says where its on/off switch lives.
     public SettingEntry AlertCpu { get; } = new(
         SettingId.AlertCpu, "Alerts", "CPU usage",
-        "Warn when processor use stays this high. Switch it from the bell on Performance",
+        "Warn when processor use stays this high — switch it from the bell on Performance",
         Keywords: "cpu processor alert threshold percent high usage warning bell on off");
 
     public SettingEntry AlertMemory { get; } = new(
         SettingId.AlertMemory, "Alerts", "Memory usage",
-        "Warn when RAM use stays this high. Switch it from the bell on Performance",
+        "Warn when RAM use stays this high — switch it from the bell on Performance",
         Keywords: "memory ram alert threshold percent high usage warning bell on off");
 
-    // Off by default, because sustained saturation is what legitimate heavy work looks like on both of
-    // these, so watching them by default would mostly report the machine doing its job.
+    // Off by default, and the copy says why: sustained saturation is what legitimate heavy work looks
+    // like on both of these, so watching them by default would mostly report the machine doing its job.
     public SettingEntry AlertGpu { get; } = new(
         SettingId.AlertGpu, "Alerts", "GPU usage",
-        "Warn when any GPU stays this busy. Off by default; switch it from the bell on Performance",
+        "Warn when any GPU stays this busy — off by default, since games and renders live here; bell on Performance",
         Keywords: "gpu graphics adapter alert threshold percent high usage warning bell on off");
 
     public SettingEntry AlertDiskActivity { get; } = new(
         SettingId.AlertDiskActivity, "Alerts", "Disk activity",
-        "Warn when any drive stays this busy. Off by default; switch it from the bell on Performance",
+        "Warn when any drive stays this busy — off by default, since large copies live here; bell on Performance",
         Keywords: "disk drive activity busy alert threshold percent warning io bell on off");
 
     public SettingEntry AlertLowDiskFree { get; } = new(
         SettingId.AlertLowDiskFree, "Alerts", "Low disk space",
-        "Warn when any drive drops below this much free space. Switch it from the bell on Storage",
+        "Warn when any drive drops below this much free space — switch it from the bell on Storage",
         Keywords: "disk space free full storage low alert threshold warning capacity bell on off");
 
     public SettingEntry AlertSustain { get; } = new(

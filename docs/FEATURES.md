@@ -420,6 +420,11 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
     the current settings) and what a click does; "any GPU" / "any drive" says the one flag covers them all.
     Set on the control itself, because the app's tooltip-as-name style matches the exact type `Button` and
     never reaches a `ToggleButton`.
+  - **A flip changes only its own metric.** Every Settings edit and every flip re-applies the whole
+    option set, and the watcher used to clear all five streaks on each — so flipping the GPU bell hid a
+    low-space banner on screen until the next minute's read, and un-did its dismissal. It now clears only
+    the metrics whose threshold changed (every usage streak if the wait did), and switching low space on
+    reads the volumes at once instead of on its 60-second timer.
   - **Master switch off** (Resource alerts, under Monitoring) disables every bell, which keeps showing its
     state and says in its tooltip, shown on a disabled control, that alerts are off in Settings.
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
@@ -1498,7 +1503,7 @@ toolbar Refresh dropped the selection back to the CPU. It matches by device id n
 **The detail header carries the resource's alert bell**, beside its name and before the jump link: each
 `ResourceRow` holds the shared `AlertSwitch` for its kind (`Alert`), so every disk shows the one
 disk-activity switch and every GPU the one GPU switch, exactly as the watcher reads them; the adapter row
-holds none and the bell takes no room. Written up under *Settings → Alert bells*.
+holds none and the bell hides itself, so the link sits where it always did. Written up under *Settings → Alert bells*.
 
 ## Toolkit
 

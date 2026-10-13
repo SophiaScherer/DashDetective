@@ -48,7 +48,6 @@
          exact type Button and so never reaches a ToggleButton. It shows on a disabled bell, which is the
          one state that most needs explaining. -->
     <ToggleButton Classes="alertBell"
-                  IsVisible="{Binding #Root.Switch, Converter={x:Static ObjectConverters.IsNotNull}}"
                   IsChecked="{Binding #Root.Switch.IsOn, Mode=TwoWay}"
                   IsEnabled="{Binding #Root.Switch.IsAvailable}"
                   ToolTip.Tip="{Binding #Root.Switch.Description}"

@@ -493,13 +493,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     }
 
     /// <summary>Pushes the alert thresholds and the master switch onto the watcher, and mirrors them onto
-    /// the bells so their tooltips describe the live rule. Thresholds first: the setter clears every
-    /// streak, so applying them after enabling would discard the first samples. The watcher holds the CPU
-    /// and memory feeds open on its own, which is why it follows the setting rather than running
-    /// unconditionally.</summary>
+    /// the bells so their tooltips describe the live rule. The watcher holds the CPU and memory feeds open
+    /// on its own, which is why it follows the setting rather than running unconditionally.</summary>
     private void ApplyAlertSettings(AppSettings settings) {
-        _alerts.Options = ResourceAlertOptions.From(settings);
-        _alerts.Enabled = settings.ResourceAlerts;
+        _alerts.Apply(settings);
         _alertSwitches.Reflect(settings);
     }
 
