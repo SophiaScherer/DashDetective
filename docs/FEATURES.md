@@ -132,7 +132,14 @@ stays in `PagerMath`. `HasPreviousPage`/`HasNextPage` drive `CanExecute` and are
 `RebuildPageLinks`; **the failure path must reset them by hand** (unlike `PageLinks`, stable commands
 survive a `Clear()`, so an unavailable list would otherwise keep a live pager over nothing). Styled
 `Button.pageArrow`, which copies File Explorer's `navBtn` disabled treatment — dim the glyph, keep the
-surface transparent — because Fluent's default disabled state paints a filled box. No ellipsis: the
+surface transparent — because Fluent's default disabled state paints a filled box. **The skip pair is
+filled and the step pair is stroked, on purpose.** First/last draw `Icons.CaretFirst`/`CaretLast` — a
+Caret-family triangle against a filled stop-bar rectangle, as `Path.filled` — because the stroked
+bar-and-chevron read as a letter and sat apart from the app's one disclosure glyph. Prev/next stay stroked
+chevrons: a single step is not a skip, and the pair is left alone until a second reason to change it. The
+bar is a closed rectangle, not a stroke, so one `Fill` colors the whole mark and the disabled dim (an
+`Opacity`) needs no per-geometry case. Geometry rather than a font glyph, so it renders the same on
+Windows and Linux. No ellipsis: the
 provider's 1000-row cap over a page size of 100 means at most ten numbers, which fit on one row.
 
 - **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the

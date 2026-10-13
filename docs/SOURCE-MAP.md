@@ -1337,10 +1337,11 @@ stays in its tab folder.
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
-                                     First/Last stop-bar variants are the Network pager's alone: paging is
-                                     navigation rather than disclosure, and a stop bar only reads against a
-                                     stroked arrow)
+                                     caret sets Fill, not Stroke. The stroked ChevronLeft/Right pair is the
+                                     Network pager's step arrows alone: paging is navigation rather than
+                                     disclosure. CaretFirst/CaretLast, the pager's skip pair, are FILLED
+                                     (a Caret triangle plus a stop-bar rectangle) so the mark reads as a
+                                     triangle, not a letter, and shares the caret family's fill)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
         ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
