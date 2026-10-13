@@ -909,7 +909,8 @@ stays in its tab folder.
                                  hiding it leaves the VM with no GPU card at all. Bundled vendor table +
                                  driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex. GttBytes
                                  (amdgpu's mem_info_gtt_total, the shared pool) is NULL, not 0, when absent:
-                                 the shared memory tile it feeds is omitted rather than dashed)
+                                 a driver that publishes no GTT is not a zero-sized pool, and it matches
+                                 GpuAdapter's nullable shared total)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,

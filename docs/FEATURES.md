@@ -1442,7 +1442,10 @@ amdgpu's GTT (`mem_info_gtt_total` / `mem_info_gtt_used`), the system memory the
 publish none. **An adapter whose shared total is unknown or 0 gets no tile at all** rather than a dash or a
 zero, so a GPU row has four tiles or five. An integrated GPU shows both: a small dedicated carve-out and a
 large shared pool. A saved tile order from before the tile existed places it beside "VRAM in use", its
-declared neighbor.
+declared neighbor. **One saved tile order covers every GPU** (`performance.stats.gpu`), so reordering tiles
+on a GPU with no shared pool saves an order without the shared tile; on a GPU that has one, the tile then
+returns beside "VRAM in use" rather than where it was last dragged. On Windows every real adapter reports a
+shared total, so in practice this arises only on Linux with a non-AMD card beside an AMD one.
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so

@@ -1216,6 +1216,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         public ulong? VramBytes { get; init; }
         /// <summary>Null when the adapter has no shared pool, which is why it has no tile.</summary>
         public StatTile? SharedTile { get; init; }
+        /// <summary>The adapter's shared total from the inventory; only read when <see cref="SharedTile"/>
+        /// exists, so it is known and above 0 there.</summary>
         public ulong? SharedBytes { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }

@@ -20,9 +20,9 @@ namespace DashDetective.Services.Platform.Linux;
 /// reader, which shows up as no GPU card at all rather than as a wrong one.
 ///
 /// Fields report "not known" honestly — "" or 0 — rather than substituting a stand-in; each consumer
-/// applies its own placeholder. <see cref="GttBytes"/> is the exception, null when absent, because the
-/// shared-memory tile it feeds is omitted rather than dashed. Stateless and never throws: an unreadable
-/// <c>/sys</c> yields no cards.
+/// applies its own placeholder. <see cref="GttBytes"/> is the exception, null when absent: a driver that
+/// publishes no GTT is not the same as a zero-sized pool, and it matches the nullable shared total on
+/// <c>GpuAdapter</c>. Stateless and never throws: an unreadable <c>/sys</c> yields no cards.
 /// </summary>
 internal sealed record DrmCardFacts(
     string Name,
