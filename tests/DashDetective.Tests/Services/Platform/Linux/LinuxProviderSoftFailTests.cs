@@ -106,6 +106,15 @@ public class LinuxProviderSoftFailTests {
         Assert.Empty(await new LinuxGpuAdapterProvider(proc).GetAsync());
     }
 
+    /// <summary>The GTT read sits inside the provider's catch like every other card file, so a denial
+    /// there cannot escape the async load.</summary>
+    [Fact]
+    public async Task LinuxGpuAdapterProvider_DeniedGttTotal_DoesNotThrow() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().ThrowOn("/sys/class/drm/card0/device/mem_info_gtt");
+
+        Assert.Null(await Record.ExceptionAsync(() => new LinuxGpuAdapterProvider(proc).GetAsync()));
+    }
+
     [Fact]
     public async Task LinuxGraphicsInfoProvider_DeniedDrmTree_ReportsTheUnknownCard() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard().ThrowOn("/sys/class/drm");

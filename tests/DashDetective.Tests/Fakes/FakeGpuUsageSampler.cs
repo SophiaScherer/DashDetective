@@ -28,9 +28,11 @@ internal sealed class FakeGpuUsageSampler : IGpuUsageSampler {
         return this;
     }
 
-    /// <summary>Stages an adapter reporting a utilization figure and its dedicated memory in use.</summary>
-    public FakeGpuUsageSampler ReportingMemory(string adapterKey, double overall, ulong usedBytes) {
-        _samples[adapterKey] = new GpuAdapterSample(overall, new Dictionary<string, double>(), usedBytes);
+    /// <summary>Stages an adapter reporting a utilization figure, its dedicated memory in use and, optionally,
+    /// its shared memory in use.</summary>
+    public FakeGpuUsageSampler ReportingMemory(
+        string adapterKey, double overall, ulong? usedBytes, ulong? sharedBytes = null) {
+        _samples[adapterKey] = new GpuAdapterSample(overall, new Dictionary<string, double>(), usedBytes, sharedBytes);
         return this;
     }
 

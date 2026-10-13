@@ -281,9 +281,10 @@
                 </StackPanel>
             </controls:WidgetPanel>
 
-            <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most, six
-                 for CPU. Uncapped like the Dashboard card strip, so a wide pane gains columns rather than
-                 widening the tiles; 150px is the width below which one wraps. -->
+            <!-- Stat tiles: the selected resource's readouts (design comp's statMap): four for most, five for
+                 a GPU with a shared memory pool, six for CPU. Uncapped like the Dashboard card strip, so a
+                 wide pane gains columns rather than widening the tiles; 150px is the width below which one
+                 wraps. -->
             <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
