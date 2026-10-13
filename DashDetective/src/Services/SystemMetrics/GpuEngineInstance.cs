@@ -80,8 +80,8 @@ internal readonly record struct GpuEngineInstance(int? Pid, string Luid, int Phy
         int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out value);
 
     /// <summary>Parses "<c>{high}_0x{low}</c>" and re-formats it, so the token always has eight lower-case
-    /// digits per half.</summary>
-    private static bool TryParseLuid(ReadOnlySpan<char> halves, out string luid) {
+    /// digits per half. Shared with <see cref="GpuMemoryUsage"/>, so both counters key on one token.</summary>
+    internal static bool TryParseLuid(ReadOnlySpan<char> halves, out string luid) {
         luid = "";
         var separator = halves.IndexOf(LuidSeparator, StringComparison.OrdinalIgnoreCase);
         if (separator < 0 ||
