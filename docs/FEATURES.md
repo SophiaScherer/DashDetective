@@ -1486,6 +1486,9 @@ in anything a user reads and "Toolkit" for the code.
 - **The old name still finds the page.** `NavItem.Keywords` carries aliases (`Toolkit`, `Tools`,
   `Commands`) and `PageSearchProvider` scores them after the subtitle, so a current name always outranks
   an alias. Because the page results are read from the nav list, a future rename needs only a keyword.
+- **Stored recents heal on load.** `RecentSearches.TryDecode` maps a persisted Page recent keyed
+  `Toolkit` to `Utilities` (key and, when it is the old name, the title), so an existing install lists the
+  new name and reopening finds the page. Narrow on purpose: Page category and that one key only.
 - The Execution Log export suggests `DashDetective-utilities-log-…`, and its text header reads
   "Utilities execution log". The Help topic key `page.toolkit` is an internal identity and stays.
 
