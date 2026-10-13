@@ -1365,6 +1365,13 @@ behind it that must not be quietly undone:
   comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
+- **Alignment rule: text columns left, numeric columns right, each header aligned with its values; the
+  toolbar filter left and its actions right.** Numeric means a measure (CPU, Memory, Disk, GPU) or an
+  identifier (PID), so PID is right-aligned like the rest and its header leads with the sort arrow
+  (`ArrowFirst`) so the label sits flush with the digits. PID alone carries a small right inset (`PidInset`)
+  on header, cells and placeholder bar, because the column gap is 4px and STATUS, its default neighbor, is
+  left-aligned text; the column's 58px minimum leaves room for six digits inside it. Keep any new column to
+  the same rule.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
 `EnumListCodec`, and the promotion of `CheckBox.optionCheck` and `ToggleButton.optionsToggle` to
 `SharedStyles` (their File Explorer copies deleted — a local style silently outranks the shared one).
