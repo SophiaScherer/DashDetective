@@ -40,8 +40,8 @@
     <Thickness x:Key="WidgetHeaderMargin">0,0,0,10</Thickness>
     <sys:Double x:Key="FieldHeight">32</sys:Double>
     <sys:Double x:Key="TableRowHeight">30</sys:Double>
-    <!-- The shortest a Hardware card gets. A floor, never a height: a card grows past it with its rows and
-         with text size, and cards in a row are stretched to the tallest by the panel, not by this. -->
+    <!-- The shortest a Hardware card gets, for a card alone on its row (Sensors when wrapped). A floor, never
+         a height: cards grow past it with their rows and text size, and the panel aligns a row. -->
     <sys:Double x:Key="HardwareCardMinHeight">160</sys:Double>
     <!-- Between a key/value row's key and its value, so a wrapped value never runs into its key. -->
     <sys:Double x:Key="KeyValueGap">8</sys:Double>

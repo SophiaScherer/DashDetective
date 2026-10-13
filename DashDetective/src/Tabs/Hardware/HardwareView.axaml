@@ -24,10 +24,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
-                <!-- No Height and no VerticalAlignment="Top": UniformFlowPanel arranges every card at its
-                     row's height, so a card that fills its slot shares a bottom edge with its row-mates
-                     at any text or interface size. The floor keeps a short card alone on a row from
-                     looking stubby; content stays top-aligned inside the stretched surface. -->
+                <!-- No Height and no Top alignment: the panel stretches each card to its row's height. -->
                 <Border Classes="panel" MinHeight="{StaticResource HardwareCardMinHeight}"
                         AutomationProperties.Name="{Binding Title}">
                     <StackPanel Spacing="12">

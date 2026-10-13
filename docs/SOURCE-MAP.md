@@ -364,8 +364,8 @@ stays in its tab folder.
         UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
                                  With DragGrip set it also drags to reorder, through the same ReorderDrag
                                  a board uses — its children are usually generated, so the order is
-                                 re-applied every time the generator rebuilds them. Every child is
-                                 ARRANGED at its row's height, so a child that stretches vertically
+                                 re-applied every time the generator rebuilds them. Every child but the
+                                 dragged one (arranged at its pickup size) is ARRANGED at its row's height, so a child that stretches vertically
                                  shares a bottom edge with its row-mates — give a card no Height and no
                                  VerticalAlignment="Top" if it should, as the Hardware cards do)
         FlowLayout, GridColumns, TableColumns, WeightedRowLayout
