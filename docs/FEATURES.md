@@ -726,7 +726,8 @@ Three places need to say more, and they are the ones a name has to disambiguate 
 - **The Dashboard's stat cards** all shared the tooltip "Open in Performance", so six cards announced the
   same thing. `DashboardCard.AccessibleName` leads with the heading and the reading instead.
 - **The Toolkit's row actions** repeated "Copy command" and "Pin to the top of the list" 31 times each.
-  They now name the command they act on.
+  They now name the command they act on, and the row body names its command and its default action
+  (`ToolkitEntry.AccessibleName`), since its tooltip leads with the action instead.
 - **The widget fold chevron** announced its glyph, "▾". It takes the panel's title.
 
 **The banners are live regions.** The resource alert is `Assertive` — it reports a condition the user did
@@ -1487,8 +1488,21 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
 - **Execution is live.** Clicking a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
   stanza to the Execution Log. A row that names a place on disk is the exception: it opens the in-app File
-  Explorer instead (`ToolkitViewModel.OpenInApp` → `FileExplorerRevealRequested` → the shell's existing
-  `RevealFile`), with Windows Explorer on the row's other icon.
+  Explorer instead (`ToolkitViewModel.Run` → `FileExplorerRevealRequested` → the shell's existing
+  `RevealFile`), with Windows Explorer on the row's one secondary icon.
+- **The activation model** (work item 35). Every row has **one default action**, and it is stated before
+  the click: the row body's tooltip leads with `ToolkitEntry.DefaultActionText`, then the description.
+  Per action kind: a folder the app can open → *Open in DashDetective's File Explorer*; a folder it
+  cannot (a `shell:` location) → *Open in Windows Explorer* (*your file manager* off Windows); `Launch`
+  → *Launch in its own window*; `Capture` → *Run — output goes to the Execution Log*; `Elevated` → *Run
+  as administrator*; `OpenUrl` → *Open in your browser*. **Secondary actions are explicit icons**, each
+  doing something the body does not: Windows Explorer on a location row, edit/delete on the user's own,
+  pin and copy on every row. The in-app File Explorer icon was removed because it repeated the body, and
+  the Explorer icon is hidden on a `shell:` row for the same reason — its slot still holds, so the
+  badges stay aligned. **Nothing runs without a deliberate action on the row.** The body's screen-reader
+  name is `AccessibleName` (command, then default action), since the tooltip does not carry the command.
+  The secondary icon's own tooltip still says "Windows Explorer" on Linux; no platform wording helper
+  existed for it.
 - **The safety invariants.** The built-in table used to be an allow-list, and the Toolkit had no
   free-form entry at all. That changed when users gained the ability to author their own commands
   (`ToolkitCommand` + the "+ Add command" form). What was actually load-bearing is kept, and **these four

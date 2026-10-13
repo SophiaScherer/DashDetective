@@ -759,43 +759,30 @@ public class ToolkitViewModelTests {
     /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%" or
     /// "$HOME".</summary>
     [Fact]
-    public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
+    public async Task Run_PathRow_SendsTheResolvedPathNotTheAuthoredOne() {
         var vm = Page();
         string? revealed = null;
         vm.FileExplorerRevealRequested += path => revealed = path;
 
-        vm.OpenInAppCommand.Execute(PathRow(OtherFolder));
+        await vm.RunCommand.ExecuteAsync(PathRow(OtherFolder));
 
         Assert.Equal(ToolkitPaths.Resolve(OtherFolder), revealed);
         Assert.NotEqual(OtherFolder, revealed);
     }
 
-    /// <summary>A shell: row has no filesystem path, so it offers the external icon only — and asking
-    /// for the in-app one anyway is refused rather than sending a path Explorer would reject.</summary>
-    [Fact]
-    public void OpenInApp_ShellLocation_IsNotOfferedAndDoesNothing() {
-        var vm = Page();
-        var shellRow = PathRow("shell:startup");
-        var revealed = 0;
-        vm.FileExplorerRevealRequested += _ => revealed++;
-
-        vm.OpenInAppCommand.Execute(shellRow);
-
-        Assert.True(shellRow.IsPathEntry);
-        Assert.False(shellRow.CanOpenInApp);
-        Assert.Equal(0, revealed);
-    }
-
-    /// <summary>A shell: row still activates as a run, because there is no in-app destination to prefer
-    /// — it is the one folder row whose click behaviour is unchanged.</summary>
+    /// <summary>A shell: row has no filesystem path, so it activates as a run instead — there is no
+    /// in-app destination to prefer, and sending one would hand Explorer a path it would reject.</summary>
     [Fact]
     public async Task Run_ShellLocationRow_StillGoesToTheShellAndIsLogged() {
         var vm = Page();
+        var shellRow = PathRow("shell:not-a-real-shell-location-xyz");
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
 
-        await vm.RunCommand.ExecuteAsync(PathRow("shell:not-a-real-shell-location-xyz"));
+        await vm.RunCommand.ExecuteAsync(shellRow);
 
+        Assert.True(shellRow.IsPathEntry);
+        Assert.False(shellRow.CanOpenInApp);
         Assert.Equal(0, revealed);
         Assert.Single(vm.Log);
     }
