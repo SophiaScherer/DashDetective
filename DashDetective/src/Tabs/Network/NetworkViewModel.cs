@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -192,8 +193,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     internal const string PublicUnavailable = "Unavailable";
 
     /// <summary>The Look up action's tooltip: the disclosure that this call goes out.</summary>
-    public string PublicLookupTip => "Asks api.ipify.org for the address the internet sees. "
-        + "This is the only lookup on this page that leaves your machine, and it runs only when you ask.";
+    public string PublicLookupTip => "Asks api.ipify.org and api6.ipify.org for the addresses the internet sees. "
+        + "Runs when you press Look up, and again on Refresh.";
 
     /// <summary>Only the newest public-address lookup may publish, so a slow earlier one cannot overwrite
     /// a newer answer.</summary>
@@ -576,9 +577,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         PublicAddresses result;
         try {
             result = await _providers.PublicAddresses.GetAsync();
-        } catch {
-            // The provider never throws; a fake or a future one might, and the rows must not stay on
-            // "Looking up…" for the session.
+        } catch (Exception e) when (e is InvalidOperationException or HttpRequestException or OperationCanceledException) {
+            // The provider never throws; a misbehaving one might, and the rows must not stay on
+            // "Looking up…" for the session. Narrow on purpose: anything else is a bug.
             result = PublicAddresses.None;
         }
 

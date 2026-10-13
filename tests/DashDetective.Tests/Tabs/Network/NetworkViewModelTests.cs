@@ -349,5 +349,7 @@ public class NetworkViewModelTests {
         var (vm, _) = CreateWithPublic();
 
         Assert.Contains("api.ipify.org", vm.PublicLookupTip);
+        Assert.Contains("api6.ipify.org", vm.PublicLookupTip);
+        Assert.Contains("Refresh", vm.PublicLookupTip);
     }
 }

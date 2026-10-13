@@ -162,6 +162,7 @@
                                 <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding PublicIpv4}"
                                            IsVisible="{Binding PublicLookedUp}"/>
                                 <Button Grid.Column="1" Classes="action" Content="Look up" Padding="10,2"
+                                        AutomationProperties.Name="Look up public IPv4"
                                         HorizontalAlignment="Right" VerticalAlignment="Center"
                                         Command="{Binding LookupPublicAddressesCommand}"
                                         ToolTip.Tip="{Binding PublicLookupTip}"
@@ -174,6 +175,7 @@
                                 <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding PublicIpv6}"
                                            IsVisible="{Binding PublicLookedUp}"/>
                                 <Button Grid.Column="1" Classes="action" Content="Look up" Padding="10,2"
+                                        AutomationProperties.Name="Look up public IPv6"
                                         HorizontalAlignment="Right" VerticalAlignment="Center"
                                         Command="{Binding LookupPublicAddressesCommand}"
                                         ToolTip.Tip="{Binding PublicLookupTip}"

@@ -70,6 +70,105 @@ public class PublicAddressProviderTests {
         Assert.Equal(PublicAddresses.None, result);
     }
 
+    /// <summary><c>IPAddress.TryParse</c> accepts these as IPv4, so the shape check is what rejects them.</summary>
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("1.2")]
+    [InlineData("1.2.3")]
+    [InlineData("0x7f.0.0.1")]
+    [InlineData("1.2.3.4.5")]
+    [InlineData("1.2.3.0004")]
+    public async Task GetAsync_NonCanonicalIpv4_IsUnavailable(string body) {
+        var (provider, _) = Create((uri, _) => Answer(uri, body, "2001:db8::7"));
+
+        var result = await provider.GetAsync();
+
+        Assert.Null(result.Ipv4);
+        Assert.Equal("2001:db8::7", result.Ipv6);
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("1.2")]
+    [InlineData("203.0.113.7")]
+    public async Task GetAsync_Ipv6EndpointAnswerWithoutAColon_IsUnavailable(string body) {
+        var (provider, _) = Create((uri, _) => Answer(uri, "203.0.113.7", body));
+
+        var result = await provider.GetAsync();
+
+        Assert.Equal("203.0.113.7", result.Ipv4);
+        Assert.Null(result.Ipv6);
+    }
+
+    /// <summary>A body past the cap is refused even when what precedes the padding is a valid address.</summary>
+    [Fact]
+    public async Task GetAsync_OversizedBody_IsUnavailable() {
+        var padded = "203.0.113.7" + new string(' ', 5000);
+        var (provider, _) = Create((uri, _) => Answer(uri, padded, padded));
+
+        var result = await provider.GetAsync();
+
+        Assert.Equal(PublicAddresses.None, result);
+    }
+
+    /// <summary>The cap is on what is read, not only on the verdict: a body that never ends must not hang
+    /// or be buffered whole.</summary>
+    [Fact]
+    public async Task GetAsync_EndlessBody_IsUnavailableWithoutReadingItAll() {
+        var (provider, _) = Create((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StreamContent(new EndlessStream()),
+        }));
+
+        var result = await provider.GetAsync();
+
+        Assert.Equal(PublicAddresses.None, result);
+    }
+
+    /// <summary>Each lookup opens its own connection, so a network switch shows on the next ask.</summary>
+    [Fact]
+    public async Task GetAsync_AsksTheServerToCloseTheConnection() {
+        var (provider, handler) = Create((uri, _) => Answer(uri, "203.0.113.7", "2001:db8::7"));
+
+        await provider.GetAsync();
+
+        Assert.Equal(2, handler.ConnectionClose.Count);
+        Assert.All(handler.ConnectionClose, close => Assert.True(close));
+    }
+
+    /// <summary>The first send can stall on proxy detection, so the request must not start on the caller's thread.</summary>
+    [Fact]
+    public void GetAsync_StartsTheRequestOffTheCallingThread() {
+        var caller = Environment.CurrentManagedThreadId;
+        var seen = new System.Collections.Concurrent.ConcurrentBag<int>();
+        var (provider, _) = Create((uri, _) => {
+            seen.Add(Environment.CurrentManagedThreadId);
+            return Answer(uri, "203.0.113.7", "2001:db8::7");
+        });
+
+        // Block this thread until the work is done, so it cannot be the one that ran it.
+        var task = provider.GetAsync();
+        ((IAsyncResult)task).AsyncWaitHandle.WaitOne();
+
+        Assert.Equal(2, seen.Count);
+        Assert.DoesNotContain(caller, seen);
+    }
+
+    private sealed class EndlessStream : System.IO.Stream {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) {
+            Array.Fill(buffer, (byte)'1', offset, count);
+            return count;
+        }
+        public override long Seek(long offset, System.IO.SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     /// <summary>An IPv4 answer on the IPv6 endpoint (and the reverse) is not what was asked for.</summary>
     [Fact]
     public async Task GetAsync_WrongFamily_IsUnavailable() {
@@ -106,7 +205,7 @@ public class PublicAddressProviderTests {
         var (provider, _) = Create(async (_, token) => {
             await Task.Delay(Timeout.Infinite, token);
             return FakeHttpHandler.Text("203.0.113.7");
-        }, TimeSpan.FromMilliseconds(50));
+        }, TimeSpan.FromMilliseconds(300));
 
         var result = await provider.GetAsync();
 
@@ -135,7 +234,7 @@ public class PublicAddressProviderTests {
             if (uri.Host == PublicAddressProvider.Ipv6Endpoint.Host)
                 await Task.Delay(Timeout.Infinite, token);
             return FakeHttpHandler.Text("203.0.113.7");
-        }, TimeSpan.FromMilliseconds(100));
+        }, TimeSpan.FromMilliseconds(300));
 
         var result = await provider.GetAsync();
 

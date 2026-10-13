@@ -16,6 +16,9 @@ internal sealed class FakeHttpHandler : HttpMessageHandler {
     /// <summary>Every URL requested, in order.</summary>
     public List<Uri> Requested { get; } = [];
 
+    /// <summary>Whether each request asked the server to close the connection, in order.</summary>
+    public List<bool> ConnectionClose { get; } = [];
+
     /// <summary>How a request is answered. Defaults to an empty 200.</summary>
     public Func<Uri, CancellationToken, Task<HttpResponseMessage>> Respond { get; set; } =
         (_, _) => Task.FromResult(Text(""));
@@ -25,8 +28,10 @@ internal sealed class FakeHttpHandler : HttpMessageHandler {
         new(status) { Content = new StringContent(body) };
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) {
-        lock (Requested)
+        lock (Requested) {
             Requested.Add(request.RequestUri!);
+            ConnectionClose.Add(request.Headers.ConnectionClose == true);
+        }
         return Respond(request.RequestUri!, token);
     }
 }

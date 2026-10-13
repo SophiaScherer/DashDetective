@@ -11,8 +11,8 @@ internal sealed record PublicAddresses(string? Ipv4, string? Ipv6) {
 }
 
 /// <summary>
-/// Asks an outside service for the machine's public IPv4 and IPv6 addresses. This is the one read in
-/// the Network tab that leaves the machine, so callers run it only when the user asks. Implementations
+/// Asks an outside service for the machine's public IPv4 and IPv6 addresses. It leaves the
+/// machine, so callers run it only when the user asks. Implementations
 /// must never throw: a family that fails or times out comes back <c>null</c>.
 /// </summary>
 internal interface IPublicAddressProvider {

@@ -3,8 +3,8 @@ using DashDetective.Services.Links;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// The Network tab's OS reads plus its browser opener and public-address lookup, resolved once in the tab's own constructor — the
-/// <c>MetricSamplers</c> shape. Only the connection tables are platform-specific, so
+/// The Network tab's OS reads plus its browser opener and public-address lookup, resolved once in the
+/// tab's own constructor — the <c>MetricSamplers</c> shape. Only the connection tables are platform-specific, so
 /// <see cref="ForCurrentPlatform"/> picks an interop and the portable providers wrap whatever they are
 /// handed.
 ///

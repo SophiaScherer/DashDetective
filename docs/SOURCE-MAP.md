@@ -1747,8 +1747,8 @@ stays in its tab folder.
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
                                 IPublicAddressProvider.cs
                                                         (seam + the PublicAddresses record; null per family
-                                                         = unavailable. THE ONE READ ON THIS TAB THAT LEAVES
-                                                         THE MACHINE — callers run it only when the user asks)
+                                                         = unavailable. IT LEAVES THE MACHINE, so callers run it
+                                                         only when the user asks)
                                 PublicAddressProvider.cs
                                                         (ipify over https, v4 and v6 concurrently, 4 s bound
                                                          each, one shared HttpClient. Accepts a body only if

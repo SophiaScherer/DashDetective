@@ -31,7 +31,7 @@ public static class HelpContent {
         new("page.performance", "Performance",
             "Live graphs per resource. Every CPU, GPU and disk on the machine is detected, and a graph can be broken down into individual cores or engines."),
         new("page.network", "Network",
-            "Your adapters and their throughput, plus the connections the machine currently holds open. The public IP lookup in IP Configuration contacts api.ipify.org, and only when you press Look up."),
+            "Your adapters and their throughput, plus the connections the machine currently holds open. The public IP rows in IP Configuration contact api.ipify.org and api6.ipify.org when you press Look up, and again on Refresh."),
         new("page.storage", "Storage",
             "Drives and partitions with free space, activity and health — including drive temperature where the disk reports it."),
         new("page.hardware", "Hardware",
