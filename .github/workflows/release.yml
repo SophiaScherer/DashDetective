@@ -1,0 +1,100 @@
+# Publishes a downloadable Windows build as a GitHub Release when a version tag is pushed.
+#
+# Tag format: vMAJOR.MINOR.PATCH, with an optional pre-release suffix (v1.2.0, v1.2.0-rc.1). A suffixed
+# tag is published as a pre-release. The tag is the version: it is stamped into the build, so the
+# Settings footer (AppInfo) reports the tag it was released from.
+#
+# The release is UNSIGNED by design — code signing is out of scope — and the release notes say so.
+# Only Windows x64 is packaged; Linux and macOS packaging are out of scope, as in dotnet-desktop.yml.
+#
+# This workflow triggers on tags alone, so it never gates an ordinary push or pull request, and it
+# has no manual trigger, so it cannot be run by accident.
+
+name: Release
+
+on:
+  push:
+    # A glob, not a regex: this also admits v1.2.0-rc.1, and the first step rejects anything that is
+    # not a well-formed version before a build is spent on it.
+    tags: [ "v*.*.*" ]
+
+# Least privilege by default; the release job raises it for itself below.
+permissions:
+  contents: read
+
+# One release per tag. Never cancelled: a half-finished release is worse than a queued one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  release:
+
+    runs-on: windows-latest
+
+    # Creating a release writes to the repo; nothing else here needs it.
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        shell: pwsh
+
+    env:
+      Solution_Name: DashDetective.sln
+      # Passed through the environment, never interpolated into a script body.
+      TAG: ${{ github.ref_name }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    # Reject a malformed tag before building anything, and derive the version from it.
+    - name: Read version from tag
+      run: |
+        if ($env:TAG -notmatch '^v(?<version>\d+\.\d+\.\d+(?<suffix>-[0-9A-Za-z.-]+)?)$') {
+          throw "Tag '$env:TAG' is not vMAJOR.MINOR.PATCH with an optional pre-release suffix (for example v1.2.0 or v1.2.0-rc.1)."
+        }
+        "VERSION=$($Matches.version)" >> $env:GITHUB_ENV
+        "PRERELEASE=$([bool]$Matches.suffix)" >> $env:GITHUB_ENV
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore $env:Solution_Name
+
+    # A tag on a broken commit must not publish.
+    - name: Execute unit tests
+      run: dotnet test $env:Solution_Name --configuration Release --no-restore --verbosity normal
+
+    # Self-contained, so users need no .NET runtime installed. Version flows into the assembly's
+    # informational version, which AppInfo reads back for the Settings footer.
+    - name: Publish
+      run: dotnet publish DashDetective/DashDetective.csproj --configuration Release --runtime win-x64 --self-contained true "-p:Version=$env:VERSION" --output "release/DashDetective-$env:VERSION-win-x64"
+
+    - name: Package
+      run: Compress-Archive -Path "release/DashDetective-$env:VERSION-win-x64" -DestinationPath "release/DashDetective-$env:VERSION-win-x64.zip"
+
+    # The gh CLI is preinstalled on the runner and authenticates with the job's own token: no
+    # third-party action and no extra secret. --notes comes first, --generate-notes appends the changelog.
+    - name: Create GitHub release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $ghArgs = @(
+          'release', 'create', $env:TAG,
+          "release/DashDetective-$env:VERSION-win-x64.zip",
+          '--title', "DashDetective $env:VERSION",
+          '--notes', 'Unsigned build: Windows SmartScreen may warn on first run. Windows x64, self-contained (no .NET runtime needed).',
+          '--generate-notes',
+          '--verify-tag'
+        )
+        if ($env:PRERELEASE -eq 'True') { $ghArgs += '--prerelease' }
+        gh @ghArgs
+        if ($LASTEXITCODE -ne 0) { throw "gh release create failed with exit code $LASTEXITCODE." }

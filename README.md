@@ -98,6 +98,27 @@ Security → Code scanning; they report rather than fail the build.
 Dependabot proposes NuGet and GitHub Actions updates weekly, grouped into one pull request per
 ecosystem.
 
+## Releases
+
+Pushing a version tag publishes a build to [GitHub Releases](../../releases) through the
+[Release](.github/workflows/release.yml) workflow. The tag format is `vMAJOR.MINOR.PATCH`, with an
+optional pre-release suffix:
+
+```powershell
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+- A tag with a suffix (`v1.2.0-rc.1`) is published as a **pre-release**; a malformed tag fails the
+  workflow before anything is built.
+- The workflow runs the test suite first, so a tag on a broken commit publishes nothing, then attaches
+  `DashDetective-<version>-win-x64.zip`: a **self-contained** Windows x64 build, so no .NET runtime is
+  needed. The version is stamped from the tag and shows in the Settings footer.
+- The build is **unsigned** by design, so Windows SmartScreen may warn on first run. The release notes
+  say so.
+- Linux and macOS are not packaged, as in the CI workflow.
+- The workflow triggers on tags alone: ordinary pushes and pull requests never run it.
+
 ## Project Structure
 
 ```
@@ -121,7 +142,7 @@ docs/
   ARCHITECTURE.md                  how the layers and seams fit together
   SOURCE-MAP.md                    every file under src/, and the trap it avoids
   FEATURES.md                      what each shipped feature does
-.github/workflows/                 CI and CodeQL
+.github/workflows/                 CI, CodeQL and release
 ```
 
 The layers and seams are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the individual
