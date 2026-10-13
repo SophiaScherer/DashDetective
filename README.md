@@ -109,6 +109,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
+- The tag must point at a commit on `main`; the workflow fails with "Tag is not on main." otherwise.
 - A tag with a suffix (`v1.2.0-rc.1`) is published as a **pre-release**; a malformed tag fails the
   workflow before anything is built.
 - The workflow runs the test suite first, so a tag on a broken commit publishes nothing, then attaches

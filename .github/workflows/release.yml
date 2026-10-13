@@ -52,10 +52,19 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Only commits on main are released. fetch-depth: 0 already brings the history; the explicit fetch
+    # makes origin/main exist whatever the checkout fetched.
+    - name: Require tag on main
+      run: |
+        git fetch origin main
+        if ($LASTEXITCODE -ne 0) { throw "Could not fetch origin/main." }
+        git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+        if ($LASTEXITCODE -ne 0) { throw "Tag is not on main." }
+
     # Reject a malformed tag before building anything, and derive the version from it.
     - name: Read version from tag
       run: |
-        if ($env:TAG -notmatch '^v(?<version>\d+\.\d+\.\d+(?<suffix>-[0-9A-Za-z.-]+)?)$') {
+        if ($env:TAG -notmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(?<suffix>-[0-9A-Za-z.-]+)?)$') {
           throw "Tag '$env:TAG' is not vMAJOR.MINOR.PATCH with an optional pre-release suffix (for example v1.2.0 or v1.2.0-rc.1)."
         }
         "VERSION=$($Matches.version)" >> $env:GITHUB_ENV
