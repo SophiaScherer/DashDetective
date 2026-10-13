@@ -638,7 +638,7 @@ Rules of thumb:
   `SystemMetricsService` (live sampling), `MetricHistory` + `ChartScale` + `ChartAxis` +
   `ChartWindow` + `ChartStatus` (charts), `ChartPalette` (series colours),
   `CollectionReconciler` (keyed-diff live lists), `HardwareNameFormatter` (CPU/GPU name trim),
-  `UptimeFormatter` / `DataRateFormatter` (formatting), and `Log` (diagnostics behind soft-fail catches).
+  `UptimeFormatter` / `DataRateFormatter` / `ByteRateFormatter` (formatting), and `Log` (diagnostics behind soft-fail catches).
 
 ## Dependencies
 
