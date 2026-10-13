@@ -724,7 +724,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
-                Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
+                Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
                 VramTile = vramTile, VramBytes = gpu.VramBytes, TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             if (previous is { Engines.Count: > 0 }) {
