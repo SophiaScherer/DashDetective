@@ -1569,7 +1569,9 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   the shared renderers, and `ToolkitViewModel.BuildLog(format)` is the one place that choice is made.
   Stanzas keep the order they are shown in — newest first — so the file reads as what was on screen. The
   Markdown renderer turns a newline into `<br>` so multi-line output stays inside its table cell. No exit
-  code row: a `ToolkitLogEntry` does not carry one.
+  code row: a `ToolkitLogEntry` does not carry one. Known limits: Markdown does not escape `&` or `\`
+  (doing so would change the system report's existing output), so output holding `&amp;` or a trailing
+  backslash can render differently from how it was written.
 - **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
   opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
   text, not by index**, so a list that gains or loses a row between sessions cannot silently re-point

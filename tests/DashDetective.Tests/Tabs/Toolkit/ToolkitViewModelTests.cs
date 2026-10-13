@@ -277,6 +277,21 @@ public class ToolkitViewModelTests {
         Assert.Equal(rendered.Count, rendered.Distinct().Count());
     }
 
+    /// <summary>Exporting before anything has run must still write a file the format can open.</summary>
+    [Theory]
+    [InlineData(DiagnosticsFormat.Text)]
+    [InlineData(DiagnosticsFormat.Json)]
+    [InlineData(DiagnosticsFormat.Markdown)]
+    [InlineData(DiagnosticsFormat.Html)]
+    [InlineData(DiagnosticsFormat.Csv)]
+    public void BuildLog_EmptyLog_RendersAWellFormedFile(DiagnosticsFormat format) {
+        var rendered = Page().BuildLog(format);
+
+        Assert.False(string.IsNullOrWhiteSpace(rendered));
+        if (format == DiagnosticsFormat.Json)
+            System.Text.Json.JsonDocument.Parse(rendered).Dispose();
+    }
+
     [Fact]
     public async Task BuildLog_StructuredFormat_KeepsTheOrderTheLogIsShownIn() {
         var vm = Page();

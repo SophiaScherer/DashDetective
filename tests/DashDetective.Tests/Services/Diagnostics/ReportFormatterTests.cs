@@ -95,6 +95,27 @@ public class ReportFormatterTests {
         Assert.Contains("| Output | a<br>b<br>c |", markdown, StringComparison.Ordinal);
     }
 
+    /// <summary>A lone carriage return (old Mac line ending, a progress line) also ends a row in some readers.</summary>
+    [Fact]
+    public void Markdown_LoneCarriageReturn_BecomesALineBreak() {
+        var report = Report(new ReportSection("Run", [new ReportRow("Output", "a\rb")]));
+
+        var markdown = MarkdownReportFormatter.Format(report);
+
+        Assert.Contains("| Output | a<br>b |", markdown, StringComparison.Ordinal);
+    }
+
+    /// <summary>The "&lt;" escape has to run before the newline replacement, or the inserted
+    /// <c>&lt;br&gt;</c> would itself become <c>&amp;lt;br&gt;</c>.</summary>
+    [Fact]
+    public void Markdown_EscapesAngleBracketsButNotTheBreakItInserts() {
+        var report = Report(new ReportSection("Run", [new ReportRow("Output", "<b>\nx")]));
+
+        var markdown = MarkdownReportFormatter.Format(report);
+
+        Assert.Contains("| Output | &lt;b><br>x |", markdown, StringComparison.Ordinal);
+    }
+
     /// <summary>A literal "&lt;DIR&gt;" would be read as an HTML tag and vanish from the rendered table.</summary>
     [Fact]
     public void Markdown_AngleBracketInAValue_IsEntityEscaped() {

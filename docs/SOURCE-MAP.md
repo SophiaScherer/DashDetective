@@ -607,8 +607,9 @@ stays in its tab folder.
                                  hypothetical: every DNS list holds a comma and a machine name is
                                  user-controlled text. Markdown also turns a newline into <br> (a raw
                                  one ends the table row — the Toolkit log's multi-line output) and
-                                 entity-escapes "<" so a "<DIR>" is not read as a tag. EXEMPT from the palette-ownership rule, since an
-                                 exported page is a browser document with no access to the theme)
+                                 entity-escapes "<" so a "<DIR>" is not read as a tag. EXEMPT from the
+                                 palette-ownership rule, since an exported page is a browser document
+                                 with no access to the theme)
         DiagnosticsJsonContext.cs
                                 (source-gen context for the JSON export, like SettingsJsonContext — it
                                  is what keeps the trimming/AOT gate clean)
