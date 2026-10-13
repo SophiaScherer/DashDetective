@@ -66,19 +66,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// Dashboard's network scale floor.</summary>
     private const double MinNetworkScaleMbps = 1.0;
 
-    /// <summary>The resource rows shown in the left rail, in display order (filtered by <see cref="ShowAllDevices"/>).</summary>
+    /// <summary>The resource rows shown in the left rail, in display order: every detected device.</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
 
     /// <summary>The currently selected resource, whose detail the right pane shows.</summary>
     [ObservableProperty] private ResourceRow _selectedResource = null!;
-
-    /// <summary>Whether the rail shows every detected instance ("All devices") or just the primary of each kind
-    /// ("Primary"). Persisted by the shell; today it only changes the disk rows (the sole multi-instance
-    /// category), but the filtering is instance-count-agnostic.</summary>
-    [ObservableProperty] private bool _showAllDevices;
-
-    /// <summary>Raised when <see cref="ShowAllDevices"/> changes, so the shell can persist the choice.</summary>
-    public event Action? ScopeChanged;
 
     // ----- Jumps to the tab that owns the selected device -----
     // The same shape as ToolkitViewModel.FileExplorerRevealRequested: this page names a device and says
@@ -115,17 +107,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyPendingReveal();
     }
 
-    /// <summary>Applies a pending reveal once its row exists, expanding the rail when the Primary scope
-    /// hides the device — the user asked for that one, not the primary of its kind. Cleared before the
-    /// scope flip, whose rebuild calls back in here.</summary>
+    /// <summary>Applies a pending reveal once its row exists.</summary>
     private void ApplyPendingReveal() {
         if (_pendingReveal is not { } deviceId || FindRow(deviceId) is not { } row)
             return;
 
         _pendingReveal = null;
-        if (!Resources.Contains(row))
-            ShowAllDevices = true;
-
         Select(row);
     }
 
@@ -372,26 +359,18 @@ public partial class PerformanceViewModel : ViewModelBase,
         _ = LoadInventoryAsync();
     }
 
-    /// <summary>Rebuilds the rail from the current rows, filtered by <see cref="ShowAllDevices"/>: the single
-    /// categories always show, while the disks collapse to the primary drive ("Primary") or expand to every
-    /// drive ("All devices"). Keeps the current selection when it survives the filter, else selects the first
-    /// row.</summary>
+    /// <summary>Rebuilds the rail from the current rows: every device, grouped by kind. Keeps the current
+    /// selection when its device survives, else selects the first row.</summary>
     private void RebuildResources() {
         var previous = SelectedResource;
 
         Resources.Clear();
         Resources.Add(_cpuRow);
         Resources.Add(_memoryRow);
-        if (ShowAllDevices)
-            foreach (var disk in _disks)
-                Resources.Add(disk.Row);
-        else if (_disks.Count > 0)
-            Resources.Add(_disks[0].Row);
-        if (ShowAllDevices)
-            foreach (var gpu in _gpus)
-                Resources.Add(gpu.Row);
-        else if (_gpus.Count > 0)
-            Resources.Add(_gpus[0].Row);
+        foreach (var disk in _disks)
+            Resources.Add(disk.Row);
+        foreach (var gpu in _gpus)
+            Resources.Add(gpu.Row);
         Resources.Add(_networkRow);
 
         // Rows built after construction (disks, GPUs) inherit the current window and palette here.
@@ -419,15 +398,6 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? Resources.FirstOrDefault(row => row.DeviceId == deviceId)
             : null;
     }
-
-    partial void OnShowAllDevicesChanged(bool value) {
-        RebuildResources();
-        ScopeChanged?.Invoke();
-    }
-
-    /// <summary>Rail scope segments: "Primary" (one of each kind) and "All devices" (every instance).</summary>
-    [RelayCommand] private void SelectPrimaryScope() => ShowAllDevices = false;
-    [RelayCommand] private void SelectAllScope() => ShowAllDevices = true;
 
     /// <summary>Detail segments (shown only for resources that <see cref="ResourceRow.SupportsDetail"/>):
     /// "Overall" (one chart) and "Detailed" (per-subunit mini charts) on the selected resource.</summary>

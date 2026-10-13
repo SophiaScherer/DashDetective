@@ -71,7 +71,7 @@ public sealed class DeviceInventory {
         _instances.Where(d => d.Category == category).ToList();
 
     /// <summary>The first instance of a category (the "primary" of its kind), or <c>null</c> if none was
-    /// detected. What the Performance rail's "Primary" filter and the singleton categories use.</summary>
+    /// detected.</summary>
     public DeviceInstance? Primary(DeviceCategory category) =>
         _instances.FirstOrDefault(d => d.Category == category);
 
