@@ -15,9 +15,9 @@
          The shared 7-column layout is repeated on the header and each row (like the Network and File
          Explorer tables). -->
     <UserControl.Resources>
-        <!-- PID is a right-aligned number whose neighbor may be STATUS, left-aligned text, and the column
-             gap is only 4px. This keeps the digits off the next column's text. It is applied to the header,
-             the cells and the placeholder bar alike so they share one right edge. -->
+        <!-- PID is right-aligned but its neighbor may be left-aligned text (STATUS), and the column gap is
+             only 4px. This inset keeps the digits off that text; the header, cells and placeholder bar all
+             take it so they share one right edge. -->
         <Thickness x:Key="PidInset">0,0,8,0</Thickness>
         <!-- Shared row template for all three groups (Apps / Background / Windows) so the 7-column
              layout is defined once instead of copy-pasted per group; it must stay in sync with the
@@ -474,7 +474,7 @@
                     <controls:SortableColumnHeader Grid.Column="{Binding NameColumn}" Text="NAME" Column="{Binding NameSort}"/>
                     <controls:SortableColumnHeader Grid.Column="{Binding PidColumn}" Text="PID" Column="{Binding PidSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"
-                                                   Margin="{StaticResource PidInset}"/>
+                                                   ContentInset="{StaticResource PidInset}"/>
                     <controls:SortableColumnHeader Grid.Column="{Binding StatusColumn}" Text="STATUS" Column="{Binding StatusSort}"/>
                     <controls:SortableColumnHeader Grid.Column="{Binding CpuColumn}" Text="CPU" Column="{Binding CpuSort}"
                                                    ContentAlignment="Right" ArrowFirst="True"/>

@@ -1370,8 +1370,10 @@ behind it that must not be quietly undone:
   identifier (PID), so PID is right-aligned like the rest and its header leads with the sort arrow
   (`ArrowFirst`) so the label sits flush with the digits. PID alone carries a small right inset (`PidInset`)
   on header, cells and placeholder bar, because the column gap is 4px and STATUS, its default neighbor, is
-  left-aligned text; the column's 58px minimum leaves room for six digits inside it. Keep any new column to
-  the same rule.
+  left-aligned text. The header takes it through `SortableColumnHeader.ContentInset` (button padding), never
+  a Margin, so the whole cell stays clickable and the drag drop-targets keep their full bounds. PID's
+  minimum width is 59px, the most that leaves CPU (72 / 0.85) as the column that sets `MinTableWidth`; a
+  seven-digit PID can still clip at that floor. Keep any new column to the same rule.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
 `EnumListCodec`, and the promotion of `CheckBox.optionCheck` and `ToggleButton.optionsToggle` to
 `SharedStyles` (their File Explorer copies deleted — a local style silently outranks the shared one).

@@ -17,7 +17,7 @@ public static class ProcessColumns {
     /// <see cref="ProcessColumnId"/>, so this array's order must match the enum's.</summary>
     private static readonly (ProcessColumnId Id, double MinWidth, double Weight)[] Table = {
         (ProcessColumnId.Name, 180, 2.4),
-        (ProcessColumnId.Pid, 58, 0.7),
+        (ProcessColumnId.Pid, 59, 0.7),
         (ProcessColumnId.Status, 58, 1),
         (ProcessColumnId.Cpu, 72, 0.85),
         (ProcessColumnId.Memory, 68, 0.85),
