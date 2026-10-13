@@ -1181,6 +1181,19 @@ Settings. Panels:
   height-capped and scrolls so many adapters don't push the page down.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
+  Two more rows, **Public IPv4 / Public IPv6**, show the address the internet sees. Unlike every other
+  row they need an **outbound call**, so they are **opt-in, like the DNS panel**: each shows a small
+  Look up button (tooltip: "Asks api.ipify.org for the address the internet sees…") and nothing is
+  requested at startup, on the sampling timers or on a Refresh that precedes the first ask. After the
+  first Look up, toolbar Refresh repeats it (`PublicLookedUp`, the `_dnsResolved` shape). The service is
+  `api.ipify.org` for IPv4 and `api6.ipify.org` for IPv6, **https only**, read concurrently with a 4 s
+  bound each (`PublicAddressProvider`, one shared `HttpClient`). A body counts only if
+  `IPAddress.TryParse` accepts it **and** it is the family asked for, so a captive portal's HTML page or
+  a v4 answer on the v6 endpoint reads "Unavailable". Each family fails independently — IPv6 missing on a
+  v4-only network is a normal outcome, not an error banner. A generation counter lets only the newest
+  lookup publish. **The public addresses are deliberately not in the diagnostics export**
+  (`GetPrimaryConfigRows`): an export is shared, and it would carry the one address the user has not
+  otherwise given anyone. The Network Help topic discloses the call as well.
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
   scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
   `NetworkUsageSampler` instance on a 1 Hz timer.

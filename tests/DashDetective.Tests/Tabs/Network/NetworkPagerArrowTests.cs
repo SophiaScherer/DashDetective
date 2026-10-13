@@ -41,7 +41,7 @@ public class NetworkPagerArrowTests {
     private static async Task<NetworkViewModel> LoadedAsync(int rowCount, IConnectionsProvider? provider = null) {
         var vm = new NetworkViewModel(
             new NetworkProviders(new StubAdapters(), provider ?? new Rows(rowCount), new StubDns(),
-                                 new FakeWebLinkOpener()));
+                                 new FakeWebLinkOpener(), new FakePublicAddressProvider()));
         vm.Refresh();
         await Task.Yield();
         return vm;

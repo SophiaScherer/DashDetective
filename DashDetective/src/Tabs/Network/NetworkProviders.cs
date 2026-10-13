@@ -3,7 +3,7 @@ using DashDetective.Services.Links;
 namespace DashDetective.Tabs.Network;
 
 /// <summary>
-/// The Network tab's OS reads plus its browser opener, resolved once in the tab's own constructor — the
+/// The Network tab's OS reads plus its browser opener and public-address lookup, resolved once in the tab's own constructor — the
 /// <c>MetricSamplers</c> shape. Only the connection tables are platform-specific, so
 /// <see cref="ForCurrentPlatform"/> picks an interop and the portable providers wrap whatever they are
 /// handed.
@@ -14,7 +14,7 @@ namespace DashDetective.Tabs.Network;
 /// </summary>
 internal sealed record NetworkProviders(
     IAdapterInfoProvider Adapters, IConnectionsProvider Connections, IDnsLookupProvider Dns,
-    IWebLinkOpener Links) {
+    IWebLinkOpener Links, IPublicAddressProvider PublicAddresses) {
 
     /// <summary>The provider set for this machine. The adapter and DNS readers are portable; the connection
     /// tables and the naming of their owners differ, and each seam chooses its own arm.</summary>
@@ -23,5 +23,5 @@ internal sealed record NetworkProviders(
 
     private static NetworkProviders Create(IConnectionsInterop interop, IProcessNameResolver names) => new(
         new AdapterInfoProvider(), new ConnectionsProvider(interop, names), new DnsLookupProvider(),
-        new WebLinkOpener());
+        new WebLinkOpener(), new PublicAddressProvider());
 }

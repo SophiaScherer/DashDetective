@@ -152,6 +152,34 @@
                         <controls:InfoRow Mono="True" Flush="True" Key="DNS" Value="{Binding IpConfig.Dns}"/>
                         <controls:InfoRow Mono="True" Flush="True" Key="MAC" Value="{Binding IpConfig.Mac}"/>
                         <controls:InfoRow Mono="True" Flush="True" Key="DHCP" Value="{Binding IpConfig.Dhcp}"/>
+                        <!-- The public addresses are the one read on this page that leaves the machine, so
+                             each row offers a Look up action (tooltip: where the request goes) until the user
+                             asks, then shows the answer. Built from the InfoRow's own styles because an
+                             InfoRow carries text only. -->
+                        <Border Classes="infoRow mono flush">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource KeyValueGap}">
+                                <TextBlock Classes="infoKey" Text="Public IPv4"/>
+                                <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding PublicIpv4}"
+                                           IsVisible="{Binding PublicLookedUp}"/>
+                                <Button Grid.Column="1" Classes="action" Content="Look up" Padding="10,2"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Command="{Binding LookupPublicAddressesCommand}"
+                                        ToolTip.Tip="{Binding PublicLookupTip}"
+                                        IsVisible="{Binding !PublicLookedUp}"/>
+                            </Grid>
+                        </Border>
+                        <Border Classes="infoRow mono flush">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource KeyValueGap}">
+                                <TextBlock Classes="infoKey" Text="Public IPv6"/>
+                                <TextBlock Grid.Column="1" Classes="infoVal" Text="{Binding PublicIpv6}"
+                                           IsVisible="{Binding PublicLookedUp}"/>
+                                <Button Grid.Column="1" Classes="action" Content="Look up" Padding="10,2"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Command="{Binding LookupPublicAddressesCommand}"
+                                        ToolTip.Tip="{Binding PublicLookupTip}"
+                                        IsVisible="{Binding !PublicLookedUp}"/>
+                            </Grid>
+                        </Border>
                     </StackPanel>
             </controls:WidgetPanel>
             <controls:WidgetPanel layout:WidgetBoard.Weight="1.1" MinWidth="280"
