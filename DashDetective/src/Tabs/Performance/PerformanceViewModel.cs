@@ -658,8 +658,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         foreach (var disk in disks) {
             var history = new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
-            var readTile = new StatTile("Read", "0 MB/s");
-            var writeTile = new StatTile("Write", "0 MB/s");
+            var readTile = new StatTile("Read", ByteRateFormatter.Format(0));
+            var writeTile = new StatTile("Write", ByteRateFormatter.Format(0));
             var responseTile = new StatTile("Response", "0 ms");
             var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       history.Points(100),
@@ -1024,21 +1024,11 @@ public partial class PerformanceViewModel : ViewModelBase,
             disk.Row.Points = disk.History.Points(100);
             disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-            disk.ReadTile.Value = FormatRate(sample.ReadBytesPerSec);
-            disk.WriteTile.Value = FormatRate(sample.WriteBytesPerSec);
+            disk.ReadTile.Value = ByteRateFormatter.Format(sample.ReadBytesPerSec);
+            disk.WriteTile.Value = ByteRateFormatter.Format(sample.WriteBytesPerSec);
             // Avg. Disk sec/Transfer is in seconds; show it in milliseconds like Task Manager's "Response".
             disk.ResponseTile.Value = $"{(sample.ResponseSeconds * 1000).ToString("0.0", CultureInfo.InvariantCulture)} ms";
         }
-    }
-
-    /// <summary>Formats a byte/second throughput as "N MB/s" (binary MiB), whole at ≥ 10 and one
-    /// decimal below so small transfers stay legible.</summary>
-    private static string FormatRate(double bytesPerSec) {
-        var mib = bytesPerSec / (1L << 20);
-        var value = mib >= 10
-            ? Math.Round(mib).ToString(CultureInfo.InvariantCulture)
-            : mib.ToString("F1", CultureInfo.InvariantCulture);
-        return $"{value} MB/s";
     }
 
     /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
