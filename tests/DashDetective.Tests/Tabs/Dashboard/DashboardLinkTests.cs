@@ -72,6 +72,31 @@ public class DashboardLinkTests {
         Assert.Equal([DeviceIds.Network], asked);
     }
 
+    /// <summary>A click raised while a pointer press is in progress is a pointer click, and stays.</summary>
+    [Fact]
+    public void TakeClickGesture_DuringAPointerPress_IsAPointerClick() {
+        var link = new DashboardLink();
+
+        link.NotePointerPress();
+
+        Assert.Equal(LinkGesture.Click, link.TakeClickGesture());
+    }
+
+    /// <summary>A press that ended (released, or capture lost) must not mark a later click — from the
+    /// keyboard or UI Automation's Invoke — as a pointer click, or that click would be swallowed.</summary>
+    [Fact]
+    public void TakeClickGesture_AfterThePressEnded_IsNotAPointerClick() {
+        var page = Page();
+        var asked = Watch(page);
+        var link = new DashboardLink { Command = page.OpenCpuChartCommand };
+
+        link.NotePointerPress();
+        link.NotePointerEnd();
+        link.Respond(link.TakeClickGesture());
+
+        Assert.Equal([DeviceIds.Cpu], asked);
+    }
+
     /// <summary>Enter on a focused card still opens it: the keyboard has no single-click to guard against.</summary>
     [Fact]
     public void EnterOnAFocusedLink_OpensItsDevice() {

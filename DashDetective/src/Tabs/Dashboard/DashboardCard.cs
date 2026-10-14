@@ -57,13 +57,14 @@ public partial class DashboardCard : ObservableObject {
     /// a line of its own, so the template hangs it off the tooltip.</summary>
     [ObservableProperty] private string _note = "";
 
-    /// <summary>The card's tooltip: its note when it has one, otherwise how to open it. A card has no
-    /// room for a line of its own, so both hang off the tooltip and the note wins — a card explaining why it
-    /// reads "—" has more to say than one repeating an affordance.</summary>
-    public string Tip => Note.Length > 0 ? Note : OpenHint;
+    /// <summary>The card's tooltip: its note first when it has one, then how to open it. A card has no room
+    /// for a line of its own, so both hang off the tooltip — and the hint stays, because a single click no
+    /// longer opens anything and the double click would otherwise go unsaid.</summary>
+    public string Tip => Note.Length > 0 ? Note + "\n" + OpenHint : OpenHint;
 
-    /// <summary>What a screen reader announces. The tooltip alone would read "Open in Performance" on
-    /// every card, so this leads with the heading and the reading.</summary>
+    /// <summary>What a screen reader announces. The tooltip alone would read the same open hint on every
+    /// card, and a keyboard user opens with Enter anyway, so this leads with the heading and the
+    /// reading.</summary>
     public string AccessibleName => Note.Length > 0
         ? $"{Label}, {Note}"
         : string.Join(", ", new[] { Label, $"{Value} {Unit}".Trim(), Sub }.Where(p => p.Length > 0));

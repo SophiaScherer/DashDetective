@@ -256,20 +256,24 @@ package.
 their own device on the Performance tab, so a GPU or a specific disk card lands on that device's row
 rather than on whichever row was last selected there. Cards carry the `DeviceIds` id they were built
 from, and the page raises it without knowing which tab shows it — the shell wires that, the same way it
-does for the jumps in the other direction. The affordance is the chart itself, a `Button Classes="bare"`
-that adds a hand cursor, a hover tint and keyboard activation; the **widget header is untouched**, so the
-drag and its double-tap fold behave as they did. A card's tooltip prefers its no-reading note over
-the open hint, since the note has more to say and there is only room for one.
+does for the jumps in the other direction. The affordance is the chart itself, a `DashboardLink`
+(below) that adds a hand cursor, a hover tint and keyboard activation; the **widget header is
+untouched**, so the drag and its double-tap fold behave as they did. A card's tooltip leads with its
+no-reading note when it has one and keeps the open hint on the line below, since the double click is
+not otherwise discoverable.
 
 **Leaving the page takes a double click** (work item 68). A single click on a card or a chart does
 nothing; a double click, or Enter/Space on the focused card or chart, opens it. Each is a
 `DashboardLink` — a `Button` that styles as one (`StyleKeyOverride`), so `Button.bare`, the hover tint
 and the tooltip-to-name rule still apply — whose `OnClick` tells a pointer click from a key press and
-routes both, and `DoubleTapped`, through one gate (`Respond`). Its two pointer clicks never reach the
-command, so a double click opens exactly once. Tooltips say so: *Double-click to open … in
-Performance*. The stat cards have no drag to protect (their panel sets no `DragGrip`), and the charts'
-drag lives on the widget header, which the gate does not touch. Nothing else in the app changed: buttons
-and links such as *View in Hardware* are explicit controls and keep a single click.
+routes both, and `DoubleTapped`, through one gate (`Respond`). The pointer state is cleared on release
+and on capture loss, so a later keyboard press or UI Automation Invoke is never misread as a pointer
+click. Its two pointer clicks never reach the command, so a double click opens exactly once. Tooltips
+say so (*Double-click to open … in Performance*); the **accessible names do not** (*Open CPU in
+Performance*), because a keyboard or screen-reader user presses Enter, and a card's name is its heading
+and reading. The stat cards have no drag to protect (their panel sets no `DragGrip`), and the charts'
+drag lives on the widget header, which the gate does not touch. Nothing else in the app changed:
+buttons and links such as *View in Hardware* are explicit controls and keep a single click.
 
 ## Universal search
 

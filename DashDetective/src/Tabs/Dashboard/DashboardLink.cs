@@ -42,20 +42,41 @@ public class DashboardLink : Button {
         command.Execute(CommandParameter);
     }
 
+    /// <summary>A pointer press began; the click it may end in is a pointer click.</summary>
+    internal void NotePointerPress() => _pointerPress = true;
+
+    /// <summary>The press is over (released, or capture lost), so a later click from the keyboard or UI
+    /// Automation's Invoke is not misread as a pointer click.</summary>
+    internal void NotePointerEnd() => _pointerPress = false;
+
+    /// <summary>What the click now being raised came from, consuming the pointer state.</summary>
+    internal LinkGesture TakeClickGesture() {
+        var gesture = _pointerPress ? LinkGesture.Click : LinkGesture.Key;
+        _pointerPress = false;
+        return gesture;
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e) {
-        _pointerPress = true;
+        NotePointerPress();
         base.OnPointerPressed(e);
     }
 
+    // The base raises the click from inside its release handler, so the state is cleared only after it.
+    protected override void OnPointerReleased(PointerReleasedEventArgs e) {
+        base.OnPointerReleased(e);
+        NotePointerEnd();
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e) {
+        base.OnPointerCaptureLost(e);
+        NotePointerEnd();
+    }
+
     protected override void OnKeyDown(KeyEventArgs e) {
-        _pointerPress = false;
+        NotePointerEnd();
         base.OnKeyDown(e);
     }
 
     // The base would run the command on every click; this routes it through the gate instead.
-    protected override void OnClick() {
-        var gesture = _pointerPress ? LinkGesture.Click : LinkGesture.Key;
-        _pointerPress = false;
-        Respond(gesture);
-    }
+    protected override void OnClick() => Respond(TakeClickGesture());
 }

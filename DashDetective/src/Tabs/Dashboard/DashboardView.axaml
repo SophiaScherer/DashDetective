@@ -76,9 +76,11 @@
                     <TextBlock Text="{Binding CpuPercentText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartCpuText}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <!-- A double click on the body opens this device in Performance; the header keeps its
-                     drag and fold. -->
+                     drag and fold. The name is set apart from the tooltip and says no "double-click":
+                     a keyboard or screen-reader user presses Enter. -->
                 <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
-                        ToolTip.Tip="Double-click to open CPU in Performance">
+                        ToolTip.Tip="Double-click to open CPU in Performance"
+                        AutomationProperties.Name="Open CPU in Performance">
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
@@ -92,7 +94,8 @@
                     <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartMemoryText}"/>
                 </controls:WidgetPanel.HeaderContent>
                 <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
-                        ToolTip.Tip="Double-click to open Memory in Performance">
+                        ToolTip.Tip="Double-click to open Memory in Performance"
+                        AutomationProperties.Name="Open Memory in Performance">
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
                                         YMin="0" YMax="100" Points="{Binding MemoryPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
@@ -162,7 +165,8 @@
                                               Pattern2="{DynamicResource ChartPatterns}"/>
                     </Grid>
                     <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenNetworkChartCommand}"
-                            ToolTip.Tip="Double-click to open this adapter in Performance">
+                            ToolTip.Tip="Double-click to open this adapter in Performance"
+                            AutomationProperties.Name="Open the network adapter in Performance">
                         <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
                                             Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                             Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
