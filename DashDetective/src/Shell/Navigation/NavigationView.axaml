@@ -99,6 +99,22 @@
             <Setter Property="Margin" Value="12,0,0,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="RenderTransform" Value="translateY(0px)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <!-- Hover lift: the icon and label rise 1.5px as the pointer passes, upward on every edge. A render
+             transform, so layout never moves and no neighbor shifts; on the content only, so the row's
+             background and indicator stay put. Time-based, so it runs at one speed at every scale; the
+             distance is in DIPs inside the scale host, so it grows with the interface size. The selected
+             row lifts too: it is still a button, and every row answering the pointer alike reads as one
+             control. Pointer only — keyboard focus already draws Fluent's ring. Reduce motion undoes both
+             the lift and the tween at the end of this file. -->
+        <Style Selector="Button.nav:pointerover StackPanel.navContent">
+            <Setter Property="RenderTransform" Value="translateY(-1.5px)"/>
         </Style>
         <!-- The brand area stretches so the whole strip is a drag handle; the logo and wordmark inside
              it stay left-aligned. -->
@@ -284,6 +300,14 @@
             <Setter Property="Transitions">
                 <Transitions/>
             </Setter>
+        </Style>
+        <!-- After the hover lift, so it wins while both match: no tween and no lift, since an instant jump
+             is still motion. -->
+        <Style Selector=":is(Window).reduceMotion Border.rail StackPanel.navContent">
+            <Setter Property="Transitions">
+                <Transitions/>
+            </Setter>
+            <Setter Property="RenderTransform" Value="translateY(0px)"/>
         </Style>
     </UserControl.Styles>
 
