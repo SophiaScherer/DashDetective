@@ -1401,9 +1401,14 @@ stays in its tab folder.
                                  owns the search focus + the search-reveal flash, like
                                  ProcessesView/SettingsView. The row body is a chrome-less Button whose
                                  click only SELECTS; a double click (code-behind), Enter (the page's
-                                 Activate case) and the play button all run through RunCommand. The view
-                                 tells the VM when another button holds focus, so Enter on a pin pins.
-                                 The row's buttons are SIBLINGS of the body, not nested)
+                                 Activate case) and the play button all run through RunCommand. Enter
+                                 asks the view's FocusProbe what holds focus WINDOW-WIDE at press time,
+                                 so a focused toolbar or nav button keeps the key. The row's buttons are
+                                 SIBLINGS of the body, not nested)
+                                ToolkitActivation.cs    (pure activation decisions: which row Enter runs
+                                                         for what holds focus — a row body, nothing, or
+                                                         anything else, which keeps the key — and the play
+                                                         button's repeat-press guard)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
                                 ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —

@@ -82,8 +82,12 @@ public sealed partial class ToolkitEntry : ObservableObject {
     /// default is discoverable without trying it.</summary>
     public string DefaultActionText => DefaultActionFor(Action.Kind, CanOpenInApp, OperatingSystem.IsWindows());
 
-    /// <summary>The row body's tooltip: the default action, then what the command is for.</summary>
-    public string ActivationTip => DefaultActionText + "\n" + Description;
+    /// <summary>How a row is activated, said where the action is: a click only selects.</summary>
+    public const string ActivationGesture = "Double-click or press Enter";
+
+    /// <summary>The row body's tooltip: how to activate it and what that does, then what the command is
+    /// for.</summary>
+    public string ActivationTip => ActivationGesture + ": " + DefaultActionText + "\n" + Description;
 
     /// <summary>The row body's screen-reader name. Leads with the command, which the tooltip does not
     /// carry, so each row announces which command it would act on.</summary>

@@ -52,10 +52,10 @@ public class ToolkitEntryTests {
                      Row(ToolkitAction.OpenPath("shell:startup")).DefaultActionText);
 
     [Fact]
-    public void ActivationTip_LeadsWithTheDefaultActionThenTheDescription() {
+    public void ActivationTip_LeadsWithTheGestureAndTheDefaultActionThenTheDescription() {
         var entry = Row(ToolkitAction.Elevated("sfc", "/scannow"), description: "Scans system files");
 
-        Assert.Equal("Run as administrator\nScans system files", entry.ActivationTip);
+        Assert.Equal("Double-click or press Enter: Run as administrator\nScans system files", entry.ActivationTip);
     }
 
     /// <summary>The tooltip does not carry the command, so the name has to, or every row of one kind
@@ -76,7 +76,8 @@ public class ToolkitEntryTests {
 
         Assert.All(rows, entry => {
             Assert.False(string.IsNullOrWhiteSpace(entry.DefaultActionText));
-            Assert.StartsWith(entry.DefaultActionText + "\n", entry.ActivationTip, StringComparison.Ordinal);
+            Assert.StartsWith(ToolkitEntry.ActivationGesture + ": " + entry.DefaultActionText + "\n",
+                              entry.ActivationTip, StringComparison.Ordinal);
         });
     }
 

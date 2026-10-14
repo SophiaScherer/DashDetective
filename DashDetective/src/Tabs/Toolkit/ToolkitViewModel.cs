@@ -27,7 +27,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     private readonly ToolkitRunner _runner;
     private readonly IToolkitCatalog _catalog;
     private ToolkitCategory? _category;
-    private string? _pendingReveal;
+    private ToolkitEntry? _pendingReveal;
 
     /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner and is the
     /// only thing that can draw one; left null in a test, where there is nothing to draw on.</summary>
@@ -133,36 +133,39 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
     public event Action? SearchFocusRequested;
 
-    /// <summary>Nudges the view to reveal the pending command. Carries nothing: the command lives in
+    /// <summary>Nudges the view to reveal the pending row. Carries nothing: the row lives in
     /// <see cref="TakePendingReveal"/>, so a reveal that arrives before the view exists is not lost.</summary>
     public event Action? RevealRequested;
 
-    /// <summary>Brings a command into view after universal search navigated here. The filter is reset
-    /// first: a chip or a half-typed search from earlier could otherwise have hidden the very row the
-    /// user just picked. The row is selected, never run — picking a search result is not a click on
-    /// it, so running it is left to a second, deliberate Enter or double click.</summary>
-    public void Reveal(string command) {
+    /// <summary>Brings a row into view after universal search navigated here. The filter is reset first:
+    /// a chip or a half-typed search from earlier could otherwise have hidden the very row the user just
+    /// picked. The row is selected by identity — a custom row and a catalog row can share a label — and
+    /// never run: picking a search result is not an activation. A row no longer on the page clears the
+    /// selection, so Enter cannot run whatever was selected before.</summary>
+    public void Reveal(ToolkitEntry target) {
         SelectCategory(Categories[0]);
         Search = "";
+        SelectedEntry = null;
         foreach (var entry in AllEntries) {
-            if (entry.Command == command) {
+            if (ReferenceEquals(entry, target)) {
                 SelectedEntry = entry;
                 break;
             }
         }
 
+
         // Held rather than passed to the event, because on the first jump to this tab the view has not
         // been built yet and so is not listening — the shell navigates and reveals in one breath, but
         // the page's visual tree only appears on the next layout pass. The view drains this when it
         // attaches, and the event covers the case where it was already attached.
-        _pendingReveal = command;
+        _pendingReveal = target;
         RevealRequested?.Invoke();
     }
 
-    /// <summary>Takes the command waiting to be revealed, if any, clearing it. Called by the view both
+    /// <summary>Takes the row waiting to be revealed, if any, clearing it. Called by the view both
     /// when it attaches and when <see cref="RevealRequested"/> fires, so whichever comes first wins and
     /// the other finds nothing.</summary>
-    internal string? TakePendingReveal() {
+    internal ToolkitEntry? TakePendingReveal() {
         var pending = _pendingReveal;
         _pendingReveal = null;
         return pending;
@@ -181,16 +184,23 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
                 ClearSearch();
                 return true;
 
-            // Unconsumed when nothing is selected, a run is in flight, or another button has focus, so
-            // the key still reaches whatever that is.
-            case ShortcutId.Activate when SelectedEntry is { } entry && !FocusedControlOwnsEnter &&
-                                          RunCommand.CanExecute(entry):
-                _ = Activate(entry);
-                return true;
+            case ShortcutId.Activate:
+                return ActivateFromEnter();
 
             default:
                 return false;
         }
+    }
+
+    // Unconsumed when focus is on another control, nothing is selected, or a run is in flight, so the key
+    // still reaches whatever has focus.
+    private bool ActivateFromEnter() {
+        var (focus, row) = FocusProbe?.Invoke() ?? (ToolkitActivation.Focus.Other, null);
+        if (ToolkitActivation.EnterTarget(focus, row, SelectedEntry) is not { } entry || !RunCommand.CanExecute(entry))
+            return false;
+
+        _ = Activate(entry);
+        return true;
     }
 
     /// <summary>Raised when a row asks to be opened in the app's own File Explorer, carrying the resolved
@@ -210,9 +220,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             newValue.IsSelected = true;
     }
 
-    /// <summary>Set by the view while a button other than a row body holds focus. Enter then belongs to
-    /// that button — pressing it on a focused pin must pin, not run the selected command.</summary>
-    internal bool FocusedControlOwnsEnter { get; set; }
+    /// <summary>Asked by Enter, at press time, what holds keyboard focus — window-wide, since a focused
+    /// toolbar or nav control must keep Enter too. Set by the view; null (no view yet) reads as focus
+    /// elsewhere, so nothing runs.</summary>
+    internal Func<(ToolkitActivation.Focus Focus, ToolkitEntry? Row)>? FocusProbe { get; set; }
 
     /// <summary>A single click on a row body: selects it, and nothing else.</summary>
     [RelayCommand]

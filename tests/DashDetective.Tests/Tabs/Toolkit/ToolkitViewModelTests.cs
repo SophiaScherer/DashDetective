@@ -16,7 +16,7 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// The rows exercised here deliberately point at a tool that does not exist, so the whole
 /// view-model → runner → launcher chain runs for real without anything being started.
 /// </summary>
-public class ToolkitViewModelTests {
+public sealed class ToolkitViewModelTests : IDisposable {
     // The Windows table by name rather than whichever ForCurrentPlatform() resolves: the assertions
     // below are written against its rows (%temp%, regedit, %appdata%), so naming it keeps them running
     // on the Linux CI leg instead of silently asserting against a table that has none of them.
@@ -822,7 +822,7 @@ public class ToolkitViewModelTests {
     public void Reveal_ClearsTheFilterSoTheRowIsOnThePage() {
         var vm = Page("zzzz-no-such-command");
 
-        vm.Reveal("%temp%");
+        vm.Reveal(Catalog.First(e => e.Command == "%temp%"));
 
         Assert.Equal("", vm.Search);
         Assert.True(vm.HasCommands);
@@ -903,11 +903,16 @@ public class ToolkitViewModelTests {
         Assert.Empty(launcher.Calls);
     }
 
+
+    private static void FocusOn(ToolkitViewModel vm, ToolkitActivation.Focus focus, ToolkitEntry? row = null) =>
+        vm.FocusProbe = () => (focus, row);
+
     [Fact]
-    public void HandleShortcut_ActivateWithARowSelected_RunsThatRow() {
+    public void HandleShortcut_ActivateWithARowSelectedAndNothingFocused_RunsThatRow() {
         var launcher = new FakeProcessLauncher();
         var vm = Page(launcher: launcher);
         vm.SelectCommand.Execute(CaptureRow());
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
 
         var consumed = vm.HandleShortcut(ShortcutId.Activate);
 
@@ -915,23 +920,49 @@ public class ToolkitViewModelTests {
         Assert.Equal("whoami", launcher.Single.FileName);
     }
 
+    /// <summary>A focused row body runs its own row, even if another was clicked earlier.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateOnAFocusedRowBody_RunsTheFocusedRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow("selected-earlier"));
+        FocusOn(vm, ToolkitActivation.Focus.RowBody, CaptureRow("focused-now"));
+
+        Assert.True(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Equal("focused-now", launcher.Single.FileName);
+        Assert.Equal("focused-now", vm.SelectedEntry?.Command);
+    }
+
     /// <summary>Unconsumed, so Enter still reaches whatever would otherwise have taken it.</summary>
     [Fact]
     public void HandleShortcut_ActivateWithNothingSelected_IsLeftAlone() {
         var launcher = new FakeProcessLauncher();
         var vm = Page(launcher: launcher);
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
 
         Assert.False(vm.HandleShortcut(ShortcutId.Activate));
         Assert.Empty(launcher.Calls);
     }
 
-    /// <summary>Enter on a focused pin button must press the pin, not run the selected command.</summary>
+    /// <summary>Enter on a focused pin, a toolbar button or a nav item must press that control — never
+    /// run the selected command, which could raise a UAC prompt the user did not ask for.</summary>
     [Fact]
-    public void HandleShortcut_ActivateWhileAnotherButtonHasFocus_IsLeftAlone() {
+    public void HandleShortcut_ActivateWhileAnyOtherControlHasFocus_IsLeftAlone() {
         var launcher = new FakeProcessLauncher();
         var vm = Page(launcher: launcher);
         vm.SelectCommand.Execute(CaptureRow());
-        vm.FocusedControlOwnsEnter = true;
+        FocusOn(vm, ToolkitActivation.Focus.Other);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>With no view to say what has focus, nothing is assumed: Enter runs nothing.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNoFocusProbe_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
 
         Assert.False(vm.HandleShortcut(ShortcutId.Activate));
         Assert.Empty(launcher.Calls);
@@ -958,7 +989,6 @@ public class ToolkitViewModelTests {
         vm.Search = "temp";
 
         Assert.Same(entry, vm.SelectedEntry);
-        vm.SelectCommand.Execute(null);
     }
 
     /// <summary>Picking a universal-search result selects the row and flashes it, but never runs it —
@@ -969,13 +999,47 @@ public class ToolkitViewModelTests {
         var vm = Page(launcher: launcher);
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
+        var target = Catalog.First(e => e.Command == "ipconfig /all");
 
-        vm.Reveal("ipconfig /all");
+        vm.Reveal(target);
 
-        Assert.Equal("ipconfig /all", vm.SelectedEntry?.Command);
+        Assert.Same(target, vm.SelectedEntry);
+        Assert.Same(target, vm.TakePendingReveal());
         Assert.Empty(launcher.Calls);
         Assert.Empty(vm.Log);
         Assert.Equal(0, revealed);
-        vm.SelectCommand.Execute(null);
+    }
+
+    /// <summary>A row that is no longer on the page (deleted since the search ran) leaves nothing
+    /// selected, so the next Enter cannot run whatever was selected before.</summary>
+    [Fact]
+    public void Reveal_ARowNoLongerOnThePage_ClearsTheSelection() {
+        var vm = Page();
+        vm.SelectCommand.Execute(Catalog.First(e => e.Command == "%temp%"));
+
+        vm.Reveal(CaptureRow("gone"));
+
+        Assert.Null(vm.SelectedEntry);
+    }
+
+    /// <summary>A custom row sharing a catalog row's label is selected as itself, not as the catalog
+    /// row that happens to come first.</summary>
+    [Fact]
+    public void Reveal_ACustomRowSharingACatalogLabel_SelectsTheCustomRow() {
+        var vm = Page();
+        vm.AddCommand(new ToolkitCommand("ipconfig /all", "Mine", ToolkitCommandType.Capture, "ipconfig"));
+        var custom = vm.Custom.Single();
+
+        vm.Reveal(custom);
+
+        Assert.Same(custom, vm.SelectedEntry);
+    }
+
+    // The catalogs are singletons, so a selection left on one of their rows would leak into the next test
+    // — cleared here even when an assertion failed.
+    public void Dispose() {
+        foreach (var entry in Catalog)
+            entry.IsSelected = false;
+        GC.SuppressFinalize(this);
     }
 }

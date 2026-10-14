@@ -338,7 +338,7 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
                                                 <Border Classes="cmdRow" Classes.selected="{Binding IsSelected}"
-                                                        Tag="{Binding Command}">
+                                                        Tag="{Binding}">
                                                   <Panel>
                                                     <!-- Reveal tint, behind the content and spanning
                                                          the whole row — which is why the row's inset
@@ -467,8 +467,11 @@
                                                                  program: the one-click way to run it,
                                                                  through the same RunCommand as a double
                                                                  click. Its tooltip is the default action
-                                                                 itself ("Run as administrator"). -->
-                                                            <Button Classes="rowAction"
+                                                                 itself ("Run as administrator"). The
+                                                                 second press of a double click is
+                                                                 swallowed in the code-behind, so it runs
+                                                                 once. -->
+                                                            <Button Classes="rowAction play"
                                                                     ToolTip.Tip="{Binding DefaultActionText}"
                                                                     AutomationProperties.Name="{Binding RunButtonName}"
                                                                     IsVisible="{Binding HasRunButton}"
