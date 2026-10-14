@@ -43,12 +43,12 @@
         </Style>
         <!-- Pager buttons: the current page number accented, and the four skip/step arrows dimmed at
              either end via the disabled state. No ellipsis — every page number fits on one row. -->
-        <!-- Skip/step arrows bracketing the page numbers. Same 30px box and hover as pageLink so the row
-             reads as one control, with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
+        <!-- Skip/step arrows bracketing the page numbers. Same 30px minimum box and hover as pageLink so the row
+             reads as one control (a minimum, so both grow with the text and the arrows stretch to match), with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
              surface transparent, since Fluent's default disabled state paints a filled box. -->
         <Style Selector="Button.pageArrow">
             <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -58,8 +58,8 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.pageArrow Path">
-            <Setter Property="Width" Value="14"/>
-            <Setter Property="Height" Value="14"/>
+            <Setter Property="Width" Value="{StaticResource IconSizeSmall}"/>
+            <Setter Property="Height" Value="{StaticResource IconSizeSmall}"/>
             <Setter Property="Stretch" Value="Uniform"/>
             <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="StrokeThickness" Value="1.6"/>
@@ -87,7 +87,7 @@
 
         <Style Selector="Button.pageLink">
             <Setter Property="MinWidth" Value="30"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
@@ -237,16 +237,16 @@
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" Height="{StaticResource TableRowHeight}">
-                                        <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="{DynamicResource TextSizeCompact}"
+                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" MinHeight="{StaticResource TableRowHeight}">
+                                        <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="{DynamicResource TextSizeBody}"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="{DynamicResource TextSizeSmall}"
+                                        <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="{DynamicResource TextSizeBody}"
                                                    FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSubtle}"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="{DynamicResource TextSizeSmall}"
+                                        <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="{DynamicResource TextSizeBody}"
                                                    VerticalAlignment="Center" Foreground="{Binding StateBrush}"/>
-                                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="{DynamicResource TextSizeSmall}"
+                                        <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="{DynamicResource TextSizeBody}"
                                                    VerticalAlignment="Center" TextAlignment="Right"
                                                    Foreground="{DynamicResource TextMuted}"/>
                                     </Grid>

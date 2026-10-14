@@ -142,6 +142,18 @@ bar is a closed rectangle, not a stroke, so one `Fill` colors the whole mark and
 Windows and Linux. No ellipsis: the
 provider's 1000-row cap over a page size of 100 means at most ten numbers, which fit on one row.
 
+- **Network type follows the shared scale.** Each Network text element takes the rung its equivalent
+elsewhere uses: connection rows (process, remote address, state, protocol) are **Body**, as the Processes
+and Storage table rows are; headers are the shared `colHead`; IP Configuration is the shared `InfoRow`;
+adapter name/description match the Performance device cards; the console is Caption like the Toolkit log.
+Nothing is a literal. Three things around the text had to learn to grow with it, because a fixed size
+holding scaled text is where Text size breaks: the **connection row** and the **pager buttons** use
+`MinHeight` rather than `Height`; the **console's line height is derived from its font size**
+(`ConsoleCapacity.LineHeightFor`, 1.25x, so 15 at the default) instead of a literal 15, and the capacity
+it reports is re-derived when the size changes — a fixed 15 overlapped the lines at 200 %. The page size
+(100 rows) and the table's 240px body cap do not depend on row height: the body scrolls. Pager step
+arrows are `IconSizeSmall`, like other row-level icon buttons.
+
 - **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the
 tab that owns the selected device: a disk row to **Storage** (selecting that drive), the network row to
 **Network** (flashing that adapter), and CPU/Memory/GPU to **Hardware** (tab only — it is a static spec

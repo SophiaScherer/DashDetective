@@ -1810,7 +1810,10 @@ stays in its tab folder.
                                                          the control stays general; its tooltip is on a
                                                          WRAPPER because a disabled button takes no
                                                          pointer-over and the disabled state is the one
-                                                         needing an explanation. The box is Classes="flat"
+                                                         needing an explanation. THE CONSOLE LINE HEIGHT IS
+                                                         SET IN CODE from the font size (ConsoleCapacity.
+                                                         LineHeightFor), never a literal, so Text size
+                                                         spaces lines instead of overlapping them. The box is Classes="flat"
                                                          like every box inside a field Border — Fluent's
                                                          focus block otherwise paints a filled rectangle
                                                          around the text alone, beside the icon)

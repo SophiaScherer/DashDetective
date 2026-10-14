@@ -50,18 +50,19 @@
                 <Button Grid.Column="1" Classes="go" Content="{Binding #Root.ButtonText}"
                         Command="{Binding #Root.SubmitCommand}"/>
             </Grid>
-            <!-- LineHeight is fixed rather than left to the font, so the capacity arithmetic is
-                 exact and reads the same on both platforms. -->
+            <!-- LineHeight is fixed rather than left to the font, so the capacity arithmetic is exact and
+                 reads the same on both platforms. It is set in code-behind from the font size, which is a
+                 text-size token: a literal here stopped growing with Text size and overlapped the lines. -->
             <Border x:Name="ConsoleBox" Background="{DynamicResource ConsoleBg}" CornerRadius="6"
                     Padding="10" ClipToBounds="True" SizeChanged="OnConsoleBoxSizeChanged">
                 <!-- Top-aligned: output grows down from the first line with the summary under it, so an
                      idle console reads the same as it did before the box started filling the widget. -->
                 <StackPanel Spacing="3" VerticalAlignment="Top">
-                    <TextBlock Text="{Binding #Root.ConsoleText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="{DynamicResource TextSizeCaption}" LineHeight="15" TextWrapping="NoWrap"
+                    <TextBlock x:Name="ConsoleOut" Text="{Binding #Root.ConsoleText}" FontFamily="{StaticResource MonoFont}"
+                               FontSize="{DynamicResource TextSizeCaption}" TextWrapping="NoWrap"
                                Foreground="{Binding #Root.ConsoleBrush}"/>
-                    <TextBlock Text="{Binding #Root.FooterText}" FontFamily="{StaticResource MonoFont}"
-                               FontSize="{DynamicResource TextSizeCaption}" LineHeight="15" Foreground="{Binding #Root.FooterBrush}"/>
+                    <TextBlock x:Name="ConsoleFoot" Text="{Binding #Root.FooterText}" FontFamily="{StaticResource MonoFont}"
+                               FontSize="{DynamicResource TextSizeCaption}" Foreground="{Binding #Root.FooterBrush}"/>
                 </StackPanel>
             </Border>
         </DockPanel>
