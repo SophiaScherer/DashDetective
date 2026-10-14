@@ -41,7 +41,7 @@ public class PerformanceRevealTests {
     private static async Task<PerformanceViewModel> LoadedAsync() {
         var page = Page();
         // The constructor fires its own load and forgets it; letting that finish keeps the row set stable.
-        await Task.Delay(100);
+        await page.InitialLoad;
         await page.LoadInventoryAsync();
         return page;
     }
@@ -98,7 +98,7 @@ public class PerformanceRevealTests {
         page.Reveal(DeviceIds.Disk(SecondDisk));
         Assert.DoesNotContain(page.Resources, row => row.DeviceId == DeviceIds.Disk(SecondDisk));
 
-        await Task.Delay(100);
+        await page.InitialLoad;
         await page.LoadInventoryAsync();
 
         Assert.Equal(DeviceIds.Disk(SecondDisk), page.SelectedResource.DeviceId);

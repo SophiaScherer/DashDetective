@@ -1433,8 +1433,73 @@ total whole from 10 GB up and to one decimal below, so a small total never reads
 sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
 Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both
 ("0 / 460 MB"); an unknown usage reads "— / 12 GB", never a fake 0; an unknown total is a bare "—"
-(`GpuMemoryFormatter`). **The separate dedicated-vs-shared GPU memory work (the next sprint's item) builds
-on this convention: each tile is "usage / total" under a label naming the pool.**
+(`GpuMemoryFormatter`). **Shared GPU memory has its own tile, "Shared memory in use"**, right after the
+VRAM one and on the same convention: each tile is "usage / total" under a label naming its pool. The total is
+DXGI's `SharedSystemMemory` (`DeviceInstance.SharedBytes`) and the usage is PDH
+`\GPU Adapter Memory(*)\Shared Usage` summed across `_phys_N` — the third counter on the sampler's one query,
+and exactly the pair Task Manager's "Shared GPU memory" reads, with no other arithmetic. On Linux it is
+amdgpu's GTT (`mem_info_gtt_total` / `mem_info_gtt_used`), the system memory the card can map; other drivers
+publish none. **An adapter whose shared total is unknown or 0 gets no tile at all** rather than a dash or a
+zero, so a GPU row has four tiles or five. An integrated GPU shows both: a small dedicated carve-out and a
+large shared pool. A saved tile order from before the tile existed places it beside "VRAM in use", its
+declared neighbor. **One saved tile order covers every GPU** (`performance.stats.gpu`), so reordering tiles
+on a GPU with no shared pool saves an order without the shared tile; on a GPU that has one, the tile then
+returns beside "VRAM in use" rather than where it was last dragged. On Windows every real adapter reports a
+shared total, so in practice this arises only on Linux with a non-AMD card beside an AMD one.
+
+**Copy, Video Encode and Video Decode have tiles too**, after 3D and in Task Manager's order — its other
+three default graphs, so they read without switching to Per engine. Each is the busiest engine under that
+label, the same per-type rule as 3D (`GpuEngineTiles`). Two decisions: **a tile exists only for an engine
+the adapter publishes** — it is added the first tick that engine reports, and an adapter without one (or
+Linux, which has no engine map) has no tile rather than a 0 %; and **only unambiguous names map**. AMD
+publishes its encoder as "Video Codec", which serves decoding too on some parts, so the Radeon iGPU has Copy
+and Video Decode tiles and keeps Video Codec in the Per engine grid under its own name. A GPU row therefore
+has four to eight tiles. **"Reports" means a process has used that engine**: PDH's `\GPU Engine(*)` counters
+are per process, so an engine no process has opened has no instance yet, and its tile appears the first time
+one does (a video starting, say), not when the page opens. Once a tile exists, a tick that names the engine
+reads its load, one that names other engines but not this one reads 0 %, and a tick with no engine map or no
+reading at all shows "—" rather than keeping the last figure.
+
+**One saved tile order covers every GPU**, and its re-application is keyed by tile id: two GPUs with the same
+number of tiles under different labels (say Video Encode on one, Video Decode on the other) used to keep the
+first one's permutation, because `ChildOrder` only rebuilt on a change of count. It now also rebuilds when the
+ids change (`ChildOrder.Sync(ids)`, called from `ReorderablePanel.CollectVisible`). The shared tile's caveat
+above still applies to a tile one GPU has and the other lacks.
+
+**Below the tiles, a GPU lists its details** with `InfoRow`, as Task Manager does beside its graphs: Driver
+version, DirectX version and Physical location (`GpuDetailRows`). **A fact the adapter does not publish has
+no row** — no dash — and an adapter with none has no list. **They are a separate read, not part of the
+inventory** (`IGpuDetailsProvider`): on Windows the DirectX probe loads `d3d12.dll`, `D3D12Core.dll` and the
+vendor's user-mode driver into the process, can wake a sleeping discrete GPU on a hybrid laptop, and a
+driver crash there cannot be caught. Every page loads the inventory, so carrying them there cost the
+Dashboard, Storage and every Refresh that work; now only the Performance tab asks, once its GPU rows exist,
+off the UI thread. `ForCurrentPlatform()` is one process-wide `GpuDetailsCache`, so each adapter is read once
+per run (about 0.5 s on the dev box) and a Refresh is served from memory. A rebuilt row keeps its list until
+the read returns.
+- **Driver version** is `Win32_VideoController.DriverVersion` through the shared `VideoControllers`, the same
+  rows the Hardware tab's Graphics card now reads, so the two tabs cannot disagree. Those rows have no LUID,
+  so they join to DXGI by PCI identity (`GpuDriverRows`, the sensor readers' join). On Linux it is the
+  module's own version (`DrmCardFacts.DriverVersion`); in-tree amdgpu has none, so its row is omitted.
+- **Physical location** is the device's `LocationInformation` registry value. pci.sys stores it as a resource
+  reference with the arguments appended (`…;PCI bus %1, device %2, function %3;(1,0,0)`), so the tuple is
+  parsed and re-worded rather than shown raw (`PciLocation`). A card in a numbered slot carries the slot first
+  (`…;PCI Slot %1 (PCI bus %2, …);(3,1,0,0)`), and the last three values are taken; the plain-text forms of
+  both are read too. On Linux it is the card's PCI address, which is
+  **hex** — bus `0f` is "PCI bus 15", matching Windows. Two cards of one model match the same device rows and
+  cannot be told apart by PCI ids, so each gets the shared driver version but **no location** rather than a
+  guessed one.
+- **DirectX version** is "12 (FL x.y)" from `D3D12CreateDevice`'s documented capability test: with a null
+  `ppDevice` it returns a success code for a supported feature level (S_FALSE is the documented one; any
+  success counts) and hands back no device — but it still loads `d3d12.dll`, `D3D12Core.dll` and the vendor's
+  user-mode driver, which is why this read is kept off the inventory. Levels are tried from 12_2 down to 11_0
+  on the live DXGI adapter; no admin is needed. **It reports the real Direct3D 12 maximum, which can differ
+  from Task Manager**: the RTX 3060 reads "12 (FL 12.2)" here where Task Manager may show "12 (FL 12.1)".
+  The higher figure is kept because it is what the hardware supports. A machine with no Direct3D 12 is
+  noticed once, logged once, and not probed again that run. Linux has no DirectX and omits the row. The
+  probe and the driver read soft-fail independently.
+
+The detail pane now scrolls on its own: at a large interface or text size the details would otherwise sit
+past the window's foot on a self-scrolling page.
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
@@ -1930,7 +1995,8 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
   `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
   been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
-  which now feeds the Performance tab's GPU **VRAM** tile — carried per adapter on
+  which now feeds the Performance tab's GPU **VRAM** tile (and its shared total the **Shared memory**
+  tile) — carried per adapter on
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
@@ -1944,8 +2010,10 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
-- `Win32_VideoController` is still read by `HardwareInfoProvider` for the Hardware tab's spec card; the
-  inventory uses `GpuAdapterProvider`. (The old single-name `GpuInfoProvider` was deleted once nothing
+- `Win32_VideoController` is still read for the Hardware tab's spec card, and now also for each adapter's
+  driver version and location (through the shared `VideoControllers`, joined to DXGI by PCI identity); the
+  adapter list itself is `GpuAdapterProvider`'s. Every per-adapter detail — engine tiles, driver, DirectX
+  version, location — is that adapter's own, so a two-GPU machine lists two independent sets. (The old single-name `GpuInfoProvider` was deleted once nothing
   called it.)
 
 ## Repo-hygiene / portfolio pass

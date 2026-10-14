@@ -20,7 +20,9 @@ namespace DashDetective.Services.Platform.Linux;
 /// reader, which shows up as no GPU card at all rather than as a wrong one.
 ///
 /// Fields report "not known" honestly — "" or 0 — rather than substituting a stand-in; each consumer
-/// applies its own placeholder. Stateless and never throws: an unreadable <c>/sys</c> yields no cards.
+/// applies its own placeholder. <see cref="GttBytes"/> is the exception, null when absent: a driver that
+/// publishes no GTT is not the same as a zero-sized pool, and it matches the nullable shared total on
+/// <c>GpuAdapter</c>. Stateless and never throws: an unreadable <c>/sys</c> yields no cards.
 /// </summary>
 internal sealed record DrmCardFacts(
     string Name,
@@ -32,7 +34,9 @@ internal sealed record DrmCardFacts(
     uint SubsystemDeviceId,
     uint Revision,
     ulong VramBytes,
-    string HwmonPath) {
+    string HwmonPath,
+    ulong? GttBytes = null,
+    string DriverVersion = "") {
 
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string DrmRoot = "/sys/class/drm";
@@ -159,8 +163,19 @@ internal sealed record DrmCardFacts(
             ParseHexId(proc.ReadAllText(device + "/subsystem_device")),
             ParseHexId(proc.ReadAllText(device + "/revision")),
             ParseUInt64(proc.ReadAllText(device + "/mem_info_vram_total")),
-            HwmonPathOf(proc, device));
+            HwmonPathOf(proc, device),
+            // amdgpu's GTT: the system memory the GPU can map, Linux's analogue of DXGI's shared memory.
+            ParseOptionalUInt64(proc.ReadAllText(device + "/mem_info_gtt_total")),
+            DriverVersionOf(proc, device));
     }
+
+    /// <summary>
+    /// The driver module's own version string. Out-of-tree modules publish one (the proprietary NVIDIA
+    /// driver does); an in-tree driver like amdgpu ships with the kernel and publishes none, so this is ""
+    /// rather than the kernel release, which would be a different fact under this one's label.
+    /// </summary>
+    private static string DriverVersionOf(IProcFileSystem proc, string device) =>
+        proc.ReadAllText(device + "/driver/module/version")?.Trim() ?? "";
 
     /// <summary>The card's hwmon directory, or "" when it has none. amdgpu and the open NVIDIA drivers
     /// register one per card; the proprietary NVIDIA blob registers none, which is why its temperature has
@@ -200,9 +215,11 @@ internal sealed record DrmCardFacts(
         return slash < 0 ? path : path[(slash + 1)..];
     }
 
-    private static ulong ParseUInt64(string? text) =>
+    private static ulong ParseUInt64(string? text) => ParseOptionalUInt64(text) ?? 0;
+
+    private static ulong? ParseOptionalUInt64(string? text) =>
         text is not null
         && ulong.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
             ? value
-            : 0;
+            : null;
 }
