@@ -6,9 +6,10 @@ using Xunit;
 namespace DashDetective.Tests.Shell;
 
 /// <summary>
-/// Pins how MainWindow wires its chrome: the custom title bar, and Back's place in the toolbar. Each of these builds and runs either way; the symptom
-/// of losing one is a window that quietly keeps the system title bar, draws Fluent's caption buttons, or
-/// scales its title bar away from the buttons beside it.
+/// Pins how MainWindow wires its chrome: the custom title bar, and Back's place in the toolbar. Each of
+/// these builds and runs either way; the symptom of losing one is a window that quietly keeps the system
+/// title bar, draws Fluent's caption buttons, scales its title bar away from the buttons beside it, or
+/// hides Back with the nav bar.
 /// </summary>
 public class MainWindowTests {
     private static readonly string Markup =

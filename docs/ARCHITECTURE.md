@@ -250,9 +250,11 @@ Overrides persist as one encoded string, ids and keys by name.
 `ShellShortcutHandler` (`src/Shell/Shortcuts`) attaches one tunneling `KeyDown` handler to the window.
 Dispatch is a priority chain on `MainWindowViewModel.HandleShortcut` — a capture in progress, then an
 open modal, then the search dropdown, then the current page's scope, then global — so it is testable
-without a UI. A key whose tab binding declines is offered again under its global binding, if it has one
-(`ShortcutCatalog.Resolve`). That is how File Explorer's `Alt+←` falls through to page Back. The mouse's
-back button uses the same dispatch. The modal step is `ModalShortcuts`, split out because the shell view model builds every
+without a UI. A tab binding shadows a global one on the same gesture; only a global entry marked
+`CatchesFallThrough` (page Back alone) is offered after a tab binding that declines
+(`ShortcutCatalog.Resolve`). That is how File Explorer's `Alt+←` reaches page Back at the start of its
+folder trail. The mouse's back and forward buttons are decided by `MouseNavigation` in the same order,
+plus the text-box guard the keys get from `AllowInTextInput`. The modal step is `ModalShortcuts`, split out because the shell view model builds every
 page and cannot itself be constructed in a test. **The capture check has to come first**: the handler tunnels from the window and so sees
 a press before the Settings capture box does, and would otherwise run the shortcut being rebound.
 

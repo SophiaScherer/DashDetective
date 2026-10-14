@@ -14,6 +14,9 @@ namespace DashDetective.Shared.Shortcuts;
 /// for bare keys, which must reach the text box instead of triggering an app action.</param>
 /// <param name="ShowInHelp">Whether Help lists this entry. False for members of a run that a single
 /// row already covers — Ctrl+2…Ctrl+9 are described by the Ctrl+1 row.</param>
+/// <param name="CatchesFallThrough">Global entries only: whether a press the current tab bound but declined
+/// is offered to this action next, rather than ending there. Opt-in, so a rebind onto a tab's gesture
+/// stays shadowed by that tab as it always has; only Back sets it.</param>
 public sealed record Shortcut(
     ShortcutId Id,
     IReadOnlyList<KeyGesture> Gestures,
@@ -21,4 +24,5 @@ public sealed record Shortcut(
     string Description,
     ShortcutScope Scope,
     bool AllowInTextInput = true,
-    bool ShowInHelp = true);
+    bool ShowInHelp = true,
+    bool CatchesFallThrough = false);

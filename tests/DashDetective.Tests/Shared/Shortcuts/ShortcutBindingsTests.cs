@@ -259,6 +259,29 @@ public class ShortcutBindingsTests {
                      bindings.Resolve(Key.Back, KeyModifiers.Alt, false, ShortcutScope.FileExplorer));
     }
 
+    /// <summary>Rebinding a global action onto a tab's gesture keeps the old shadowing: on that tab the press
+    /// is the tab's alone, even when the tab declines it (End Task with nothing selected).</summary>
+    [Fact]
+    public void Resolve_GlobalReboundOntoATabGesture_IsStillShadowedByTheTab() {
+        var bindings = new ShortcutBindings();
+        Assert.True(bindings.TryRebind(ShortcutId.Refresh, new KeyGesture(Key.Delete), out _));
+
+        Assert.Equal([ShortcutId.EndTask],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Processes));
+        Assert.Equal([ShortcutId.Refresh],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Network));
+    }
+
+    /// <summary>A rebind keeps Back's opt-in: moved onto a tab's gesture, it still catches what the tab declines.</summary>
+    [Fact]
+    public void Resolve_PageBackReboundOntoATabGesture_StillFallsThrough() {
+        var bindings = new ShortcutBindings();
+        Assert.True(bindings.TryRebind(ShortcutId.Back, new KeyGesture(Key.Delete), out _));
+
+        Assert.Equal([ShortcutId.EndTask, ShortcutId.Back],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Processes));
+    }
+
     /// <summary>Restore defaults is catalog-driven, so the new entry goes back with everything else.</summary>
     [Fact]
     public void ResetAll_PutsPageBackBackOnAltLeft() {

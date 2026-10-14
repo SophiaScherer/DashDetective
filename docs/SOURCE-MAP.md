@@ -490,17 +490,20 @@ stays in its tab folder.
                                  HandleGlobal maps them to nav positions by subtracting NavigateTab1)
         ShortcutScope.cs        (Global, Search, or the tab that owns the shortcut)
         Shortcut.cs             (one entry: gestures, Help copy, scope, whether it survives a focused
-                                 text box, whether Help lists it)
+                                 text box, whether Help lists it, and for a global entry whether it
+                                 catches a press the current tab declined)
         ShortcutGroup.cs        (one headed block of shortcuts, as Help renders them)
         IShortcutTarget.cs      (a page opts in with Scope + HandleShortcut, so no per-page shell wiring)
         ShortcutCatalog.cs      (the SHIPPED DEFAULTS, one static table, plus the pure table-taking
                                  TryResolve/Resolve/GroupForHelp. Invariant: neither an action nor a gesture
                                  bound twice WITHIN one scope — one id may serve several scopes, which is
-                                 how "/" focuses both the Processes and Toolkit filters. Resolve returns
-                                 the tab's match THEN the global one, and the listener runs the first that
-                                 acts. That is how File Explorer's Alt+Left falls through to page Back at
-                                 the start of its folder trail. MouseBack is the same ordered list for the
-                                 mouse's back button, which is not rebindable)
+                                 how "/" focuses both the Processes and Toolkit filters. A tab binding
+                                 SHADOWS a global one on the same gesture; Resolve offers the global one
+                                 second only when it is marked CatchesFallThrough, and the listener runs
+                                 the first that acts. Only Back is marked, which is how File Explorer's
+                                 Alt+Left reaches page Back at the start of its folder trail. OPT-IN on
+                                 purpose: a user rebinding another global action onto a tab's gesture
+                                 keeps the old shadowing)
         ShortcutBindings.cs     (the bindings ACTUALLY IN FORCE: those defaults with the user's rebinds
                                  applied. Resolution and Help grouping live here because both have to see
                                  what the user chose; the catalog's helpers do the work, so neither
@@ -1263,6 +1266,12 @@ stays in its tab folder.
       BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
                                  from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
                                  shape, so it is testable without constructing the shell)
+      MouseNavigation.cs        (what the mouse's back/forward buttons do, in the chain's order: capture
+                                 leaves the press alone, a modal swallows it, a FOCUSED TEXT BOX keeps it,
+                                 then the tab's own step, then (back only) page history. Pure and split
+                                 out like ModalShortcuts so it is testable. The text guard is the one Alt+←
+                                 gets from AllowInTextInput; without it a press in File Explorer's path box
+                                 fell past the tab, which declines while editing, and left the page)
       ModalShortcuts.cs         (the MODAL step of HandleShortcut and ActiveScope: while Help or the
                                  accent picker is open, Esc dismisses it, Enter falls through to the
                                  focused button, everything else is swallowed, and keys resolve in

@@ -1,4 +1,5 @@
 using Avalonia.Automation;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -274,7 +275,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _currentPage = Nav.SelectedNav.Page;
         _pageHistory.Visit(Nav.SelectedNav);
         Nav.SelectionChanged += OnNavSelected;
-        Shortcuts.Changed += () => OnPropertyChanged(nameof(BackToolTip));
+        Shortcuts.Changed += OnShortcutsChanged;
 
         // Start the page the bar selected; every other page stays idle until it is navigated to.
         UpdatePageActivity();
@@ -654,6 +655,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
         return HandleGlobal(id);
     }
+
+    /// <summary>Runs the mouse's back or forward button. The decision lives in <see cref="MouseNavigation"/>
+    /// so it is testable; this supplies the shell's state.</summary>
+    public bool HandleMouseButton(PointerUpdateKind button, bool textInputFocused) =>
+        MouseNavigation.Handle(button, textInputFocused, _settings.IsCapturingShortcut, Help, AccentPicker,
+                               CurrentPage as IShortcutTarget, TryGoBack);
+
+    /// <summary>A rebind can change Back's key, which its tooltip names.</summary>
+    private void OnShortcutsChanged() => OnPropertyChanged(nameof(BackToolTip));
 
     /// <summary>Handles the shortcuts that work anywhere, whatever page is showing.</summary>
     private bool HandleGlobal(ShortcutId id) => id switch {
