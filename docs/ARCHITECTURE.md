@@ -289,7 +289,7 @@ and none of it needs admin rights:
 | `shell32.dll` | Open and the native Properties sheet |
 | `kernel32.dll`, `psapi.dll` | Process I/O and memory; the NVMe health-log IOCTL |
 | `dxgi.dll` | Enumerating GPU adapters by LUID |
-| `d3d12.dll` | A GPU's DirectX feature level, by capability test (no device is created) |
+| `d3d12.dll` | A GPU's DirectX feature level, by capability test. No device is handed back, but D3D12Core and the vendor's user-mode driver load, so only the Performance tab asks, once per adapter per run |
 | `user32.dll`, `dwmapi.dll` | Window and title-bar integration |
 | `nvapi64.dll`, `nvml.dll`, `atiadlxx.dll` | GPU temperature and power, from the display driver |
 

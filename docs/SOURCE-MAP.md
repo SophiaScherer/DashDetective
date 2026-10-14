@@ -353,7 +353,10 @@ stays in its tab folder.
                                  tests without a layout pass. Reset() is the way back to the declared
                                  order, and it needs its own method because neither neighbour can do it:
                                  ApplySaved is a deliberate no-op on an empty save, and Sync early-returns
-                                 whenever the child count is unchanged, which is every reset)
+                                 whenever the child count is unchanged, which is every reset.
+                                 Sync(ids) — what ReorderablePanel calls — ALSO REBUILDS WHEN THE SAME
+                                 COUNT CARRIES DIFFERENT IDS: one GPU's tiles swapped for another's of equal
+                                 length kept the old permutation and applied it to the wrong tiles)
         Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
                                  start from; OwnsItsOwnGesture, the one list of controls that take clicks
                                  of their own, which a drag and a widget header's double-tap both refuse;
@@ -1100,23 +1103,44 @@ stays in its tab folder.
                                  IDENTITY, not a local detail: a Dashboard card names its device by one
                                  and the Performance rail reveals the row carrying it, so minting them
                                  here is what stops the two spelling the same device differently)
-        IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuDetails / GpuAdapter records. GpuAdapter.FormatLuidToken —
-                                 pure, unit-tested — lives on the record, not the DXGI reader. GpuDetails is
-                                 the driver / DirectX / location trio, each NULL where unpublished;
-                                 FormatDirectX writes a D3D_FEATURE_LEVEL as "12 (FL 12.1)".
+        IGpuAdapterProvider.cs  (seam + the GpuPciId / GpuAdapter records. GpuAdapter.FormatLuidToken —
+                                 pure, unit-tested — lives on the record, not the DXGI reader.
                                  GpuAdapter.LuidToken IS NAMED FOR WINDOWS BUT IS NOT ALWAYS A LUID: it is
                                  whatever this platform uses to say "the same adapter" across independent
                                  readers — the PDH luid token on Windows, the card's PCI address on Linux)
         LinuxGpuAdapterProvider.cs
                                 (/sys/class/drm enumeration over the shared DrmCardFacts, taking its Key
                                  rather than deriving one. Packs the two sysfs subsystem id files into the
-                                 single field DXGI reports, so a card reads the same on both platforms.
-                                 Details: the module's driver version and the PCI address as a location;
-                                 DirectX is always null — there is none)
+                                 single field DXGI reports, so a card reads the same on both platforms)
+        IGpuDetailsProvider.cs  (seam + the GpuDetails record — driver / DirectX / location, each NULL where
+                                 unpublished; FormatDirectX writes a D3D_FEATURE_LEVEL as "12 (FL 12.1)".
+                                 DELIBERATELY NOT PART OF THE INVENTORY: the Windows DirectX probe loads
+                                 d3d12, D3D12Core and the vendor UMD (and can wake a dGPU), so only the
+                                 Performance tab asks, after its GPU rows exist. ForCurrentPlatform() is
+                                 ONE PROCESS-WIDE GpuDetailsCache over the platform reader)
+        GpuDetailsCache.cs      (each adapter's details kept for the run, keyed by adapter key; only unseen
+                                 adapters reach the reader, reads serialized so a Refresh during the first
+                                 read waits rather than probing twice. An adapter the reader had nothing
+                                 for is asked again; a reader that throws caches nothing. Portable)
+        WindowsGpuDetailsProvider.cs
+                                (DirectX via D3D12CreateDevice's capability test on the live adapter —
+                                 handed through WindowsGpuAdapterProvider.Enumerate's visit hook — any
+                                 SUCCESS code counts, 12_2 down to 11_0; a missing d3d12.dll is LOGGED ONCE
+                                 and never probed again. Driver and location from VideoControllers via
+                                 GpuDriverRows; WMI is not touched when no requested adapter exists.
+                                 TYPE-ANNOTATED, not constructor-annotated: its methods call annotated BCL
+                                 APIs (WMI, registry) and the type-annotated adapter provider, so a
+                                 constructor-only attribute does not build. Removing the IsWindows guard in
+                                 ForCurrentPlatform fails CA1416. Holds UnsupportedGpuDetailsProvider)
+        LinuxGpuDetailsProvider.cs
+                                (DrmCardFacts by Key: the module's driver version (none for amdgpu), the
+                                 PCI address as a location, DirectX always null — there is none)
         PciLocation.cs          (an adapter's bus/device/function from EITHER notation — the Windows
-                                 registry's "(1,0,0)" argument tuple or a Linux address "0000:01:00.0",
-                                 which is HEX — written as Task Manager's "PCI bus 1, device 0, function
-                                 0" in DECIMAL. Anything unrecognized is null, so the row is omitted)
+                                 registry's "(1,0,0)" argument tuple (or a slot's "(3,1,0,0)", last three
+                                 taken) or a Linux address "0000:01:00.0", which is HEX — written as Task
+                                 Manager's "PCI bus 1, device 0, function 0" in DECIMAL. Plain-text "PCI
+                                 bus …" and "PCI Slot N (PCI bus …)" are read too. Anything unrecognized is
+                                 null, so the row is omitted)
         GpuDriverRows.cs        (joins the Win32_VideoController rows to the DXGI adapters BY PCI IDENTITY
                                  (PnpPciParser + GpuPciMatcher, the sensor readers' join), since those rows
                                  carry no LUID. TWO CARDS OF ONE MODEL match the same rows: the driver
@@ -1128,13 +1152,10 @@ stays in its tab folder.
                                  DedicatedVideoMemory rides through DeviceInventory onto
                                  DeviceInstance.VramBytes → the Performance GPU VRAM tile, and
                                  SharedSystemMemory onto DeviceInstance.SharedBytes → its shared memory tile;
-                                 that total is the one Task Manager's "Shared GPU memory" reads. Also fills
-                                 GpuDetails: DirectX from D3D12CreateDevice's DOCUMENTED CAPABILITY TEST
-                                 (null ppDevice → S_FALSE for a supported level, NO DEVICE CREATED), probed
-                                 12_2 down to 11_0 on the live adapter pointer inside the DXGI walk; driver
-                                 and location from VideoControllers via GpuDriverRows. Both catches are
-                                 unfiltered on purpose: a secondary read must never fault the adapter list.
-                                 ~200–350 ms per load, off the UI thread)
+                                 that total is the one Task Manager's "Shared GPU memory" reads.
+                                 Enumerate(visit) hands each adapter's live pointer to an optional callback
+                                 before release — how the details reader probes Direct3D without a second
+                                 walk. The inventory passes none, so it never loads Direct3D)
         IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
                                 (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
                                  ForCurrentPlatform shares ONE reader with the Storage page)
@@ -1958,7 +1979,10 @@ stays in its tab folder.
                                  SCROLLS ON ITS OWN: a GPU's details list sits below the tiles, and at a
                                  large interface or text size it would otherwise be cut off at the
                                  window's foot. ResourceRow.Stats is observable because a GPU's Copy /
-                                 video engine tiles arrive with its first sample, not with its row.)
+                                 video engine tiles arrive with its first sample, not with its row, and
+                                 Details because the GPU details are a separate read LoadInventoryAsync
+                                 makes only after the GPU rows are built. InitialLoad is the constructor's
+                                 loads as one task, so tests await it instead of sleeping.)
                                 (Reveal(deviceId) is the jump INTO this page, the counterpart to the
                                  detail header's jumps out of it. Rows carry the DeviceInstance id they
                                  were built from. Two things it must keep doing: EXPAND THE RAIL when the
