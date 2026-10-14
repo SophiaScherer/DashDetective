@@ -40,6 +40,16 @@ public sealed class ShortcutBindings {
         Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) =>
         ShortcutCatalog.TryResolve(All, key, modifiers, textInputFocused, scope, out id);
 
+    /// <summary>Every action a key press may run against the live bindings, the active tab's first; the
+    /// shell runs the first that acts. See <see cref="ShortcutCatalog.Resolve"/>.</summary>
+    public IReadOnlyList<ShortcutId> Resolve(
+        Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope) =>
+        ShortcutCatalog.Resolve(All, key, modifiers, textInputFocused, scope);
+
+    /// <summary>How a shortcut's binding reads right now, rebinds included — for a tooltip that names
+    /// its key. Empty for an id with no entry.</summary>
+    public string KeysFor(ShortcutId id) => Find(id)?.Keys ?? "";
+
     /// <summary>
     /// Binds <paramref name="gesture"/> to <paramref name="id"/>, unless something in the same scope
     /// already has it — in which case nothing changes and <paramref name="conflict"/> names the holder.

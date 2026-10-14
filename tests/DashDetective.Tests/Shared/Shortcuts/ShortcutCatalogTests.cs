@@ -137,6 +137,51 @@ public class ShortcutCatalogTests {
     }
 
     [Fact]
+    public void Resolve_AltLeftOnAnyTabButFileExplorer_IsPageBackAlone() {
+        foreach (var scope in new[] { ShortcutScope.Global, ShortcutScope.Processes, ShortcutScope.Network })
+            Assert.Equal([ShortcutId.Back], ShortcutCatalog.Resolve(
+                ShortcutCatalog.All, Key.Left, KeyModifiers.Alt, textInputFocused: false, scope));
+    }
+
+    /// <summary>The folder trail is offered first and page back second, so a File Explorer that has
+    /// nowhere to go back to lets the key fall through rather than swallowing it.</summary>
+    [Fact]
+    public void Resolve_AltLeftOnFileExplorer_OffersFolderBackThenPageBack() =>
+        Assert.Equal([ShortcutId.NavigateBack, ShortcutId.Back], ShortcutCatalog.Resolve(
+            ShortcutCatalog.All, Key.Left, KeyModifiers.Alt, textInputFocused: false, ShortcutScope.FileExplorer));
+
+    /// <summary>Text-guarded on purpose: otherwise Alt+← in File Explorer's path box would skip the
+    /// guarded folder binding and leave the page mid-edit.</summary>
+    [Fact]
+    public void Resolve_AltLeftInATextBox_OffersNothing() {
+        Assert.Empty(ShortcutCatalog.Resolve(
+            ShortcutCatalog.All, Key.Left, KeyModifiers.Alt, textInputFocused: true, ShortcutScope.FileExplorer));
+        Assert.Empty(ShortcutCatalog.Resolve(
+            ShortcutCatalog.All, Key.Left, KeyModifiers.Alt, textInputFocused: true, ShortcutScope.Global));
+    }
+
+    [Fact]
+    public void Resolve_GestureBoundNowhere_OffersNothing() =>
+        Assert.Empty(ShortcutCatalog.Resolve(
+            ShortcutCatalog.All, Key.Q, KeyModifiers.Alt, textInputFocused: false, ShortcutScope.FileExplorer));
+
+    /// <summary>One id bound in both a tab and Global is offered once, so it never runs twice.</summary>
+    [Fact]
+    public void Resolve_SameIdInTabAndGlobal_OffersItOnce() {
+        Shortcut[] table = [
+            new(ShortcutId.Refresh, [new KeyGesture(Key.F5)], "F5", "Refresh", ShortcutScope.Network),
+            new(ShortcutId.Refresh, [new KeyGesture(Key.F5)], "F5", "Refresh", ShortcutScope.Global),
+        ];
+
+        Assert.Equal([ShortcutId.Refresh], ShortcutCatalog.Resolve(
+            table, Key.F5, KeyModifiers.None, textInputFocused: false, ShortcutScope.Network));
+    }
+
+    [Fact]
+    public void MouseBack_OffersTheTabsOwnBackBeforePageBack() =>
+        Assert.Equal([ShortcutId.NavigateBack, ShortcutId.Back], ShortcutCatalog.MouseBack);
+
+    [Fact]
     public void TryResolve_ReservesControlFForUniversalSearchOnEveryTab() {
         // Ctrl+F belongs to the toolbar search box alone — no tab may reclaim it for its own field.
         foreach (var scope in Enum.GetValues<ShortcutScope>()) {

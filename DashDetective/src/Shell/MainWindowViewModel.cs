@@ -106,6 +106,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
     public NavigationViewModel Nav { get; } = new();
 
+    /// <summary>The pages visited, for Back. Held here rather than on the bar, so collapsing or re-docking
+    /// the bar cannot touch it, and fed from <see cref="OnNavSelected"/>, the one place every route to a
+    /// page (click, Ctrl+digit, search, a cross-page reveal) ends up.</summary>
+    private readonly PageHistory<NavItem> _pageHistory = new();
+
     /// <summary>The live keyboard bindings: the catalog's defaults with the user's rebinds applied. One
     /// instance, shared by the key handler, Help, universal search and the Settings page, so all four
     /// describe and act on the same thing.</summary>
@@ -137,6 +142,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>What the toolbar's Refresh button promises on the current page — see
     /// <see cref="RefreshHint"/> for why it is worded rather than disabled.</summary>
     public string RefreshToolTip => RefreshHint.For(CurrentPage, IsLive);
+
+    /// <summary>Whether Back has a page to return to. Drives the toolbar button's enabled state.</summary>
+    public bool CanGoBack => _pageHistory.CanGoBack;
+
+    /// <summary>The toolbar Back button's tooltip, naming the page it opens — see <see cref="BackHint"/>.</summary>
+    public string BackToolTip => BackHint.For(_pageHistory.Previous?.Title, Shortcuts);
 
     /// <summary>Whether the app should hide to the tray (rather than exit) when the window is closed.
     /// Gated on <see cref="TrayIntegration.HidesOnClose"/>, so a desktop with no tray closes normally
@@ -261,7 +272,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Settings, _settings, Nav.Navigate),
         });
         _currentPage = Nav.SelectedNav.Page;
+        _pageHistory.Visit(Nav.SelectedNav);
         Nav.SelectionChanged += OnNavSelected;
+        Shortcuts.Changed += () => OnPropertyChanged(nameof(BackToolTip));
 
         // Start the page the bar selected; every other page stays idle until it is navigated to.
         UpdatePageActivity();
@@ -652,6 +665,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.PreviousTab => CycleTab(-1),
         ShortcutId.ToggleNavCollapse => Run(Nav.ToggleCollapseCommand),
         ShortcutId.OpenSettings => NavigateToPage(_settings),
+        ShortcutId.Back => TryGoBack(),
         ShortcutId.ToggleLive => Run(ToggleLiveCommand),
         ShortcutId.Refresh => Run(RefreshCommand),
         ShortcutId.Export => Raise(ExportRequested),
@@ -707,6 +721,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         DismissAlert();
         return true;
     }
+
+    /// <summary>Returns to the previous page. Unconsumed at the start of history, so the key or button
+    /// press is left alone rather than swallowed by a Back that did nothing.</summary>
+    private bool TryGoBack() {
+        if (!_pageHistory.TryGoBack(out var item))
+            return false;
+
+        // The history already holds this page as current, so the visit this navigation reports is a no-op.
+        Nav.Navigate(item);
+        return true;
+    }
+
+    /// <summary>The toolbar's Back button.</summary>
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void GoBack() => TryGoBack();
 
     /// <summary>Selects the nav item at the given position. An index past the end of the bar (Ctrl+8
     /// on a shorter bar) is simply ignored.</summary>
@@ -774,6 +803,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void OnNavSelected(NavItem item) {
         CurrentPage = item.Page;
         UpdatePageActivity();
+
+        _pageHistory.Visit(item);
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(BackToolTip));
+        GoBackCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Whether the user still has to be told that closing the window leaves the app running in

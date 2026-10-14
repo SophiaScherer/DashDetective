@@ -92,6 +92,31 @@ is not docked to yet. `MainWindowViewModel` owns page routing and delegates the 
 `Nav`, wiring `Nav.SelectionChanged` → `CurrentPage`. Orientation and collapse **persist** (see
 *Persistence* below); this is shared shell work, not a tab-local change.
 
+**Back returns to the previous page** (work item 44): a stroked `ChevronLeft` button at the left of the
+toolbar, `Alt+←`, and the mouse's back button (XButton1). The decisions inside it:
+
+- **History lives in the shell, not the bar.** `PageHistory<NavItem>` (`src/Shell/Navigation`) is held by
+  `MainWindowViewModel` and fed from `OnNavSelected`, the one place every route to a page ends up — a nav
+  click, `Ctrl+1 … 9`, a search result, a cross-page reveal. Hooking each caller would miss the next one.
+  The button is toolbar chrome, so it is on every page, and collapsing or re-docking the bar cannot move
+  it or clear the trail (`MainWindowTests` pins that it is not in `NavigationView`).
+- **A step back pushes nothing.** `TryGoBack` makes the popped page current, so the visit the navigation
+  then reports is recognized as a repeat and absorbed. Without that, two Backs would bounce between two
+  pages. A repeat of the current page is never recorded, and the trail keeps the last 50 pages.
+- **No forward.** It was not asked for, so neither a page forward command nor the mouse's forward button
+  (XButton2) is bound. File Explorer keeps its own `Alt+→` forward for folders.
+- **At the start of history Back does nothing and consumes nothing.** The button is disabled with a dimmed
+  glyph (the `navBtn` treatment), and the key and mouse button are reported unhandled.
+- **The tooltip names where Back goes** ("Back to Processes (Alt+←)"), through `BackHint`, and reads the key
+  from the live bindings, so a rebind shows there too.
+- **File Explorer goes first.** On that tab, `Alt+←` resolves to its own folder back as well as to page
+  Back, and the shell offers them in that order (`ShortcutCatalog.Resolve`). While the folder trail has
+  somewhere to go, the press steps back a folder. At the trail's start the tab reports it unhandled, and
+  the same press goes back a page. The mouse button follows the same order (`ShortcutCatalog.MouseBack`).
+- **A modal or a capture wins.** Both inputs go through `HandleShortcut`, so with Help or the accent picker
+  open, Back is swallowed and nothing happens. While a shortcut capture is armed, the key reaches the
+  capture box.
+
 **A horizontal bar is as tall as its content, not a fixed height.** It used to be 64px (54 collapsed)
 times the text scale, but on a top or bottom bar only the labels grow with the text — the icons, the
 avatar and the logo do not — so at 150 % a ~96px bar held ~50px of content and read as an empty band
@@ -1648,6 +1673,12 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   through. Resolution is **scope-aware**: a gesture may mean different things on different tabs
   (`Alt+↑` sorts on Processes, climbs a folder on File Explorer). **`Esc` has exactly one owner** — the
   chain, not individual controls. See *Keyboard shortcuts* in `docs/ARCHITECTURE.md`.
+- **A tab binding that declines falls through to the global one for the same gesture.** `Resolve`
+  returns the tab's match, then the global one, and the listener runs the first that acts. `Alt+←` is the
+  only default gesture in both: File Explorer's folder back, then page `Back` (see *Navigation bar*).
+  Before this change a declined tab binding ended the press, so a user's rebind that shadowed a global
+  gesture also ended it. Now it falls through. `Back` is `AllowInTextInput: false` like the folder
+  binding, or `Alt+←` in the path box would skip the guarded folder binding and leave the page mid-edit.
 - **One `ShortcutId` may be bound in several scopes.** `/` → `FocusFilter` serves both the Processes
   filter and the Toolkit filter: the shell offers a resolved id to whichever page is current, so a new
   tab reuses the existing action rather than minting a near-duplicate id per tab. The catalog invariant

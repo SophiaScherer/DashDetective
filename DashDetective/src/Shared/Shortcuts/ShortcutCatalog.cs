@@ -44,6 +44,12 @@ public static class ShortcutCatalog {
         new(ShortcutId.OpenSettings, [new KeyGesture(Key.OemComma, KeyModifiers.Control)],
             "Ctrl+,", "Open Settings", ShortcutScope.Global),
 
+        // File Explorer binds the same gesture to its folder trail; that tab's binding resolves first and
+        // falls through to this one once the trail runs out (see Resolve). Text-guarded like that one, or
+        // Alt+← in the path box would leave the page mid-edit.
+        new(ShortcutId.Back, [new KeyGesture(Key.Left, KeyModifiers.Alt)],
+            "Alt+←", "Go back to the previous page", ShortcutScope.Global, AllowInTextInput: false),
+
         // ----- Toolbar actions -----
         new(ShortcutId.ToggleLive, [new KeyGesture(Key.P, KeyModifiers.Control)],
             "Ctrl+P", "Pause or resume live sampling", ShortcutScope.Global),
@@ -216,12 +222,33 @@ public static class ShortcutCatalog {
     /// chosen bindings through this code rather than through a second copy of it.</summary>
     public static bool TryResolve(IReadOnlyList<Shortcut> shortcuts,
         Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {
-        if (scope != ShortcutScope.Global &&
-            TryMatch(shortcuts, key, modifiers, textInputFocused, scope, out id))
-            return true;
-
-        return TryMatch(shortcuts, key, modifiers, textInputFocused, ShortcutScope.Global, out id);
+        var ids = Resolve(shortcuts, key, modifiers, textInputFocused, scope);
+        id = ids.Count > 0 ? ids[0] : default;
+        return ids.Count > 0;
     }
+
+    /// <summary>Every action a key press may run, in the order to offer them: the active tab's binding,
+    /// then the global one for the same gesture. The shell runs the first that acts, so a tab binding
+    /// that declines (File Explorer's Alt+← at the start of its folder trail) falls through to the
+    /// global meaning rather than swallowing the key.</summary>
+    public static IReadOnlyList<ShortcutId> Resolve(IReadOnlyList<Shortcut> shortcuts,
+        Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope) {
+        var ids = new List<ShortcutId>(2);
+        if (scope != ShortcutScope.Global &&
+            TryMatch(shortcuts, key, modifiers, textInputFocused, scope, out var own))
+            ids.Add(own);
+
+        if (TryMatch(shortcuts, key, modifiers, textInputFocused, ShortcutScope.Global, out var global) &&
+            !ids.Contains(global))
+            ids.Add(global);
+
+        return ids;
+    }
+
+    /// <summary>What the mouse's back button (XButton1) runs, offered in order like a resolved key: the
+    /// current tab's own back first (File Explorer's folder trail), then page history. A button rather
+    /// than a gesture, so it is not rebindable.</summary>
+    public static IReadOnlyList<ShortcutId> MouseBack { get; } = [ShortcutId.NavigateBack, ShortcutId.Back];
 
     private static bool TryMatch(IReadOnlyList<Shortcut> shortcuts,
         Key key, KeyModifiers modifiers, bool textInputFocused, ShortcutScope scope, out ShortcutId id) {

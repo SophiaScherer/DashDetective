@@ -6,7 +6,7 @@ using Xunit;
 namespace DashDetective.Tests.Shell;
 
 /// <summary>
-/// Pins how MainWindow wires the custom title bar. Each of these builds and runs either way; the symptom
+/// Pins how MainWindow wires its chrome: the custom title bar, and Back's place in the toolbar. Each of these builds and runs either way; the symptom
 /// of losing one is a window that quietly keeps the system title bar, draws Fluent's caption buttons, or
 /// scales its title bar away from the buttons beside it.
 /// </summary>
@@ -41,5 +41,16 @@ public class MainWindowTests {
         Assert.True(bar >= 0, "MainWindow no longer places a TitleBar.");
         Assert.True(bar < host, "The TitleBar must come before the ScaleHost, not inside it.");
         Assert.Equal(-1, Markup.IndexOf("<controls:TitleBar", host, hostEnd - host, StringComparison.Ordinal));
+    }
+
+    /// <summary>Back is window chrome rather than part of the nav bar, so it is on every page and
+    /// collapsing or re-docking the bar cannot move or hide it.</summary>
+    [Fact]
+    public void BackButton_SitsInTheToolbarNotTheNavBar() {
+        var navBar = File.ReadAllText(
+            Path.Combine(PaletteFile.SourceRoot(), "src/Shell/Navigation/NavigationView.axaml"));
+
+        Assert.Contains(@"Command=""{Binding GoBackCommand}""", Markup);
+        Assert.DoesNotContain("GoBackCommand", navBar);
     }
 }
