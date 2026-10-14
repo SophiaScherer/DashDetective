@@ -9,6 +9,7 @@ public enum SettingId {
     GraphColors,
     AccentColor,
     ClockFormat,
+    ClockShowSeconds,
     UiScale,
     TextScale,
     HighContrast,

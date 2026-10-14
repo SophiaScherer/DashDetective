@@ -132,7 +132,10 @@ stays in its tab folder.
                                 stays MB/s on purpose, as Task Manager's does)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
-      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
+      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference, with or without seconds
+                                (default with: the Toolkit log). DelayToNextTick is the time to the next
+                                displayed change, so the toolbar clock's timer can sit on minute boundaries
+                                when seconds are off. Invariant on BOTH
       FileSave.cs              (the ONE save-file flow: offer the formats, take a destination from the
                                 native dialog, write what the chosen extension asked for. Replaced three
                                 near-identical copies — toolbar Export, the two Settings buttons, the

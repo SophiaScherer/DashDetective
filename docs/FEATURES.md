@@ -239,7 +239,7 @@ feature update (WMI `Win32_OperatingSystem.Caption` + registry `DisplayVersion`)
 timer) — with the static facts loaded once at startup by `SystemInfoProvider` (WMI + registry, async);
 the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
 live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
-(top-right) is also fully wired: a live 24-hour **clock** (`MainWindowViewModel` 1 s `DispatcherTimer`;
+(top-right) is also fully wired: a live **clock** (`MainWindowViewModel` `DispatcherTimer`, re-aimed at the next second or minute boundary;
 its `TextBlock` has a fixed `Width` + centred text so the proportional-font `HH:mm:ss` reserves constant
 space and ticking never reflows the toolbar),
 a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
@@ -339,6 +339,14 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   remain sortable and machine-parseable. `ToolkitLogEntry` keeps its raw `DateTime` alongside the
   formatted string so rows already on screen re-stamp when the preference changes, and the toolbar
   clock's fixed width is sized for the wider 12-hour string so switching does not reflow the toolbar.
+  **Show seconds** (`AppSettings.ClockShowSeconds`, a toggle under Clock format, default on so existing
+  installs see no change) applies to both formats but to the **toolbar clock only**: the Toolkit log keeps
+  seconds (`TimeOfDayFormatter.Format` defaults the flag on) because they order commands run together.
+  The clock timer is not a fixed 1 s tick: `UpdateClock` re-aims it each time at
+  `TimeOfDayFormatter.DelayToNextTick`, the next second boundary or, without seconds, the next minute
+  boundary, so a minute-only clock flips exactly on the minute and wakes once a minute rather than
+  polling every second. Keep the re-aim in `UpdateClock` — a fixed interval would put the flip up to a
+  minute late. The `init` default of `true` is load-bearing (see the `SettingsStore.Load` merge rule).
 - **Accent color.** The row is one swatch of the accent in force; pressing it opens a **modal picker**
   (`AccentPickerOverlay`): a hue/saturation wheel, a brightness bar, a hex field, a before/after chip, and
   the draft previewed in a **Dark and a Light strip** side by side. Any colour can be picked; blue is the

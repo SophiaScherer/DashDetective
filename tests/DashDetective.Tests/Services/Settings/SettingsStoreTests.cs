@@ -38,6 +38,7 @@ public sealed class SettingsStoreTests : IDisposable {
             GraphColorsName = "Teal",
             AccentColor = "#1a3a8a",
             ClockFormat = ClockFormat.TwelveHour,
+            ClockShowSeconds = false,
             AlertCpuEnabled = true,
             AlertMemoryEnabled = false,
             AlertGpuEnabled = true,
@@ -99,6 +100,27 @@ public sealed class SettingsStoreTests : IDisposable {
         Assert.True(loaded.AlertCpuEnabled);
         Assert.False(loaded.AlertGpuEnabled);   // ships off, but with a number already in the box
         Assert.Equal(90, loaded.AlertGpuPercent);
+    }
+
+    /// <summary>A file from before the seconds choice must keep the clock showing them — the init default is
+    /// load-bearing, and a silent false would hide seconds on every existing install.</summary>
+    [Fact]
+    public void Load_FileWithoutClockShowSeconds_KeepsSecondsOn() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "ClockFormat": "TwelveHour" }
+            """);
+
+        Assert.True(new SettingsStore(_path).Load().ClockShowSeconds);
+    }
+
+    [Fact]
+    public void SaveThenLoad_ClockShowSecondsOff_RoundTrips() {
+        using (var store = new SettingsStore(_path)) {
+            store.Save(AppSettings.Defaults with { ClockShowSeconds = false });
+            store.Flush();
+        }
+
+        Assert.False(new SettingsStore(_path).Load().ClockShowSeconds);
     }
 
     /// <summary>A file saved before Graph colors existed keeps its choice under the old key.</summary>
