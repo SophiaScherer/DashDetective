@@ -280,25 +280,35 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             time, line, ToolkitOutputFormatter.Running, ClockFormat, isRunning: cancellable);
         Log.Insert(0, pending);
 
-        // Owned per run: the run command refuses concurrency, so there is never more than one.
-        using var cts = new CancellationTokenSource();
-        _runCts = cts;
-        IsCapturing = cancellable;
+        // Only a cancellable run takes the source and the flag. Run and OpenExternally are separate
+        // commands with separate concurrency gates, so a launch can start while a capture is in flight;
+        // it must leave the capture's source and Cancel state alone.
+        var cts = cancellable ? new CancellationTokenSource() : null;
+        if (cts is not null) {
+            _runCts = cts;
+            IsCapturing = true;
+        }
 
         ToolkitRunResult result;
         try {
-            result = await _runner.RunAsync(action, cts.Token);
+            result = await _runner.RunAsync(action, cts?.Token ?? CancellationToken.None);
         } finally {
             // Cleared before the source is disposed, so a late Cancel finds nothing rather than a corpse.
-            IsCapturing = false;
-            _runCts = null;
+            if (cts is not null && ReferenceEquals(_runCts, cts)) {
+                IsCapturing = false;
+                _runCts = null;
+            }
+
+            cts?.Dispose();
         }
 
-        // Reference equality: if the user cleared the log while the command was in flight, the
-        // placeholder is gone and the result goes with it — they asked for an empty log, so putting a
-        // stanza back would be ignoring them.
-        if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
-            Log[0] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
+        // By reference, not by position: a launch row can insert its own stanza above this one while the
+        // capture runs. If the user cleared the log while the command was in flight, the placeholder is
+        // gone and the result goes with it — they asked for an empty log, so putting a stanza back would
+        // be ignoring them.
+        var index = Log.IndexOf(pending);
+        if (index >= 0)
+            Log[index] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
     }
 
     /// <summary>

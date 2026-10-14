@@ -229,6 +229,9 @@ public class ToolkitRunnerTests {
 
     // ----- Cancellation -----
 
+    // Bounded, so a regression fails the test rather than hanging the CI leg.
+    private static Task<T> Done<T>(Task<T> run) => run.WaitAsync(TimeSpan.FromSeconds(10));
+
     private static ToolkitAction Slow() => ToolkitAction.Capture("slowtool");
 
     /// <summary>The cancel reaches the launcher through the runner, and what the command had printed by
@@ -242,7 +245,7 @@ public class ToolkitRunnerTests {
 
         var running = runner.RunAsync(Slow(), cts.Token);
         cts.Cancel();
-        var result = await running;
+        var result = await Done(running);
 
         Assert.False(result.Success);
         Assert.Contains("got this far", result.Output, StringComparison.Ordinal);
@@ -261,7 +264,7 @@ public class ToolkitRunnerTests {
 
         var running = runner.RunAsync(Slow(), cts.Token);
         cts.Cancel();
-        var result = await running;
+        var result = await Done(running);
 
         Assert.False(result.Success);
         Assert.Contains("Cancelled after", result.Output, StringComparison.Ordinal);

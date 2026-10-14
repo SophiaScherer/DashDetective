@@ -90,7 +90,9 @@ internal sealed class SystemProcessLauncher : IProcessLauncher {
             timeoutCts.Token, cancellationToken);
 
         // Killed from the token's own callback rather than after the await resumes, so a cancel kills the
-        // tree synchronously: at app shutdown nothing is left running to resume a continuation.
+        // tree synchronously: at app shutdown nothing is left running to resume a continuation, and a
+        // kill queued to the thread pool could lose the race with the exit. Deliberately left on the
+        // caller's (UI) thread: the kill is milliseconds, and moving it off would reopen that race.
         using var killOnStop = linked.Token.Register(() => TryKill(process));
 
         var timedOut = false;

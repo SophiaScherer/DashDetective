@@ -1616,7 +1616,10 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   partial output survives; and **navigating away does not cancel** — the run lands in the log as it always
   has. The one exception is shutdown: `ToolkitViewModel` is `IDisposable` solely so
   `MainWindowViewModel.Dispose` cancels a run in flight and leaves no orphaned child. `Esc` is not bound to
-  Cancel; it still only clears the filter. A launcher that ignores its token cannot be stopped from here, and
+  Cancel; it still only clears the filter. `Run` and `OpenExternally` have separate concurrency gates, so
+  a launch can start while a capture runs: only a cancellable run takes the cancel source and the
+  `IsCapturing` flag (and clears them only if still its own), and a result finds its stanza by reference
+  rather than assuming it is still the top one. A launcher that ignores its token cannot be stopped from here, and
   the page then simply waits for the process as before.
 - System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
   resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly

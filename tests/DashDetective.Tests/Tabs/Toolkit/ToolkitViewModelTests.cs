@@ -850,6 +850,10 @@ public class ToolkitViewModelTests {
         return (vm, launcher);
     }
 
+    // A regression that stops a cancel working leaves a held run in flight forever; bounded, it fails
+    // the test instead of hanging the whole CI leg.
+    private static Task Done(Task run) => run.WaitAsync(TimeSpan.FromSeconds(10));
+
     private static ToolkitEntry Slow(string command = "slowtool") =>
         new(command, "Takes a while", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
             ToolkitAction.Capture(command));
@@ -864,7 +868,7 @@ public class ToolkitViewModelTests {
         Assert.True(Assert.Single(vm.Log).IsRunning);
 
         launcher.Complete(new ProcessCapture(0, "done", "", false));
-        await running;
+        await Done(running);
 
         Assert.False(Assert.Single(vm.Log).IsRunning);
     }
@@ -881,7 +885,7 @@ public class ToolkitViewModelTests {
 
         Assert.True(vm.CancelRunCommand.CanExecute(null));
         vm.CancelRunCommand.Execute(null);
-        await running;
+        await Done(running);
 
         var logged = Assert.Single(vm.Log);
         Assert.Contains("Pinging 10.255.255.1", logged.Output, StringComparison.Ordinal);
@@ -899,7 +903,7 @@ public class ToolkitViewModelTests {
 
         var first = vm.RunCommand.ExecuteAsync(Slow("first"));
         vm.CancelRunCommand.Execute(null);
-        await first;
+        await Done(first);
 
         Assert.True(vm.RunCommand.CanExecute(Slow()));
         Assert.False(vm.CancelRunCommand.CanExecute(null));
@@ -907,7 +911,7 @@ public class ToolkitViewModelTests {
         var second = vm.RunCommand.ExecuteAsync(Slow("second"));
         Assert.False(second.IsCompleted);
         launcher.Complete(new ProcessCapture(0, "second ran", "", false));
-        await second;
+        await Done(second);
 
         Assert.Equal(["second", "first"], vm.Log.Select(l => l.Command));
         Assert.Equal("second ran", vm.Log[0].Output);
@@ -931,7 +935,7 @@ public class ToolkitViewModelTests {
         Assert.False(vm.CancelRunCommand.CanExecute(null));
         Assert.False(Assert.Single(vm.Log).IsRunning);
 
-        await running;
+        await Done(running);
     }
 
     [Fact]
@@ -940,7 +944,7 @@ public class ToolkitViewModelTests {
 
         var running = vm.RunCommand.ExecuteAsync(Slow());
         launcher.Complete(new ProcessCapture(0, "all done", "", false));
-        await running;
+        await Done(running);
 
         Assert.False(vm.CancelRunCommand.CanExecute(null));
         vm.CancelRunCommand.Execute(null);
@@ -961,7 +965,7 @@ public class ToolkitViewModelTests {
         Assert.Equal(1, raised);
 
         launcher.Complete(new ProcessCapture(0, "", "", false));
-        await running;
+        await Done(running);
 
         Assert.Equal(2, raised);
     }
@@ -974,7 +978,7 @@ public class ToolkitViewModelTests {
 
         var running = vm.RunCommand.ExecuteAsync(Slow());
         launcher.Complete(new ProcessCapture(-1, "partial", "", TimedOut: true));
-        await running;
+        await Done(running);
 
         var logged = Assert.Single(vm.Log);
         Assert.Contains("Timed out", logged.Output, StringComparison.Ordinal);
@@ -990,7 +994,7 @@ public class ToolkitViewModelTests {
         var running = vm.RunCommand.ExecuteAsync(Slow());
         vm.ClearLogCommand.Execute(null);
         vm.CancelRunCommand.Execute(null);
-        await running;
+        await Done(running);
 
         Assert.Empty(vm.Log);
         Assert.False(vm.HasLog);
@@ -1010,7 +1014,7 @@ public class ToolkitViewModelTests {
         Assert.False(running.IsCompleted);
 
         launcher.Complete(new ProcessCapture(0, "finished anyway", "", false));
-        await running;
+        await Done(running);
 
         Assert.Equal("finished anyway", Assert.Single(vm.Log).Output);
         Assert.True(vm.RunCommand.CanExecute(Slow()));
@@ -1025,7 +1029,7 @@ public class ToolkitViewModelTests {
 
         var running = vm.RunCommand.ExecuteAsync(Slow());
         vm.CancelRunCommand.Execute(null);
-        await running;
+        await Done(running);
 
         Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
         Assert.True(vm.RunCommand.CanExecute(Slow()));
@@ -1038,7 +1042,7 @@ public class ToolkitViewModelTests {
 
         var running = vm.RunCommand.ExecuteAsync(Slow());
         vm.Dispose();
-        await running;
+        await Done(running);
 
         Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
     }
@@ -1050,5 +1054,42 @@ public class ToolkitViewModelTests {
         vm.Dispose();
 
         Assert.Empty(vm.Log);
+    }
+
+    /// <summary>Run and OpenExternally have separate concurrency gates, so a launch can start while a
+    /// capture is in flight. It must not take the capture's cancel state: Cancel stays available, still
+    /// stops the capture, and the capture's result lands on its own stanza rather than being dropped.</summary>
+    [Fact]
+    public async Task CancelRun_WhileALaunchRunsAlongside_StillCancelsTheCapture() {
+        var (vm, launcher) = HeldPage();
+        launcher.PartialOutput = "partial";
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+
+        Assert.True(vm.IsCapturing);
+        Assert.True(vm.CancelRunCommand.CanExecute(null));
+
+        vm.CancelRunCommand.Execute(null);
+        await Done(capture);
+
+        Assert.Equal(["alongside", "slowtool"], vm.Log.Select(l => l.Command));
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.Contains("partial", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>The same overlap must not blind shutdown: a launch finishing first leaves the capture's
+    /// source in place, so Dispose still stops the child.</summary>
+    [Fact]
+    public async Task Dispose_AfterALaunchRanAlongside_StillCancelsTheCapture() {
+        var (vm, _) = HeldPage();
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+        vm.Dispose();
+        await Done(capture);
+
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
     }
 }
