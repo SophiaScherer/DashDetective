@@ -17,7 +17,21 @@ public partial class NetworkView : UserControl {
         // navigation resets the connections list to the top (the live refresh reconciles in place and
         // deliberately keeps the offset).
         DataContextChanged += (_, _) => Rewire();
+        // The column minimums scale with the text, so a Text size change has to re-report even though
+        // the table's width did not move.
+        ConnectionsHeaderProcess.PropertyChanged += (_, e) => {
+            if (e.Property == TextBlock.FontSizeProperty)
+                ReportConnectionsMetrics();
+        };
     }
+
+    private void OnConnectionsHeaderSizeChanged(object? sender, SizeChangedEventArgs e) => ReportConnectionsMetrics();
+
+    // Reported from the view: there is no converter-free path from an element's size or font to a view
+    // model property. The header spans the table minus the scroll gutter, which is the width the rows get.
+    private void ReportConnectionsMetrics() =>
+        _subscribed?.SetConnectionsTableMetrics(ConnectionsHeader.Bounds.Width,
+                                                ConnectionsTableLayout.ScaleOf(ConnectionsHeaderProcess.FontSize));
 
     private void Rewire() {
         if (_subscribed is not null) {

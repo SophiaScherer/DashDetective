@@ -1817,6 +1817,22 @@ stays in its tab folder.
                                                          like every box inside a field Border — Fluent's
                                                          focus block otherwise paints a filled rectangle
                                                          around the text alone, beside the icon)
+                                ConsoleCapacity.cs      (pure arithmetic for the console box: lines that
+                                                         fit a height, and the line height derived from the
+                                                         font size at 1.25x — 15 at the default. Derived,
+                                                         never a literal, so Text size spaces lines rather
+                                                         than overlapping them; the box's padding, footer
+                                                         line and gap are the reserved height)
+                                ConnectionsTableLayout.cs
+                                                        (the connections table's responsive columns:
+                                                         Protocol drops first, then State, then Remote;
+                                                         Process stays. Minimums are at 100 % text and are
+                                                         MULTIPLIED BY THE TEXT SCALE, which the view reads
+                                                         off the header's font size. All columns are STARS:
+                                                         the header and each row are separate grids, so an
+                                                         Auto column would size to each one's own content
+                                                         and misalign. Over TableColumns, like File
+                                                         Explorer's list)
                                 HostLink.cs             (the https URL a typed target means, or null when
                                                          it is not a usable host — which is what leaves the
                                                          link icon disabled. Uri.CheckHostName decides, and

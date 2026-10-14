@@ -10,6 +10,12 @@
          Tab-local by the repo's promotion rule: both users are the Network tab. The console TOKENS are
          app-level (Palette.axaml) because the Toolkit tab draws them too — this panel is not. -->
     <UserControl.Styles>
+        <!-- The shared field is a fixed FieldHeight; at a large Text size its text needs more than that, and
+             the submit button beside it (MinHeight) would outgrow it. A local style outranks the shared one. -->
+        <Style Selector="Border.field">
+            <Setter Property="Height" Value="NaN"/>
+            <Setter Property="MinHeight" Value="{StaticResource FieldHeight}"/>
+        </Style>
         <!-- The link icon greys out with its button rather than vanishing, so the affordance is visible
              before a host is typed. The glyph draws its own Stroke, so opacity is what dims it. -->
         <Style Selector="Button.clearField:disabled Path">

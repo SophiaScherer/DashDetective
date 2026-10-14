@@ -19,19 +19,19 @@
          for IP/address values that read better column-aligned (IP config, connection endpoints, and
          the ping/DNS console output). -->
     <UserControl.Resources>
-        <!-- The connections table's columns, declared once and applied to both the header row and the
-             row template through GridColumns.Definitions, so the two cannot drift apart. -->
-        <sys:String x:Key="ConnectionColumns">1.2*,1.4*,*,Auto</sys:String>
+        <!-- The connections table's columns come from the view model (ConnectionColumns), applied to both
+             the header row and the row template through GridColumns.Definitions, so the two cannot drift
+             apart. They narrow and drop with the width and the text size: see ConnectionsTableLayout. -->
     </UserControl.Resources>
 
     <UserControl.Styles>
         <!-- TextBlock.colHead and Border.field are shared (src/Shared/Styles/SharedStyles.axaml); the
              connections table and the Ping/DNS targets use them as-is. Button.go stays here: it is the
-             field's submit partner and no other tab has one. Its height tracks Border.field. -->
+             field's submit partner and no other tab has one. Its minimum height tracks Border.field. -->
         <Style Selector="Button.go">
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
             <Setter Property="FontSize" Value="{DynamicResource TextSizeCompact}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
@@ -42,9 +42,10 @@
             <Setter Property="Background" Value="{DynamicResource HoverOverlayStrong}"/>
         </Style>
         <!-- Pager buttons: the current page number accented, and the four skip/step arrows dimmed at
-             either end via the disabled state. No ellipsis — every page number fits on one row. -->
-        <!-- Skip/step arrows bracketing the page numbers. Same 30px minimum box and hover as pageLink so the row
-             reads as one control (a minimum, so both grow with the text and the arrows stretch to match), with FileExplorer's navBtn disabled treatment: dim the glyph and keep the
+             either end via the disabled state. No ellipsis: every page number fits on one row. -->
+        <!-- Skip/step arrows bracketing the page numbers. Same 30px minimum box and hover as pageLink so
+             the row reads as one control; a minimum so both grow with the text, with the arrows
+             stretching to match. Disabled follows File Explorer's navBtn: dim the glyph and keep the
              surface transparent, since Fluent's default disabled state paints a filled box. -->
         <Style Selector="Button.pageArrow">
             <Setter Property="Width" Value="30"/>
@@ -67,7 +68,10 @@
             <Setter Property="StrokeJoin" Value="Round"/>
         </Style>
         <!-- The skip pair is filled (Icons.Caret*), not stroked like the step chevrons. Declared after the
-             rule above so it wins the tie; the disabled dim below is on Opacity, so it covers either. -->
+             rule above so it wins the tie; the disabled dim below is on Opacity, so it covers either.
+             The 12 is an optical size, not a token: a filled glyph's bounds are fuller than a stroked
+             chevron's (which Uniform stretches to 16), so it needs a smaller box to read as the same
+             weight, and 12 lands it at the File Explorer tree caret's ~11px. -->
         <Style Selector="Button.pageArrow Path.filled">
             <Setter Property="Width" Value="12"/>
             <Setter Property="Height" Value="12"/>
@@ -171,7 +175,10 @@
                          equal Mbps must map to equal pixels for the comparison to be honest. The peak
                          caption on the right makes the shared ceiling legible. -->
                     <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="18">
+                        <!-- A WrapPanel, so at a large Text size the two readouts wrap onto a second line
+                             rather than running into the peak caption beside them. -->
+                        <WrapPanel Grid.Column="0" Orientation="Horizontal" ItemSpacing="18" LineSpacing="2"
+                                   Margin="0,0,10,0">
                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom">
                                 <TextBlock Text="↓" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartNetDownText}"/>
                                 <TextBlock Text="{Binding DownText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
@@ -182,7 +189,7 @@
                                 <TextBlock Text="{Binding UpText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextMuted}"/>
                                 <TextBlock Text="{Binding UpUnit}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSubtle}"/>
                             </StackPanel>
-                        </StackPanel>
+                        </WrapPanel>
                         <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="{DynamicResource TextSizeCaption}"
                                    VerticalAlignment="Bottom" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
@@ -219,36 +226,47 @@
                                   WidgetId="network.connections" Title="Active Connections">
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding ConnectionsSummary}" FontSize="{DynamicResource TextSizeCaption}"
-                               Foreground="{DynamicResource TextSubtle}"/>
+                               Foreground="{DynamicResource TextSubtle}" TextTrimming="CharacterEllipsis"/>
                 </controls:WidgetPanel.HeaderContent>
                 <StackPanel Spacing="10">
                     <!-- The whole page scrolls, so the table has to bound its own body or it never
                          scrolls. 240 keeps the panel and its pager on-screen in the default window. -->
                     <controls:WidgetTable x:Name="ConnectionsTable" MaxBodyHeight="240" BodyScrollBars="Auto">
                         <controls:WidgetTable.Header>
-                            <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}"
-                                  Margin="0,0,0,2">
-                                <TextBlock Grid.Column="0" Classes="colHead" Text="PROCESS"/>
-                                <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS"/>
-                                <TextBlock Grid.Column="2" Classes="colHead" Text="STATE"/>
-                                <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right"/>
+                            <Grid x:Name="ConnectionsHeader" layout:GridColumns.Definitions="{Binding ConnectionColumns}"
+                                  Margin="0,0,0,2" SizeChanged="OnConnectionsHeaderSizeChanged">
+                                <!-- Every cell ellipsizes inside its own column and carries the gap as a left margin, so
+                                     a dropped (zero-width) column reserves none. -->
+                                <TextBlock x:Name="ConnectionsHeaderProcess" Grid.Column="0" Classes="colHead" Text="PROCESS"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Classes="colHead" Text="REMOTE ADDRESS" Margin="8,0,0,0"
+                                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowRemoteColumn}"/>
+                                <TextBlock Grid.Column="2" Classes="colHead" Text="STATE" Margin="8,0,0,0"
+                                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowStateColumn}"/>
+                                <TextBlock Grid.Column="3" Classes="colHead" Text="PROTOCOL" TextAlignment="Right" Margin="8,0,0,0"
+                                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowProtocolColumn}"/>
                             </Grid>
                         </controls:WidgetTable.Header>
                         <ItemsControl ItemsSource="{Binding Connections}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ConnectionRow">
-                                    <Grid layout:GridColumns.Definitions="{StaticResource ConnectionColumns}" MinHeight="{StaticResource TableRowHeight}">
+                                    <Grid layout:GridColumns.Definitions="{Binding $parent[UserControl].((vm:NetworkViewModel)DataContext).ConnectionColumns}"
+                                          MinHeight="{StaticResource TableRowHeight}">
                                         <TextBlock Grid.Column="0" Text="{Binding Process}" FontSize="{DynamicResource TextSizeBody}"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                    Foreground="{DynamicResource TextPrimary}"/>
                                         <TextBlock Grid.Column="1" Text="{Binding RemoteEndpoint}" FontSize="{DynamicResource TextSizeBody}"
-                                                   FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSubtle}"/>
+                                                   FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSubtle}"
+                                                   IsVisible="{Binding $parent[UserControl].((vm:NetworkViewModel)DataContext).ShowRemoteColumn}"/>
                                         <TextBlock Grid.Column="2" Text="{Binding State}" FontSize="{DynamicResource TextSizeBody}"
-                                                   VerticalAlignment="Center" Foreground="{Binding StateBrush}"/>
+                                                   VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{Binding StateBrush}"
+                                                   IsVisible="{Binding $parent[UserControl].((vm:NetworkViewModel)DataContext).ShowStateColumn}"/>
                                         <TextBlock Grid.Column="3" Text="{Binding Protocol}" FontSize="{DynamicResource TextSizeBody}"
-                                                   VerticalAlignment="Center" TextAlignment="Right"
-                                                   Foreground="{DynamicResource TextMuted}"/>
+                                                   VerticalAlignment="Center" TextAlignment="Right" Margin="8,0,0,0"
+                                                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMuted}"
+                                                   IsVisible="{Binding $parent[UserControl].((vm:NetworkViewModel)DataContext).ShowProtocolColumn}"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
