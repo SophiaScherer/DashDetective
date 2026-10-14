@@ -1603,6 +1603,21 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   (reference equality, so a log cleared mid-run drops the result rather than resurrecting it), and it
   keeps the time the command **started** — stamping it on completion would put a 90 s `systeminfo` a
   minute and a half away from the click that caused it.
+- **A running captured command can be cancelled.** Its in-flight stanza shows a **Cancel** button
+  (`CancelRunCommand`, available only while `IsCapturing`), and nothing else on the page is added or
+  disabled: this is not a busy flag. **Only a captured command is cancellable** — a launch returns at
+  once and an elevated one is deliberately not waited on, so their stanzas never show it. Cancelling
+  **kills the process tree** (`Kill(entireProcessTree: true)`), not just the wait, and does it from the
+  token's own callback so it is synchronous. The stanza is replaced in place like any completion, keeps
+  what the command had printed and its start time, and ends with `Cancelled after 3.2 s — the command was
+  stopped.` Three decisions not to undo: **cancel and timeout share one linked token but stay distinct
+  outcomes** (`ProcessCapture.Cancelled` vs `TimedOut`, and the user's cancel wins a tie), so a timeout is
+  never reported as the user's doing; the **streams are still drained without the token**, which is how the
+  partial output survives; and **navigating away does not cancel** — the run lands in the log as it always
+  has. The one exception is shutdown: `ToolkitViewModel` is `IDisposable` solely so
+  `MainWindowViewModel.Dispose` cancels a run in flight and leaves no orphaned child. `Esc` is not bound to
+  Cancel; it still only clears the filter. A launcher that ignores its token cannot be stopped from here, and
+  the page then simply waits for the process as before.
 - System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
   resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly
   as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so

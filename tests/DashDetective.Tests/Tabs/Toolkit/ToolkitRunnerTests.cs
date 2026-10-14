@@ -3,6 +3,7 @@ using DashDetective.Tests.Fakes;
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -10,8 +11,8 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 
 /// <summary>Covers <see cref="ToolkitRunner"/>: each action kind takes the right path, arguments reach
 /// the OS as a list rather than a command line, a non-https documentation link is refused outright, and
-/// every way a run can go wrong — missing tool, non-zero exit, timeout, declined UAC prompt — becomes a
-/// worded failure result instead of an exception.</summary>
+/// every way a run can go wrong — missing tool, non-zero exit, timeout, cancel, declined UAC prompt —
+/// becomes a worded failure result instead of an exception.</summary>
 public class ToolkitRunnerTests {
     private static (ToolkitRunner Runner, FakeProcessLauncher Launcher) Build() {
         var launcher = new FakeProcessLauncher();
@@ -224,5 +225,75 @@ public class ToolkitRunnerTests {
 
         Assert.False(result.Success);
         Assert.Contains("Could not start", result.Output, StringComparison.Ordinal);
+    }
+
+    // ----- Cancellation -----
+
+    private static ToolkitAction Slow() => ToolkitAction.Capture("slowtool");
+
+    /// <summary>The cancel reaches the launcher through the runner, and what the command had printed by
+    /// then comes back under the cancel note rather than being dropped.</summary>
+    [Fact]
+    public async Task RunAsync_CaptureCancelled_FailsKeepsTheOutputAndSaysCancelled() {
+        var (runner, launcher) = Build();
+        launcher.HoldCaptures = true;
+        launcher.PartialOutput = "got this far";
+        using var cts = new CancellationTokenSource();
+
+        var running = runner.RunAsync(Slow(), cts.Token);
+        cts.Cancel();
+        var result = await running;
+
+        Assert.False(result.Success);
+        Assert.Contains("got this far", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Cancelled after", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Timed out", result.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>A launcher that throws on cancel rather than reporting it is still the user's doing: it
+    /// must read as cancelled, not as "Could not run".</summary>
+    [Fact]
+    public async Task RunAsync_LauncherThrowsOnCancel_ReadsAsCancelledNotAsAFault() {
+        var (runner, launcher) = Build();
+        launcher.HoldCaptures = true;
+        launcher.ThrowOnCancellation = true;
+        using var cts = new CancellationTokenSource();
+
+        var running = runner.RunAsync(Slow(), cts.Token);
+        cts.Cancel();
+        var result = await running;
+
+        Assert.False(result.Success);
+        Assert.Contains("Cancelled after", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Could not run", result.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>A timeout the token did not cause still reads as a timeout, even with a live token.</summary>
+    [Fact]
+    public async Task RunAsync_TimedOutWithALiveToken_StillReadsAsTimedOut() {
+        var (runner, launcher) = Build();
+        launcher.NextCapture = new ProcessCapture(-1, "", "", TimedOut: true);
+        using var cts = new CancellationTokenSource();
+
+        var result = await runner.RunAsync(
+            Slow().WithTimeout(TimeSpan.FromSeconds(20)), cts.Token);
+
+        Assert.Contains("Timed out after 20s", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cancelled", result.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>A launch has returned before anyone could cancel it, so a token that is already cancelled
+    /// changes nothing about it — the shell is still handed the target.</summary>
+    [Fact]
+    public async Task RunAsync_Launch_IgnoresTheToken() {
+        var (runner, launcher) = Build();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var result = await runner.RunAsync(ToolkitAction.Launch("regedit"), cts.Token);
+
+        Assert.True(result.Success);
+        Assert.Equal(ToolkitOutputFormatter.Launched, result.Output);
+        Assert.False(launcher.Single.Captured);
     }
 }

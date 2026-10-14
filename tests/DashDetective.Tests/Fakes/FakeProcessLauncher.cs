@@ -1,6 +1,7 @@
 using DashDetective.Tabs.Toolkit;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tests.Fakes;
@@ -21,6 +22,26 @@ internal sealed class FakeProcessLauncher : IProcessLauncher {
     /// <summary>What the next capture reports back. Defaults to a clean, silent run.</summary>
     public ProcessCapture NextCapture { get; set; } = new(0, "", "", false);
 
+    /// <summary>Whether a capture stays in flight until <see cref="Complete"/> (or a cancel) ends it,
+    /// instead of returning <see cref="NextCapture"/> at once.</summary>
+    public bool HoldCaptures { get; set; }
+
+    /// <summary>What a held capture had printed when a cancel killed it.</summary>
+    public string PartialOutput { get; set; } = "";
+
+    /// <summary>A launcher that never looks at its token — the cancel is a no-op and the capture ends only
+    /// when the test completes it.</summary>
+    public bool IgnoreCancellation { get; set; }
+
+    /// <summary>A launcher that throws <see cref="OperationCanceledException"/> on cancel rather than
+    /// reporting it as a result.</summary>
+    public bool ThrowOnCancellation { get; set; }
+
+    private TaskCompletionSource<ProcessCapture>? _held;
+
+    /// <summary>Ends a held capture with the given result, as if the process had finished on its own.</summary>
+    public void Complete(ProcessCapture capture) => _held?.TrySetResult(capture);
+
     /// <summary>The only call, when a test expects exactly one.</summary>
     public LaunchRecord Single => Calls.Count == 1
         ? Calls[0]
@@ -32,10 +53,24 @@ internal sealed class FakeProcessLauncher : IProcessLauncher {
     }
 
     public Task<ProcessCapture> CaptureAsync(
-        string fileName, IReadOnlyList<string> arguments, TimeSpan timeout) {
+        string fileName, IReadOnlyList<string> arguments, TimeSpan timeout,
+        CancellationToken cancellationToken = default) {
         Calls.Add(new LaunchRecord(fileName, [.. arguments], Elevated: false, Captured: true, timeout));
         Throw();
-        return Task.FromResult(NextCapture);
+        if (!HoldCaptures)
+            return Task.FromResult(NextCapture);
+
+        var held = new TaskCompletionSource<ProcessCapture>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _held = held;
+        if (!IgnoreCancellation)
+            cancellationToken.Register(() => {
+                if (ThrowOnCancellation)
+                    held.TrySetException(new OperationCanceledException(cancellationToken));
+                else
+                    held.TrySetResult(new ProcessCapture(-1, PartialOutput, "", TimedOut: false, Cancelled: true));
+            });
+
+        return held.Task;
     }
 
     private void Throw() {
