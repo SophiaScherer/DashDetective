@@ -135,7 +135,10 @@ stays in its tab folder.
       TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference, with or without seconds
                                 (default with: the Toolkit log). DelayToNextTick is the time to the next
                                 displayed change, so the toolbar clock's timer can sit on minute boundaries
-                                when seconds are off. Invariant on BOTH
+                                when seconds are off (plus a 5 ms cushion so an early tick cannot repaint
+                                the old value). Invariant on BOTH arms: the 12-hour one must say AM/PM
+                                whatever the host locale designates, and the 24-hour one must not pick up
+                                a locale's separator)
       FileSave.cs              (the ONE save-file flow: offer the formats, take a destination from the
                                 native dialog, write what the chosen extension asked for. Replaced three
                                 near-identical copies — toolbar Export, the two Settings buttons, the

@@ -91,7 +91,8 @@ public class TimeOfDayFormatterTests {
     public void DelayToNextTick_WithSeconds_IsTheRestOfTheSecond() {
         var now = new DateTime(2026, 8, 29, 16, 5, 9, 250);
 
-        Assert.Equal(TimeSpan.FromMilliseconds(750), TimeOfDayFormatter.DelayToNextTick(now, true));
+        Assert.Equal(TimeSpan.FromMilliseconds(750) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, true));
     }
 
     /// <summary>The point of the whole setting: at 16:05:09.250 the next change is the 16:06:00 flip.</summary>
@@ -99,7 +100,8 @@ public class TimeOfDayFormatterTests {
     public void DelayToNextTick_WithoutSeconds_IsTheRestOfTheMinute() {
         var now = new DateTime(2026, 8, 29, 16, 5, 9, 250);
 
-        Assert.Equal(TimeSpan.FromSeconds(50.75), TimeOfDayFormatter.DelayToNextTick(now, false));
+        Assert.Equal(TimeSpan.FromSeconds(50.75) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, false));
     }
 
     /// <summary>Exactly on a boundary waits a full period rather than firing again at once.</summary>
@@ -107,16 +109,32 @@ public class TimeOfDayFormatterTests {
     public void DelayToNextTick_OnABoundary_IsAFullPeriod() {
         var now = new DateTime(2026, 8, 29, 16, 5, 0);
 
-        Assert.Equal(TimeSpan.FromSeconds(1), TimeOfDayFormatter.DelayToNextTick(now, true));
-        Assert.Equal(TimeSpan.FromMinutes(1), TimeOfDayFormatter.DelayToNextTick(now, false));
+        Assert.Equal(TimeSpan.FromSeconds(1) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, true));
+        Assert.Equal(TimeSpan.FromMinutes(1) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, false));
     }
 
     [Fact]
     public void DelayToNextTick_LastSecondOfTheDay_LandsOnMidnight() {
         var now = new DateTime(2026, 8, 29, 23, 59, 59, 900);
 
-        Assert.Equal(TimeSpan.FromMilliseconds(100), TimeOfDayFormatter.DelayToNextTick(now, true));
-        Assert.Equal(TimeSpan.FromMilliseconds(100), TimeOfDayFormatter.DelayToNextTick(now, false));
+        Assert.Equal(TimeSpan.FromMilliseconds(100) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, true));
+        Assert.Equal(TimeSpan.FromMilliseconds(100) + TimeOfDayFormatter.TickCushion,
+            TimeOfDayFormatter.DelayToNextTick(now, false));
+    }
+
+    /// <summary>A tick that lands on the scheduled instant, or up to the cushion early, must format the
+    /// NEW minute — the early-tick repaint of the old value is what the cushion exists to prevent.</summary>
+    [Fact]
+    public void DelayToNextTick_TickArrivingEarlyByLessThanTheCushion_StillShowsTheNewMinute() {
+        var now = new DateTime(2026, 8, 29, 16, 5, 59, 800);
+        var early = TimeSpan.FromMilliseconds(4);
+
+        var tick = now + TimeOfDayFormatter.DelayToNextTick(now, false) - early;
+
+        Assert.Equal("16:06", TimeOfDayFormatter.Format(tick, ClockFormat.TwentyFourHour, false));
     }
 
     /// <summary>The default is the format every clock in the app used before the setting existed.</summary>

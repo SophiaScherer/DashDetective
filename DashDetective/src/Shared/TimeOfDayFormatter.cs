@@ -23,11 +23,15 @@ public static class TimeOfDayFormatter {
         return time.ToString(pattern, CultureInfo.InvariantCulture);
     }
 
-    /// <summary>How long until the displayed time next changes: the next second boundary, or the next
-    /// minute boundary without seconds. Lets a minute-only clock flip on the minute, not up to a
+    /// <summary>Added past the boundary so a timer that fires a hair early still formats the new
+    /// second or minute, not the one it just showed.</summary>
+    public static readonly TimeSpan TickCushion = TimeSpan.FromMilliseconds(5);
+
+    /// <summary>How long until the displayed time next changes: just past the next second boundary, or
+    /// the next minute boundary without seconds. Lets a minute-only clock flip on the minute, not up to a
     /// minute late.</summary>
     public static TimeSpan DelayToNextTick(DateTime now, bool showSeconds) {
         var unit = showSeconds ? TimeSpan.TicksPerSecond : TimeSpan.TicksPerMinute;
-        return TimeSpan.FromTicks(unit - now.Ticks % unit);
+        return TimeSpan.FromTicks(unit - now.Ticks % unit) + TickCushion;
     }
 }

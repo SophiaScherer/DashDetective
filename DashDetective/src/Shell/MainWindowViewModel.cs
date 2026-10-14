@@ -583,8 +583,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// calls the view model it already resolved from its DataContext.</summary>
     public void Notify(string message) => _notices.Show(message);
 
-    /// <summary>Re-stamps the clock and re-aims the timer at the next boundary, so a minute-only clock
-    /// flips on the minute instead of drifting up to a minute late.</summary>
+    /// <summary>Re-stamps the clock and sets the next tick for just past the next second (or minute)
+    /// boundary, so the display changes when the time does.</summary>
     private void UpdateClock() {
         var now = DateTime.Now;
         Clock = TimeOfDayFormatter.Format(now, _clockFormat, _clockShowSeconds);

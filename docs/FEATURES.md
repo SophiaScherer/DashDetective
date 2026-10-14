@@ -240,7 +240,7 @@ timer) — with the static facts loaded once at startup by `SystemInfoProvider` 
 the old "Updated N min ago" label was removed. **With this, every surface on the Dashboard page is now
 live — nothing on it is static mock** (Settings is now partly live — see the Settings bullet). The shell **toolbar**
 (top-right) is also fully wired: a live **clock** (`MainWindowViewModel` `DispatcherTimer`, re-aimed at the next second or minute boundary;
-its `TextBlock` has a fixed `Width` + centred text so the proportional-font `HH:mm:ss` reserves constant
+its `TextBlock` has a fixed `Width` + centred text so the proportional-font time string reserves constant
 space and ticking never reflows the toolbar),
 a **Live** pill that pauses/resumes all sampling (`DashboardViewModel.SetLive`), a **Refresh** button
 that now refreshes **whichever page is active** through the `IRefreshablePage` marker interface
@@ -345,8 +345,9 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   The clock timer is not a fixed 1 s tick: `UpdateClock` re-aims it each time at
   `TimeOfDayFormatter.DelayToNextTick`, the next second boundary or, without seconds, the next minute
   boundary, so a minute-only clock flips exactly on the minute and wakes once a minute rather than
-  polling every second. Keep the re-aim in `UpdateClock` — a fixed interval would put the flip up to a
-  minute late. The `init` default of `true` is load-bearing (see the `SettingsStore.Load` merge rule).
+  polling every second, with a 5 ms `TickCushion` so a tick that fires early cannot repaint the old
+  minute. Keep the re-aim in `UpdateClock` — a fixed interval would put the flip up to a minute late.
+  The cost: with seconds off, a manual system-clock change can take up to a minute to show. The `init` default of `true` is load-bearing (see the `SettingsStore.Load` merge rule).
 - **Accent color.** The row is one swatch of the accent in force; pressing it opens a **modal picker**
   (`AccentPickerOverlay`): a hue/saturation wheel, a brightness bar, a hex field, a before/after chip, and
   the draft previewed in a **Dark and a Light strip** side by side. Any colour can be picked; blue is the
