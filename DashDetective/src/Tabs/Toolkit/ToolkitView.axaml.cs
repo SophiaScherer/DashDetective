@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -20,6 +21,41 @@ public partial class ToolkitView : UserControl {
 
     public ToolkitView() {
         InitializeComponent();
+
+        // Page-wide, so every focus move inside the page tells the view model who owns Enter.
+        AddHandler(GotFocusEvent, OnFocusArrived, handledEventsToo: true);
+        AddHandler(LostFocusEvent, OnFocusLeft, handledEventsToo: true);
+    }
+
+    // A focused button other than a row body keeps Enter for itself, as it would on any other page;
+    // a row body, or nothing, leaves it to the page's Activate. LostFocus fires before the next
+    // GotFocus, so focus leaving the page entirely ends here with the flag cleared.
+    private void OnFocusArrived(object? sender, FocusChangedEventArgs e) {
+        if (_boundViewModel is not null)
+            _boundViewModel.FocusedControlOwnsEnter = e.Source is Button button && !button.Classes.Contains("rowRun");
+    }
+
+    private void OnFocusLeft(object? sender, FocusChangedEventArgs e) {
+        if (_boundViewModel is not null)
+            _boundViewModel.FocusedControlOwnsEnter = false;
+    }
+
+    // Selection follows keyboard focus, so Enter on a row reached by Tab runs that row and not one
+    // clicked earlier. A pointer press is left to the click, which selects anyway.
+    private void OnRowGotFocus(object? sender, FocusChangedEventArgs e) {
+        if (e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional &&
+            sender is Control { DataContext: ToolkitEntry entry } && _boundViewModel is { } vm)
+            vm.SelectCommand.Execute(entry);
+    }
+
+    // Double-tap has no XAML command binding, so it is routed here — the File Explorer rows' shape. The
+    // two clicks inside it only select, so this is the gesture's one effect.
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e) {
+        if (sender is not Control { DataContext: ToolkitEntry entry } || _boundViewModel is not { } vm)
+            return;
+
+        _ = vm.Activate(entry);
+        e.Handled = true;
     }
 
     protected override void OnDataContextChanged(EventArgs e) {

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:DashDetective.Tabs.Toolkit"
              xmlns:controls="using:DashDetective.Shared.Controls"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="620"
              x:DataType="vm:ToolkitViewModel"
              x:Class="DashDetective.Tabs.Toolkit.ToolkitView">
@@ -39,6 +40,11 @@
         <Style Selector="Border.cmdRow:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
         </Style>
+        <!-- The selected row: fill-only and winning over hover, as File Explorer's fileRow and the
+             Processes procRow draw it. Selection runs nothing; it is what Enter acts on. -->
+        <Style Selector="Border.cmdRow.selected">
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        </Style>
 
         <!-- The search-reveal tint, on its own layer behind the row's content, because cmdRow carries a
              hover rule that a transition would smear. The transition and tint colour are the shared
@@ -52,10 +58,9 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         </Style>
 
-        <!-- The run affordance: a chrome-less button filling the row, so the whole thing is clickable
-             AND reachable by Tab. Being a real Button is what makes Enter work on a focused row — the
-             shortcut layer leaves Enter unconsumed (Activate falls through MainWindowViewModel's global
-             switch), so it arrives here natively and no IShortcutTarget case is needed. -->
+        <!-- The row body: a chrome-less button filling the row, so the whole thing is clickable AND
+             reachable by Tab. Its click only SELECTS; a double click, Enter (the page's Activate case)
+             or the play button runs. Space on a focused body selects, as a click does. -->
         <!-- Layered on the shared Button.bare, which carries the chrome-less setters; only the stretch
              to fill the row is local. Call sites set Classes="bare rowRun". -->
         <Style Selector="Button.rowRun">
@@ -63,13 +68,13 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <!-- Concurrent runs are refused, so a run in flight disables every row at once. Dimmed only
-             lightly: this is a second-or-two state for most commands, and greying the whole list hard
-             would read as the page having broken rather than as it being busy. -->
-        <Style Selector="Button.rowRun:disabled">
+        <!-- Concurrent runs are refused, so a run in flight dims every row at once — read off
+             RunCommand.IsRunning, the command's own state, rather than a page flag. The body stays
+             enabled because selecting is still fine. Dimmed only lightly: this is a second-or-two state
+             for most commands, and greying the whole list hard would read as the page having broken. -->
+        <Style Selector="Button.rowRun.busy">
             <Setter Property="Opacity" Value="0.65"/>
         </Style>
-
         <!-- Uppercase section label above each category card. -->
         <Style Selector="TextBlock.sectionHead">
             <Setter Property="FontSize" Value="{DynamicResource TextSizeSmall}"/>
@@ -332,7 +337,8 @@
                                     <ItemsControl ItemsSource="{Binding Items}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="vm:ToolkitEntry">
-                                                <Border Classes="cmdRow" Tag="{Binding Command}">
+                                                <Border Classes="cmdRow" Classes.selected="{Binding IsSelected}"
+                                                        Tag="{Binding Command}">
                                                   <Panel>
                                                     <!-- Reveal tint, behind the content and spanning
                                                          the whole row — which is why the row's inset
@@ -340,19 +346,24 @@
                                                          Padding up here. -->
                                                     <Border Classes="revealFlash"/>
 
-                                                    <!-- The run button covers everything but the row's
-                                                         own affordances, which stay siblings: nesting a
+                                                    <!-- The body covers everything but the row's own
+                                                         affordances, which stay siblings: nesting a
                                                          button inside a button would make those clicks
-                                                         run the command too. Its tooltip leads with the
-                                                         default action, so what a click does is known
-                                                         before it is made. -->
+                                                         reach the body too. A click selects; a double
+                                                         click activates through the code-behind, which
+                                                         calls the same RunCommand the play button binds.
+                                                         Its tooltip leads with the default action, so
+                                                         what activating does is known beforehand. -->
                                                     <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto"
                                                           ColumnSpacing="10" Margin="14,12">
                                                         <Button Grid.Column="0" Classes="bare rowRun"
+                                                                Classes.busy="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand.IsRunning}"
                                                                 ToolTip.Tip="{Binding ActivationTip}"
                                                                 AutomationProperties.Name="{Binding AccessibleName}"
-                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
-                                                                CommandParameter="{Binding}">
+                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).SelectCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                DoubleTapped="OnRowDoubleTapped"
+                                                                GotFocus="OnRowGotFocus">
                                                             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
                                                                 <Border Grid.Column="0" Width="28" Height="28"
                                                                         CornerRadius="7"
@@ -412,10 +423,10 @@
 
                                                         <!-- The editable slot on a parameterised row
                                                              (ping/tracert), and nothing at all on the
-                                                             rest. A sibling of the run button rather
+                                                             rest. A sibling of the row body rather
                                                              than inside it: a TextBox nested in a
-                                                             Button would run the command on every
-                                                             click into the field. Enter in the box
+                                                             Button would have every click into the
+                                                             field reach the body. Enter in the box
                                                              runs the row, which the shortcut layer
                                                              allows through because Activate is
                                                              AllowInTextInput: false. -->
@@ -440,20 +451,42 @@
                                                             </TextBox>
                                                         </Border>
 
-                                                        <!-- The secondary destination on a location row:
-                                                             the machine's own Explorer, while the row body
-                                                             opens the in-app File Explorer. Hidden on a
-                                                             shell: row, whose body already goes to
-                                                             Explorer — the icon would only repeat it. The
-                                                             box-with-an-escaping-arrow is the "leaves the
-                                                             app" idea ToolkitIcons.Link draws for a URL. -->
+                                                        <!-- One slot, first in the action cluster, for
+                                                             whichever of two buttons the row's kind
+                                                             earns. They never meet: a location never
+                                                             starts a program. -->
                                                         <!-- The slot is held open by the Panel, not the
-                                                             button: a hidden button would collapse this
-                                                             Auto column, the flexible column would take
-                                                             the space, and shell:startup's badge would
-                                                             sit 28px right of every other Folders row. -->
-                                                        <Panel Grid.Column="2" Width="28"
-                                                               IsVisible="{Binding IsPathEntry}">
+                                                             buttons, on EVERY row: a hidden button would
+                                                             collapse this Auto column, the flexible column
+                                                             would take the space, and a shell: or link
+                                                             row's badge would sit 38px right of its
+                                                             neighbours — in My Commands, where kinds mix,
+                                                             on every other row. -->
+                                                        <Panel Grid.Column="2" Width="28">
+                                                            <!-- Play, on a row whose default starts a
+                                                                 program: the one-click way to run it,
+                                                                 through the same RunCommand as a double
+                                                                 click. Its tooltip is the default action
+                                                                 itself ("Run as administrator"). -->
+                                                            <Button Classes="rowAction"
+                                                                    ToolTip.Tip="{Binding DefaultActionText}"
+                                                                    AutomationProperties.Name="{Binding RunButtonName}"
+                                                                    IsVisible="{Binding HasRunButton}"
+                                                                    Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <Path Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="None"
+                                                                      Fill="{DynamicResource TextTertiary}"
+                                                                      Data="{x:Static nav:Icons.Play}"/>
+                                                            </Button>
+
+                                                            <!-- The secondary destination on a location
+                                                                 row: the machine's own Explorer, while the
+                                                                 body opens the in-app File Explorer. Hidden
+                                                                 on a shell: row, whose body already goes to
+                                                                 Explorer — the icon would only repeat it.
+                                                                 The box-with-an-escaping-arrow is the
+                                                                 "leaves the app" idea ToolkitIcons.Link
+                                                                 draws for a URL. -->
                                                             <Button Classes="rowAction"
                                                                     ToolTip.Tip="Open in Windows Explorer"
                                                                     IsVisible="{Binding CanOpenInApp}"

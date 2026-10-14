@@ -1337,7 +1337,8 @@ stays in its tab folder.
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
+                                     caret sets Fill, not Stroke. Play (the Toolkit's run button) is filled
+                                     in the same family, a size up, and drawn at Stretch="None". The stroked Chevron* pair and its
                                      First/Last stop-bar variants are the Network pager's alone: paging is
                                      navigation rather than disclosure, and a stop bar only reads against a
                                      stroked arrow)
@@ -1398,10 +1399,11 @@ stays in its tab folder.
                                  IShortcutTarget. Running a row is an async RelayCommand that refuses
                                  concurrent runs and prepends one stanza to the log. View code-behind
                                  owns the search focus + the search-reveal flash, like
-                                 ProcessesView/SettingsView. The row is a chrome-less Button so Enter
-                                 works on a focused row natively — ShortcutId.Activate falls through
-                                 MainWindowViewModel's global switch unconsumed, so no IShortcutTarget
-                                 case is needed. The copy button is a SIBLING of it, not nested)
+                                 ProcessesView/SettingsView. The row body is a chrome-less Button whose
+                                 click only SELECTS; a double click (code-behind), Enter (the page's
+                                 Activate case) and the play button all run through RunCommand. The view
+                                 tells the VM when another button holds focus, so Enter on a pin pins.
+                                 The row's buttons are SIBLINGS of the body, not nested)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
                                 ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —

@@ -1,4 +1,6 @@
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,8 +25,10 @@ public class ToolkitViewModelTests {
     // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
     // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
     // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
-    private static ToolkitViewModel Page(string search = "") =>
-        new(WindowsToolkitCatalog.Instance) { Search = search };
+    private static ToolkitViewModel Page(string search = "", FakeProcessLauncher? launcher = null) =>
+        new(WindowsToolkitCatalog.Instance, launcher is null ? new ToolkitRunner() : new ToolkitRunner(launcher)) {
+            Search = search,
+        };
 
     // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
     // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
@@ -823,5 +827,155 @@ public class ToolkitViewModelTests {
         Assert.Equal("", vm.Search);
         Assert.True(vm.HasCommands);
         Assert.Contains(vm.Groups.SelectMany(g => g.Items), entry => entry.Command == "%temp%");
+    }
+
+    // ----- Selecting versus activating -----
+
+    // A captured row: the fake launcher answers it synchronously, so a run started by a fire-and-forget
+    // path (Enter) has finished by the time the call that started it returns.
+    private static ToolkitEntry CaptureRow(string command = "whoami") =>
+        new(command, "Captured", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture(command));
+
+    /// <summary>The whole point of the model: a single click picks a row and starts nothing.</summary>
+    [Fact]
+    public void Select_RunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        vm.SelectCommand.Execute(entry);
+
+        Assert.Same(entry, vm.SelectedEntry);
+        Assert.True(entry.IsSelected);
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+    }
+
+    [Fact]
+    public void Select_AFolderRow_DoesNotNavigate() {
+        var vm = Page();
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        vm.SelectCommand.Execute(PathRow());
+
+        Assert.Equal(0, revealed);
+    }
+
+    [Fact]
+    public void Select_AnotherRow_MovesTheHighlight() {
+        var vm = Page();
+        var first = CaptureRow("first");
+        var second = CaptureRow("second");
+
+        vm.SelectCommand.Execute(first);
+        vm.SelectCommand.Execute(second);
+
+        Assert.False(first.IsSelected);
+        Assert.True(second.IsSelected);
+    }
+
+    /// <summary>A double click runs the row exactly once, through the same path the play button binds.</summary>
+    [Fact]
+    public async Task Activate_RunsTheRowExactlyOnceAndSelectsIt() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        await vm.Activate(entry);
+
+        Assert.Equal("whoami", launcher.Single.FileName);
+        Assert.Single(vm.Log);
+        Assert.Same(entry, vm.SelectedEntry);
+    }
+
+    [Fact]
+    public async Task Activate_AFolderRow_OpensItInTheAppOnce() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        await vm.Activate(PathRow());
+
+        Assert.Equal(1, revealed);
+        Assert.Empty(launcher.Calls);
+    }
+
+    [Fact]
+    public void HandleShortcut_ActivateWithARowSelected_RunsThatRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+
+        var consumed = vm.HandleShortcut(ShortcutId.Activate);
+
+        Assert.True(consumed);
+        Assert.Equal("whoami", launcher.Single.FileName);
+    }
+
+    /// <summary>Unconsumed, so Enter still reaches whatever would otherwise have taken it.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNothingSelected_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>Enter on a focused pin button must press the pin, not run the selected command.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWhileAnotherButtonHasFocus_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+        vm.FocusedControlOwnsEnter = true;
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    [Fact]
+    public void Search_HidingTheSelectedRow_ClearsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "zzzz-no-such-command";
+
+        Assert.Null(vm.SelectedEntry);
+        Assert.False(entry.IsSelected);
+    }
+
+    [Fact]
+    public void Search_StillShowingTheSelectedRow_KeepsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "temp";
+
+        Assert.Same(entry, vm.SelectedEntry);
+        vm.SelectCommand.Execute(null);
+    }
+
+    /// <summary>Picking a universal-search result selects the row and flashes it, but never runs it —
+    /// running stays a second, deliberate action.</summary>
+    [Fact]
+    public void Reveal_SelectsTheRowAndRunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        vm.Reveal("ipconfig /all");
+
+        Assert.Equal("ipconfig /all", vm.SelectedEntry?.Command);
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+        Assert.Equal(0, revealed);
+        vm.SelectCommand.Execute(null);
     }
 }

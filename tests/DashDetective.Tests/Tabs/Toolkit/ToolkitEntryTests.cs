@@ -80,6 +80,33 @@ public class ToolkitEntryTests {
         });
     }
 
+    /// <summary>Only a row whose default starts a program gets a play button; a folder or a link only
+    /// navigates, and a double click or Enter covers that.</summary>
+    [Theory]
+    [InlineData(ToolkitActionKind.Launch, true)]
+    [InlineData(ToolkitActionKind.Capture, true)]
+    [InlineData(ToolkitActionKind.Elevated, true)]
+    [InlineData(ToolkitActionKind.OpenPath, false)]
+    [InlineData(ToolkitActionKind.OpenUrl, false)]
+    public void HasRunButton_OnlyForRowsThatStartAProgram(ToolkitActionKind kind, bool expected) {
+        var action = kind switch {
+            ToolkitActionKind.Launch => ToolkitAction.Launch("regedit"),
+            ToolkitActionKind.Capture => ToolkitAction.Capture("whoami"),
+            ToolkitActionKind.Elevated => ToolkitAction.Elevated("sfc", "/scannow"),
+            ToolkitActionKind.OpenPath => ToolkitAction.OpenPath(Folder),
+            _ => ToolkitAction.OpenUrl("https://example.com"),
+        };
+
+        Assert.Equal(expected, Row(action).HasRunButton);
+    }
+
+    /// <summary>The play button names its action first and the command it acts on, so thirty of them
+    /// do not all announce "Run".</summary>
+    [Fact]
+    public void RunButtonName_NamesTheActionAndTheCommand() =>
+        Assert.Equal("Run as administrator: sfc /scannow",
+                     Row(ToolkitAction.Elevated("sfc", "/scannow"), command: "sfc /scannow").RunButtonName);
+
     /// <summary>A row the user authored states its default like any catalog row does.</summary>
     [Theory]
     [InlineData(ToolkitCommandType.Url, "https://example.com", "Open in your browser")]

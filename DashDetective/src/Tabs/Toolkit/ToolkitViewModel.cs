@@ -17,13 +17,14 @@ namespace DashDetective.Tabs.Toolkit;
 /// command column and the log panel scroll independently, so the log stays pinned in view.
 ///
 /// The list is narrowed by a category chip and a search box together, through
-/// <see cref="ToolkitFilter"/>. Picking a row runs its <see cref="ToolkitEntry.Action"/> through
+/// <see cref="ToolkitFilter"/>. A single click selects a row; a double click, Enter or its play button
+/// activates it, running its <see cref="ToolkitEntry.Action"/> through
 /// <see cref="ToolkitRunner"/> and prepends what happened to the log; the view model never touches a
 /// process itself, and only ever runs actions authored in an <see cref="IToolkitCatalog"/> or built
 /// from what the user typed into the form.
 /// </summary>
 public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
-    private readonly ToolkitRunner _runner = new();
+    private readonly ToolkitRunner _runner;
     private readonly IToolkitCatalog _catalog;
     private ToolkitCategory? _category;
     private string? _pendingReveal;
@@ -36,8 +37,13 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>Test seam: the same page over an explicit command set. The public ctor resolves this
     /// machine's, so the shell still builds this with <c>new()</c>.</summary>
-    internal ToolkitViewModel(IToolkitCatalog catalog) {
+    internal ToolkitViewModel(IToolkitCatalog catalog) : this(catalog, new ToolkitRunner()) { }
+
+    /// <summary>Test seam: also takes the runner, so a test can see exactly what reached the process
+    /// launcher — and that selecting a row reached nothing.</summary>
+    internal ToolkitViewModel(IToolkitCatalog catalog, ToolkitRunner runner) {
         _catalog = catalog;
+        _runner = runner;
 
         var options = new List<ToolkitCategoryOption> {
             new("All", null, SelectCategory),
@@ -133,10 +139,17 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>Brings a command into view after universal search navigated here. The filter is reset
     /// first: a chip or a half-typed search from earlier could otherwise have hidden the very row the
-    /// user just picked.</summary>
+    /// user just picked. The row is selected, never run — picking a search result is not a click on
+    /// it, so running it is left to a second, deliberate Enter or double click.</summary>
     public void Reveal(string command) {
         SelectCategory(Categories[0]);
         Search = "";
+        foreach (var entry in AllEntries) {
+            if (entry.Command == command) {
+                SelectedEntry = entry;
+                break;
+            }
+        }
 
         // Held rather than passed to the event, because on the first jump to this tab the view has not
         // been built yet and so is not listening — the shell navigates and reveals in one breath, but
@@ -168,6 +181,13 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
                 ClearSearch();
                 return true;
 
+            // Unconsumed when nothing is selected, a run is in flight, or another button has focus, so
+            // the key still reaches whatever that is.
+            case ShortcutId.Activate when SelectedEntry is { } entry && !FocusedControlOwnsEnter &&
+                                          RunCommand.CanExecute(entry):
+                _ = Activate(entry);
+                return true;
+
             default:
                 return false;
         }
@@ -178,6 +198,36 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// idea another tab exists, exactly as <see cref="PinsChanged"/> has no idea a settings file
     /// does.</summary>
     public event Action<string>? FileExplorerRevealRequested;
+
+    /// <summary>The row a single click, or keyboard focus, last picked. Selecting never runs anything:
+    /// a double click, Enter or the row's play button does.</summary>
+    [ObservableProperty] private ToolkitEntry? _selectedEntry;
+
+    partial void OnSelectedEntryChanged(ToolkitEntry? oldValue, ToolkitEntry? newValue) {
+        if (oldValue is not null)
+            oldValue.IsSelected = false;
+        if (newValue is not null)
+            newValue.IsSelected = true;
+    }
+
+    /// <summary>Set by the view while a button other than a row body holds focus. Enter then belongs to
+    /// that button — pressing it on a focused pin must pin, not run the selected command.</summary>
+    internal bool FocusedControlOwnsEnter { get; set; }
+
+    /// <summary>A single click on a row body: selects it, and nothing else.</summary>
+    [RelayCommand]
+    private void Select(ToolkitEntry? entry) => SelectedEntry = entry;
+
+    /// <summary>A double click or Enter: selects the row and runs its default action through
+    /// <see cref="RunCommand"/>, the same path the play button takes. A run already in flight refuses it,
+    /// as it refuses the button.</summary>
+    public Task Activate(ToolkitEntry? entry) {
+        if (entry is null)
+            return Task.CompletedTask;
+
+        SelectedEntry = entry;
+        return RunCommand.CanExecute(entry) ? RunCommand.ExecuteAsync(entry) : Task.CompletedTask;
+    }
 
     /// <summary>
     /// Activates a row: its default action, which <see cref="ToolkitEntry.DefaultActionText"/> words. A
@@ -446,6 +496,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             foreach (var item in group.Items)
                 matched.Add(item);
         }
+
+        // A selection the filter hid is dropped, so Enter cannot run a row the user can no longer see.
+        if (SelectedEntry is { } selected && !matched.Contains(selected))
+            SelectedEntry = null;
 
         HasCommands = matched.Count > 0;
         CountLabel = matched.Count == 1
