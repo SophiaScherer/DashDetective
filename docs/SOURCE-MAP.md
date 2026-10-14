@@ -54,6 +54,9 @@ stays in its tab folder.
   /src
 ```
 
+`Assets/dashdetective.ico` is the app, window, tray and executable icon: the nav brand tile at the default
+accent, ten PNG entries from 16 to 256 px. The csproj's `ApplicationIcon` stamps it into the exe.
+
 ## `src/Shared`
 
 ```
