@@ -1368,6 +1368,10 @@ stays in its tab folder.
                                                          the card's no-reading note when it has one, else
                                                          the open hint — because a card has no room for a
                                                          line of its own and the note has more to say)
+                                DashboardLink.cs        (the card/chart jump to Performance: a Button,
+                                                         styled as one, whose single pointer click does
+                                                         NOTHING — a double click or Enter/Space goes.
+                                                         Every gesture passes Respond, the one gate)
                                 CpuStaticInfo.cs        (record for the result)
                                 IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
                                                         (RAM info via WMI, async)

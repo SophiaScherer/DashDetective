@@ -50,10 +50,10 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DashboardCard">
-                    <!-- The card is a click target that opens its own device in Performance. A button
-                         rather than a tap handler, so it takes focus and answers Enter/Space too; the
-                         cards' panel sets no DragGrip, so nothing here competes for the press. -->
-                    <Button Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
+                    <!-- The card opens its own device in Performance on a double click, never a single
+                         one (DashboardLink). Still a button, so it takes focus and answers Enter/Space;
+                         the cards' panel sets no DragGrip, so nothing here competes for the press. -->
+                    <vm:DashboardLink Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
                             AutomationProperties.Name="{Binding AccessibleName}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                         <controls:StatCard Selectable="True"
@@ -63,7 +63,7 @@
                                            Label="{Binding Label}" Value="{Binding Value}" Unit="{Binding Unit}"
                                            Sub="{Binding Sub}" YMin="0" YMax="100" Points="{Binding Points}"
                                            AxisMaxLabel="{Binding AxisMaxLabel}" AxisMinLabel="0"/>
-                    </Button>
+                    </vm:DashboardLink>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -75,29 +75,30 @@
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding CpuPercentText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartCpuText}"/>
                 </controls:WidgetPanel.HeaderContent>
-                <!-- The body opens this device in Performance; the header keeps its drag and fold. -->
-                <Button Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
-                        ToolTip.Tip="Open CPU in Performance">
+                <!-- A double click on the body opens this device in Performance; the header keeps its
+                     drag and fold. -->
+                <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenCpuChartCommand}"
+                        ToolTip.Tip="Double-click to open CPU in Performance">
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartCpu}"
                                         YMin="0" YMax="100" Points="{Binding CpuPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                         StatusText="{Binding CpuChartStatus}"/>
-                </Button>
+                </vm:DashboardLink>
             </controls:WidgetPanel>
             <controls:WidgetPanel WidgetId="dashboard.memory" MinWidth="340" layout:WidgetBoard.MaxSlotWidth="760"
                                   Title="Memory Utilization" Subtitle="{Binding MemoryChartCaption}">
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Text="{Binding MemoryUtilizationText}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource ChartMemoryText}"/>
                 </controls:WidgetPanel.HeaderContent>
-                <Button Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
-                        ToolTip.Tip="Open Memory in Performance">
+                <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenMemoryChartCommand}"
+                        ToolTip.Tip="Double-click to open Memory in Performance">
                     <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True" Stroke="{DynamicResource ChartMemory}"
                                         YMin="0" YMax="100" Points="{Binding MemoryPoints}"
                                         AxisMaxLabel="100%" AxisMidLabel="50%" AxisMinLabel="0"
                                         AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                         StatusText="{Binding MemoryChartStatus}"/>
-                </Button>
+                </vm:DashboardLink>
             </controls:WidgetPanel>
 
             <!-- ===== System info + Network throughput. System info keeps the wider share of whatever
@@ -160,8 +161,8 @@
                                               Label2="Upload" Brush2="{DynamicResource ChartNetUp}"
                                               Pattern2="{DynamicResource ChartPatterns}"/>
                     </Grid>
-                    <Button Classes="bare openChart" Command="{Binding OpenNetworkChartCommand}"
-                            ToolTip.Tip="Open this adapter in Performance">
+                    <vm:DashboardLink Classes="bare openChart" Command="{Binding OpenNetworkChartCommand}"
+                            ToolTip.Tip="Double-click to open this adapter in Performance">
                         <controls:Sparkline Classes="chartPanel" Fill="True" ShowGrid="True"
                                             Stroke="{DynamicResource ChartNetDown}" Points="{Binding NetworkDownPoints}"
                                             Stroke2="{DynamicResource ChartNetUp}" Points2="{Binding NetworkUpPoints}"
@@ -171,7 +172,7 @@
                                             AxisMinLabel="0"
                                             AxisStartLabel="{Binding ChartRangeStart}" AxisEndLabel="now"
                                             StatusText="{Binding NetworkChartStatus}"/>
-                    </Button>
+                    </vm:DashboardLink>
                 </StackPanel>
             </controls:WidgetPanel>
     </layout:WidgetBoard>

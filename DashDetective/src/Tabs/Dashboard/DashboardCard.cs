@@ -19,7 +19,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// </summary>
 public partial class DashboardCard : ObservableObject {
     /// <summary>What a card's tooltip says when it has no note of its own.</summary>
-    public const string OpenHint = "Open in Performance";
+    public const string OpenHint = "Double-click to open in Performance";
 
     public DashboardCard(
         DeviceCategory category, string deviceId, string label, string unit, Action<string> onOpen) {
@@ -57,7 +57,7 @@ public partial class DashboardCard : ObservableObject {
     /// a line of its own, so the template hangs it off the tooltip.</summary>
     [ObservableProperty] private string _note = "";
 
-    /// <summary>The card's tooltip: its note when it has one, otherwise where a click goes. A card has no
+    /// <summary>The card's tooltip: its note when it has one, otherwise how to open it. A card has no
     /// room for a line of its own, so both hang off the tooltip and the note wins — a card explaining why it
     /// reads "—" has more to say than one repeating an affordance.</summary>
     public string Tip => Note.Length > 0 ? Note : OpenHint;
