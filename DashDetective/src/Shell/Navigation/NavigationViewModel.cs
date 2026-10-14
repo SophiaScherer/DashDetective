@@ -10,6 +10,7 @@ using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Identity;
 using DashDetective.Services.Threading;
 using DashDetective.Shared;
+using DashDetective.Shared.Shortcuts;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -153,7 +154,7 @@ public partial class NavigationViewModel : ViewModelBase {
         nameof(ControlsDock), nameof(FooterAvatarDock),
         nameof(ChevronPointing), nameof(ChevronWidth), nameof(ChevronHeight),
         nameof(ChevronHAlign), nameof(ChevronVAlign),
-        nameof(ChevronCornerRadius))]
+        nameof(ChevronCornerRadius), nameof(SectionsPlacement))]
     private NavOrientation _orientation = NavOrientation.Left;
 
     /// <summary>The navigation entries shown on the bar, in display order.</summary>
@@ -568,7 +569,7 @@ public partial class NavigationViewModel : ViewModelBase {
     }
 
     /// <summary>Populates the bar and selects the first item. Items must be created with
-    /// <see cref="Navigate"/> as their select callback so clicks route back here.</summary>
+    /// <see cref="Activate"/> as their select callback so presses route back here.</summary>
     public void Initialize(IEnumerable<NavItem> items) {
         foreach (var item in items)
             NavItems.Add(item);
@@ -578,15 +579,93 @@ public partial class NavigationViewModel : ViewModelBase {
         SelectionChanged?.Invoke(SelectedNav);
     }
 
+    /// <summary>A press on a nav item: the current page's item opens its section list, any other item
+    /// navigates. Kept apart from <see cref="Navigate"/>, which shortcuts, search and cross-page jumps also
+    /// call, so none of those can open the list by landing on the page already showing.</summary>
+    public void Activate(NavItem item) {
+        if (item == SelectedNav) {
+            if (HasSections)
+                IsSectionsOpen = !IsSectionsOpen;
+            return;
+        }
+
+        Navigate(item);
+    }
+
     /// <summary>Selects a nav item (single-select) and notifies the shell to host its page.
     /// No-ops when the item is already selected.</summary>
     public void Navigate(NavItem item) {
         if (item == SelectedNav)
             return;
 
+        // The list described the page being left; the shell reports the new page's once it is laid out.
+        SetSections([]);
+
         SelectedNav.IsSelected = false;
         SelectedNav = item;
         item.IsSelected = true;
         SelectionChanged?.Invoke(item);
+    }
+
+    // ----- Page sections (the current page's titled widgets, listed from its nav item) -----
+
+    /// <summary>The current page's sections, in reading order. Rebuilt by <see cref="SetSections"/>.</summary>
+    public ObservableCollection<PageSectionOption> Sections { get; } = new();
+
+    /// <summary>Whether the current page has enough sections to offer the list. Drives the caret on the
+    /// selected item and whether pressing it again opens anything.</summary>
+    public bool HasSections => PageSections.ShouldShow(Sections.Count);
+
+    /// <summary>Whether the section list is open. Bound two-way to the popup, so a close the view makes
+    /// (an outside press) comes back here rather than leaving the flag stale.</summary>
+    [ObservableProperty] private bool _isSectionsOpen;
+
+    /// <summary>Raised as the list opens, so the shell re-reads the page: the list is built live, which
+    /// is what keeps a reorder or a widget that appeared since the last read in it.</summary>
+    public event Action? SectionsRefreshRequested;
+
+    /// <summary>Raised when a section is chosen, so the shell can scroll it into view. Carries the
+    /// section, never a control: the shell kept the widgets it measured.</summary>
+    public event Action<PageSection>? SectionPicked;
+
+    /// <summary>Where the list opens: beside a vertical rail, away from the docked edge, and into the
+    /// page from a horizontal bar.</summary>
+    public PlacementMode SectionsPlacement => Orientation switch {
+        NavOrientation.Left => PlacementMode.RightEdgeAlignedTop,
+        NavOrientation.Right => PlacementMode.LeftEdgeAlignedTop,
+        NavOrientation.Top => PlacementMode.BottomEdgeAlignedLeft,
+        _ => PlacementMode.TopEdgeAlignedLeft,
+    };
+
+    /// <summary>Replaces the section list with what the shell measured on the current page. A page with
+    /// too few sections closes the list rather than leaving an empty or one-row popup up.</summary>
+    internal void SetSections(IReadOnlyList<SectionCandidate> candidates) {
+        Sections.Clear();
+        foreach (var section in PageSections.Discover(candidates))
+            Sections.Add(new PageSectionOption(section, PickSection));
+
+        OnPropertyChanged(nameof(HasSections));
+        if (!HasSections)
+            IsSectionsOpen = false;
+    }
+
+    partial void OnIsSectionsOpenChanged(bool value) {
+        if (value)
+            SectionsRefreshRequested?.Invoke();
+    }
+
+    private void PickSection(PageSection section) {
+        IsSectionsOpen = false;
+        SectionPicked?.Invoke(section);
+    }
+
+    /// <summary>Esc closes an open section list. Only consumed while it is open, so the key otherwise
+    /// falls through the shell's chain as before.</summary>
+    internal bool HandleSectionsShortcut(ShortcutId id) {
+        if (id != ShortcutId.Escape || !IsSectionsOpen)
+            return false;
+
+        IsSectionsOpen = false;
+        return true;
     }
 }

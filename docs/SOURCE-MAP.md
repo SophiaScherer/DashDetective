@@ -292,7 +292,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  MinHeight and a MinHeight instead would make every folding card taller. The glyph is set from the
                                  pseudo-class rather than a converter, which keeps it out of Icons —
                                  touching Icons at all throws without a render backend, so a test could
-                                 not reach the rule.
+                                 not reach the rule. WidgetPanel.highlighted tints the surface while
+                                 RevealFlash holds the class — with no fade, since a Background
+                                 transition here would also animate every widget through a theme switch.
                                  which is what satisfies compiled bindings without an x:DataType)
         WindowChrome.axaml      (AppWindowDecorations: the ControlTheme for Avalonia 12's
                                  WindowDrawnDecorations, i.e. the caption buttons of a window that draws its
@@ -1389,7 +1391,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  since an export names a path and a deep one is exactly the case worth
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
-                                 code-behind calls — MainWindow's own Export among them)
+                                 code-behind calls — MainWindow's own Export among them. The page hosts
+                                 are named (ScrollingHost / SelfScrollingHost) so RefreshSections can
+                                 read the current page's titled widgets for the nav bar's section list,
+                                 on each page change and each open; a pick is scrolled and flashed here)
       BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
                                  from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
                                  shape, so it is testable without constructing the shell)
@@ -1512,6 +1517,15 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      Without that, two Backs would bounce between two pages. Capped at 50.
                                      Generic so tests use strings: NavItem's icon needs a render backend.
                                      Same idea as File Explorer's NavigationHistory, which is tab-local)
+        PageSections.cs             (which widgets are the current page's SECTIONS and in what order:
+                                     visible, titled, in reading order of where they were ARRANGED
+                                     (rows within RowTolerance, then left to right), since a dragged
+                                     board no longer matches its markup. Pure over SectionCandidate
+                                     records the shell measures, so it needs no layout pass. Fewer than
+                                     two sections and the list is not offered. PageSection.Source is the
+                                     candidate index, which is how MainWindow finds the widget again
+                                     without the view model holding a control)
+        PageSectionOption.cs        (one row of the section list: the section plus its jump command)
 ```
 
 ## `src/Tabs/Dashboard`

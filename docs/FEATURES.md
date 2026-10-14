@@ -70,6 +70,35 @@ point drives the **same shared** `NavigationViewModel`:
   dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
   otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
+- **Page sections** (work item 46) — **press the current page's nav item again** for an "On this page"
+  list of its sections; choosing one scrolls it to the top of its scroller and flashes it. A section is a
+  visible `WidgetPanel` with a title, outermost only, listed in reading order of where it was
+  **arranged** — rows top to bottom, left to right within a row — because widgets are reordered by
+  dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
+  - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
+    the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
+    a tab stop to every page, and have nowhere to go on a horizontal bar without moving its neighbors.
+    The caret glyph (`Icons.CaretDown`) shows on the selected item only when the page has sections, and
+    overlays the row's padding so it never moves anything: at the end of an expanded vertical row, under
+    the icon on a collapsed rail, in the trailing padding of a horizontal item. Keyboard: Tab to the
+    selected item and press Enter; the first section takes focus, Esc closes.
+  - **`Activate`, not `Navigate`, is the item's press.** `Navigate` is also what `Ctrl+1…9`, search and
+    the cross-page jumps call, and landing on the page already showing must not open a list.
+  - **Built live, on every open and every page change**, from the page's visual tree in `MainWindow`
+    (`RefreshSections`): the view model never holds a control, and a reorder or a fold since the last
+    read is always reflected. Nothing persists.
+  - **The scroll asks for a viewport-tall rect from just above the widget**, so its heading lands at the
+    top rather than wherever it first comes into view. `BringIntoView` finds the nearest scroller, so a
+    self-scrolling page's own pane scrolls instead of the shell's; a folded widget is its header, so
+    that is what shows.
+  - **The popup is the Processes options shape**: one `ScaleHost` of its own, not light-dismissed so the
+    window stays hoverable, an outside press closing it from code-behind, and `IsOpen` bound two-way.
+    Esc is the shortcut chain's while focus is in the window (`HandleSectionsShortcut`, beside the
+    search dropdown's step) and the popup's own `KeyDown` while focus is inside it, since the popup is a
+    separate visual root the window's listener never sees.
+  - **The flash is `WidgetPanel.highlighted`**, tinting the whole surface for `RevealFlash`'s hold. It
+    does not fade, unlike `Border.revealFlash`: a transition on the surface would also animate every
+    widget through a theme switch while the page behind it snaps.
 
 The footer avatar shows the **device's own account picture** when the OS has one, read through the
 `IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
@@ -637,9 +666,9 @@ merely bigger. `Sparkline` composes its own axis text with `FormattedText` and s
 subtree, so charts needed nothing either.
 
 **One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
-and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
-five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
-menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+and inherit nothing from the shell's, so there are eight: `MainWindow`, `TrayNoticeWindow`, and the
+six popups (universal search, the navigation dock flyout and section list, the File Explorer and
+Processes options menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
 the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
 resource. **The custom title bar sits outside `MainWindow`'s host on purpose**, beside caption buttons
 drawn at the OS's scale — see *Window chrome*.

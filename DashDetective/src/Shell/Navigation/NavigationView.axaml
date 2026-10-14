@@ -257,6 +257,32 @@
             <Setter Property="Fill" Value="{DynamicResource Accent}"/>
         </Style>
 
+        <!-- Section caret: a cue on the current page's item that pressing it again lists the page's
+             sections. A glyph, not a second button, so the row stays one tab stop and one hit target. It
+             overlays the row's padding rather than joining its content, so showing it never moves a
+             neighbor: at the trailing end of an expanded vertical row, under the icon on a collapsed rail,
+             and in the trailing padding of a horizontal bar's item. -->
+        <Style Selector="Border.rail Path.sectionsCaret">
+            <Setter Property="IsVisible" Value="False"/>
+            <Setter Property="Fill" Value="{DynamicResource TextTertiary}"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.rail.hasSections Button.nav.selected Path.sectionsCaret">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.rail.collapsed Path.sectionsCaret">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="Margin" Value="0,0,0,-7"/>
+        </Style>
+        <!-- After the collapsed rule, so a collapsed horizontal bar takes this one. -->
+        <Style Selector="Border.rail.horizontal Path.sectionsCaret">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,-10,0"/>
+        </Style>
+
         <!-- Drag-to-dock: dim the bar where it still sits so it reads as picked up, while the overlay's
              drop band previews the edge it will land on. The puck is kept out of a moving cursor's way by
              ShowChevron, not by a style — a setter cannot override the local IsVisible binding. -->
@@ -302,7 +328,7 @@
          the item list fills the middle, with the dock edges flipped for a horizontal bar. -->
     <Border x:Name="RailBorder"
             Classes="rail" Classes.collapsed="{Binding IsRailCollapsed}" Classes.horizontal="{Binding IsHorizontal}"
-            Classes.relocating="{Binding IsRelocating}"
+            Classes.relocating="{Binding IsRelocating}" Classes.hasSections="{Binding HasSections}"
             Width="{Binding RailWidth}"
             SizeChanged="OnRailSizeChanged"
             Background="{DynamicResource SidebarBackground}"
@@ -419,7 +445,7 @@
             <ScrollViewer x:Name="ItemScroll"
                           VerticalScrollBarVisibility="{Binding ScrollV}"
                           HorizontalScrollBarVisibility="{Binding ScrollH}">
-                <ItemsControl ItemsSource="{Binding NavItems}" Margin="12,4">
+                <ItemsControl x:Name="NavList" ItemsSource="{Binding NavItems}" Margin="12,4">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="{Binding ItemsOrientation}"
@@ -444,6 +470,8 @@
                                         <Rectangle Classes="navIndicatorH" Width="18" Height="3"
                                                    RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                                        <Path Classes="sectionsCaret" Width="8" Height="5" Stretch="Uniform"
+                                              Data="{x:Static nav:Icons.CaretDown}"/>
                                         <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
                                             <Path Classes="navIcon" Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform"
                                                   Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
@@ -460,6 +488,39 @@
             </ScrollViewer>
         </DockPanel>
     </Border>
+
+        <!-- The current page's sections, opened by pressing its nav item again. The view points it at that
+             item (PlacementTarget) and the view model picks the side. Not light-dismissed, so the rest of the
+             window stays hoverable; an outside press closes it from code-behind, as the Processes options
+             popup does. IsOpen is two-way, so that close reaches the view model. -->
+        <Popup x:Name="SectionsPopup" Placement="{Binding SectionsPlacement}"
+               IsLightDismissEnabled="False"
+               IsOpen="{Binding IsSectionsOpen, Mode=TwoWay}">
+            <!-- A popup is its own visual root, so it carries the interface scale itself. -->
+            <controls:ScaleHost Scale="{DynamicResource UiScale}">
+                <Border Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource Hairline}" BorderThickness="1"
+                        CornerRadius="8" Padding="4" Margin="6"
+                        BoxShadow="{StaticResource ShadowPopup}">
+                    <StackPanel Spacing="2" MinWidth="200">
+                        <TextBlock Classes="dockMenuHeader" Text="ON THIS PAGE"/>
+                        <ItemsControl ItemsSource="{Binding Sections}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="nav:PageSectionOption">
+                                    <Button Classes="pickTile" Command="{Binding SelectCommand}"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                            AutomationProperties.Name="{Binding Title}">
+                                        <Border Classes="dockRow">
+                                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </controls:ScaleHost>
+        </Popup>
 
         <!-- Collapse/expand puck. Every dimension comes from the view model so the semi-circle follows
              the docked edge with no converters, and it reuses the same ToggleCollapse command as the
