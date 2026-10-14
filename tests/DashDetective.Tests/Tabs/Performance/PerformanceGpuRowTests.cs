@@ -23,8 +23,12 @@ public class PerformanceGpuRowTests {
     /// <summary>Builds the page over a staged sampler and drives one inventory load to completion, handing
     /// back the sampler the page kept for itself — the first the factory minted. The inventory load mints
     /// and disposes one of its own, so the two must not be the same object.</summary>
+    private static Task<(PerformanceViewModel ViewModel, FakeGpuUsageSampler PageSampler)>
+        LoadedAsync(Func<FakeGpuUsageSampler> sampler, params GpuAdapter[] adapters) =>
+        LoadedAsync(sampler, new FakeGpuDetailsProvider(), adapters);
+
     private static async Task<(PerformanceViewModel ViewModel, FakeGpuUsageSampler PageSampler)>
-        LoadedAsync(Func<FakeGpuUsageSampler> sampler, params GpuAdapter[] adapters) {
+        LoadedAsync(Func<FakeGpuUsageSampler> sampler, FakeGpuDetailsProvider details, params GpuAdapter[] adapters) {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
 
@@ -36,11 +40,12 @@ public class PerformanceGpuRowTests {
                 var minted = sampler();
                 pageSampler ??= minted;
                 return minted;
-            });
+            },
+            gpuDetails: details);
 
-        // The constructor fires its own load and forgets it; letting that finish first keeps the final row
-        // set deterministic, as in the Dashboard's GPU tests.
-        await Task.Delay(100);
+        // The constructor fires its own load; awaiting it rather than racing a second load against it keeps
+        // the final row set deterministic.
+        await viewModel.InitialLoad;
         await viewModel.LoadInventoryAsync();
         return (viewModel, pageSampler!);
     }
@@ -321,12 +326,45 @@ public class PerformanceGpuRowTests {
         Assert.Equal(["3D", "Copy", "VRAM in use", "Temp", "Power"], GpuRow(viewModel).Stats.Select(t => t.Label));
     }
 
+    /// <summary>A tick with no engine map measured nothing, so the engine tiles go to the placeholder rather
+    /// than keep the last tick's figure.</summary>
+    [Fact]
+    public async Task EngineTiles_TickWithNoEngineMap_ShowThePlaceholder() {
+        var (viewModel, sampler) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 40, new Dictionary<string, double> {
+                ["3D"] = 40, ["Copy"] = 7,
+            }),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
+
+        sampler.Reporting(Amd, 40);
+        viewModel.UpdateGpuAdapters();
+
+        Assert.Contains(GpuRow(viewModel).Stats, t => t.Label == "Copy" && t.Value == "—");
+    }
+
+    /// <summary>The same for a tick on which the adapter reports no reading at all.</summary>
+    [Fact]
+    public async Task EngineTiles_TickWithNoReading_ShowThePlaceholder() {
+        var (viewModel, sampler) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 40, new Dictionary<string, double> {
+                ["3D"] = 40, ["Copy"] = 7,
+            }),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
+
+        sampler.Silent(Amd);
+        viewModel.UpdateGpuAdapters();
+
+        Assert.Contains(GpuRow(viewModel).Stats, t => t.Label == "Copy" && t.Value == "—");
+    }
+
+    private static readonly GpuDetails Rtx3060 = new("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0");
+
     [Fact]
     public async Task Details_PublishedFacts_AreListedUnderTaskManagersLabels() {
         var (viewModel, _) = await LoadedAsync(
             () => new FakeGpuUsageSampler().Reporting(Amd, 37),
-            new GpuAdapter(Amd, "NVIDIA GeForce RTX 3060", false, 0,
-                           Details: new GpuDetails("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0")));
+            new FakeGpuDetailsProvider().With(Amd, Rtx3060),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
 
         var row = GpuRow(viewModel);
         Assert.True(row.HasDetails);
@@ -336,14 +374,13 @@ public class PerformanceGpuRowTests {
     }
 
     /// <summary>The acceptance criterion: a fact the adapter does not expose is omitted, not shown as a dash
-    /// or a zero; an adapter with none shows no list.</summary>
+    /// or a zero; an adapter the provider knows nothing about shows no list.</summary>
     [Fact]
     public async Task Details_UnpublishedFacts_AreOmitted() {
         var (viewModel, _) = await LoadedAsync(
             () => new FakeGpuUsageSampler().Reporting(Amd, 37).Reporting("0000:01:00.0", 5),
-            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 0,
-                           Details: new GpuDetails(null, null, "PCI bus 3, device 0, function 0")),
-            Adapter("0000:01:00.0", "NVIDIA nvidia (10de:2504)"));
+            new FakeGpuDetailsProvider().With(Amd, new GpuDetails(null, null, "PCI bus 3, device 0, function 0")),
+            Adapter(Amd, "AMD amdgpu (1002:73df)"), Adapter("0000:01:00.0", "NVIDIA nvidia (10de:2504)"));
 
         var amd = GpuRow(viewModel, "GPU 0");
         Assert.Equal(["Physical location"], amd.Details.Select(d => d.Key));
@@ -361,10 +398,10 @@ public class PerformanceGpuRowTests {
             () => new FakeGpuUsageSampler()
                 .Reporting(Nvidia, 30, new Dictionary<string, double> { ["3D"] = 30, ["VideoEncode"] = 9 })
                 .Reporting(Radeon, 4, new Dictionary<string, double> { ["3D"] = 4, ["Video Decode"] = 2 }),
-            new GpuAdapter(Nvidia, "NVIDIA GeForce RTX 3060", false, 0,
-                           Details: new GpuDetails("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0")),
-            new GpuAdapter(Radeon, "AMD Radeon(TM) Graphics", false, 0,
-                           Details: new GpuDetails("32.0.12019.1028", "12 (FL 12.1)", "PCI bus 15, device 0, function 0")));
+            new FakeGpuDetailsProvider()
+                .With(Nvidia, Rtx3060)
+                .With(Radeon, new GpuDetails("32.0.12019.1028", "12 (FL 12.1)", "PCI bus 15, device 0, function 0")),
+            Adapter(Nvidia, "NVIDIA GeForce RTX 3060"), Adapter(Radeon, "AMD Radeon(TM) Graphics"));
 
         var first = GpuRow(viewModel, "GPU 0");
         var second = GpuRow(viewModel, "GPU 1");
@@ -374,6 +411,38 @@ public class PerformanceGpuRowTests {
         Assert.DoesNotContain(first.Stats, t => t.Label == "Video Decode");
         Assert.Contains(second.Stats, t => t.Label == "Video Decode" && t.Value == "2 %");
         Assert.DoesNotContain(second.Stats, t => t.Label == "Video Encode");
+    }
+
+    /// <summary>The page asks for details only once it has GPU rows, by their adapter keys.</summary>
+    [Fact]
+    public async Task Details_AreRequestedForTheGpuRowsOnly() {
+        var details = new FakeGpuDetailsProvider();
+        await LoadedAsync(() => new FakeGpuUsageSampler().Reporting(Amd, 37), details,
+                          Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        Assert.All(details.Requests, request => Assert.Equal([Amd], request));
+        Assert.NotEmpty(details.Requests);
+    }
+
+    [Fact]
+    public async Task Details_NoGpuRows_AreNeverRequested() {
+        var details = new FakeGpuDetailsProvider();
+        await LoadedAsync(() => new FakeGpuUsageSampler(), details);
+
+        Assert.Empty(details.Requests);
+    }
+
+    /// <summary>A rebuilt row keeps its list rather than blanking until the read returns, and a provider
+    /// that throws leaves the row and its tiles intact with no list.</summary>
+    [Fact]
+    public async Task Details_ProviderThrows_RowSurvivesWithoutAList() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37), new FakeGpuDetailsProvider().Throwing(),
+            Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        var row = GpuRow(viewModel);
+        Assert.False(row.HasDetails);
+        Assert.Contains(row.Stats, t => t.Label == "3D");
     }
 
     [Fact]

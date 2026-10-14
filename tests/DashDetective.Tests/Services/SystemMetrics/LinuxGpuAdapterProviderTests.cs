@@ -56,23 +56,6 @@ public class LinuxGpuAdapterProviderTests {
         Assert.Null(adapter.SharedSystemMemory);
     }
 
-    /// <summary>The NVIDIA module publishes its version; the location is the card's PCI address in Task
-    /// Manager's words; there is no DirectX, so that fact is null rather than a stand-in.</summary>
-    [Fact]
-    public async Task GetAsync_NvidiaCard_CarriesDriverAndLocationButNoDirectX() {
-        var adapter = Assert.Single(await Read(new FakeProcFileSystem().WithNvidiaCard()));
-
-        Assert.Equal(new GpuDetails("550.107.02", null, "PCI bus 1, device 0, function 0"), adapter.Details);
-    }
-
-    /// <summary>amdgpu is in-tree and publishes no version of its own, so only the location remains.</summary>
-    [Fact]
-    public async Task GetAsync_AmdCard_HasNoDriverVersion() {
-        var adapter = Assert.Single(await Read(new FakeProcFileSystem().WithAmdgpuCard()));
-
-        Assert.Equal(new GpuDetails(null, null, "PCI bus 3, device 0, function 0"), adapter.Details);
-    }
-
     [Fact]
     public async Task GetAsync_NoDrmTree_ReturnsEmpty() {
         Assert.Empty(await Read(new FakeProcFileSystem()));

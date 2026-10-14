@@ -17,6 +17,21 @@ public class PciLocationTests {
         Assert.Equal("PCI bus 1, device 0, function 0", location?.ToString());
     }
 
+    /// <summary>A device in a numbered slot carries the slot first; the last three values are the
+    /// location.</summary>
+    [Fact]
+    public void FromWindows_SlotResourceReference_ReadsTheLastThreeValues() {
+        var location = PciLocation.FromWindows(
+            @"@System32\drivers\pci.sys,#65538;PCI Slot %1 (PCI bus %2, device %3, function %4);(3,1,0,0)");
+
+        Assert.Equal(new PciLocation(1, 0, 0), location);
+    }
+
+    [Fact]
+    public void FromWindows_PlainSlotText_ReadsTheBusInside() {
+        Assert.Equal(new PciLocation(2, 0, 1), PciLocation.FromWindows("PCI Slot 4 (PCI bus 2, device 0, function 1)"));
+    }
+
     [Fact]
     public void FromWindows_PlainText_IsReadToo() {
         Assert.Equal(new PciLocation(15, 0, 1), PciLocation.FromWindows("PCI bus 15, device 0, function 1"));
@@ -29,6 +44,8 @@ public class PciLocationTests {
     [InlineData("Internal High Definition Audio Bus")]
     [InlineData(@"@System32\drivers\pci.sys,#65536;PCI bus %1, device %2, function %3;(1,0)")]
     [InlineData(@"@System32\drivers\pci.sys,#65536;PCI bus %1, device %2, function %3;(1,x,0)")]
+    [InlineData(@"@System32\drivers\pci.sys,#65536;PCI bus %1, device %2, function %3;(1,0,0,0,0)")]
+    [InlineData("PCI Slot 4 (on the riser)")]
     [InlineData("PCI bus 1, slot 0, function 0")]
     public void FromWindows_Unrecognized_IsNull(string? value) {
         Assert.Null(PciLocation.FromWindows(value));

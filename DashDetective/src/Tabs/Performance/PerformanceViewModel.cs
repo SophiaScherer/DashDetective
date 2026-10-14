@@ -16,6 +16,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Performance;
@@ -223,6 +224,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     // Temperature/power come from the per-vendor SDKs instead — PDH has no sensor counters. Read on the same
     // throughput tick, keyed by each adapter's PCI identity rather than its LUID (the vendor SDKs have no LUID).
     private readonly IGpuSensorProvider _gpuSensors = IGpuSensorProvider.ForCurrentPlatform();
+    // Asked only once GPU rows exist: on Windows it loads Direct3D 12 and the vendor driver.
+    private readonly IGpuDetailsProvider _gpuDetails;
     private bool _gpuDetailed;
 
     // ---- Ethernet / network (live) ----
@@ -249,12 +252,14 @@ public partial class PerformanceViewModel : ViewModelBase,
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
     /// and the inventory load disposes one of its own.
-    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings and <paramref name="gpuDetails"/>
+    /// each GPU's driver / DirectX / location list; tests pass fakes.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
         Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
-        IPhysicalDiskThroughputSampler? throughputSampler = null) {
+        IPhysicalDiskThroughputSampler? throughputSampler = null, IGpuDetailsProvider? gpuDetails = null) {
         _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
+        _gpuDetails = gpuDetails ?? IGpuDetailsProvider.ForCurrentPlatform();
         // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
         // unshared instance simply never hears an accent change.
         _theme = theme ?? new ThemeService();
@@ -366,11 +371,13 @@ public partial class PerformanceViewModel : ViewModelBase,
 
         // Load static hardware info off the UI thread; the sub/spec labels fill in when ready. The device
         // inventory enumerates the physical disks into their own rows.
-        _ = LoadCpuInfoAsync();
-        _ = LoadMemoryInfoAsync();
-        _ = LoadNetworkInfoAsync();
-        _ = LoadInventoryAsync();
+        InitialLoad = Task.WhenAll(
+            LoadCpuInfoAsync(), LoadMemoryInfoAsync(), LoadNetworkInfoAsync(), LoadInventoryAsync());
     }
+
+    /// <summary>The loads the constructor starts, so a test can await them instead of guessing how long
+    /// they take. Each soft-fails on its own, so this never faults.</summary>
+    internal Task InitialLoad { get; }
 
     /// <summary>Rebuilds the rail from the current rows, filtered by <see cref="ShowAllDevices"/>: the single
     /// categories always show, while the disks collapse to the primary drive ("Primary") or expand to every
@@ -644,8 +651,32 @@ public partial class PerformanceViewModel : ViewModelBase,
             BuildGpuRows(inventory.All(DeviceCategory.Gpu));
         } catch when (token.IsCancellationRequested) {
             // The tab was left mid-read (cancelled, or failed once the user had gone); the rail on screen is still the last good one.
+            return;
         } catch {
             // Leave the rail without the enumerated disk/GPU rows on a transient failure.
+            return;
+        }
+
+        await LoadGpuDetailsAsync(token);
+    }
+
+    /// <summary>Fills each GPU row's details list once the rows exist. Asked here rather than by the
+    /// inventory, which every page loads: only this tab shows the details, and on Windows reading them loads
+    /// Direct3D 12. The provider caches per adapter, so a refresh does not read again.</summary>
+    private async Task LoadGpuDetailsAsync(CancellationToken token) {
+        if (_gpus.Count == 0)
+            return;
+
+        try {
+            var details = await _gpuDetails.GetAsync(_gpus.ConvertAll(g => g.Luid));
+            token.ThrowIfCancellationRequested();
+            foreach (var gpu in _gpus)
+                if (details.TryGetValue(gpu.Luid, out var facts))
+                    gpu.Row.Details = GpuDetailRows.For(facts);
+        } catch when (token.IsCancellationRequested) {
+            // The tab was left mid-read; the rows keep whatever list they had.
+        } catch {
+            // The provider has logged it; the rows show no list rather than a partial one.
         }
     }
 
@@ -724,8 +755,8 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       history.Points(100), Array.Empty<StatTile>(), Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
-                // Driver, DirectX and location, each omitted where the adapter does not publish it.
-                Details = GpuDetailRows.For(gpu.GpuDetails),
+                // A rebuilt row keeps its details list until LoadGpuDetailsAsync refills it.
+                Details = previous?.Row.Details ?? Array.Empty<DetailRow>(),
             };
             var resource = new GpuResource {
                 Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
@@ -914,6 +945,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                 // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
                 // nothing rather than as a broken tab.
                 gpu.Row.Note = GpuNoReadingNote.For(gpu.Pci?.VendorId, _gpuSampler.NvidiaMetricsEnabled);
+                BlankEngineTiles(gpu);
                 continue;
             }
 
@@ -941,8 +973,10 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// tick so the Detailed view is warm when opened.
     /// </summary>
     private static void UpdateGpuEngines(GpuResource gpu, IReadOnlyDictionary<string, double> rawEngines) {
-        if (rawEngines.Count == 0)
+        if (rawEngines.Count == 0) {
+            BlankEngineTiles(gpu);
             return;
+        }
 
         var byEngine = FoldEngines(rawEngines);
 
@@ -976,6 +1010,13 @@ public partial class PerformanceViewModel : ViewModelBase,
             var value = Math.Round(Math.Clamp(readings.GetValueOrDefault(label), 0, 100));
             tile.Value = $"{value.ToString(CultureInfo.InvariantCulture)} %";
         }
+    }
+
+    /// <summary>A tick with no engine map, or no reading at all, measured nothing: the engine tiles go to the
+    /// placeholder rather than keep a value from an earlier tick.</summary>
+    private static void BlankEngineTiles(GpuResource gpu) {
+        foreach (var tile in gpu.EngineTiles.Values)
+            tile.Value = Placeholders.NoReading;
     }
 
     /// <summary>A GPU's tiles in their declared order: the engines Task Manager graphs (3D, then each of

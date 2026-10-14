@@ -22,15 +22,16 @@ public enum DeviceCategory { Cpu, Memory, Gpu, Disk, Network }
 /// are not carried here: the view models overlay those per tick, keyed by <see cref="Id"/> /
 /// <see cref="DiskNumber"/> / <see cref="GpuLuid"/>. <see cref="VramBytes"/> is a GPU's dedicated video
 /// memory, <see cref="SharedBytes"/> its shared system memory (null where none is published) and
-/// <see cref="GpuPci"/> its PCI identity, and <see cref="GpuDetails"/> its driver, DirectX and bus facts
-/// (each null where unpublished) — all static per adapter, so they ride along with the identity rather than
-/// being sampled. <see cref="GpuPci"/> is what the Performance tab's per-vendor GPU sensor readers attribute
-/// a temperature/power reading by.
+/// <see cref="GpuPci"/> its PCI identity — all static per adapter, so they ride along with the identity
+/// rather than being sampled. <see cref="GpuPci"/> is what the Performance tab's per-vendor GPU
+/// sensor readers attribute a temperature/power reading by. A GPU's driver, DirectX and location facts are
+/// NOT carried here: they cost a Direct3D probe, so only the Performance tab asks for them
+/// (<see cref="IGpuDetailsProvider"/>).
 /// </summary>
 public sealed record DeviceInstance(
     DeviceCategory Category, string Id, string Name, string Sub, string Spec,
     int? DiskNumber = null, string? GpuLuid = null, ulong? VramBytes = null, GpuPciId? GpuPci = null,
-    ulong? SharedBytes = null, GpuDetails? GpuDetails = null);
+    ulong? SharedBytes = null);
 
 /// <summary>
 /// The ids <see cref="DeviceInventory"/> gives a <see cref="DeviceInstance"/>. Minted here rather than
@@ -159,7 +160,7 @@ public sealed class DeviceInventory {
                 DeviceCategory.Gpu, DeviceIds.Gpu(gpu.LuidToken), name,
                 HardwareNameFormatter.ShortenGpu(gpu.Name), gpu.Name,
                 GpuLuid: gpu.LuidToken, VramBytes: gpu.DedicatedVideoMemory, GpuPci: gpu.Pci,
-                SharedBytes: gpu.SharedSystemMemory, GpuDetails: gpu.Details));
+                SharedBytes: gpu.SharedSystemMemory));
         }
 
         // Disks are the one multi-instance category today. Reuse StorageComposer for the display name (keyed by

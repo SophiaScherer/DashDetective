@@ -155,7 +155,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     protected void CollectVisible() {
         // A generator rebuilds its children whenever its source changes, which resets the order — so
         // put the saved one back before laying anything out.
-        if (_childOrder.Sync(Children.Count))
+        if (_childOrder.Sync(DeclaredIds()))
             ApplySavedOrder();
 
         _visible.Clear();

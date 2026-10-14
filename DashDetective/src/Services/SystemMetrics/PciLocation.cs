@@ -16,18 +16,29 @@ internal readonly record struct PciLocation(int Bus, int Device, int Function) {
     /// <summary>
     /// Parses a device's <c>LocationInformation</c> registry value. pci.sys stores it as a resource
     /// reference with its arguments appended, <c>@System32\drivers\pci.sys,#65536;PCI bus %1, device %2,
-    /// function %3;(1,0,0)</c>, so the trailing tuple is read rather than the localized text. An older
-    /// plain "PCI bus 1, device 0, function 0" is read too. Anything else is null.
+    /// function %3;(1,0,0)</c>, so the trailing tuple is read rather than the localized text. A device in a
+    /// numbered slot gets <c>…;PCI Slot %1 (PCI bus %2, device %3, function %4);(3,1,0,0)</c>, whose last
+    /// three values are the location. The plain "PCI bus 1, device 0, function 0" and "PCI Slot 3 (PCI bus 1,
+    /// device 0, function 0)" are read too. Anything else is null.
     /// </summary>
     public static PciLocation? FromWindows(string? locationInformation) {
         if (string.IsNullOrWhiteSpace(locationInformation))
             return null;
 
         var text = locationInformation.Trim();
-        if (text.EndsWith(')') && text.LastIndexOf('(') is var open and >= 0) {
-            var args = text[(open + 1)..^1].Split(',', StringSplitOptions.TrimEntries);
-            return args.Length == 3 ? Build(args[0], args[1], args[2], NumberStyles.None) : null;
+        // A resource reference: "@file,#id;template;(args)".
+        if (text.StartsWith('@') && text.EndsWith(')')
+            && text.LastIndexOf(";(", StringComparison.Ordinal) is var open and >= 0) {
+            var args = text[(open + 2)..^1].Split(',', StringSplitOptions.TrimEntries);
+            return args.Length is 3 or 4
+                ? Build(args[^3], args[^2], args[^1], NumberStyles.None)
+                : null;
         }
+
+        const string slot = "PCI Slot ";
+        if (text.StartsWith(slot, StringComparison.Ordinal) && text.EndsWith(')')
+            && text.IndexOf('(') is var inner and >= 0)
+            text = text[(inner + 1)..^1].Trim();
 
         const string prefix = "PCI bus ";
         if (!text.StartsWith(prefix, StringComparison.Ordinal))

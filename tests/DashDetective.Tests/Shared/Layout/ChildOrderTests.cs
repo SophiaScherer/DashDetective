@@ -40,6 +40,39 @@ public class ChildOrderTests {
         Assert.True(order.Sync(4));
     }
 
+    /// <summary>The cross-GPU case: the strip is handed another device's tiles of the same count. Keyed on
+    /// count alone the old permutation stayed and was applied to the new items.</summary>
+    [Fact]
+    public void SyncIds_SameCountDifferentIds_Rebuilds() {
+        var order = new ChildOrder();
+        order.ApplySaved(["c", "a", "b"], ["a", "b", "c"]);
+
+        Assert.True(order.Sync(["a", "b", "x"]));
+        Assert.Equal([0, 1, 2], order.Shown(previewing: false));
+    }
+
+    [Fact]
+    public void SyncIds_SameIds_KeepsThePermutation() {
+        var order = new ChildOrder();
+        order.ApplySaved(["c", "a", "b"], ["a", "b", "c"]);
+
+        Assert.False(order.Sync(["a", "b", "c"]));
+        Assert.Equal("c a b", Shown(order, previewing: false, "a", "b", "c"));
+    }
+
+    /// <summary>After the rebuild, the saved order applies to the new ids by id: "b" and "c" move as saved
+    /// and "x", which the save does not name, keeps its declared place.</summary>
+    [Fact]
+    public void SyncIds_ThenApplySaved_OrdersTheNewItemsById() {
+        var order = new ChildOrder();
+        order.ApplySaved(["c", "b", "a"], ["a", "b", "c"]);
+        order.Sync(["x", "b", "c"]);
+
+        order.ApplySaved(["c", "b", "a"], ["x", "b", "c"]);
+
+        Assert.Equal("x c b", Shown(order, previewing: false, "x", "b", "c"));
+    }
+
     // ===== Resetting =====
 
     [Fact]

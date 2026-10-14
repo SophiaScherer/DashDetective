@@ -14,6 +14,7 @@ namespace DashDetective.Shared.Layout;
 public sealed class ChildOrder {
     private readonly List<int> _order = new();
     private readonly List<int> _preview = new();
+    private List<string>? _ids;
 
     /// <summary>The order to lay out: the one being tried during a drag, the settled one otherwise.</summary>
     public IReadOnlyList<int> Shown(bool previewing) => previewing ? _preview : _order;
@@ -28,6 +29,33 @@ public sealed class ChildOrder {
         _order.Clear();
         for (var i = 0; i < childCount; i++)
             _order.Add(i);
+        return true;
+    }
+
+    /// <summary>
+    /// <see cref="Sync(int)"/>, but also rebuilding when the same number of children now carries different
+    /// ids — an ItemsControl handed another source of equal length, such as one GPU's tiles for another's.
+    /// Keyed on count alone, the previous permutation was kept and applied to the wrong items.
+    /// </summary>
+    public bool Sync(IReadOnlyList<string> declared) {
+        var relabeled = _ids is not null && !SameIds(_ids, declared);
+        if (_ids is null || relabeled)
+            _ids = new List<string>(declared);
+        if (!relabeled)
+            return Sync(declared.Count);
+
+        _order.Clear();
+        for (var i = 0; i < declared.Count; i++)
+            _order.Add(i);
+        return true;
+    }
+
+    private static bool SameIds(List<string> known, IReadOnlyList<string> declared) {
+        if (known.Count != declared.Count)
+            return false;
+        for (var i = 0; i < declared.Count; i++)
+            if (!string.Equals(known[i], declared[i], StringComparison.Ordinal))
+                return false;
         return true;
     }
 
@@ -82,7 +110,7 @@ public sealed class ChildOrder {
         if (saved is null || saved.Count == 0 || declared.Count == 0)
             return false;
 
-        Sync(declared.Count);
+        Sync(declared);
         var resolved = WidgetOrders.Resolve(Named(declared), saved);
         var position = new Dictionary<string, int>(resolved.Count);
         for (var i = 0; i < resolved.Count; i++)

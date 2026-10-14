@@ -48,7 +48,7 @@ public class PerformanceRefreshHistoryTests {
 
         // The rail otherwise lists only the primary disk and GPU.
         viewModel.ShowAllDevices = true;
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadInventoryAsync();
         return viewModel;
     }

@@ -159,8 +159,11 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     [ObservableProperty] private IReadOnlyList<StatTile> _stats;
 
     /// <summary>Static facts listed under the stat tiles (a GPU's driver, DirectX version and location).
-    /// Empty for a resource with none, which then draws no list.</summary>
-    public IReadOnlyList<DetailRow> Details { get; init; } = Array.Empty<DetailRow>();
+    /// Empty for a resource with none, which then draws no list. Observable because a GPU's arrive after
+    /// its row, from a separate read.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDetails))]
+    private IReadOnlyList<DetailRow> _details = Array.Empty<DetailRow>();
 
     /// <summary>Whether <see cref="Details"/> has anything to show — the list's visibility.</summary>
     public bool HasDetails => Details.Count > 0;
