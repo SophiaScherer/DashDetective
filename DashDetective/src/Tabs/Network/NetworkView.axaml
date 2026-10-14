@@ -193,7 +193,7 @@
                         <TextBlock Grid.Column="1" Text="{Binding ThroughputScaleText}" FontSize="{DynamicResource TextSizeCaption}"
                                    VerticalAlignment="Bottom" Foreground="{DynamicResource TextSubtle}"/>
                     </Grid>
-                    <TextBlock Classes="cardSub" Text="{Binding ThroughputChartCaption}"/>
+                    <TextBlock Classes="cardSub" Text="{Binding ThroughputChartCaption}" TextWrapping="Wrap"/>
                     <!-- One series each, so each is keyed above its own trace rather than by a shared
                          legend — with two stacked charts, naming which is which beats naming both at once.
                          Both carry the same value labels, which is what keeps their gutters equal and so

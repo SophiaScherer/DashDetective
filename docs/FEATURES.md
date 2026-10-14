@@ -154,7 +154,10 @@ it reports is re-derived when the size changes — a fixed 15 overlapped the lin
 (`ConnectionsTableLayout`: Protocol, then State, then Remote address; Process stays), its minimums scaled by
 the text size, and every cell ellipsizes inside its own column so values and headers never run into the next.
 The Throughput readouts wrap onto a second line before they would meet the peak caption, and the Ping/DNS
-field and its button use minimum heights so they grow together. The page size
+field and its button use minimum heights so they grow together. The Throughput caption wraps, as it is a
+short sentence. **The console text is clipped by design, not wrapped**: it is a fixed-width terminal whose
+line count is the capacity arithmetic, so a wrapped line would break `ConsoleCapacity`; a long line is cut
+at the box edge like a real terminal. The page size
 (100 rows) and the table's 240px body cap do not depend on row height: the body scrolls. Pager step
 arrows are `IconSizeSmall`, like other row-level icon buttons.
 
