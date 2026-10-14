@@ -89,6 +89,15 @@ public class DrmCardFactsTests {
         Assert.Null(Assert.Single(DrmCardFacts.Read(new FakeProcFileSystem().WithNvidiaCard())).GttBytes);
     }
 
+    /// <summary>The driver version is the module's own, shared by the Hardware card and the Performance
+    /// details; amdgpu is in-tree and has none, which is "" rather than the kernel release.</summary>
+    [Fact]
+    public void Read_DriverVersion_IsTheModulesOwnOrEmpty() {
+        var cards = DrmCardFacts.Read(Amd().WithNvidiaCard());
+
+        Assert.Equal(["", "550.107.02"], cards.Select(c => c.DriverVersion));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("N/A\n")]

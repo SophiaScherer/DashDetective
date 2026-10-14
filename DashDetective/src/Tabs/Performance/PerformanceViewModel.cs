@@ -720,26 +720,29 @@ public partial class PerformanceViewModel : ViewModelBase,
                 : null;
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
-            StatTile[] tiles = sharedTile is null
-                ? [threeDTile, vramTile, tempTile, powerTile]
-                : [threeDTile, vramTile, sharedTile, tempTile, powerTile];
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
-                                      history.Points(100), tiles, Select) {
+                                      history.Points(100), Array.Empty<StatTile>(), Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
+                // Driver, DirectX and location, each omitted where the adapter does not publish it.
+                Details = GpuDetailRows.For(gpu.GpuDetails),
             };
             var resource = new GpuResource {
                 Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
                 VramTile = vramTile, VramBytes = gpu.VramBytes, SharedTile = sharedTile, SharedBytes = gpu.SharedBytes,
                 TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
-            if (previous is { Engines.Count: > 0 }) {
+            if (previous is not null) {
                 foreach (var engine in previous.Engines) {
                     resource.Engines.Add(engine);
                     resource.EnginesByBase[engine.Key] = engine;
                 }
-                PublishGpuEngines(resource);
+                foreach (var (label, tile) in previous.EngineTiles)
+                    resource.EngineTiles[label] = tile;
+                if (resource.Engines.Count > 0)
+                    PublishGpuEngines(resource);
             }
+            row.Stats = GpuStats(resource);
             rebuilt.Add(resource);
         }
 
@@ -951,6 +954,43 @@ public partial class PerformanceViewModel : ViewModelBase,
             engine.History.Push(Math.Clamp(value, 0, 100));
             engine.Chart.Points = engine.History.Points(100);
         }
+
+        UpdateGpuEngineTiles(gpu, GpuEngineTiles.Readings(byEngine));
+    }
+
+    /// <summary>Fills the Copy / Video Encode / Video Decode tiles, adding one the first time its engine
+    /// reports. A tile whose engine is missing from a later sample reads 0 %, as its chart does: the engine
+    /// exists, and no process is using it.</summary>
+    private static void UpdateGpuEngineTiles(GpuResource gpu, IReadOnlyDictionary<string, double> readings) {
+        var added = false;
+        foreach (var label in readings.Keys) {
+            if (gpu.EngineTiles.ContainsKey(label))
+                continue;
+            gpu.EngineTiles[label] = new StatTile(label, Placeholders.NoReading);
+            added = true;
+        }
+        if (added)
+            gpu.Row.Stats = GpuStats(gpu);
+
+        foreach (var (label, tile) in gpu.EngineTiles) {
+            var value = Math.Round(Math.Clamp(readings.GetValueOrDefault(label), 0, 100));
+            tile.Value = $"{value.ToString(CultureInfo.InvariantCulture)} %";
+        }
+    }
+
+    /// <summary>A GPU's tiles in their declared order: the engines Task Manager graphs (3D, then each of
+    /// Copy / Video Encode / Video Decode the adapter has), then memory, then the sensors.</summary>
+    private static StatTile[] GpuStats(GpuResource gpu) {
+        var tiles = new List<StatTile> { gpu.ThreeDTile };
+        foreach (var label in GpuEngineTiles.Labels)
+            if (gpu.EngineTiles.TryGetValue(label, out var tile))
+                tiles.Add(tile);
+        tiles.Add(gpu.VramTile);
+        if (gpu.SharedTile is { } shared)
+            tiles.Add(shared);
+        tiles.Add(gpu.TempTile);
+        tiles.Add(gpu.PowerTile);
+        return tiles.ToArray();
     }
 
     /// <summary>The "3D" tile's figure: the adapter's 3D engine, as Task Manager's 3D graph reads it, falling
@@ -1223,6 +1263,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required StatTile PowerTile { get; init; }
         public GpuPciId? Pci { get; init; }
         public List<EngineChart> Engines { get; } = new();
+        /// <summary>The Copy / Video Encode / Video Decode tiles this adapter has shown, by label.</summary>
+        public Dictionary<string, StatTile> EngineTiles { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, EngineChart> EnginesByBase { get; } = new(StringComparer.Ordinal);
     }
 

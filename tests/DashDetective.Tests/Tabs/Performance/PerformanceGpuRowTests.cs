@@ -240,6 +240,142 @@ public class PerformanceGpuRowTests {
         Assert.Null(row.NoteTip);
     }
 
+    /// <summary>The GPU row by name, with the rail showing every device so a second GPU is listed.</summary>
+    private static ResourceRow GpuRow(PerformanceViewModel viewModel, string name = "GPU") {
+        viewModel.ShowAllDevices = true;
+        return viewModel.Resources.Single(r => r.Name == name);
+    }
+
+    /// <summary>NVIDIA publishes all three of Task Manager's other engines, so each gets a tile after 3D,
+    /// in Task Manager's order, reading its busiest engine (six Copy engines read the busiest, not a sum).</summary>
+    [Fact]
+    public async Task EngineTiles_PublishedEngines_EachGetATileInTaskManagersOrder() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 40, new Dictionary<string, double> {
+                ["3D"] = 40, ["Copy"] = 7, ["Copy_1"] = 3, ["VideoDecode"] = 12, ["VideoEncode"] = 25,
+            }),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
+
+        var row = GpuRow(viewModel);
+        Assert.Equal(["3D", "Copy", "Video Encode", "Video Decode", "VRAM in use", "Temp", "Power"],
+                     row.Stats.Select(t => t.Label));
+        Assert.Equal(["40 %", "7 %", "25 %", "12 %"], row.Stats.Take(4).Select(t => t.Value));
+    }
+
+    /// <summary>The Radeon iGPU names its encoder "Video Codec", which maps to neither label, so it has no
+    /// Video Encode tile rather than one at 0 %.</summary>
+    [Fact]
+    public async Task EngineTiles_EngineTypeNotPublished_HasNoTile() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 20, new Dictionary<string, double> {
+                ["3D"] = 5, ["Copy"] = 0, ["Video Decode"] = 0, ["Video Codec 0"] = 20,
+            }),
+            Adapter(Amd, "AMD Radeon(TM) Graphics"));
+
+        var labels = GpuRow(viewModel).Stats.Select(t => t.Label).ToList();
+        Assert.Equal(["3D", "Copy", "Video Decode", "VRAM in use", "Temp", "Power"], labels);
+    }
+
+    /// <summary>A platform with no engine map (Linux) gets none of the three tiles.</summary>
+    [Fact]
+    public async Task EngineTiles_NoEngineMap_NoEngineTiles() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37), Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        viewModel.UpdateGpuAdapters();
+
+        Assert.Equal(["3D", "VRAM in use", "Temp", "Power"], GpuRow(viewModel).Stats.Select(t => t.Label));
+    }
+
+    /// <summary>An engine first seen on a later tick gains its tile then; once it exists, a tick that does
+    /// not mention it reads 0 %, as its chart does.</summary>
+    [Fact]
+    public async Task EngineTiles_EngineAppearingLater_GainsItsTile() {
+        var (viewModel, sampler) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 40, new Dictionary<string, double> { ["3D"] = 40 }),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
+        var row = GpuRow(viewModel);
+        Assert.DoesNotContain(row.Stats, t => t.Label == "Video Encode");
+
+        sampler.Reporting(Amd, 40, new Dictionary<string, double> { ["3D"] = 40, ["VideoEncode"] = 30 });
+        viewModel.UpdateGpuAdapters();
+        Assert.Contains(row.Stats, t => t.Label == "Video Encode" && t.Value == "30 %");
+
+        sampler.Reporting(Amd, 40, new Dictionary<string, double> { ["3D"] = 40 });
+        viewModel.UpdateGpuAdapters();
+        Assert.Contains(row.Stats, t => t.Label == "Video Encode" && t.Value == "0 %");
+    }
+
+    /// <summary>A toolbar Refresh rebuilds the row; its engine tiles come back with it rather than waiting
+    /// for a tick.</summary>
+    [Fact]
+    public async Task EngineTiles_AfterRefresh_AreKept() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 40, new Dictionary<string, double> {
+                ["3D"] = 40, ["Copy"] = 7,
+            }),
+            Adapter(Amd, "NVIDIA GeForce RTX 3060"));
+
+        await viewModel.LoadInventoryAsync();
+
+        Assert.Equal(["3D", "Copy", "VRAM in use", "Temp", "Power"], GpuRow(viewModel).Stats.Select(t => t.Label));
+    }
+
+    [Fact]
+    public async Task Details_PublishedFacts_AreListedUnderTaskManagersLabels() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37),
+            new GpuAdapter(Amd, "NVIDIA GeForce RTX 3060", false, 0,
+                           Details: new GpuDetails("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0")));
+
+        var row = GpuRow(viewModel);
+        Assert.True(row.HasDetails);
+        Assert.Equal(["Driver version", "DirectX version", "Physical location"], row.Details.Select(d => d.Key));
+        Assert.Equal(["32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0"],
+                     row.Details.Select(d => d.Value));
+    }
+
+    /// <summary>The acceptance criterion: a fact the adapter does not expose is omitted, not shown as a dash
+    /// or a zero; an adapter with none shows no list.</summary>
+    [Fact]
+    public async Task Details_UnpublishedFacts_AreOmitted() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().Reporting(Amd, 37).Reporting("0000:01:00.0", 5),
+            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 0,
+                           Details: new GpuDetails(null, null, "PCI bus 3, device 0, function 0")),
+            Adapter("0000:01:00.0", "NVIDIA nvidia (10de:2504)"));
+
+        var amd = GpuRow(viewModel, "GPU 0");
+        Assert.Equal(["Physical location"], amd.Details.Select(d => d.Key));
+        var bare = GpuRow(viewModel, "GPU 1");
+        Assert.False(bare.HasDetails);
+        Assert.Empty(bare.Details);
+    }
+
+    /// <summary>Two GPUs: each row lists its own adapter's facts and has its own engine tiles.</summary>
+    [Fact]
+    public async Task Details_MultiGpu_EachRowHasItsOwn() {
+        const string Nvidia = "luid_n";
+        const string Radeon = "luid_r";
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler()
+                .Reporting(Nvidia, 30, new Dictionary<string, double> { ["3D"] = 30, ["VideoEncode"] = 9 })
+                .Reporting(Radeon, 4, new Dictionary<string, double> { ["3D"] = 4, ["Video Decode"] = 2 }),
+            new GpuAdapter(Nvidia, "NVIDIA GeForce RTX 3060", false, 0,
+                           Details: new GpuDetails("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0")),
+            new GpuAdapter(Radeon, "AMD Radeon(TM) Graphics", false, 0,
+                           Details: new GpuDetails("32.0.12019.1028", "12 (FL 12.1)", "PCI bus 15, device 0, function 0")));
+
+        var first = GpuRow(viewModel, "GPU 0");
+        var second = GpuRow(viewModel, "GPU 1");
+        Assert.Equal("32.0.16.1062", first.Details[0].Value);
+        Assert.Equal("PCI bus 15, device 0, function 0", second.Details[2].Value);
+        Assert.Contains(first.Stats, t => t.Label == "Video Encode" && t.Value == "9 %");
+        Assert.DoesNotContain(first.Stats, t => t.Label == "Video Decode");
+        Assert.Contains(second.Stats, t => t.Label == "Video Decode" && t.Value == "2 %");
+        Assert.DoesNotContain(second.Stats, t => t.Label == "Video Encode");
+    }
+
     [Fact]
     public void FoldEngines_NumberedEnginesOfOneBase_KeepsTheBusiestRatherThanTheSum() {
         var folded = PerformanceViewModel.FoldEngines(new Dictionary<string, double> {

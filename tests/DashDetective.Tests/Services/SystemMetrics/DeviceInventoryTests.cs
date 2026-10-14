@@ -133,6 +133,24 @@ public class DeviceInventoryTests {
         Assert.Null(inv.Primary(DeviceCategory.Cpu)!.SharedBytes);
     }
 
+    /// <summary>Each adapter carries its own details — the two GPUs on the dev box sit at different slots
+    /// under different drivers — and an adapter whose provider published none carries null.</summary>
+    [Fact]
+    public void Compose_GpuIdentity_CarriesEachAdaptersDetailsOrNull() {
+        var nvidia = new GpuDetails("32.0.16.1062", "12 (FL 12.2)", "PCI bus 1, device 0, function 0");
+        var amd = new GpuDetails("32.0.12019.1028", "12 (FL 12.1)", "PCI bus 15, device 0, function 0");
+        var gpus = new[] {
+            new GpuAdapter("luid_a", "NVIDIA GeForce RTX 3060", false, 0, Details: nvidia),
+            new GpuAdapter("luid_b", "AMD Radeon(TM) Graphics", false, 0, Details: amd),
+            new GpuAdapter("luid_c", "NVIDIA nvidia (10de:2504)", false, 0),
+        };
+        var inv = DeviceInventory.Compose(
+            Cpu, Memory, gpus, new HashSet<string> { "luid_a", "luid_b", "luid_c" }, [], [], "Ethernet", "");
+
+        Assert.Equal(new[] { nvidia, amd, null }, inv.All(DeviceCategory.Gpu).Select(x => x.GpuDetails));
+        Assert.Null(inv.Primary(DeviceCategory.Cpu)!.GpuDetails);
+    }
+
     [Fact]
     public void Compose_MultipleGpus_EnumeratesRealAdaptersIndexedByLuid() {
         var gpus = new[] {

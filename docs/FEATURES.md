@@ -1447,6 +1447,38 @@ on a GPU with no shared pool saves an order without the shared tile; on a GPU th
 returns beside "VRAM in use" rather than where it was last dragged. On Windows every real adapter reports a
 shared total, so in practice this arises only on Linux with a non-AMD card beside an AMD one.
 
+**Copy, Video Encode and Video Decode have tiles too**, after 3D and in Task Manager's order — its other
+three default graphs, so they read without switching to Per engine. Each is the busiest engine under that
+label, the same per-type rule as 3D (`GpuEngineTiles`). Two decisions: **a tile exists only for an engine
+the adapter publishes** — it is added the first tick that engine reports, and an adapter without one (or
+Linux, which has no engine map) has no tile rather than a 0 %; and **only unambiguous names map**. AMD
+publishes its encoder as "Video Codec", which serves decoding too on some parts, so the Radeon iGPU has Copy
+and Video Decode tiles and keeps Video Codec in the Per engine grid under its own name. A GPU row therefore
+has four to eight tiles; one saved tile order still covers them all, with the shared tile's caveat.
+
+**Below the tiles, a GPU lists its details** with `InfoRow`, as Task Manager does beside its graphs: Driver
+version, DirectX version and Physical location (`GpuDetailRows`). **A fact the adapter does not publish has
+no row** — no dash — and an adapter with none has no list. They ride on `DeviceInstance.GpuDetails` from the
+adapter provider, read once per inventory load:
+- **Driver version** is `Win32_VideoController.DriverVersion` through the shared `VideoControllers`, the same
+  rows the Hardware tab's Graphics card now reads, so the two tabs cannot disagree. Those rows have no LUID,
+  so they join to DXGI by PCI identity (`GpuDriverRows`, the sensor readers' join). On Linux it is the
+  module's own version (`DrmCardFacts.DriverVersion`); in-tree amdgpu has none, so its row is omitted.
+- **Physical location** is the device's `LocationInformation` registry value. pci.sys stores it as a resource
+  reference with the arguments appended (`…;PCI bus %1, device %2, function %3;(1,0,0)`), so the tuple is
+  parsed and re-worded rather than shown raw (`PciLocation`). On Linux it is the card's PCI address, which is
+  **hex** — bus `0f` is "PCI bus 15", matching Windows. Two cards of one model match the same device rows and
+  cannot be told apart by PCI ids, so each gets the shared driver version but **no location** rather than a
+  guessed one.
+- **DirectX version** is "12 (FL x.y)" from `D3D12CreateDevice`'s documented capability test: with a null
+  `ppDevice` it answers S_FALSE for a supported feature level and creates no device. Levels are tried from
+  12_2 down to 11_0 on the live DXGI adapter, so no admin and no device is held. **It reports the true
+  Direct3D 12 maximum, 12_2 on the RTX 3060**, which Task Manager may show as 12.1. Linux has no DirectX and
+  omits the row. The probe and the driver read soft-fail independently and never fault the adapter list.
+
+The detail pane now scrolls on its own: at a large interface or text size the details would otherwise sit
+past the window's foot on a self-scrolling page.
+
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
 no package, no redistributable and **no admin** are needed. Support by vendor:
@@ -1956,8 +1988,10 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
-- `Win32_VideoController` is still read by `HardwareInfoProvider` for the Hardware tab's spec card; the
-  inventory uses `GpuAdapterProvider`. (The old single-name `GpuInfoProvider` was deleted once nothing
+- `Win32_VideoController` is still read for the Hardware tab's spec card, and now also for each adapter's
+  driver version and location (through the shared `VideoControllers`, joined to DXGI by PCI identity); the
+  adapter list itself is `GpuAdapterProvider`'s. Every per-adapter detail — engine tiles, driver, DirectX
+  version, location — is that adapter's own, so a two-GPU machine lists two independent sets. (The old single-name `GpuInfoProvider` was deleted once nothing
   called it.)
 
 ## Repo-hygiene / portfolio pass

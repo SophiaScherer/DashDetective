@@ -46,7 +46,8 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
                     Memory: FormatVram(card.VramBytes) ?? spec?.Memory ?? "—",
                     CudaCores: spec?.CudaCores ?? "—",
                     BoostClock: spec?.BoostClock ?? "—",
-                    Driver: DriverVersion(card),
+                    // An in-tree driver such as amdgpu publishes no version of its own; see DrmCardFacts.
+                    Driver: card.DriverVersion.Length > 0 ? card.DriverVersion : "—",
                     Bus: spec?.Bus ?? "—"));
             }
 
@@ -61,16 +62,4 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
     /// back.</summary>
     private static string? FormatVram(ulong bytes) =>
         bytes > 0 ? FileSizeFormatter.Format((long)bytes) : null;
-
-    /// <summary>
-    /// The driver's own version string, from the module behind the card. Present for out-of-tree modules
-    /// (the proprietary NVIDIA driver publishes one); an in-tree driver like amdgpu ships with the kernel
-    /// and publishes none, so its row stays "—" rather than borrowing the kernel release, which would be a
-    /// different fact wearing this one's label. The driver's <i>name</i> is already part of the adapter
-    /// name, so nothing is lost.
-    /// </summary>
-    private string DriverVersion(DrmCardFacts card) {
-        var version = _proc.ReadAllText(card.DevicePath + "/driver/module/version")?.Trim();
-        return string.IsNullOrEmpty(version) ? "—" : version;
-    }
 }

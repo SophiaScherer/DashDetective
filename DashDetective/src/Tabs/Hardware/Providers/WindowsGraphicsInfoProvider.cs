@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 namespace DashDetective.Tabs.Hardware;
 
 /// <summary>
-/// Graphics facts from <c>Win32_VideoController</c> — <b>every</b> physical adapter's name and Windows
-/// driver version, since a machine can have a discrete GPU alongside an integrated one and the Dashboard
-/// and Performance tabs already show both. Filtered to PCI-bus adapters, skipping virtual/software ones.
+/// Graphics facts from <c>Win32_VideoController</c> (through the shared <see cref="VideoControllers"/>) —
+/// <b>every</b> physical adapter's name and Windows driver version, since a machine can have a discrete GPU
+/// alongside an integrated one and the Dashboard and Performance tabs already show both.
 /// VRAM (<c>AdapterRAM</c> is 4 GB-capped and misleading), memory type, CUDA-core count, boost clock and
 /// bus width have no reliable WMI source, so they come from <see cref="HardwareCatalog"/> by model. The
 /// platform check lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>.
@@ -24,26 +24,20 @@ internal sealed class WindowsGraphicsInfoProvider : IGraphicsInfoProvider {
         try {
             var adapters = new List<GraphicsAdapterInfo>();
 
-            WmiRead.ForEach("SELECT Name, PNPDeviceID, DriverVersion FROM Win32_VideoController", obj => {
-                // Physical GPUs sit on the PCI bus; virtual/software adapters are ROOT\/SWD\.
-                var pnp = obj["PNPDeviceID"] as string;
-                if (pnp is null || !pnp.StartsWith(@"PCI\", StringComparison.OrdinalIgnoreCase))
-                    return;
+            // The same rows the Performance tab's GPU details read, so both show one driver version.
+            foreach (var controller in VideoControllers.Read()) {
+                if (string.IsNullOrEmpty(controller.Name))
+                    continue;
 
-                var name = WmiRead.Text(obj, "Name");
-                if (string.IsNullOrEmpty(name))
-                    return;
-
-                var driver = WmiRead.Text(obj, "DriverVersion");
-                var spec = HardwareCatalog.LookupGpu(name);
+                var spec = HardwareCatalog.LookupGpu(controller.Name);
                 adapters.Add(new GraphicsAdapterInfo(
-                    Name: name,
+                    Name: controller.Name,
                     Memory: spec?.Memory ?? "—",
                     CudaCores: spec?.CudaCores ?? "—",
                     BoostClock: spec?.BoostClock ?? "—",
-                    Driver: string.IsNullOrEmpty(driver) ? "—" : driver,
+                    Driver: string.IsNullOrEmpty(controller.DriverVersion) ? "—" : controller.DriverVersion,
                     Bus: spec?.Bus ?? "—"));
-            });
+            }
 
             return adapters.Count == 0 ? GraphicsInfo.Unknown : new GraphicsInfo(adapters);
         } catch (Exception e) {

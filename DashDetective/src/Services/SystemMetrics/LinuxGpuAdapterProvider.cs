@@ -43,7 +43,12 @@ internal sealed class LinuxGpuAdapterProvider : IGpuAdapterProvider {
                     card.IsSoftware,
                     card.VramBytes,
                     new GpuPciId(card.VendorId, card.DeviceId, PackSubSysId(card), card.Revision),
-                    card.GttBytes));
+                    card.GttBytes,
+                    // No DirectX on Linux, so that row is omitted rather than filled with a stand-in.
+                    new GpuDetails(
+                        card.DriverVersion.Length > 0 ? card.DriverVersion : null,
+                        null,
+                        PciLocation.FromLinux(card.PciAddress)?.ToString())));
 
             return adapters;
         } catch (Exception e) {
