@@ -126,6 +126,10 @@ stays in its tab folder.
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
                                 single unit from the shared peak via UnitFor)
+      ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
+                                Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
+                                KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
+                                stays MB/s on purpose, as Task Manager's does)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
       TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
@@ -1025,14 +1029,36 @@ stays in its tab folder.
                                  SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
-                                 Performance rows each own one)
+                                 Performance rows each own one. A SECOND COUNTER on the same PDH query,
+                                 \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
+                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
+                                 still samples and usage stays null)
+        GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
+                                 token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
+                                 it joins the inventory key), and Join() onto the engine samples. A
+                                 memory-only LUID is dropped — the inventory keys GPUs off the engine
+                                 counter — and a missing reading stays null, never 0)
+        GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
+                                 eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
+                                 adapter carries several engines of a type (six Copy on an RTX 3060). The
+                                 LUID is re-formatted through GpuAdapter.FormatLuidToken so it joins the
+                                 inventory. Pure, so it runs on every CI leg. THE ONE PARSER: the
+                                 Processes tab's ProcessGpuSampler reads the same names through it)
+        GpuEngineLoad.cs        (Task Manager's rule over those instances: an engine's load = the SUM of its
+                                 process instances, clamped; adapter = busiest engine; a type = its busiest
+                                 engine; a process = its busiest engine. SAME-TYPE ENGINES ARE NEVER SUMMED —
+                                 keying by type inflated Copy past any one engine's load. ByProcess is
+                                 the Processes tab's GPU column, so a row and the adapter total it sits
+                                 under cannot follow different rules)
         LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
                                  EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
                                  no figure — omitting one would delete its card entirely, and a 0 would show
                                  real hardware as permanently idle. NO ENGINE BREAKDOWN: sysfs has one
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
-                                 construction; only the utilisation file is re-read per tick)
+                                 construction; only the utilization file and amdgpu's mem_info_vram_used
+                                 (dedicated VRAM in use; null for a driver that publishes none) are re-read
+                                 per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
                                  publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
@@ -1326,6 +1352,8 @@ stays in its tab folder.
 
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
+                                (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
+                                 its MetricHistory, keyed by LUID / disk number.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
@@ -1894,11 +1922,16 @@ stays in its tab folder.
                                  since disk and GPU rows arrive with an async inventory load.
                                  RebuildResources matches the surviving selection BY DEVICE ID, not by
                                  reference: a rebuilt disk or GPU row is a new object, so the toolbar
-                                 Refresh used to drop the selection back to the CPU.)
+                                 Refresh used to drop the selection back to the CPU. The rebuild also
+                                 carries each surviving disk's and GPU's MetricHistory (and the GPU's
+                                 per-engine charts) over, keyed by disk number / LUID.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
+                                GpuMemoryFormatter.cs   (VRAM in use tile: "used / total", Memory-caption
+                                                         style; MB under 1 GiB; "— / 12 GB" for an
+                                                         unknown usage, a bare "—" for an unknown total)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
                                 WindowsGpuSensorProvider.cs OPPOSITE SHAPES. Windows has no in-box sensor
                                 IGpuSensorReader.cs      API, so it fans out to one reader per vendor SDK:
@@ -1985,6 +2018,10 @@ stays in its tab folder.
                                                          click on the sole selected row only. Decided on the
                                                          press and applied on the tap, so a double-click's
                                                          first click or a drag never clears the selection)
+                                ProcessGpuSampler.cs    (per-process GPU % from PDH \GPU Engine(*), Task
+                                                         Manager's counter, pinned by a test. PDH only: the
+                                                         parse and the per-engine rule are the shared
+                                                         GpuEngineInstance / GpuEngineLoad.ByProcess)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.

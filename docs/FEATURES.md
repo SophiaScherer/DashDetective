@@ -1247,8 +1247,7 @@ process under its parent only when the parent is in the snapshot **and shares th
 so Edge's ~27 `msedge.exe` helpers fold into one Edge row while unrelated apps aren't swallowed under
 `explorer.exe`. Data is **in-box, no new dependencies, no admin**: `System.Diagnostics.Process`
 (CPU % via `TotalProcessorTime` diff, memory, threads, status, exe path), a feature-local
-`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` grouped by the `pid_` token for
-GPU %, and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
+`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` for GPU % (see the note below), and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
 enumeration can't report: **parent PIDs** (a Toolhelp32 snapshot) and the **category** — the classic
 "alt-tab window" test via `EnumWindows` marks an **App** (UWP frames re-attributed from
 `ApplicationFrameHost.exe` to the hosted process), Session 0 isolation via `ProcessIdToSessionId`
@@ -1274,6 +1273,10 @@ address space too, but it is the corpse of a user process and its cgroup still p
 `ProcessCategory.Windows` means "Windows process" on one platform and "system process" on the other; the
 enum member keeps its name because only the display strings differ. **Permanent gap:** per-process GPU has
 no rootless Linux source, so that column is always 0 — not a TODO.
+**The GPU column follows Task Manager's per-engine rule**, the same `GpuEngineLoad` the adapter totals use
+(see *Multi-GPU*): a process's figure is its busiest physical engine across every adapter, its instances on
+one engine summed. It used to sum by (PID, engine type) with no adapter, so a process on both GPUs, or on
+several Copy engines, read their total.
 **The per-process Network ("NET") column was REMOVED BY DESIGN** (2026-07, branch
 `processesRemoveNET`) — there is no in-box, non-admin per-process network-rate API on Windows (Task
 Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a
@@ -1427,15 +1430,15 @@ smaller number — 0.5 GB where Cached was 15 GB.) Deliberately a **page-local**
 the sampler is `WindowsMemoryUsageSampler` behind `IMemoryUsageSampler` — M6. The rationale above still
 holds; only the names and the folder changed.) Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
 so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
-blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM** tile is live too, and it is
-the one tile that is **not** sampled: DXGI's dedicated video memory is static per adapter, so
-`GpuAdapterProvider`'s `DedicatedVideoMemory` (already read for the multi-GPU work, previously discarded)
-is now carried on `DeviceInstance.VramBytes` and set once in `BuildGpuRows` when the row is built —
-re-read only when Refresh re-runs the inventory. It is formatted by **reusing** `FileSizeFormatter`
-(File Explorer's binary byte humanizer, already called cross-tab by Storage), so a 12 GB discrete card
-and a 512 MB integrated adapter each read naturally instead of forcing a fixed GB unit; zero/absent
-yields "—". `DeviceInstance` gained a trailing optional `ulong? VramBytes` and `DeviceInventory.Compose`
-passes it through (both under explicit sign-off; `GpuAdapterProvider` itself was untouched).
+blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM in use** tile reads
+**"used / total"**, the same convention as the Memory rail caption ("19.5 / 32 GB": used to one decimal,
+total whole from 10 GB up and to one decimal below, so a small total never reads under its usage), so the label states which quantity it shows and both numbers appear. The total is static
+(DXGI's dedicated video memory, carried on `DeviceInstance.VramBytes` from the inventory); the usage is
+sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
+Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both
+("0 / 460 MB"); an unknown usage reads "— / 12 GB", never a fake 0; an unknown total is a bare "—"
+(`GpuMemoryFormatter`). **The separate dedicated-vs-shared GPU memory work (the next sprint's item) builds
+on this convention: each tile is "usage / total" under a label naming the pool.**
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
@@ -1935,6 +1938,13 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
+- **Decision — utilization follows Task Manager's per-engine rule** (`GpuEngineLoad`). PDH reports one
+  instance per (process, physical engine); an engine's load is the sum over its instances, an adapter reads
+  its busiest engine, and a type ("3D", "Copy") reads its busiest engine of that type. **Engines of one type
+  are never summed**: the RTX 3060 has six Copy engines, and keying by type added them into a Copy figure no
+  engine was doing, which then competed for the adapter's headline. Evidence: under a ~50 % 3D load the
+  headline already matched Task Manager (48–52 vs 52, one 3D engine), so the inflation was in multi-engine
+  types.
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.
