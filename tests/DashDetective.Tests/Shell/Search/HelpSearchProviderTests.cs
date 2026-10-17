@@ -82,7 +82,7 @@ public class HelpSearchProviderTests {
     [Fact]
     public async Task QueryAsync_ActivatingAPageResultAsksForGettingStarted() {
         HelpTab? tab = null;
-        var results = await Query("Toolkit", (t, _) => tab = t);
+        var results = await Query("Utilities", (t, _) => tab = t);
 
         results.OrderByDescending(r => r.Score).First().Activate();
 

@@ -4,7 +4,7 @@
 
 A system-information console built with [Avalonia UI](https://avaloniaui.net/) and .NET 10.
 It presents live machine metrics and hardware details across nine tabs — Dashboard, File Explorer,
-Processes, Performance, Network, Storage, Hardware, Toolkit and Settings — in a single themeable
+Processes, Performance, Network, Storage, Hardware, Utilities and Settings — in a single themeable
 window.
 
 Most of it can be driven from the keyboard: `Ctrl+1`–`Ctrl+9` jump between tabs, `F5` refreshes,
