@@ -219,6 +219,10 @@
                 <!-- The trail and the editable path share this field and swap places: Ctrl+L or a click
                      reveals the box, Enter opens what was typed, Esc or clicking away restores the trail. -->
                 <Panel>
+                    <!-- Holds one line at the crumbs' own font size, so an empty trail (no folder open) keeps
+                         the field's height instead of shrinking to its padding and jumping on first open. -->
+                    <TextBlock Classes="crumbText" Text="Ag" Opacity="0" IsHitTestVisible="False"
+                               AutomationProperties.AccessibilityView="Raw"/>
                     <ItemsControl ItemsSource="{Binding Crumbs}" IsVisible="{Binding ShowCrumbs}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
