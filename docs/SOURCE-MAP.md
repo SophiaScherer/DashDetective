@@ -364,7 +364,10 @@ stays in its tab folder.
         UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
                                  With DragGrip set it also drags to reorder, through the same ReorderDrag
                                  a board uses — its children are usually generated, so the order is
-                                 re-applied every time the generator rebuilds them)
+                                 re-applied every time the generator rebuilds them. Every child but the
+                                 dragged one (arranged at its pickup size) is ARRANGED at its row's height, so a child that stretches vertically
+                                 shares a bottom edge with its row-mates — give a card no Height and no
+                                 VerticalAlignment="Top" if it should, as the Hardware cards do)
         FlowLayout, GridColumns, TableColumns, WeightedRowLayout
 ```
 
@@ -1838,7 +1841,9 @@ stays in its tab folder.
                                                          IRefreshablePage; Sensors card left as "—".
                                                          Every card drags to reorder — the grid is a
                                                          UniformFlowPanel with Reorder="Item", saved under
-                                                         the "hardware" key)
+                                                         the "hardware" key. The card Border fills its
+                                                         row's height and sets only a MinHeight floor
+                                                         from Dimensions.axaml — see FEATURES.md)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the
