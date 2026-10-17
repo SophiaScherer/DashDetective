@@ -21,6 +21,7 @@ public class LinuxGpuAdapterProviderTests {
         Assert.Equal("AMD amdgpu (1002:73df)", adapter.Name);
         Assert.False(adapter.IsSoftware);
         Assert.Equal(17179869184u, adapter.DedicatedVideoMemory);
+        Assert.Equal(8589934592UL, adapter.SharedSystemMemory);
     }
 
     /// <summary>PCI config space carries the two subsystem ids as one 32-bit field, device in the high
@@ -52,6 +53,7 @@ public class LinuxGpuAdapterProviderTests {
 
         Assert.Equal("NVIDIA nvidia (10de:2504)", adapter.Name);
         Assert.Equal(0u, adapter.DedicatedVideoMemory);
+        Assert.Null(adapter.SharedSystemMemory);
     }
 
     [Fact]
