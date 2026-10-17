@@ -23,7 +23,7 @@ public static class HelpContent {
     /// built without a render backend, and this copy has to stay testable headlessly.</summary>
     public static readonly IReadOnlyList<HelpTopic> GettingStarted = [
         new("page.dashboard", "Dashboard",
-            "A real-time overview of the whole machine: CPU, memory, GPU, disk and network at a glance."),
+            "A real-time overview of the whole machine: CPU, memory, GPU, disk and network at a glance. Double-click a card or chart to open it in Performance."),
         new("page.fileExplorer", "File Explorer",
             "Browse files and folders, with sizes and types, and an address bar you can type a path into."),
         new("page.processes", "Processes",
@@ -37,7 +37,7 @@ public static class HelpContent {
         new("page.hardware", "Hardware",
             "A spec sheet of what is installed: processor, motherboard, memory, graphics and disks."),
         new("page.toolkit", "Toolkit",
-            "Common diagnostic commands, ready to run. Pin the ones you use often, or add your own."),
+            "Common diagnostic commands, ready to run. A click selects one; double-click it, press Enter or use its play button to run it. Pin the ones you use often, or add your own."),
         new("page.settings", "Settings",
             "Everything you can change: appearance, navigation, monitoring, resource alerts, keyboard shortcuts and export."),
         new("shell.search", "Search",

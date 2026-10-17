@@ -1337,7 +1337,8 @@ stays in its tab folder.
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
+                                     caret sets Fill, not Stroke. Play (the Toolkit's run button) is filled
+                                     in the same family, a size up, and drawn at Stretch="None". The stroked Chevron* pair and its
                                      First/Last stop-bar variants are the Network pager's alone: paging is
                                      navigation rather than disclosure, and a stop bar only reads against a
                                      stroked arrow)
@@ -1367,6 +1368,10 @@ stays in its tab folder.
                                                          the card's no-reading note when it has one, else
                                                          the open hint — because a card has no room for a
                                                          line of its own and the note has more to say)
+                                DashboardLink.cs        (the card/chart jump to Performance: a Button,
+                                                         styled as one, whose single pointer click does
+                                                         NOTHING — a double click or Enter/Space goes.
+                                                         Every gesture passes Respond, the one gate)
                                 CpuStaticInfo.cs        (record for the result)
                                 IMemoryInfoProvider.cs + WindowsMemoryInfoProvider.cs
                                                         (RAM info via WMI, async)
@@ -1398,17 +1403,27 @@ stays in its tab folder.
                                  IShortcutTarget. Running a row is an async RelayCommand that refuses
                                  concurrent runs and prepends one stanza to the log. View code-behind
                                  owns the search focus + the search-reveal flash, like
-                                 ProcessesView/SettingsView. The row is a chrome-less Button so Enter
-                                 works on a focused row natively — ShortcutId.Activate falls through
-                                 MainWindowViewModel's global switch unconsumed, so no IShortcutTarget
-                                 case is needed. The copy button is a SIBLING of it, not nested)
+                                 ProcessesView/SettingsView. The row body is a chrome-less Button whose
+                                 click only SELECTS; a double click (code-behind), Enter (the page's
+                                 Activate case) and the play button all run through RunCommand. Enter
+                                 asks the view's FocusProbe what holds focus WINDOW-WIDE at press time,
+                                 so a focused toolbar or nav button keeps the key. The row's buttons are
+                                 SIBLINGS of the body, not nested)
+                                ToolkitActivation.cs    (pure activation decisions: which row Enter runs
+                                                         for what holds focus — a row body, nothing, or
+                                                         anything else, which keeps the key — and the play
+                                                         button's repeat-press guard)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
                                 ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —
                                                          what a command opens, driving its icon + badge)
                                 ToolkitEntry.cs         (immutable row model; its Icon/Badge* getters
                                                          resolve through ToolkitIcons ON READ, so the
-                                                         filter/catalog tests never load geometry)
+                                                         filter/catalog tests never load geometry.
+                                                         DefaultActionText words what activating the row
+                                                         does, per action kind, and leads its tooltip —
+                                                         plain strings, outside ToolkitIcons, so the
+                                                         wording is testable headlessly)
                                 ToolkitGroup.cs         (immutable category section: upper-cased header
                                                          + the entries that survived the filter)
                                 ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)

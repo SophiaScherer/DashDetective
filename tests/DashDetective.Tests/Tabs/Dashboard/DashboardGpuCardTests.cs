@@ -76,7 +76,7 @@ public class DashboardGpuCardTests {
         Assert.Equal("", card.Unit);
         // …and the card can say why, since it has no room for a line of its own.
         Assert.Equal("Turn on \"NVIDIA GPU utilization\" in Settings to read this card.", card.Note);
-        Assert.Equal(card.Note, card.Tip);
+        Assert.StartsWith(card.Note, card.Tip, System.StringComparison.Ordinal);
     }
 
     /// <summary>A card that reports carries no note — nothing to explain — so its tooltip falls back to

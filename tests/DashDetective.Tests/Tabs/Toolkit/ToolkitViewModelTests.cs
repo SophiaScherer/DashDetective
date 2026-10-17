@@ -1,4 +1,6 @@
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +16,7 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// The rows exercised here deliberately point at a tool that does not exist, so the whole
 /// view-model → runner → launcher chain runs for real without anything being started.
 /// </summary>
-public class ToolkitViewModelTests {
+public sealed class ToolkitViewModelTests : IDisposable {
     // The Windows table by name rather than whichever ForCurrentPlatform() resolves: the assertions
     // below are written against its rows (%temp%, regedit, %appdata%), so naming it keeps them running
     // on the Linux CI leg instead of silently asserting against a table that has none of them.
@@ -23,8 +25,10 @@ public class ToolkitViewModelTests {
     // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
     // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
     // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
-    private static ToolkitViewModel Page(string search = "") =>
-        new(WindowsToolkitCatalog.Instance) { Search = search };
+    private static ToolkitViewModel Page(string search = "", FakeProcessLauncher? launcher = null) =>
+        new(WindowsToolkitCatalog.Instance, launcher is null ? new ToolkitRunner() : new ToolkitRunner(launcher)) {
+            Search = search,
+        };
 
     // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
     // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
@@ -759,43 +763,30 @@ public class ToolkitViewModelTests {
     /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%" or
     /// "$HOME".</summary>
     [Fact]
-    public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
+    public async Task Run_PathRow_SendsTheResolvedPathNotTheAuthoredOne() {
         var vm = Page();
         string? revealed = null;
         vm.FileExplorerRevealRequested += path => revealed = path;
 
-        vm.OpenInAppCommand.Execute(PathRow(OtherFolder));
+        await vm.RunCommand.ExecuteAsync(PathRow(OtherFolder));
 
         Assert.Equal(ToolkitPaths.Resolve(OtherFolder), revealed);
         Assert.NotEqual(OtherFolder, revealed);
     }
 
-    /// <summary>A shell: row has no filesystem path, so it offers the external icon only — and asking
-    /// for the in-app one anyway is refused rather than sending a path Explorer would reject.</summary>
-    [Fact]
-    public void OpenInApp_ShellLocation_IsNotOfferedAndDoesNothing() {
-        var vm = Page();
-        var shellRow = PathRow("shell:startup");
-        var revealed = 0;
-        vm.FileExplorerRevealRequested += _ => revealed++;
-
-        vm.OpenInAppCommand.Execute(shellRow);
-
-        Assert.True(shellRow.IsPathEntry);
-        Assert.False(shellRow.CanOpenInApp);
-        Assert.Equal(0, revealed);
-    }
-
-    /// <summary>A shell: row still activates as a run, because there is no in-app destination to prefer
-    /// — it is the one folder row whose click behaviour is unchanged.</summary>
+    /// <summary>A shell: row has no filesystem path, so it activates as a run instead — there is no
+    /// in-app destination to prefer, and sending one would hand Explorer a path it would reject.</summary>
     [Fact]
     public async Task Run_ShellLocationRow_StillGoesToTheShellAndIsLogged() {
         var vm = Page();
+        var shellRow = PathRow("shell:not-a-real-shell-location-xyz");
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
 
-        await vm.RunCommand.ExecuteAsync(PathRow("shell:not-a-real-shell-location-xyz"));
+        await vm.RunCommand.ExecuteAsync(shellRow);
 
+        Assert.True(shellRow.IsPathEntry);
+        Assert.False(shellRow.CanOpenInApp);
         Assert.Equal(0, revealed);
         Assert.Single(vm.Log);
     }
@@ -831,10 +822,224 @@ public class ToolkitViewModelTests {
     public void Reveal_ClearsTheFilterSoTheRowIsOnThePage() {
         var vm = Page("zzzz-no-such-command");
 
-        vm.Reveal("%temp%");
+        vm.Reveal(Catalog.First(e => e.Command == "%temp%"));
 
         Assert.Equal("", vm.Search);
         Assert.True(vm.HasCommands);
         Assert.Contains(vm.Groups.SelectMany(g => g.Items), entry => entry.Command == "%temp%");
+    }
+
+    // ----- Selecting versus activating -----
+
+    // A captured row: the fake launcher answers it synchronously, so a run started by a fire-and-forget
+    // path (Enter) has finished by the time the call that started it returns.
+    private static ToolkitEntry CaptureRow(string command = "whoami") =>
+        new(command, "Captured", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture(command));
+
+    /// <summary>The whole point of the model: a single click picks a row and starts nothing.</summary>
+    [Fact]
+    public void Select_RunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        vm.SelectCommand.Execute(entry);
+
+        Assert.Same(entry, vm.SelectedEntry);
+        Assert.True(entry.IsSelected);
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+    }
+
+    [Fact]
+    public void Select_AFolderRow_DoesNotNavigate() {
+        var vm = Page();
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        vm.SelectCommand.Execute(PathRow());
+
+        Assert.Equal(0, revealed);
+    }
+
+    [Fact]
+    public void Select_AnotherRow_MovesTheHighlight() {
+        var vm = Page();
+        var first = CaptureRow("first");
+        var second = CaptureRow("second");
+
+        vm.SelectCommand.Execute(first);
+        vm.SelectCommand.Execute(second);
+
+        Assert.False(first.IsSelected);
+        Assert.True(second.IsSelected);
+    }
+
+    /// <summary>A double click runs the row exactly once, through the same path the play button binds.</summary>
+    [Fact]
+    public async Task Activate_RunsTheRowExactlyOnceAndSelectsIt() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        await vm.Activate(entry);
+
+        Assert.Equal("whoami", launcher.Single.FileName);
+        Assert.Single(vm.Log);
+        Assert.Same(entry, vm.SelectedEntry);
+    }
+
+    [Fact]
+    public async Task Activate_AFolderRow_OpensItInTheAppOnce() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        await vm.Activate(PathRow());
+
+        Assert.Equal(1, revealed);
+        Assert.Empty(launcher.Calls);
+    }
+
+
+    private static void FocusOn(ToolkitViewModel vm, ToolkitActivation.Focus focus, ToolkitEntry? row = null) =>
+        vm.FocusProbe = () => (focus, row);
+
+    [Fact]
+    public void HandleShortcut_ActivateWithARowSelectedAndNothingFocused_RunsThatRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
+
+        var consumed = vm.HandleShortcut(ShortcutId.Activate);
+
+        Assert.True(consumed);
+        Assert.Equal("whoami", launcher.Single.FileName);
+    }
+
+    /// <summary>A focused row body runs its own row, even if another was clicked earlier.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateOnAFocusedRowBody_RunsTheFocusedRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow("selected-earlier"));
+        FocusOn(vm, ToolkitActivation.Focus.RowBody, CaptureRow("focused-now"));
+
+        Assert.True(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Equal("focused-now", launcher.Single.FileName);
+        Assert.Equal("focused-now", vm.SelectedEntry?.Command);
+    }
+
+    /// <summary>Unconsumed, so Enter still reaches whatever would otherwise have taken it.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNothingSelected_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>Enter on a focused pin, a toolbar button or a nav item must press that control — never
+    /// run the selected command, which could raise a UAC prompt the user did not ask for.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWhileAnyOtherControlHasFocus_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+        FocusOn(vm, ToolkitActivation.Focus.Other);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>With no view to say what has focus, nothing is assumed: Enter runs nothing.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNoFocusProbe_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    [Fact]
+    public void Search_HidingTheSelectedRow_ClearsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "zzzz-no-such-command";
+
+        Assert.Null(vm.SelectedEntry);
+        Assert.False(entry.IsSelected);
+    }
+
+    [Fact]
+    public void Search_StillShowingTheSelectedRow_KeepsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "temp";
+
+        Assert.Same(entry, vm.SelectedEntry);
+    }
+
+    /// <summary>Picking a universal-search result selects the row and flashes it, but never runs it —
+    /// running stays a second, deliberate action.</summary>
+    [Fact]
+    public void Reveal_SelectsTheRowAndRunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+        var target = Catalog.First(e => e.Command == "ipconfig /all");
+
+        vm.Reveal(target);
+
+        Assert.Same(target, vm.SelectedEntry);
+        Assert.Same(target, vm.TakePendingReveal());
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+        Assert.Equal(0, revealed);
+    }
+
+    /// <summary>A row that is no longer on the page (deleted since the search ran) leaves nothing
+    /// selected, so the next Enter cannot run whatever was selected before.</summary>
+    [Fact]
+    public void Reveal_ARowNoLongerOnThePage_ClearsTheSelection() {
+        var vm = Page();
+        vm.SelectCommand.Execute(Catalog.First(e => e.Command == "%temp%"));
+
+        vm.Reveal(CaptureRow("gone"));
+
+        Assert.Null(vm.SelectedEntry);
+    }
+
+    /// <summary>A custom row sharing a catalog row's label is selected as itself, not as the catalog
+    /// row that happens to come first.</summary>
+    [Fact]
+    public void Reveal_ACustomRowSharingACatalogLabel_SelectsTheCustomRow() {
+        var vm = Page();
+        vm.AddCommand(new ToolkitCommand("ipconfig /all", "Mine", ToolkitCommandType.Capture, "ipconfig"));
+        var custom = vm.Custom.Single();
+
+        vm.Reveal(custom);
+
+        Assert.Same(custom, vm.SelectedEntry);
+    }
+
+    // The catalogs are singletons, so a selection left on one of their rows would leak into the next test
+    // — cleared here even when an assertion failed.
+    public void Dispose() {
+        foreach (var entry in Catalog)
+            entry.IsSelected = false;
+        GC.SuppressFinalize(this);
     }
 }
