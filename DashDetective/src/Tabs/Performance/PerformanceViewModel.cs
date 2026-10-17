@@ -235,13 +235,17 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Where the rows' colours come from. This page assigns brushes in code rather than binding
     /// {DynamicResource}, so it has to be told when the accent moves the palette.</summary>
     private readonly ThemeService _theme;
+
+    /// <summary>The alert switches each row's bell flips. One flag per kind, so every disk shares the
+    /// disk-activity switch and every GPU the GPU one, exactly as the watcher reads them.</summary>
+    private readonly AlertSwitches _alerts;
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel(SystemMetricsService service, ThemeService theme)
-        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme) { }
+    public PerformanceViewModel(SystemMetricsService service, ThemeService theme, AlertSwitches alerts)
+        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme, alerts: alerts) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
     /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
@@ -249,11 +253,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
     /// and the inventory load disposes one of its own.
-    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.
+    /// <paramref name="alerts"/> are the shell's shared alert switches; a page left without them gets its own.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
         Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
-        IPhysicalDiskThroughputSampler? throughputSampler = null) {
+        IPhysicalDiskThroughputSampler? throughputSampler = null, AlertSwitches? alerts = null) {
+        _alerts = alerts ?? new AlertSwitches();
         _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
         // unshared instance simply never hears an accent change.
@@ -298,6 +304,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select) {
             DeviceId = DeviceIds.Cpu, Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
+            Alert = _alerts.Cpu,
         };
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
@@ -307,7 +314,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                          _memCachedTile, _memCommittedTile,
                                      }, Select) {
             DeviceId = DeviceIds.Memory, Link = HardwareLink(),
-            StatOrder = StatOrderFor(ChartSeries.Memory),
+            StatOrder = StatOrderFor(ChartSeries.Memory), Alert = _alerts.Memory,
         };
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
@@ -671,7 +678,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select) {
                 DeviceId = disk.Id, Link = StorageLink(disk.DiskNumber),
-                StatOrder = StatOrderFor(ChartSeries.Storage),
+                StatOrder = StatOrderFor(ChartSeries.Storage), Alert = _alerts.DiskActivity,
             };
             var resource = new DiskResource {
                 DiskNumber = number, Row = row, History = history,
@@ -721,7 +728,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                           threeDTile, vramTile, tempTile, powerTile,
                                       }, Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
-                StatOrder = StatOrderFor(ChartSeries.Gpu),
+                StatOrder = StatOrderFor(ChartSeries.Gpu), Alert = _alerts.Gpu,
             };
             var resource = new GpuResource {
                 Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,

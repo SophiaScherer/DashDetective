@@ -170,21 +170,25 @@
                 <!-- The jump link goes in HeaderLead so it sits against the name rather than making the
                      title itself clickable: a bare title offers no resting cue that it goes anywhere.
                      Hidden on a resource with no home tab (HasLink), the same way the Overall/Detailed
-                     toggle below is gated on SupportsDetail. -->
+                     toggle below is gated on SupportsDetail. The alert bell sits against the name too,
+                     since it is about this resource; it takes no room on one nothing watches. -->
                 <controls:WidgetPanel.HeaderLead>
-                    <Button Classes="link" Margin="10,0,0,0"
-                            IsVisible="{Binding SelectedResource.HasLink}"
-                            Command="{Binding SelectedResource.Link.Command}"
-                            ToolTip.Tip="Open this device on the tab that owns it">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="{Binding SelectedResource.Link.Label}"
-                                       VerticalAlignment="Center"/>
-                            <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
-                                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                                  VerticalAlignment="Center"
-                                  Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" Margin="8,0,0,0" Spacing="4">
+                        <controls:AlertBell Switch="{Binding SelectedResource.Alert}"/>
+                        <Button Classes="link"
+                                IsVisible="{Binding SelectedResource.HasLink}"
+                                Command="{Binding SelectedResource.Link.Command}"
+                                ToolTip.Tip="Open this device on the tab that owns it">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{Binding SelectedResource.Link.Label}"
+                                           VerticalAlignment="Center"/>
+                                <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
+                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                      VerticalAlignment="Center"
+                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </controls:WidgetPanel.HeaderLead>
                 <controls:WidgetPanel.HeaderContent>
                     <TextBlock Classes="cardSub" Text="{Binding SelectedResource.Spec}"/>

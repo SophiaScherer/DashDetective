@@ -67,13 +67,20 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     private readonly List<int> _temperatureDiskNumbers = new();
     private int _temperatureTickCounter;
 
-    public StorageViewModel(SystemMetricsService service)
-        : this(service, HardwareProviders.ForCurrentPlatform()) { }
+    /// <summary>The low-free-space alert's switch, drawn as the bell on every drive card. One flag for every
+    /// drive, as the watcher reads it, shared with the shell so a flip here is what it persists.</summary>
+    public AlertSwitch LowDiskSpaceAlert { get; }
+
+    public StorageViewModel(SystemMetricsService service, AlertSwitches alerts)
+        : this(service, HardwareProviders.ForCurrentPlatform(), alerts) { }
 
     /// <summary>Test seam: the same page over an explicit provider set. The public ctor resolves the real
-    /// one, so the shell still builds this exactly as before.</summary>
-    internal StorageViewModel(SystemMetricsService service, HardwareProviders providers) {
+    /// one, so the shell still builds this exactly as before. A page left without the shell's alert
+    /// switches gets its own.</summary>
+    internal StorageViewModel(SystemMetricsService service, HardwareProviders providers,
+                              AlertSwitches? alerts = null) {
         _providers = providers;
+        LowDiskSpaceAlert = (alerts ?? new AlertSwitches()).DiskSpace;
 
         _service = service;
 
@@ -292,7 +299,7 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _temperatureDiskNumbers.Clear();
             SelectedDrive = null;
             foreach (var data in StorageComposer.Compose(disks, volumes)) {
-                var card = ToDriveCard(data, SelectDrive);
+                var card = ToDriveCard(data, SelectDrive, LowDiskSpaceAlert);
                 Drives.Add(card);
                 _cardsByDisk[data.DiskNumber] = card;
                 if (data.TemperatureCelsius.HasValue)
@@ -414,10 +421,11 @@ public partial class StorageViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// fixed semantic colours; used/free are formatted (binary units, like the Dashboard). Read/Write are
     /// seeded by the throughput sampler; Temp shows the NVMe reading or "—" when none is available. The card
     /// carries its disk number and a select command, so it also acts as the Disk Activity panel's selector.</summary>
-    private static DriveCard ToDriveCard(DriveCardData data, Action<DriveCard> onSelected) {
+    private static DriveCard ToDriveCard(DriveCardData data, Action<DriveCard> onSelected, AlertSwitch alert) {
         var healthy = data.Health == DriveHealth.Healthy;
         return new DriveCard(data.DiskNumber, onSelected) {
             Name = data.Name,
+            Alert = alert,
             Model = data.Model,
             Health = healthy ? "Healthy" : "Caution",
             HealthForeground = healthy ? HealthyFg : CautionFg,
