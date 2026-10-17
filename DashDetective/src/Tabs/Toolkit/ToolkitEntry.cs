@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -65,17 +66,56 @@ public sealed partial class ToolkitEntry : ObservableObject {
     public bool RequiresElevation => Action.RequiresElevation;
 
     /// <summary>Whether this row opens a location rather than running something — the rows that get the
-    /// "open where?" pair of icons.</summary>
+    /// external file-manager icon beside the in-app default.</summary>
     public bool IsPathEntry => Action.Kind == ToolkitActionKind.OpenPath;
 
     /// <summary>Whether the app's own File Explorer could open this row. False for a <c>shell:</c>
     /// location, which resolves through the shell namespace and has no path to navigate to — those rows
-    /// offer the external icon only.</summary>
+    /// open in the shell by default.</summary>
     public bool CanOpenInApp => IsPathEntry && ToolkitPaths.IsFileSystemPath(Action.Target);
 
     /// <summary>The row's target with environment variables expanded: what the in-app File Explorer is
     /// asked to reveal. Resolved on read, so it follows the session like the runner's does.</summary>
     public string ResolvedPath => ToolkitPaths.Resolve(Action.Target);
+
+    /// <summary>What activating the row does, said before it is done. Leads the row's tooltip, so the
+    /// default is discoverable without trying it.</summary>
+    public string DefaultActionText => DefaultActionFor(Action.Kind, CanOpenInApp, OperatingSystem.IsWindows());
+
+    /// <summary>How a row is activated, said where the action is: a click only selects.</summary>
+    public const string ActivationGesture = "Double-click or press Enter";
+
+    /// <summary>The row body's tooltip: how to activate it and what that does, then what the command is
+    /// for.</summary>
+    public string ActivationTip => ActivationGesture + ": " + DefaultActionText + "\n" + Description;
+
+    /// <summary>The row body's screen-reader name. Leads with the command, which the tooltip does not
+    /// carry, so each row announces which command it would act on.</summary>
+    public string AccessibleName => Command + ": " + DefaultActionText;
+
+    /// <summary>Whether activating the row starts a program, which earns it an explicit play button. A
+    /// folder or a link only navigates, so a double click or Enter is enough there.</summary>
+    public bool HasRunButton => Action.Kind is ToolkitActionKind.Launch or ToolkitActionKind.Capture
+                                    or ToolkitActionKind.Elevated;
+
+    /// <summary>The play button's screen-reader name: the action first, since that is what it does.</summary>
+    public string RunButtonName => DefaultActionText + ": " + Command;
+
+    /// <summary>Whether this is the page's selected row. Owned by <see cref="ToolkitViewModel.SelectedEntry"/>;
+    /// observable so the highlight follows without rebuilding the list.</summary>
+    [ObservableProperty] private bool _isSelected;
+
+    /// <summary>Test seam: the wording per action kind, with the platform passed in so the file-manager
+    /// name is checkable from either host.</summary>
+    internal static string DefaultActionFor(ToolkitActionKind kind, bool canOpenInApp, bool windows) => kind switch {
+        ToolkitActionKind.OpenPath when canOpenInApp => "Open in DashDetective's File Explorer",
+        ToolkitActionKind.OpenPath => windows ? "Open in Windows Explorer" : "Open in your file manager",
+        ToolkitActionKind.OpenUrl => "Open in your browser",
+        ToolkitActionKind.Launch => "Launch in its own window",
+        ToolkitActionKind.Capture => "Run — output goes to the Execution Log",
+        ToolkitActionKind.Elevated => "Run as administrator",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
 
     public string BadgeLabel => ToolkitCatalog.LabelFor(Kind);
     public Geometry Icon => ToolkitIcons.GlyphFor(Kind);

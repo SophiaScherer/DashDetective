@@ -17,16 +17,17 @@ namespace DashDetective.Shell.Search.Providers;
 /// </summary>
 public sealed class ToolkitSearchProvider : ISearchProvider {
     private readonly Func<IReadOnlyList<ToolkitEntry>> _entries;
-    private readonly Action<string> _reveal;
+    private readonly Action<ToolkitEntry> _reveal;
     private readonly Geometry? _icon;
 
     /// <param name="entries">The command set to search. Passed as a callback so the provider reads
     /// whatever the catalog holds at query time rather than a copy taken at startup.</param>
-    /// <param name="reveal">Navigates to the Toolkit tab and reveals the command.</param>
+    /// <param name="reveal">Navigates to the Toolkit tab and reveals the row. Handed the entry itself, not
+    /// its label: a custom row and a catalog row can share one.</param>
     /// <param name="icon">The row glyph. Passed in rather than read from the nav <c>Icons</c> table,
     /// which cannot be touched without a render backend attached.</param>
     public ToolkitSearchProvider(
-        Func<IReadOnlyList<ToolkitEntry>> entries, Action<string> reveal, Geometry? icon = null) {
+        Func<IReadOnlyList<ToolkitEntry>> entries, Action<ToolkitEntry> reveal, Geometry? icon = null) {
         _entries = entries;
         _reveal = reveal;
         _icon = icon;
@@ -51,7 +52,7 @@ public sealed class ToolkitSearchProvider : ISearchProvider {
             var command = entry.Command;
             results.Add(new SearchResult(
                 SearchCategory.Toolkit, command, entry.Description, score,
-                () => _reveal(command), _icon, command, Key: command));
+                () => _reveal(entry), _icon, command, Key: command));
         }
 
         return Task.FromResult<IReadOnlyList<SearchResult>>(results);

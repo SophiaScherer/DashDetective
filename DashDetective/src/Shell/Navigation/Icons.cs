@@ -5,7 +5,7 @@ namespace DashDetective.Shell.Navigation;
 /// <summary>
 /// Shared navigation icon geometries. Paths are authored in an 18x18 coordinate
 /// space (matching the design document) and are drawn as stroked outlines — except the
-/// <c>Caret*</c> disclosure set, which is filled.
+/// <c>Caret*</c> disclosure set and <c>Play</c>, which are filled.
 /// </summary>
 public static class Icons {
     // Four rounded tiles forming a dashboard grid.
@@ -110,6 +110,10 @@ public static class Icons {
     public static readonly Geometry CaretRight = Geometry.Parse("M6.5,5 L6.5,13 L11.5,9 Z");
     public static readonly Geometry CaretUp = Geometry.Parse("M5,11.5 L13,11.5 L9,6.5 Z");
     public static readonly Geometry CaretDown = Geometry.Parse("M5,6.5 L13,6.5 L9,11.5 Z");
+
+    // The Toolkit's run button. Filled like the carets, and a size up from CaretRight so it reads as a
+    // button's glyph rather than a disclosure mark.
+    public static readonly Geometry Play = Geometry.Parse("M6,4 L6,14 L14,9 Z");
 
     /// <summary>
     /// The disclosure caret for a direction, used by the nav bar's edge puck. A plain map — the rule
