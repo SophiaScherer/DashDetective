@@ -15,7 +15,7 @@
          handled in App.axaml.cs, which holds the window reference. -->
     <TrayIcon.Icons>
         <TrayIcons>
-            <TrayIcon Icon="/Assets/avalonia-logo.ico" ToolTipText="DashDetective" Clicked="OnTrayShow">
+            <TrayIcon Icon="/Assets/dashdetective.ico" ToolTipText="DashDetective" Clicked="OnTrayShow">
                 <TrayIcon.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Show DashDetective" Click="OnTrayShow"/>
