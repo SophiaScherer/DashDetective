@@ -35,6 +35,13 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // Cancels the in-flight query when the term changes or the box closes.
     private CancellationTokenSource? _running;
 
+    // Set by Enter pressed before the results for the typed term have landed: the top result opens once
+    // they do. Every route that cancels the run (typing, Close, Clear, Dismiss) clears it with the run.
+    private bool _activateOnResults;
+
+    // Esc cut a pending query short, so the rows still held answer an older term; reopening reruns it.
+    private bool _needsQuery;
+
     /// <summary>The current results, best first. Grouping is a view concern; the order here is the
     /// order the keyboard walks them in.</summary>
     public ObservableCollection<SearchResult> Results { get; } = new();
@@ -102,6 +109,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // there is nothing to search for, so there is nothing to wait for either.
     partial void OnTextChanged(string value) {
         _debounce.Stop();
+        _needsQuery = false;
 
         if (value.Trim().Length == 0) {
             CancelRunning();
@@ -129,8 +137,9 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         InFlightQuery = RunQueryAsync(Text);
     }
 
-    private async Task RunQueryAsync(string term) {
+    private async Task RunQueryAsync(string term, bool activateTop = false) {
         var token = StartRun();
+        _activateOnResults = activateTop;
 
         IReadOnlyList<SearchResult> results;
         try {
@@ -147,6 +156,13 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
 
         IsSearching = false;
         ShowResults(results);
+
+        // Enter was pressed while this term was still pending: open what it found, if anything.
+        if (_activateOnResults) {
+            _activateOnResults = false;
+            if (Results.Count > 0)
+                Activate(Results[0]);
+        }
     }
 
     // Replaces the list and puts the keyboard on the best match, so Enter works without arrowing first.
@@ -201,9 +217,14 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
 
     // An empty box offers the recents; one that still holds a term brings its results back.
     private void OpenDropdown() {
-        if (Text.Trim().Length > 0)
+        if (Text.Trim().Length > 0) {
             IsOpen = true;
-        else
+            if (_needsQuery) {
+                _needsQuery = false;
+                IsSearching = true;
+                _debounce.Start();
+            }
+        } else
             ShowRecents();
     }
 
@@ -267,8 +288,31 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// (the shortcut layer deliberately leaves Enter to whatever text box has focus).</summary>
     [RelayCommand]
     public void ActivateSelected() {
+        // A dropdown that is closed (Esc) shows nothing to open, and its rows may answer an older term.
+        if (!IsOpen)
+            return;
+
+        // The list on screen still answers an older term while the typed one is pending, so its
+        // highlighted row is the wrong thing to open. Run the typed term now and open its top result.
+        if (IsSearching && Text.Trim().Length > 0) {
+            ActivateWhenResultsLand();
+            return;
+        }
+
         if (SelectedIndex >= 0 && SelectedIndex < Results.Count)
             Activate(Results[SelectedIndex]);
+    }
+
+    // A run already in flight is for the current term (typing cancels it), so it is simply waited for;
+    // otherwise the debounce is still counting and Enter skips the rest of it.
+    private void ActivateWhenResultsLand() {
+        if (_running is not null) {
+            _activateOnResults = true;
+            return;
+        }
+
+        _debounce.Stop();
+        InFlightQuery = RunQueryAsync(Text, activateTop: true);
     }
 
     /// <summary>Runs a result the user clicked, wherever it sits in the list.</summary>
@@ -289,7 +333,10 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// <summary>Hides the dropdown but leaves the term in place, so Ctrl+F brings the same results
     /// straight back.</summary>
     public void Close() {
+        // A debounce still counting would otherwise fire into the closed box.
+        _debounce.Stop();
         CancelRunning();
+        _needsQuery |= IsSearching;
         IsSearching = false;
         IsOpen = false;
     }
@@ -353,6 +400,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         _running?.Cancel();
         _running?.Dispose();
         _running = null;
+        _activateOnResults = false;
     }
 
     /// <summary>Stops the debounce timer and cancels any in-flight query. Safe to call more than once.</summary>
