@@ -22,6 +22,10 @@ public enum ShortcutId {
     ToggleNavCollapse,
     OpenSettings,
 
+    /// <summary>Returns to the previously visited page. Not File Explorer's <see cref="NavigateBack"/>,
+    /// which steps through folders on that one tab and shares its default gesture.</summary>
+    Back,
+
     // ----- Toolbar actions -----
     ToggleLive,
     Refresh,

@@ -58,6 +58,8 @@ public static class HelpContent {
             "Where a field can guess what you are typing, the rest of the suggestion appears grayed out after the caret — press Tab to accept it."),
         new("tip.navigation", null,
             "Drag the navigation bar by its logo to dock it to any window edge, or press Ctrl+B to collapse it to a slim icon rail."),
+        new("tip.back", null,
+            "The back arrow at the left of the toolbar returns to the page you were on before, as do Alt+← and your mouse's back button. In File Explorer they step back through folders first."),
         new("tip.live", null,
             "The Live pill in the toolbar shows whether sampling is running — click it or press Ctrl+P to pause updates while you read a chart."),
         new("tip.performance", null,
