@@ -1181,6 +1181,23 @@ Settings. Panels:
   height-capped and scrolls so many adapters don't push the page down.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
+  Two more rows, **Public IPv4 / Public IPv6**, show the address the internet sees. Like the Ping and
+  DNS panels they send something off the machine, so they are **opt-in**: each shows a small Look up
+  button whose tooltip names both `api.ipify.org` and `api6.ipify.org` and says it runs on Look up and
+  again on Refresh (each button has its own accessible name). Nothing is requested at startup, on the
+  sampling timers or on a Refresh that precedes the first ask; after the first Look up, toolbar Refresh
+  repeats it (`PublicLookedUp`, the `_dnsResolved` shape). Both families are read concurrently over
+  **https only**, off the UI thread (`Task.Run` inside `PublicAddressProvider`, so first-send proxy
+  detection cannot stall the page), with a 4 s bound each. The shared `HttpClient` sends
+  `Connection: close` and pools for 10 s at most, so a VPN or Wi-Fi switch shows on the next lookup, and
+  the body is read through a 64-byte cap rather than buffered whole. A body counts only if it is a
+  canonical address of the family asked for (IPv4: exactly four 1-3 digit octets, since
+  `IPAddress.TryParse` accepts "12345" and "1.2"; IPv6: contains `:`), so a captive portal's HTML page
+  or a v4 answer on the v6 endpoint reads "Unavailable". Each family fails independently — IPv6 missing
+  on a v4-only network is a normal outcome (logged at Info), not an error banner. A generation counter
+  lets only the newest lookup publish. **The public addresses are deliberately not in the diagnostics
+  export** (`GetPrimaryConfigRows`): an export is shared, and it would carry the one address the user
+  has not otherwise given anyone. The Network Help topic discloses the call as well.
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
   scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
   `NetworkUsageSampler` instance on a 1 Hz timer.
