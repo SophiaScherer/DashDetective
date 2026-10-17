@@ -136,4 +136,34 @@ public class ToolkitOutputFormatterTests {
     public void Failed_NoReasonGiven_StillSaysSomething() {
         Assert.False(string.IsNullOrWhiteSpace(ToolkitOutputFormatter.Failed("   ")));
     }
+
+    // ----- Cancelled -----
+
+    /// <summary>The wording names the elapsed time to a tenth of a second, in the invariant culture, so the
+    /// log reads the same under any locale.</summary>
+    [Fact]
+    public void Cancelled_NoOutput_IsJustTheNoteWithTheElapsedTime() {
+        var text = ToolkitOutputFormatter.Cancelled(TimeSpan.FromMilliseconds(3240), "");
+
+        Assert.Equal("Cancelled after 3.2 s — the command was stopped.", text);
+    }
+
+    /// <summary>What the command had printed before it was stopped survives, with the note after it.</summary>
+    [Fact]
+    public void Cancelled_WithOutput_KeepsItAboveTheNote() {
+        var text = ToolkitOutputFormatter.Cancelled(TimeSpan.FromSeconds(1), "got this far");
+
+        Assert.Equal("got this far\nCancelled after 1.0 s — the command was stopped.", text);
+    }
+
+    /// <summary>A cancel is not a timeout: the two outcomes must never read alike in the log.</summary>
+    [Fact]
+    public void Cancelled_IsWordedDifferentlyFromTimedOut() {
+        var cancelled = ToolkitOutputFormatter.Cancelled(TimeSpan.FromSeconds(5), "");
+        var timedOut = ToolkitOutputFormatter.TimedOut(TimeSpan.FromSeconds(5), "");
+
+        Assert.NotEqual(timedOut, cancelled);
+        Assert.DoesNotContain("Timed out", cancelled, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cancelled", timedOut, StringComparison.Ordinal);
+    }
 }
