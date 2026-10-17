@@ -116,10 +116,6 @@ public sealed record AppSettings {
     /// effect on Windows, where the same figure comes from a performance counter.</summary>
     public bool NvidiaGpuMetrics { get; init; }
 
-    /// <summary>Performance tab: show every detected instance in the left rail ("All devices") rather than
-    /// only the primary of each kind ("Primary"). Meaningful when a category has more than one instance.</summary>
-    public bool PerformanceShowAllDevices { get; init; }
-
     /// <summary>Performance tab: the CPU resource shows a per-logical-processor chart grid ("Detailed")
     /// rather than the single overall utilization chart.</summary>
     public bool CpuDetailedView { get; init; }

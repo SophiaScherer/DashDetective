@@ -1916,9 +1916,9 @@ stays in its tab folder.
                                  does. The chart panel between them does not move.)
                                 (Reveal(deviceId) is the jump INTO this page, the counterpart to the
                                  detail header's jumps out of it. Rows carry the DeviceInstance id they
-                                 were built from. Two things it must keep doing: EXPAND THE RAIL when the
-                                 Primary scope hides the device — the caller asked for that one, not the
-                                 primary of its kind — and HOLD a reveal whose row does not exist yet,
+                                 were built from. The rail always lists every device (the old Primary/All
+                                 toggle is gone), so a reveal has nothing to un-hide; it must HOLD a
+                                 reveal whose row does not exist yet,
                                  since disk and GPU rows arrive with an async inventory load.
                                  RebuildResources matches the surviving selection BY DEVICE ID, not by
                                  reference: a rebuilt disk or GPU row is a new object, so the toolbar
