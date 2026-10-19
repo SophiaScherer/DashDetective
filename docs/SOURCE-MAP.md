@@ -1756,6 +1756,16 @@ stays in its tab folder.
                                                          Windows-only field (DHCP) is guarded inline → "—")
                                 AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
+                                IPublicAddressProvider.cs
+                                                        (seam + the PublicAddresses record; null per family
+                                                         = unavailable. IT LEAVES THE MACHINE, so callers run it
+                                                         only when the user asks)
+                                PublicAddressProvider.cs
+                                                        (ipify over https, v4 and v6 concurrently, 4 s bound
+                                                         each, one shared HttpClient. Accepts a body only if
+                                                         it parses as the family asked for — a captive
+                                                         portal page must not be shown as an address. Filtered
+                                                         catch; portable, no platform arms)
                                 IConnectionsInterop.cs  (seam + ForCurrentPlatform() + the RawConnection
                                                          struct. ADDRESS FAMILIES ARE WHATEVER THE PLATFORM
                                                          CAN SUPPLY, not a fixed set — Linux includes IPv6,
