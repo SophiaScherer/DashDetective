@@ -493,20 +493,28 @@ stays in its tab folder.
                                  HandleGlobal maps them to nav positions by subtracting NavigateTab1)
         ShortcutScope.cs        (Global, Search, or the tab that owns the shortcut)
         Shortcut.cs             (one entry: gestures, Help copy, scope, whether it survives a focused
-                                 text box, whether Help lists it)
+                                 text box, whether Help lists it, and for a global entry whether it
+                                 catches a press the current tab declined)
         ShortcutGroup.cs        (one headed block of shortcuts, as Help renders them)
         IShortcutTarget.cs      (a page opts in with Scope + HandleShortcut, so no per-page shell wiring)
         ShortcutCatalog.cs      (the SHIPPED DEFAULTS, one static table, plus the pure table-taking
-                                 TryResolve/GroupForHelp. Invariant: neither an action nor a gesture
+                                 TryResolve/Resolve/GroupForHelp. Invariant: neither an action nor a gesture
                                  bound twice WITHIN one scope — one id may serve several scopes, which is
-                                 how "/" focuses both the Processes and Toolkit filters)
+                                 how "/" focuses both the Processes and Toolkit filters. A tab binding
+                                 SHADOWS a global one on the same gesture; Resolve offers the global one
+                                 second only when it is marked CatchesFallThrough, and the listener runs
+                                 the first that acts. Only Back is marked, which is how File Explorer's
+                                 Alt+Left reaches page Back at the start of its folder trail. OPT-IN on
+                                 purpose: a user rebinding another global action onto a tab's gesture
+                                 keeps the old shadowing)
         ShortcutBindings.cs     (the bindings ACTUALLY IN FORCE: those defaults with the user's rebinds
                                  applied. Resolution and Help grouping live here because both have to see
                                  what the user chose; the catalog's helpers do the work, so neither
                                  exists twice. A rebind replaces ALL of a shortcut's default gestures, so
                                  rebinding Refresh leaves neither F5 nor Ctrl+R firing it. A clash is
                                  refused only WITHIN one scope — Alt+Up is legally both Processes sort
-                                 and File Explorer up, since only one tab is ever current)
+                                 and File Explorer up, since only one tab is ever current. KeysFor gives a
+                                 binding's live display string, for a tooltip that names its key)
         GestureFormatter.cs     (a KeyGesture as Help spells it. Only REBOUND entries use it — a default
                                  keeps its hand-written copy, which says things a formatter cannot
                                  ("Ctrl+1 … Ctrl+9" covers nine bindings in one row). Also owns
@@ -1258,6 +1266,15 @@ stays in its tab folder.
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
                                  code-behind calls — MainWindow's own Export among them)
+      BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
+                                 from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
+                                 shape, so it is testable without constructing the shell)
+      MouseNavigation.cs        (what the mouse's back/forward buttons do, in the chain's order: capture
+                                 leaves the press alone, a modal swallows it, a FOCUSED TEXT BOX keeps it,
+                                 then the tab's own step, then (back only) page history. Pure and split
+                                 out like ModalShortcuts so it is testable. The text guard is the one Alt+←
+                                 gets from AllowInTextInput; without it a press in File Explorer's path box
+                                 fell past the tab, which declines while editing, and left the page)
       ModalShortcuts.cs         (the MODAL step of HandleShortcut and ActiveScope: while Help or the
                                  accent picker is open, Esc dismisses it, Enter falls through to the
                                  focused button, everything else is swallowed, and keys resolve in
@@ -1344,14 +1361,21 @@ stays in its tab folder.
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
                                      caret sets Fill, not Stroke. The stroked Chevron* pair and its
-                                     First/Last stop-bar variants are the Network pager's alone: paging is
-                                     navigation rather than disclosure, and a stop bar only reads against a
-                                     stroked arrow)
+                                     First/Last stop-bar variants are for navigation rather than
+                                     disclosure: the Network pager, and ChevronLeft for the toolbar's Back.
+                                     A stop bar only reads against a stroked arrow)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
         ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
                                      which the unit tests do not have, so touching Icons at all throws)
         NavPositionOption.cs        (selectable item VM for the dock menu, like NavItem/ThemeOption)
+        PageHistory.cs              (the page trail behind the toolbar's Back, held by MainWindowViewModel
+                                     rather than the bar so collapsing or re-docking cannot clear it.
+                                     A step back makes the popped page CURRENT without pushing anything,
+                                     so the navigation it triggers reports a repeat that Visit absorbs.
+                                     Without that, two Backs would bounce between two pages. Capped at 50.
+                                     Generic so tests use strings: NavItem's icon needs a render backend.
+                                     Same idea as File Explorer's NavigationHistory, which is tab-local)
 ```
 
 ## `src/Tabs/Dashboard`
