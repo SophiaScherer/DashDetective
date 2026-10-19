@@ -415,7 +415,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// </summary>
     public string BuildLogText() {
         var sb = new StringBuilder();
-        sb.AppendLine("DashDetective — Toolkit execution log");
+        sb.AppendLine("DashDetective — Utilities execution log");
         sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         sb.AppendLine();
 

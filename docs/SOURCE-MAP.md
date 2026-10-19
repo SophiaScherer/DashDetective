@@ -1339,7 +1339,8 @@ stays in its tab folder.
                                      horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
-        NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all
+        NavItem.cs, Icons.cs        (NavItem is a pure data model, with optional search Keywords so a
+                                     renamed page keeps its old name; Icons holds the glyph geometries, all
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
