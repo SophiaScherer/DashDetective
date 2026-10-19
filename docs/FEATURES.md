@@ -1387,10 +1387,12 @@ CPU %/Memory % come from the shared `SystemMetricsService`.
 drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
 Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
 (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
-strip (`StatTile` item VMs). The **rail scope** segments ("Primary" / "All devices", which collapse the
-multi-instance categories to one row each) head the rail itself: over the whole page they read as if they
-scoped the detail pane, which they never did. The **adapter row** shows both directions, "↓ receive" over
-"↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
+strip (`StatTile` item VMs). The rail **always lists every detected device**: a Primary / All devices
+toggle (and the persisted `PerformanceShowAllDevices` setting behind it) was removed because "All devices"
+is the only view worth having, and hiding a second disk or GPU behind a switch made the page look as if it
+were missing hardware. An old `settings.json` still carrying that key loads fine, since the store ignores
+members `AppSettings` no longer has (`SchemaVersion` stays 1). The **adapter row** shows both directions,
+"↓ receive" over "↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
 traffic. This is the one chart on which every grid line is labelled both ways, both axes are named, and the
 per-core / per-engine cells carry their two ends; see the charting grades in AGENTS.md. Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
 `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
@@ -1474,10 +1476,10 @@ outside `src/Tabs/Performance/` only to add `GpuPciId` to `GpuAdapterProvider` a
 
 **`Reveal(deviceId)` is the jump in**, the counterpart to the detail header's jumps out, and the Dashboard
 is its first caller. Rows carry the `DeviceInstance` id they were built from, so an id names one device
-rather than a kind. Two decisions inside it: a reveal **expands the rail to "All devices"** when the
-Primary scope hides the device — the caller asked for that one, not the primary of its kind — and one
-that arrives **before its row exists** is held until the async inventory load builds it, the arrangement
-the Network tab already uses for an early adapter reveal. That second one needed a fix to hold: the rail
+rather than a kind. Two decisions inside it. Every device is always in the rail, so a reveal never has
+anything to un-hide. And a reveal that arrives **before its row exists** is held until the async inventory
+load builds it, the arrangement the Network tab already uses for an early adapter reveal. That second one
+needed a fix to hold: the rail
 matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
 toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
