@@ -1439,8 +1439,19 @@ total whole from 10 GB up and to one decimal below, so a small total never reads
 sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
 Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both
 ("0 / 460 MB"); an unknown usage reads "— / 12 GB", never a fake 0; an unknown total is a bare "—"
-(`GpuMemoryFormatter`). **The separate dedicated-vs-shared GPU memory work (the next sprint's item) builds
-on this convention: each tile is "usage / total" under a label naming the pool.**
+(`GpuMemoryFormatter`). **Shared GPU memory has its own tile, "Shared memory in use"**, right after the
+VRAM one and on the same convention: each tile is "usage / total" under a label naming its pool. The total is
+DXGI's `SharedSystemMemory` (`DeviceInstance.SharedBytes`) and the usage is PDH
+`\GPU Adapter Memory(*)\Shared Usage` summed across `_phys_N` — the third counter on the sampler's one query,
+and exactly the pair Task Manager's "Shared GPU memory" reads, with no other arithmetic. On Linux it is
+amdgpu's GTT (`mem_info_gtt_total` / `mem_info_gtt_used`), the system memory the card can map; other drivers
+publish none. **An adapter whose shared total is unknown or 0 gets no tile at all** rather than a dash or a
+zero, so a GPU row has four tiles or five. An integrated GPU shows both: a small dedicated carve-out and a
+large shared pool. A saved tile order from before the tile existed places it beside "VRAM in use", its
+declared neighbor. **One saved tile order covers every GPU** (`performance.stats.gpu`), so reordering tiles
+on a GPU with no shared pool saves an order without the shared tile; on a GPU that has one, the tile then
+returns beside "VRAM in use" rather than where it was last dragged. On Windows every real adapter reports a
+shared total, so in practice this arises only on Linux with a non-AMD card beside an AMD one.
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
@@ -1944,7 +1955,8 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
   `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
   been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
-  which now feeds the Performance tab's GPU **VRAM** tile — carried per adapter on
+  which now feeds the Performance tab's GPU **VRAM** tile (and its shared total the **Shared memory**
+  tile) — carried per adapter on
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
