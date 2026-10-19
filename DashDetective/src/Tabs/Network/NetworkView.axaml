@@ -104,10 +104,12 @@
     <layout:WidgetBoard ColumnSpacing="{StaticResource SpacePage}" RowSpacing="{StaticResource SpacePage}" Order="{Binding Widgets.Order, Mode=TwoWay}">
             <controls:WidgetPanel WidgetId="network.adapters" MinWidth="260"
                                   layout:WidgetBoard.MaxSlotWidth="520" Title="Adapters">
-                    <!-- Cap the list to ~the IP Configuration card's height and scroll the overflow, so
-                         a machine with many adapters doesn't push the rest of the page off-screen. -->
-                    <ScrollViewer MaxHeight="188"
-                                  HorizontalScrollBarVisibility="Disabled"
+                    <!-- The list asks for ~the IP Configuration card's height and scrolls the overflow, so
+                         many adapters don't push the page off-screen. MeasureCap, not a MaxHeight on the
+                         scroller: that centered it in a card stretched to the row, with a gap above and
+                         below. The card's height now decides how much of the list shows. -->
+                    <vm:MeasureCap HeightCap="188">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Adapters}">
                             <ItemsControl.ItemTemplate>
@@ -140,6 +142,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    </vm:MeasureCap>
             </controls:WidgetPanel>
             <controls:WidgetPanel WidgetId="network.ipconfig" MinWidth="260"
                                   layout:WidgetBoard.MaxSlotWidth="520" Title="IP Configuration">
