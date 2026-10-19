@@ -1402,7 +1402,11 @@ stays in its tab folder.
                                  chips + count) over a grouped command list, beside a pinned 340px
                                  Execution Log. ISelfScrollingPage (each column scrolls itself) +
                                  IShortcutTarget. Running a row is an async RelayCommand that refuses
-                                 concurrent runs and prepends one stanza to the log. View code-behind
+                                 concurrent runs and prepends one stanza to the log. CancelRunCommand
+                                 stops a CAPTURED command in flight (IsCapturing gates it; the VM owns
+                                 one CancellationTokenSource per run and nulls it before disposing).
+                                 IDisposable only so MainWindowViewModel.Dispose cancels a run at
+                                 shutdown; leaving the page does NOT cancel. View code-behind
                                  owns the search focus + the search-reveal flash, like
                                  ProcessesView/SettingsView. The row is a chrome-less Button so Enter
                                  works on a focused row natively — ShortcutId.Activate falls through
@@ -1422,7 +1426,11 @@ stays in its tab folder.
                                                          OBSERVABLE, and it keeps the raw Timestamp beside
                                                          the formatted Time: the clock-format preference can
                                                          change while rows are on screen, and a row storing
-                                                         only its pre-formatted string could not be re-stamped)
+                                                         only its pre-formatted string could not be re-stamped.
+                                                         IsRunning marks the in-flight placeholder of a
+                                                         CAPTURED command, the one stanza that shows Cancel;
+                                                         fixed at construction, because the finished stanza
+                                                         is a new instance)
                                 ToolkitCatalog.cs       (static COPY table only — categories, section
                                                          headers, badge labels. Reads the same on every
                                                          platform, which is why it stayed static when the
@@ -1458,14 +1466,17 @@ stays in its tab folder.
                                                          appends exactly one element, so a parameterised
                                                          entry's value can never split into a flag)
                                 ToolkitRunner.cs        (THE single entry point for running a row. Never
-                                                         throws — a missing tool, non-zero exit, timeout
-                                                         or declined UAC prompt all become worded
+                                                         throws — a missing tool, non-zero exit, timeout,
+                                                         cancel or declined UAC prompt all become worded
                                                          failures. Expands env vars in the TARGET only;
-                                                         refuses any OpenUrl that isn't https://)
+                                                         refuses any OpenUrl that isn't https://. Takes
+                                                         the cancel token for a CAPTURE only; a launch
+                                                         ignores it)
                                 ToolkitRunResult.cs     (record: Success / Output / ExitCode)
                                 ToolkitOutputFormatter.cs (pure statics: stream merge, CRLF normalising,
                                                          console sign-off trim, 200-line / 16 KB caps with
-                                                         the trim announced, plus the outcome wording)
+                                                         the trim announced, plus the outcome wording —
+                                                         TimedOut and Cancelled stay separate wordings)
                                 IProcessLauncher.cs +   (the process seam + its real implementation — the
                                 SystemProcessLauncher.cs only place in the app that starts a process.
                                                          Arguments go via ProcessStartInfo.ArgumentList,
@@ -1473,6 +1484,12 @@ stays in its tab folder.
                                                          drained CONCURRENTLY and WITHOUT the timeout
                                                          token, or a command that floods its pipe
                                                          deadlocks and a killed one loses what it printed.
+                                                         A cancel and the timeout share one linked token,
+                                                         and the process TREE is killed from that token's
+                                                         own callback (synchronous, so a cancel at app
+                                                         shutdown cannot lose the race with the exit);
+                                                         ProcessCapture.Cancelled vs TimedOut says which
+                                                         fired, and the user's cancel wins a tie.
                                                          BuildLaunchInfo takes the platform as a parameter
                                                          so both elevation arms are testable from either
                                                          host: runas verb on Windows, pkexec as the file
