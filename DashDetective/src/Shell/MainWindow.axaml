@@ -11,7 +11,7 @@
         mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
         x:Class="DashDetective.Shell.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/dashdetective.ico"
         Title="DashDetective"
         Width="1180" Height="760"
         MinWidth="{Binding MinWindowWidth}" MinHeight="{Binding MinWindowHeight}"
