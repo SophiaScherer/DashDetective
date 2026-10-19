@@ -81,6 +81,15 @@ public static class Icons {
         "M6.8,7 A2.2,2.2 0 1 1 9.9,9 C9.2,9.5 8.9,9.8 8.9,10.6 " +
         "M9,13 h0.01");
 
+    // A bell (an alert's switch): a domed body on a flared rim, with the clapper beneath. Drawn filled
+    // for an alert that is on and outlined with a slash for one that is off, so the state is in the shape
+    // rather than in a color.
+    private const string BellBody =
+        "M9,2.5 C6.6,2.5 5,4.4 5,6.8 V9.8 L3.5,12.5 H14.5 L13,9.8 V6.8 C13,4.4 11.4,2.5 9,2.5 Z " +
+        "M7.4,14.3 A1.7,1.7 0 0 0 10.6,14.3";
+    public static readonly Geometry Bell = Geometry.Parse(BellBody);
+    public static readonly Geometry BellOff = Geometry.Parse(BellBody + " M3,2.5 L15,15.5");
+
     // Panel/sidebar-split glyph (stroked) used for the collapse/expand affordance, matching the design
     // document: a rounded panel outline with a thin divider carving off a narrow rail. The divider sits
     // on the side the bar will move toward, so the glyph reads directionally per dock edge and state.

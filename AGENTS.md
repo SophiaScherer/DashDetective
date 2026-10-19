@@ -783,7 +783,8 @@ reading, a GPU at 130 °C is a hot one.
 - **A setting that can be switched off encodes "off" in the value where that is unambiguous.** An alert
   threshold of `0` means "not watched", which keeps one control per row and one check in the watcher.
   Where the *number* has to survive being switched off, the switch is a separate persisted flag — that
-  is why the alert rows store both, so GPU can ship off with 90 already in the box.
+  is why each alert stores its flag and its threshold separately (the switch now lives on the resource's
+  bell), so GPU can ship off with 90 already in the box.
 - **`SettingId` and `SettingCatalog` are a bijection**, pinned by a test: a new id without an entry
   fails the build. The page's labels bind to the catalog rather than holding literals, so the copy on
   screen is by construction the copy universal search matches against.

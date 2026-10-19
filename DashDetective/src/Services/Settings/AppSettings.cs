@@ -90,9 +90,10 @@ public sealed record AppSettings {
     /// are only watched while this is on.</summary>
     public bool ResourceAlerts { get; init; }
 
-    /// <summary>Whether each resource is watched. Separate from the threshold beside it so a switched-off
-    /// row still remembers its number: GPU and disk activity ship off — sustained saturation of either is
-    /// what legitimate heavy work looks like — but with a sensible figure already in the box.</summary>
+    /// <summary>Whether each resource is watched — switched by the bell on the resource's own page. Stored
+    /// separately from the threshold so a switched-off resource still remembers its number: GPU and disk
+    /// activity ship off — sustained saturation of either is what legitimate heavy work looks like — but
+    /// with a sensible figure already in the box.</summary>
     public bool AlertCpuEnabled { get; init; } = true;
     public bool AlertMemoryEnabled { get; init; } = true;
     public bool AlertGpuEnabled { get; init; }
