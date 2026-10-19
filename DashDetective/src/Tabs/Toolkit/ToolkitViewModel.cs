@@ -180,9 +180,9 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     public event Action<string>? FileExplorerRevealRequested;
 
     /// <summary>
-    /// Activates a row. A row that names a place on disk opens in the app's own File Explorer — staying
-    /// in the app is the point of having the tab — and the shell is still one click away on the row's
-    /// other icon. Everything else runs.
+    /// Activates a row: its default action, which <see cref="ToolkitEntry.DefaultActionText"/> words. A
+    /// row that names a place on disk opens in the app's own File Explorer — staying in the app is the
+    /// point of having the tab — and the shell is the row's one secondary icon. Everything else runs.
     /// </summary>
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task Run(ToolkitEntry? entry) {
@@ -194,19 +194,12 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         return Execute(entry);
     }
 
-    /// <summary>Opens the row's folder in the app's own File Explorer. Nothing is logged: the Execution
-    /// Log is a transcript of what ran, and this navigates rather than running anything.</summary>
-    [RelayCommand]
-    private void OpenInApp(ToolkitEntry? entry) {
-        if (entry is not { CanOpenInApp: true })
-            return;
+    // Nothing is logged: the Execution Log is a transcript of what ran, and this navigates instead.
+    private void OpenInApp(ToolkitEntry entry) => FileExplorerRevealRequested?.Invoke(entry.ResolvedPath);
 
-        FileExplorerRevealRequested?.Invoke(entry.ResolvedPath);
-    }
-
-    /// <summary>Opens the row's location in Windows Explorer — the row's original behaviour, kept as its
-    /// own icon now that the click goes to the in-app explorer. Goes through the ordinary run path, so
-    /// the Execution Log still records it.</summary>
+    /// <summary>Opens the row's location in Windows Explorer — the secondary action on a location row,
+    /// whose default is the in-app explorer. Goes through the ordinary run path, so the Execution Log
+    /// still records it.</summary>
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task OpenExternally(ToolkitEntry? entry) => Execute(entry);
 

@@ -343,11 +343,14 @@
                                                     <!-- The run button covers everything but the row's
                                                          own affordances, which stay siblings: nesting a
                                                          button inside a button would make those clicks
-                                                         run the command too. -->
-                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                                         run the command too. Its tooltip leads with the
+                                                         default action, so what a click does is known
+                                                         before it is made. -->
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto"
                                                           ColumnSpacing="10" Margin="14,12">
                                                         <Button Grid.Column="0" Classes="bare rowRun"
-                                                                ToolTip.Tip="{Binding Description}"
+                                                                ToolTip.Tip="{Binding ActivationTip}"
+                                                                AutomationProperties.Name="{Binding AccessibleName}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).RunCommand}"
                                                                 CommandParameter="{Binding}">
                                                             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
@@ -437,13 +440,13 @@
                                                             </TextBox>
                                                         </Border>
 
-                                                        <!-- "Open where?" on the rows that name a
-                                                             location. Clicking the row body opens the
-                                                             in-app File Explorer, so this icon repeats
-                                                             that deliberately: the pair reads as a
-                                                             choice, and neither destination is the one
-                                                             you have to discover. Hidden on a shell:
-                                                             row, which has no path to navigate to. -->
+                                                        <!-- The secondary destination on a location row:
+                                                             the machine's own Explorer, while the row body
+                                                             opens the in-app File Explorer. Hidden on a
+                                                             shell: row, whose body already goes to
+                                                             Explorer — the icon would only repeat it. The
+                                                             box-with-an-escaping-arrow is the "leaves the
+                                                             app" idea ToolkitIcons.Link draws for a URL. -->
                                                         <!-- The slot is held open by the Panel, not the
                                                              button: a hidden button would collapse this
                                                              Auto column, the flexible column would take
@@ -452,42 +455,24 @@
                                                         <Panel Grid.Column="2" Width="28"
                                                                IsVisible="{Binding IsPathEntry}">
                                                             <Button Classes="rowAction"
-                                                                    ToolTip.Tip="Open in DashDetective's File Explorer"
+                                                                    ToolTip.Tip="Open in Windows Explorer"
                                                                     IsVisible="{Binding CanOpenInApp}"
-                                                                    Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenInAppCommand}"
+                                                                    Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenExternallyCommand}"
                                                                     CommandParameter="{Binding}">
                                                                 <Path Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}" Stretch="Uniform"
                                                                       Stroke="{DynamicResource TextTertiary}"
                                                                       StrokeThickness="1.3" StrokeJoin="Round"
-                                                                      Data="M1.5,2.5 H11.5 A0.5,0.5 0 0 1 12,3
-                                                                            V11 A0.5,0.5 0 0 1 11.5,11.5
-                                                                            H1.5 A0.5,0.5 0 0 1 1,11 V3
-                                                                            A0.5,0.5 0 0 1 1.5,2.5 Z
-                                                                            M1,5.5 H12"/>
+                                                                      Data="M7.5,1.5 H12 V6 M12,1.5 L6.5,7
+                                                                            M9.5,8 V11.5 A0.5,0.5 0 0 1 9,12
+                                                                            H2 A0.5,0.5 0 0 1 1.5,11.5 V4.5
+                                                                            A0.5,0.5 0 0 1 2,4 H5.5"/>
                                                             </Button>
                                                         </Panel>
-
-                                                        <!-- The machine's own Explorer. The box-with-an-
-                                                             escaping-arrow is the same "leaves the app"
-                                                             idea ToolkitIcons.Link draws for a URL. -->
-                                                        <Button Grid.Column="3" Classes="rowAction"
-                                                                ToolTip.Tip="Open in Windows Explorer"
-                                                                IsVisible="{Binding IsPathEntry}"
-                                                                Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).OpenExternallyCommand}"
-                                                                CommandParameter="{Binding}">
-                                                            <Path Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}" Stretch="Uniform"
-                                                                  Stroke="{DynamicResource TextTertiary}"
-                                                                  StrokeThickness="1.3" StrokeJoin="Round"
-                                                                  Data="M7.5,1.5 H12 V6 M12,1.5 L6.5,7
-                                                                        M9.5,8 V11.5 A0.5,0.5 0 0 1 9,12
-                                                                        H2 A0.5,0.5 0 0 1 1.5,11.5 V4.5
-                                                                        A0.5,0.5 0 0 1 2,4 H5.5"/>
-                                                        </Button>
 
                                                         <!-- Edit and delete, on the user's own rows only:
                                                              a catalog row has no Source to fill the form
                                                              from, and is not the user's to remove. -->
-                                                        <Button Grid.Column="4" Classes="rowAction"
+                                                        <Button Grid.Column="3" Classes="rowAction"
                                                                 ToolTip.Tip="Edit this command"
                                                                 IsVisible="{Binding IsCustom}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).EditCustomCommand}"
@@ -499,7 +484,7 @@
                                                                         L4,11.5 Z M7.5,3 L10,5.5"/>
                                                         </Button>
 
-                                                        <Button Grid.Column="5" Classes="rowAction"
+                                                        <Button Grid.Column="4" Classes="rowAction"
                                                                 ToolTip.Tip="Delete this command"
                                                                 IsVisible="{Binding IsCustom}"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).DeleteCustomCommand}"
@@ -516,7 +501,7 @@
                                                              a bound Fill, because a bool-to-brush step
                                                              would mean a value converter — which this
                                                              codebase does without everywhere else. -->
-                                                        <Button Grid.Column="6" Classes="rowAction"
+                                                        <Button Grid.Column="5" Classes="rowAction"
                                                                 AutomationProperties.Name="{Binding Command, StringFormat='Pin {0} to the top of the list'}"
                                                                 ToolTip.Tip="Pin to the top of the list"
                                                                 Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).TogglePinCommand}"
@@ -542,7 +527,7 @@
 
                                                         <!-- Copy affordance. Placed with the row it
                                                              belongs to. -->
-                                                        <Button Grid.Column="7" Classes="rowAction"
+                                                        <Button Grid.Column="6" Classes="rowAction"
                                                                 AutomationProperties.Name="{Binding Command, StringFormat='Copy the {0} command'}"
                                                                 ToolTip.Tip="Copy command"
                                                                 Click="OnCopyClick">
