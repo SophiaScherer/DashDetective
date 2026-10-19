@@ -313,6 +313,13 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
   itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
   showing, since they open directly beneath a pointer the expand button has already left there.
+- **Enter during the debounce.** The list on screen still answers the previous term until the debounce
+  fires, so Enter in the same burst as the typing must not open its highlighted row (it opened the top
+  recent). Enter with a pending term runs the query for the typed text at once and opens that run's top
+  result when it lands; a further keystroke, `Close`, `Clear` or a dismissal drops the pending open, and
+  a run with no results opens nothing. Enter on a settled list, and a click on a row, are unchanged.
+  Esc stops the debounce too, and Enter on a closed dropdown opens nothing; reopening the box (Ctrl+F
+  or a click) reruns a term Esc cut short rather than showing the older rows.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -1211,7 +1218,11 @@ Settings. Panels:
   `CancellationTokenSource`), console-style output with record type (`DnsLookupProvider`). The field is
   seeded with `example.com` but **nothing resolves until Look up is pressed**, and Refresh re-resolves
   only once a lookup has been run — a manual refresh must not become the first packet the panel ever
-  sent. It, too, used to fire from the constructor.
+  sent. It, too, used to fire from the constructor. **The latest submit wins:** each lookup takes a
+  generation number and publishes only while it is still current, because a single-label name can take
+  seconds to fail and used to land after, and overwrite, a newer lookup. Look up shows a `Resolving
+  <host>…` footer at once so a slow answer does not read as an ignored Enter; Refresh re-resolves
+  without it.
 - **Open in browser** — both probe panels' fields carry a small link icon that opens the typed host in
   the default browser (`HostLink` composes the URL, `IWebLinkOpener` launches it). **https only**, the
   rule `ToolkitRunner` already enforces on every URL the app opens: a router's admin page reached from
