@@ -727,7 +727,8 @@ Three places need to say more, and they are the ones a name has to disambiguate 
 - **The Dashboard's stat cards** all shared the tooltip "Open in Performance", so six cards announced the
   same thing. `DashboardCard.AccessibleName` leads with the heading and the reading instead.
 - **The Toolkit's row actions** repeated "Copy command" and "Pin to the top of the list" 31 times each.
-  They now name the command they act on.
+  They now name the command they act on, and the row body names its command and its default action
+  (`ToolkitEntry.AccessibleName`), since its tooltip leads with the action instead.
 - **The widget fold chevron** announced its glyph, "▾". It takes the panel's title.
 
 **The banners are live regions.** The resource alert is `Assertive` — it reports a condition the user did
@@ -1491,10 +1492,42 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
   four categories (`ToolkitCategory` — Folders / System Tools / Diagnostics / Docs & Links) and five
   entry kinds (`ToolkitEntryKind`, each with a badge label, colour and glyph) exist and are tested.
-- **Execution is live.** Clicking a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
+- **Execution is live.** Activating a row runs its `ToolkitAction` through `ToolkitRunner` and prepends a
   stanza to the Execution Log. A row that names a place on disk is the exception: it opens the in-app File
-  Explorer instead (`ToolkitViewModel.OpenInApp` → `FileExplorerRevealRequested` → the shell's existing
-  `RevealFile`), with Windows Explorer on the row's other icon.
+  Explorer instead (`ToolkitViewModel.Run` → `FileExplorerRevealRequested` → the shell's existing
+  `RevealFile`), with Windows Explorer on the row's one secondary icon.
+- **The activation model** (work item 35). Every row has **one default action**, and it is stated
+  before activation: the row body's tooltip reads *Double-click or press Enter:* followed by
+  `ToolkitEntry.DefaultActionText`, then the description on a second line. Per action kind: a folder
+  the app can open → *Open in DashDetective's File Explorer*; a folder it cannot (a `shell:` location)
+  → *Open in Windows Explorer* (*your file manager* off Windows); `Launch` → *Launch in its own
+  window*; `Capture` → *Run — output goes to the Execution Log*; `Elevated` → *Run as administrator*;
+  `OpenUrl` → *Open in your browser*. **Secondary actions are explicit icons**, each doing something
+  the body does not: Windows Explorer on a location row, edit/delete on the user's own, pin and copy on
+  every row. The in-app File Explorer icon was removed because it repeated the body, and the Explorer
+  icon is hidden on a `shell:` row for the same reason — its slot still holds, so the badges stay
+  aligned. **Nothing runs without a deliberate action on the row.** The body's screen-reader name is
+  `AccessibleName` (command, then default action), since the tooltip does not carry the command. The
+  secondary icon's own tooltip still says "Windows Explorer" on Linux; no platform wording helper
+  existed for it.
+- **A click selects; activating is deliberate** (work item 36). A single click on a row body only sets
+  `ToolkitViewModel.SelectedEntry` (the row takes the `selected` fill, as File Explorer and Processes
+  rows do). The row is activated three ways, all through the one `RunCommand`: a **double click**
+  (`ToolkitView.OnRowDoubleTapped` → `Activate`), **Enter** (the page's `ShortcutId.Activate` case),
+  and the **play button** on a row that starts a program (`ToolkitEntry.HasRunButton` — Launch,
+  Capture, Elevated; a folder or a link only navigates, so it gets none). Enter inside the
+  ping/tracert box still runs that row. What Enter may run is decided **at press time, from what holds
+  focus window-wide** (`ToolkitActivation.EnterTarget`, fed by the view's `FocusProbe`): a focused row
+  body runs that row, nothing focused runs the selection, and **focus anywhere else keeps the key** — a
+  pin, the toolbar's Refresh, a nav item. Tracking focus from the page's own events was tried first and
+  missed the shell's controls entirely, so Enter on a focused toolbar button ran the selected row. Two
+  more rules: **selection follows keyboard focus** (Tab onto a body selects it), and **a selection the
+  filter hides is dropped**. A universal-search result **selects and flashes** its row but never runs
+  it; the search hands over the entry itself, so a custom row sharing a catalog row's label is the one
+  selected, and a row no longer on the page clears the selection. The **play button swallows the second
+  press of a double click** (`ToolkitActivation.IsRepeatPress`), since a quick launch can finish before
+  the second click and would otherwise run twice. Play and the Explorer icon share the first slot of
+  the action cluster, held open on every row so badges line up even in My Commands, where kinds mix.
 - **The safety invariants.** The built-in table used to be an allow-list, and the Toolkit had no
   free-form entry at all. That changed when users gained the ability to author their own commands
   (`ToolkitCommand` + the "+ Add command" form). What was actually load-bearing is kept, and **these four
@@ -1514,12 +1547,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
      authored — which covers user URLs for free. `ToolkitCommandValidator` says the same thing earlier, in
      the form, where it is still fixable.
   4. **Nothing persisted ever runs on its own.** A stored command becomes a row; a row runs only when it is
-     clicked. The Execution Log's `$` line prints the resolved target and arguments, so a row whose label
-     disagrees with what it runs is visible the moment it fires.
+     deliberately activated — a double click, Enter on the selected or focused row, or its play button.
+     A single click and a search result only select it. The Execution Log's `$` line prints the
+     resolved target and arguments, so a row whose label disagrees with what it runs is visible the
+     moment it fires.
 
   Accepted, documented residual risk: `settings.json` can now put a mislabelled runnable row on the page if
   it is tampered with. That is not an escalation — anything able to write `%AppData%\DashDetective` can
-  already write `shell:startup` — and it cannot fire without a click.
+  already write `shell:startup` — and it cannot fire without a deliberate activation.
 - **Catalog:** four authored categories — Folders, System Tools, Diagnostics (parameterised ping/tracert
   and the elevated `sfc /scannow`) and Docs & Links — plus **My Commands** (`ToolkitCategory.Custom`),
   which holds what the user authored. Adding a *built-in* row means editing that platform's table and
@@ -1604,18 +1639,19 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   arguments — not the row's label, so a placeholder (`ping <host>`) and any flags the label omits
   (`tracert -h 20`) are both visible in the transcript.
 - **The page has no separate busy flag, on purpose.** Refusing concurrent runs makes the generated
-  command report `CanExecute` false while one is in flight, which disables every row's button by itself.
-  The stanza is written to the log *before* the command runs and replaced **in place** on completion
+  command report `CanExecute` false while one is in flight, which disables every play button by
+  itself; the row bodies stay enabled (selecting is harmless) and dim off `RunCommand.IsRunning`. The
+  stanza is written to the log *before* the command runs and replaced **in place** on completion
   (reference equality, so a log cleared mid-run drops the result rather than resurrecting it), and it
   keeps the time the command **started** — stamping it on completion would put a 90 s `systeminfo` a
-  minute and a half away from the click that caused it.
+  minute and a half away from the activation that caused it.
 - System Tools rows are launched by their **bare command** (`services.msc`, `ncpa.cpl`, `regedit`), not a
   resolved path: `%windir%` and `%windir%\System32` are both on PATH, so ShellExecute finds them exactly
   as typing them into Run does. `.msc` opens through `mmc.exe`; `.cpl` has no explicit default verb, so
   ShellExecute takes the first — `cplopen` → `control.exe` — which is why the launch must **not** set a
   Verb unless it is deliberately elevating.
 - The per-row **copy button is live**: it copies `ToolkitViewModel.CopyTextFor` — the same resolved
-  command line the log would record — so a paste into a terminal does what clicking the row does, and a
+  command line the log would record — so a paste into a terminal does what running the row does, and a
   documentation row yields its URL rather than its title. A refused or half-filled host box is left off
   altogether rather than pasted as a dangling argument. It lives in the view code-behind because the
   clipboard is reached through the window's `TopLevel`, as `SettingsView.OnCopyDiagnosticsClick` is;
@@ -1623,7 +1659,7 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   (the click needs an answer, and the log is for what *ran*).
 - Self-scrolling (`ISelfScrollingPage`) so the log panel stays pinned while the list scrolls; the
   comp's `position:sticky` has no Avalonia equivalent. Wired to `IShortcutTarget` (`ShortcutScope.Toolkit`,
-  `/` focuses the filter, `Esc` clears it) and to universal search via `ToolkitSearchProvider` — see the
+  `/` focuses the filter, `Esc` clears it, `Enter` activates the selection) and to universal search via `ToolkitSearchProvider` — see the
   reveal gotcha in the *Universal search* write-up in the Appendix. Not `IRefreshablePage` /
   `ILiveSamplingPage`: the page has nothing live to sample or re-read.
 - **Row hover carries no brush transition** — instant, like File Explorer's `fileRow` and Performance's

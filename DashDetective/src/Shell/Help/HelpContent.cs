@@ -37,7 +37,7 @@ public static class HelpContent {
         new("page.hardware", "Hardware",
             "A spec sheet of what is installed: processor, motherboard, memory, graphics and disks."),
         new("page.toolkit", "Toolkit",
-            "Common diagnostic commands, ready to run. Pin the ones you use often, or add your own."),
+            "Common diagnostic commands, ready to run. A click selects one; double-click it, press Enter or use its play button to run it. Pin the ones you use often, or add your own."),
         new("page.settings", "Settings",
             "Everything you can change: appearance, navigation, monitoring, resource alerts, keyboard shortcuts and export."),
         new("shell.search", "Search",
