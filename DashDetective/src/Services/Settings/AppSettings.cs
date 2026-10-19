@@ -40,6 +40,10 @@ public sealed record AppSettings {
     /// sortable and machine-parseable.</summary>
     public ClockFormat ClockFormat { get; init; } = ClockFormat.TwentyFourHour;
 
+    /// <summary>Whether the toolbar clock shows seconds, in either clock format. On by default: the
+    /// clock always did before this was a choice.</summary>
+    public bool ClockShowSeconds { get; init; } = true;
+
     /// <summary>How much larger to draw the whole interface, as a percentage. Text and chrome scale
     /// together, so this is one setting rather than a font size the views would each have to honour.</summary>
     public int UiScalePercent { get; init; } = 100;
