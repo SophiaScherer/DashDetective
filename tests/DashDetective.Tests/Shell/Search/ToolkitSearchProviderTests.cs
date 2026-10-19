@@ -28,7 +28,7 @@ public class ToolkitSearchProviderTests {
     ];
 
     private static Task<IReadOnlyList<SearchResult>> Query(
-        string term, IReadOnlyList<ToolkitEntry>? entries = null, Action<string>? reveal = null) =>
+        string term, IReadOnlyList<ToolkitEntry>? entries = null, Action<ToolkitEntry>? reveal = null) =>
         new ToolkitSearchProvider(() => entries ?? Sample, reveal ?? (_ => { }))
             .QueryAsync(new SearchQuery(term), CancellationToken.None);
 
@@ -53,13 +53,31 @@ public class ToolkitSearchProviderTests {
     }
 
     [Fact]
-    public async Task QueryAsync_ActivatingAResultAsksForThatCommand() {
-        string? revealed = null;
-        var results = await Query("ncpa", reveal: c => revealed = c);
+    public async Task QueryAsync_ActivatingAResultAsksForThatRow() {
+        ToolkitEntry? revealed = null;
+        var results = await Query("ncpa", reveal: e => revealed = e);
 
         results.OrderByDescending(r => r.Score).First().Activate();
 
-        Assert.Equal("ncpa.cpl", revealed);
+        Assert.Same(Sample.First(e => e.Command == "ncpa.cpl"), revealed);
+    }
+
+    /// <summary>A custom row and a catalog row can share a label; each result reveals its own row.</summary>
+    [Fact]
+    public async Task QueryAsync_TwoRowsSharingALabel_EachRevealsItsOwnRow() {
+        ToolkitEntry catalogRow = new("same-label", "Catalog", ToolkitCategory.SystemTools,
+                                      ToolkitEntryKind.App, ToolkitAction.Launch("a.exe"));
+        var customRow = ToolkitCommandFactory.ToEntry(
+            new ToolkitCommand("same-label", "Mine", ToolkitCommandType.Launch, "b.exe"));
+        var revealed = new List<ToolkitEntry>();
+
+        var results = await Query("same-label", [catalogRow, customRow], revealed.Add);
+        foreach (var result in results)
+            result.Activate();
+
+        Assert.Equal(2, revealed.Count);
+        Assert.Contains(revealed, e => ReferenceEquals(e, catalogRow));
+        Assert.Contains(revealed, e => ReferenceEquals(e, customRow));
     }
 
     [Fact]
