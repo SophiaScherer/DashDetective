@@ -935,7 +935,10 @@ stays in its tab folder.
                                  the strip and every id reads 0. IsSoftware flags ONLY simpledrm/vkms: unlike
                                  DXGI's flag, a paravirtualised GPU IS the VM's real display adapter and
                                  hiding it leaves the VM with no GPU card at all. Bundled vendor table +
-                                 driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex)
+                                 driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex. GttBytes
+                                 (amdgpu's mem_info_gtt_total, the shared pool) is NULL, not 0, when absent:
+                                 a driver that publishes no GTT is not a zero-sized pool, and it matches
+                                 GpuAdapter's nullable shared total)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
@@ -1057,15 +1060,17 @@ stays in its tab folder.
                                  SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
-                                 Performance rows each own one. A SECOND COUNTER on the same PDH query,
-                                 \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
-                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
-                                 still samples and usage stays null)
-        GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
-                                 token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
-                                 it joins the inventory key), and Join() onto the engine samples. A
-                                 memory-only LUID is dropped — the inventory keys GPUs off the engine
-                                 counter — and a missing reading stays null, never 0)
+                                 Performance rows each own one. TWO MORE COUNTERS on the same PDH query,
+                                 \GPU Adapter Memory(*)\Dedicated Usage and \Shared Usage, fill
+                                 GpuAdapterSample.DedicatedUsedBytes / SharedUsedBytes from the same collect;
+                                 if either fails to add, utilization still samples and that usage stays null)
+        GpuMemoryUsage.cs       (pure half of those counters, one parser for both: luid_..._phys_N
+                                 instances → bytes per LUID token (summed across phys, parsed with
+                                 GpuEngineInstance.TryParseLuid so it joins the inventory key), and Join()
+                                 of both maps onto the engine samples. These sums ARE Task Manager's
+                                 dedicated and shared figures — no other arithmetic. A memory-only LUID is
+                                 dropped — the inventory keys GPUs off the engine counter — and a missing
+                                 reading stays null, never 0)
         GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
                                  eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
                                  adapter carries several engines of a type (six Copy on an RTX 3060). The
@@ -1085,8 +1090,8 @@ stays in its tab folder.
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
                                  construction; only the utilization file and amdgpu's mem_info_vram_used
-                                 (dedicated VRAM in use; null for a driver that publishes none) are re-read
-                                 per tick)
+                                 and mem_info_gtt_used (dedicated VRAM and GTT/shared memory in use; null
+                                 for a driver that publishes none) are re-read per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
                                  publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
@@ -1126,7 +1131,9 @@ stays in its tab folder.
                                 (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
                                  flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
                                  DedicatedVideoMemory rides through DeviceInventory onto
-                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile)
+                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile, and
+                                 SharedSystemMemory onto DeviceInstance.SharedBytes → its shared memory tile;
+                                 that total is the one Task Manager's "Shared GPU memory" reads)
         IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
                                 (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
                                  ForCurrentPlatform shares ONE reader with the Storage page)
@@ -1991,7 +1998,8 @@ stays in its tab folder.
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
-                                GpuMemoryFormatter.cs   (VRAM in use tile: "used / total", Memory-caption
+                                GpuMemoryFormatter.cs   (VRAM in use and Shared memory in use tiles:
+                                                         "used / total", Memory-caption
                                                          style; MB under 1 GiB; "— / 12 GB" for an
                                                          unknown usage, a bare "—" for an unknown total)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE

@@ -683,19 +683,25 @@ public partial class PerformanceViewModel : ViewModelBase,
             // usage arrives per tick, so it is seeded total-only. Temp / Power are sampled per tick from the
             // vendor SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
             var vramTile = new StatTile("VRAM in use", GpuMemoryFormatter.Format(null, gpu.VramBytes));
+            // Shared memory follows the same convention, but an adapter with no shared pool gets no tile at
+            // all rather than a dash or a zero.
+            var sharedTile = gpu.SharedBytes is > 0
+                ? new StatTile("Shared memory in use", GpuMemoryFormatter.Format(null, gpu.SharedBytes))
+                : null;
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
+            StatTile[] tiles = sharedTile is null
+                ? [threeDTile, vramTile, tempTile, powerTile]
+                : [threeDTile, vramTile, sharedTile, tempTile, powerTile];
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
-                                      history.Points(100),
-                                      new[] {
-                                          threeDTile, vramTile, tempTile, powerTile,
-                                      }, Select) {
+                                      history.Points(100), tiles, Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
                 Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
-                VramTile = vramTile, VramBytes = gpu.VramBytes, TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
+                VramTile = vramTile, VramBytes = gpu.VramBytes, SharedTile = sharedTile, SharedBytes = gpu.SharedBytes,
+                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             if (previous is { Engines.Count: > 0 }) {
                 foreach (var engine in previous.Engines) {
@@ -868,6 +874,8 @@ public partial class PerformanceViewModel : ViewModelBase,
 
             // Before the utilization guard: an adapter with no utilization figure can still report memory.
             gpu.VramTile.Value = GpuMemoryFormatter.Format(sample.DedicatedUsedBytes, gpu.VramBytes);
+            if (gpu.SharedTile is { } sharedTile)
+                sharedTile.Value = GpuMemoryFormatter.Format(sample.SharedUsedBytes, gpu.SharedBytes);
 
             if (sample.Overall is not { } reading) {
                 // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
@@ -1176,6 +1184,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required StatTile VramTile { get; init; }
         /// <summary>The adapter's dedicated total from the inventory; null or 0 when unknown.</summary>
         public ulong? VramBytes { get; init; }
+        /// <summary>Null when the adapter has no shared pool, which is why it has no tile.</summary>
+        public StatTile? SharedTile { get; init; }
+        /// <summary>The adapter's shared total from the inventory; only read when <see cref="SharedTile"/>
+        /// exists, so it is known and above 0 there.</summary>
+        public ulong? SharedBytes { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }
         public GpuPciId? Pci { get; init; }
