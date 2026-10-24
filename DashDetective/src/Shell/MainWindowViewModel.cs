@@ -230,7 +230,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.HelpRequested += Help.Open;
         Nav.PropertyChanged += OnNavPropertyChanged;
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
-        _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
         _processes.PreferencesChanged += Persist;
         foreach (var order in SavedOrders)
@@ -353,7 +352,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // that command is on the page.
         _toolkit.LoadCommands(settings.CustomCommands);
         _toolkit.LoadPins(settings.PinnedCommands);
-        _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
@@ -451,7 +449,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AlertLowDiskFreePercent = _settings.LowDiskFreeAlert.Value,
         AlertSustainSeconds = _settings.AlertSustain.Value,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
-        PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),

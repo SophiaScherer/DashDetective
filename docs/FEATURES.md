@@ -320,6 +320,13 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   a run with no results opens nothing. Enter on a settled list, and a click on a row, are unchanged.
   Esc stops the debounce too, and Enter on a closed dropdown opens nothing; reopening the box (Ctrl+F
   or a click) reruns a term Esc cut short rather than showing the older rows.
+- **The dropdown's open state has one source of truth.** `Popup.IsOpen` is bound **TwoWay** because
+  Avalonia 12 binds it OneWay by default and the popup can close itself, which a OneWay binding never
+  reports: the view model stayed "open" and every later open was a no-op until a restart (work item 66).
+  Picking a recent triggered it — focus sat in the popup, was restored to the box during the close, and
+  the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
+  that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
+  from a focus handler without that guard.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -357,7 +364,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
     cannot scroll it away. The shortcut chain treats it as modal — every shortcut is swallowed and Esc
     cancels — **except Enter**, which falls through so a focused button still presses. Tab cycles inside
     the card; the wheel takes focus on open and the row's swatch gets it back on close. The body scrolls,
-    so the footer stays reachable at 200 % in a short window.
+    so the footer stays reachable at 200 % in a short window. **The card fits its window by the shared
+    `modalCard` style**, the same one Help uses (see *Help*).
   - **The strips are the real shared styles**, not imitations. `AccentPreviewScope` is a
     `ThemeVariantScope` that writes the draft into its own `Resources` through `AccentResources`, the same
     key list `ThemeService` writes to the application; the accent keys are top-level, so a subtree can
@@ -1184,8 +1192,9 @@ and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File
 Settings. Panels:
 - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
   (green connected / blue virtual / grey disconnected), status and link speed, via
-  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
-  height-capped and scrolls so many adapters don't push the page down.
+  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list
+  asks for a capped height (`MeasureCap`) and scrolls, so many adapters don't push the page down,
+  then fills the card the row gives it. A `MaxHeight` on the scroller would center it in the card with a gap above and below.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
@@ -1357,6 +1366,10 @@ behind it that must not be quietly undone:
   thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
   into the selection first, **on the tunneling press**, so it lands before the flyout opens.
   `ContextRequested` was tried for that and silently never fired.
+- **A plain click on the row that is the whole selection deselects it** (`ProcessRowClick`). It is
+  decided on the tunneling press (click count 1, no modifier, left button) and carried out by the row's
+  tap, since by the tap a double-click's first click has already changed the state; a drag cancels the
+  tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
@@ -1376,6 +1389,15 @@ behind it that must not be quietly undone:
   comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
+- **Alignment rule: text columns left, numeric columns right, each header aligned with its values; the
+  toolbar filter left and its actions right.** Numeric means a measure (CPU, Memory, Disk, GPU) or an
+  identifier (PID), so PID is right-aligned like the rest and its header leads with the sort arrow
+  (`ArrowFirst`) so the label sits flush with the digits. PID alone carries a small right inset (`PidInset`)
+  on header, cells and placeholder bar, because the column gap is 4px and STATUS, its default neighbor, is
+  left-aligned text. The header takes it through `SortableColumnHeader.ContentInset` (button padding), never
+  a Margin, so the whole cell stays clickable and the drag drop-targets keep their full bounds. PID's
+  minimum width is 59px, the most that leaves CPU (72 / 0.85) as the column that sets `MinTableWidth`; a
+  seven-digit PID can still clip at that floor. Keep any new column to the same rule.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
 `EnumListCodec`, and the promotion of `CheckBox.optionCheck` and `ToggleButton.optionsToggle` to
 `SharedStyles` (their File Explorer copies deleted — a local style silently outranks the shared one).
@@ -1392,10 +1414,12 @@ CPU %/Memory % come from the shared `SystemMetricsService`.
 drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
 Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
 (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
-strip (`StatTile` item VMs). The **rail scope** segments ("Primary" / "All devices", which collapse the
-multi-instance categories to one row each) head the rail itself: over the whole page they read as if they
-scoped the detail pane, which they never did. The **adapter row** shows both directions, "↓ receive" over
-"↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
+strip (`StatTile` item VMs). The rail **always lists every detected device**: a Primary / All devices
+toggle (and the persisted `PerformanceShowAllDevices` setting behind it) was removed because "All devices"
+is the only view worth having, and hiding a second disk or GPU behind a switch made the page look as if it
+were missing hardware. An old `settings.json` still carrying that key loads fine, since the store ignores
+members `AppSettings` no longer has (`SchemaVersion` stays 1). The **adapter row** shows both directions,
+"↓ receive" over "↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
 traffic. This is the one chart on which every grid line is labelled both ways, both axes are named, and the
 per-core / per-engine cells carry their two ends; see the charting grades in AGENTS.md. Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
 `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
@@ -1479,10 +1503,10 @@ outside `src/Tabs/Performance/` only to add `GpuPciId` to `GpuAdapterProvider` a
 
 **`Reveal(deviceId)` is the jump in**, the counterpart to the detail header's jumps out, and the Dashboard
 is its first caller. Rows carry the `DeviceInstance` id they were built from, so an id names one device
-rather than a kind. Two decisions inside it: a reveal **expands the rail to "All devices"** when the
-Primary scope hides the device — the caller asked for that one, not the primary of its kind — and one
-that arrives **before its row exists** is held until the async inventory load builds it, the arrangement
-the Network tab already uses for an early adapter reveal. That second one needed a fix to hold: the rail
+rather than a kind. Two decisions inside it. Every device is always in the rail, so a reveal never has
+anything to un-hide. And a reveal that arrives **before its row exists** is held until the async inventory
+load builds it, the arrangement the Network tab already uses for an early adapter reveal. That second one
+needed a fix to hold: the rail
 matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
 toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
@@ -1734,6 +1758,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   rank every tip below the tour. The shortcut table is deliberately **not** indexed here, since
   `ShortcutSearchProvider` already covers it and a binding listed twice under two tags only crowds the
   dropdown.
+- **The card fits its window.** Both modals share `Border.modalCard` (centered, a 24 margin on every side)
+  and set only a `MaxWidth` / `MaxHeight`: Help's are 660 and 640, with `HorizontalAlignment="Stretch"` so
+  it fills up to 660 in a roomy window. **Never a fixed `Width`.** Help's was 660, so below ~708 wide the
+  card overflowed the window, and with no margin a short window left it taller than itself: the end of the
+  body was cut off and unreachable, which read as the dialog being stuck after a resize. The body is the
+  `*` row, so it is what shrinks and scrolls while the header and tabs stay. The scrim is a stretched
+  `Border` in the shell's `Panel`, inside the `ScaleHost`, so nothing in the layer holds a size and the
+  card recenters on maximize, restore and edge drags. `ModalCardTests` pins the class and the missing Width.
 
 ## Storage
 
@@ -1818,7 +1850,7 @@ single to read and no Linux arm — it takes `Unsupported*` and the default.
 
 **A widget is a `WidgetPanel`, and a page's widgets are children of one `WidgetBoard`.** Nineteen
 widgets across seven tabs were hand-rolled `Border Classes="panel"` + `StackPanel` + `panelTitle`; that
-shape now exists once. Five rules, all load-bearing:
+shape now exists once. Six rules, all load-bearing:
 
 1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
    `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
@@ -1848,6 +1880,48 @@ shape now exists once. Five rules, all load-bearing:
    the pointer capture on *any* release, which stripped the capture a button took on its own press —
    every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
    screenshots all clean. Only a drag that actually took the capture may release it.
+6. **A reorderable panel arranges every child on whole device pixels** (work item 89). Avalonia's
+   arrange rounds a child's origin to the nearest pixel and its size *up*, separately, so a slot with
+   fractional edges could end one pixel past its panel — and the nearest clipping ancestor (a
+   `UserControl`, an `ItemsControl`, `WidgetPanel` itself, all of which clip to their bounds by
+   default) cut off the card's right border and the bottom of its top-right corner. It showed at 125 %
+   display scale and High contrast, on roughly two window widths in three. `ReorderablePanel.Placed`
+   now snaps both edges of every slot through `PixelSnap` with the framework's own layout scale, so its
+   rounding is a no-op, and both panels measure at the snapped width they will arrange at. Three
+   decisions: the edges round **half up**, not to even, so a span moved by whole pixels keeps its
+   length; a span that would snap under its child's `MinWidth` grows to it **away from the panel's
+   edge**, since the arrange would otherwise center the overflow across both sides, and that minimum is
+   counted in pixels **the framework's way** (truncated to 8 digits, then rounded up), or at a scale
+   such as 110 % its clamp adds back the pixel the snap left out; and the length is kept a hair
+   (1e-4 px) short, so the framework's round-up cannot add a pixel through a floating-point error,
+   which at 110 % it does for about one width in a hundred. The snap is in local units, so inside a
+   `ScaleHost` edges land on the layout grid rather than on device pixels; it still keeps every child
+   inside its panel, which is what the clip needs.
+
+**A widget held between two slots settles on one.** It used to flicker on every page with a board,
+worst on Network: the drop target was measured against the live slots, which include the preview, so
+moving the widget shifted the slots under a still pointer, which flipped the target back, which shifted
+them again. A narrow widget held over a wide one is over the wide one's slot in *both* orders, so there
+was no stable answer at all. `DropTarget` (`src/Shared/Layout`) fixes it in the drag model, not with a
+redraw delay, by two rules applied together:
+
+- **The target is measured against the slots frozen when the drag began**, which nothing during the
+  drag can move. The preview still re-packs live; only the question "which slot is this over" reads
+  the snapshot. It is retaken only when the slot count changes mid-drag — a child hidden, shown or
+  removed. A generator *adding* a child does not change it: the preview order never takes new ones in.
+- **Hysteresis: the target changes only once the dragged box's center is 0.2 of the smaller slot past
+  the boundary** (`DropTarget.Hysteresis`), on each axis. A fraction rather than a DIP margin, so it
+  scales with the interface size. Any fraction under 1 leaves every slot reachable; a fifth swallows a
+  hand's jitter while a swap still lands near the boundary the user sees. Straight down into the next
+  row still works — it just has to be a fifth of a row into it.
+
+**A known trade-off.** With unequal widths, the frozen slots no longer match the preview after the first
+swap, so the drop hint can sit away from the dragged box: a narrow widget swapped past a wide one is drawn
+over the wide one's new place while the hint marks its own. Rule 7's "where it already looks like it will
+land" holds at drag start. Equal-width slots are unaffected, since their geometry does not change.
+
+The keyboard path never asks a drop target anything: `TryMoveFocused` moves by one index, so it is
+unchanged.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
@@ -1914,7 +1988,8 @@ load-bearing:
 7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
-   landed one slot short — in two columns, the slot up and to the right.
+   landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
+   from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.

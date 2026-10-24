@@ -42,6 +42,11 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     // Esc cut a pending query short, so the rows still held answer an older term; reopening reruns it.
     private bool _needsQuery;
 
+    // True while IsOpen is being written false. The popup hands focus back to the box inside that write,
+    // and the box's GotFocus must not re-open a dropdown that is mid-close (the popup ignores it and the
+    // two desync).
+    private bool _closingDropdown;
+
     /// <summary>The current results, best first. Grouping is a view concern; the order here is the
     /// order the keyboard walks them in.</summary>
     public ObservableCollection<SearchResult> Results { get; } = new();
@@ -213,7 +218,10 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     /// <summary>The box took focus by some other route — the user clicked into it. Opens the same
     /// dropdown without asking for focus it already has. Without this the recents would only ever
     /// appear via the shortcut, which is not how anyone reaches a search box with a mouse.</summary>
-    public void NotifyFocused() => OpenDropdown();
+    public void NotifyFocused() {
+        if (!_closingDropdown)
+            OpenDropdown();
+    }
 
     // An empty box offers the recents; one that still holds a term brings its results back.
     private void OpenDropdown() {
@@ -245,7 +253,20 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         }
 
         ShowResults(rows);
-        IsOpen = rows.Count > 0;
+        if (rows.Count > 0)
+            IsOpen = true;
+        else
+            CloseDropdown();
+    }
+
+    // The only place IsOpen goes false, so the re-entrancy guard covers every close.
+    private void CloseDropdown() {
+        _closingDropdown = true;
+        try {
+            IsOpen = false;
+        } finally {
+            _closingDropdown = false;
+        }
     }
 
     // Finds the entry again by identity and opens it, or forgets it when the search no longer turns it
@@ -338,7 +359,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         CancelRunning();
         _needsQuery |= IsSearching;
         IsSearching = false;
-        IsOpen = false;
+        CloseDropdown();
     }
 
     /// <summary>
