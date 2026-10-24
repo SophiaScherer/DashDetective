@@ -450,6 +450,80 @@ public class UniversalSearchViewModelTests {
         Assert.Equal("Network", Assert.Single(vm.Results).Title);
     }
 
+    // The popup hands focus back to the box while it closes, and the box's GotFocus calls
+    // NotifyFocused inside the IsOpen write. This reproduces that re-entrant call.
+    private static void RestoreFocusWhenClosing(UniversalSearchViewModel vm) =>
+        vm.PropertyChanged += (_, e) => {
+            if (e.PropertyName == nameof(UniversalSearchViewModel.IsOpen) && !vm.IsOpen)
+                vm.NotifyFocused();
+        };
+
+    /// <summary>Work item 66: focus restored to the box during the close must not re-open the dropdown,
+    /// or the view model says open while the popup is shut.</summary>
+    [Fact]
+    public void Close_FocusRestoredDuringTheClose_DoesNotReopenTheDropdown() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, _, _) = BuildWithRecents(recents);
+        vm.Focus();
+        RestoreFocusWhenClosing(vm);
+
+        vm.Close();
+
+        Assert.False(vm.IsOpen);
+    }
+
+    /// <summary>Work item 66: a remembered term picked from the dropdown, then a new term typed, must
+    /// open the dropdown and deliver results again.</summary>
+    [Fact]
+    public async Task Text_NewTermAfterPickingARecent_OpensTheDropdownWithResults() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, timer, _) = BuildWithRecents(recents, null, "Storage");
+        vm.Focus();
+        RestoreFocusWhenClosing(vm);
+
+        vm.Activate(Assert.Single(vm.Results));
+        Assert.False(vm.IsOpen);
+
+        vm.Focus();
+        await SearchAsync(vm, timer, "sto");
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Storage", Assert.Single(vm.Results).Title);
+    }
+
+    /// <summary>The popup closing itself reaches the view model through the two-way binding as a plain
+    /// write of false; the next term must still be able to open the dropdown.</summary>
+    [Fact]
+    public async Task IsOpen_SelfClosedByThePopup_ReopensForTheNextTerm() {
+        var (vm, timer, _) = Build(null, "Storage");
+        await SearchAsync(vm, timer, "sto");
+        Assert.True(vm.IsOpen);
+
+        vm.IsOpen = false;
+        Assert.False(vm.IsOpen);
+
+        await SearchAsync(vm, timer, "stor");
+
+        Assert.True(vm.IsOpen);
+        Assert.Equal("Storage", Assert.Single(vm.Results).Title);
+    }
+
+    /// <summary>Only a close in progress ignores the focus; a later click into the box still opens.</summary>
+    [Fact]
+    public void NotifyFocused_AfterTheCloseHasFinished_OpensAgain() {
+        var recents = new RecentSearches();
+        recents.Remember(new SearchResult(SearchCategory.Page, "Network", "Adapters", 500, () => { }));
+        var (vm, _, _) = BuildWithRecents(recents);
+        vm.Focus();
+        vm.Close();
+
+        vm.NotifyFocused();
+
+        Assert.True(vm.IsOpen);
+    }
+
     [Fact]
     public async Task Recents_ForgetAnEntryTheSearchNoLongerTurnsUp() {
         // A file deleted, or a process exited, since it was last opened.
