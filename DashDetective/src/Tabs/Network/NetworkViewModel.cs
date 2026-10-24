@@ -239,6 +239,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// for rather than reaching out to a host they never requested.</summary>
     private bool _dnsResolved;
 
+    /// <summary>Bumped by every lookup; a result lands only while its number is still the latest.</summary>
+    private int _dnsGeneration;
+
     /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner; left null
     /// in a test, where there is nothing to draw on.</summary>
     internal Action<string>? Notify { get; set; }
@@ -531,21 +534,39 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
     private async Task LoadDnsAsync() {
         _dnsResolved = true;
+        var generation = ++_dnsGeneration;
+        var host = DnsHost.Trim();
         try {
-            var result = await _providers.Dns.GetAsync(DnsHost);
+            var result = await _providers.Dns.GetAsync(host);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
+            if (generation != _dnsGeneration)
+                return;
+
             DnsConsole = result.Console;
             DnsFooter = result.Footer;
         } catch {
-            DnsConsole = $"Name:    {DnsHost}";
-            DnsFooter = $"Could not resolve {DnsHost}";
+            if (generation != _dnsGeneration)
+                return;
+
+            DnsConsole = $"Name:    {host}";
+            DnsFooter = $"Could not resolve {host}";
         }
     }
 
     /// <summary>Runs the DNS lookup for the host currently in the field (Enter / the Look up button). The
-    /// only thing that ever resolves a name: the panel stays idle until the user asks.</summary>
+    /// only thing that ever resolves a name: the panel stays idle until the user asks. Shows a pending
+    /// line at once, since a slow lookup would otherwise leave Enter looking ignored; Refresh re-resolves
+    /// without it so the panel does not flicker.</summary>
     [RelayCommand]
-    private void LookupDns() => _ = LoadDnsAsync();
+    private void LookupDns() {
+        var host = DnsHost.Trim();
+        if (host.Length > 0) {
+            DnsConsole = $"Name:    {host}";
+            DnsFooter = $"Resolving {host}…";
+        }
+
+        _ = LoadDnsAsync();
+    }
 
     // ----- Opening a target in the browser -----
     // Each panel's field carries a link icon, disabled rather than hidden while the field holds nothing
