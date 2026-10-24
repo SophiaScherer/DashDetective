@@ -24,6 +24,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Help](#help)
 - [Storage](#storage)
+- [Hardware](#hardware)
 - [Page lifecycle](#page-lifecycle)
 - [Wheel scrolling](#wheel-scrolling)
 - [Widget system](#widget-system)
@@ -1785,6 +1786,25 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   `ILiveSamplingPage` / `IActivatablePage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
   (needs admin or vendor SDKs). No new packages, no new shared controls. (**GPU** temperature is no longer
   deferred — it is live on the Performance tab via per-vendor SDKs; see the write-up in the Appendix.)
+
+## Hardware
+
+*Shipped — branch `hardwareCardHeights`, 2026-10.*
+
+**Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
+already arranges every child at its row's height (the tallest card's). The cards used to opt out with
+`VerticalAlignment="Top"`, so each drew at its own content height and a row's bottoms never lined up
+(Processor beside Graphics, Storage Devices beside Memory). Two decisions inside it:
+
+- **Alignment is the panel's job, not a height ladder.** A fixed height per card would clip the moment
+  Text size grows — the `TextSize*` ladder is rewritten at runtime and a Dimensions token is not — while
+  the row height tracks the tallest card's content at any text or interface size, and is the same arrange
+  pass the drag preview uses. Do not put a `Height` on the card or restore `Top` alignment;
+  `HardwareCardHeightTests` pins both.
+- **The one token is a floor.** `HardwareCardMinHeight` (Dimensions.axaml) keeps a short card alone on its
+  row (Sensors, or Storage Devices once the grid wraps) from looking stubby. It is a `MinHeight`, so a card
+  still grows past it with its rows and with text size, and content stays top-aligned inside the stretched
+  surface, the spare space falling at the bottom.
 
 ## Page lifecycle
 
