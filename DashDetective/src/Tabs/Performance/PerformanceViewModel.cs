@@ -204,8 +204,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // number. This is the multi-instance category the Primary/All toggle expands or collapses.
     private readonly List<DiskResource> _disks = new();
     private readonly Dictionary<int, DiskResource> _disksByNumber = new();
-    private readonly IPhysicalDiskThroughputSampler _throughputSampler =
-        IPhysicalDiskThroughputSampler.ForCurrentPlatform();
+    private readonly IPhysicalDiskThroughputSampler _throughputSampler;
     private readonly DispatcherTimer _throughputTimer;
 
     // ---- GPUs (live, one row per physical adapter) ----
@@ -249,10 +248,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// the rows' no-reading path. The public ctor resolves both, so the shell builds this exactly as before.
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
-    /// and the inventory load disposes one of its own.</summary>
+    /// and the inventory load disposes one of its own.
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
-        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null) {
+        Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
+        IPhysicalDiskThroughputSampler? throughputSampler = null) {
+        _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
         // unshared instance simply never hears an accent change.
         _theme = theme ?? new ThemeService();
@@ -656,10 +658,14 @@ public partial class PerformanceViewModel : ViewModelBase,
         // GPUs missing — which is neither the old state nor the new one.
         var rebuilt = new List<DiskResource>(disks.Count);
         foreach (var disk in disks) {
-            var history = new MetricHistory(WindowSeconds);
+            // A refresh re-enumerates the same disks; the one still present keeps its accumulated trace.
+            var number = disk.DiskNumber ?? -1;
+            var history = _disksByNumber.TryGetValue(number, out var previous)
+                ? previous.History
+                : new MetricHistory(WindowSeconds);
             var activeTile = new StatTile("Active", "0 %");
-            var readTile = new StatTile("Read", "0 MB/s");
-            var writeTile = new StatTile("Write", "0 MB/s");
+            var readTile = new StatTile("Read", ByteRateFormatter.Format(0));
+            var writeTile = new StatTile("Write", ByteRateFormatter.Format(0));
             var responseTile = new StatTile("Response", "0 ms");
             var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
                                       history.Points(100),
@@ -668,7 +674,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                 StatOrder = StatOrderFor(ChartSeries.Storage),
             };
             var resource = new DiskResource {
-                DiskNumber = disk.DiskNumber ?? -1, Row = row, History = history,
+                DiskNumber = number, Row = row, History = history,
                 ActiveTile = activeTile, ReadTile = readTile, WriteTile = writeTile, ResponseTile = responseTile,
             };
             rebuilt.Add(resource);
@@ -694,29 +700,40 @@ public partial class PerformanceViewModel : ViewModelBase,
         // Built into a local before the rail is touched — see BuildDiskRows.
         var rebuilt = new List<GpuResource>(gpus.Count);
         foreach (var gpu in gpus) {
-            var history = new MetricHistory(WindowSeconds);
+            // A refresh re-enumerates the same adapters; the one still present keeps its overall history
+            // and its per-engine charts, so neither restarts from empty.
+            var luid = gpu.GpuLuid ?? gpu.Id;
+            _gpusByLuid.TryGetValue(luid, out var previous);
+            var history = previous?.History ?? new MetricHistory(WindowSeconds);
             // Seeded with the placeholder rather than "0": the UpdateGpuAdapters call at the end of this
             // method fills in every adapter that can report, and one that cannot must not sit at a
             // confident zero — the same rule the Dashboard's cards follow.
             var threeDTile = new StatTile("3D", Placeholders.NoReading);
-            // VRAM is static per adapter (DXGI's dedicated video memory, carried on the inventory instance),
-            // so it's set once here rather than sampled. Temp / Power are sampled per tick from the vendor
-            // SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            // VRAM in use reads "used / total": the total is static (the inventory's dedicated memory), the
+            // usage arrives per tick, so it is seeded total-only. Temp / Power are sampled per tick from the
+            // vendor SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
+            var vramTile = new StatTile("VRAM in use", GpuMemoryFormatter.Format(null, gpu.VramBytes));
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
                                       history.Points(100),
                                       new[] {
-                                          threeDTile, new StatTile("VRAM", FormatVram(gpu.VramBytes)),
-                                          tempTile, powerTile,
+                                          threeDTile, vramTile, tempTile, powerTile,
                                       }, Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu),
             };
             var resource = new GpuResource {
-                Luid = gpu.GpuLuid ?? gpu.Id, Row = row, History = history, ThreeDTile = threeDTile,
-                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
+                Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
+                VramTile = vramTile, VramBytes = gpu.VramBytes, TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
+            if (previous is { Engines.Count: > 0 }) {
+                foreach (var engine in previous.Engines) {
+                    resource.Engines.Add(engine);
+                    resource.EnginesByBase[engine.Key] = engine;
+                }
+                PublishGpuEngines(resource);
+            }
             rebuilt.Add(resource);
         }
 
@@ -747,12 +764,6 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     private ResourceLink HardwareLink() =>
         new("View in Hardware", () => HardwareRevealRequested?.Invoke());
-
-    /// <summary>Formats an adapter's dedicated VRAM for its stat tile, or "—" when DXGI reports none (a
-    /// shared-memory adapter, or a failed read). Reuses the shared byte humanizer, so a small integrated
-    /// GPU reads "128 MB" rather than "0.1 GB".</summary>
-    private static string FormatVram(ulong? bytes) =>
-        bytes is > 0 ? FileSizeFormatter.Format((long)bytes.Value) : "—";
 
     /// <summary>Follows the Settings refresh interval: retimes the page-local samplers so their charts stay
     /// in step with the shared feeds', and restates the window every caption claims.</summary>
@@ -885,6 +896,9 @@ public partial class PerformanceViewModel : ViewModelBase,
             if (!_gpusByLuid.TryGetValue(luid, out var gpu))
                 continue;
 
+            // Before the utilization guard: an adapter with no utilization figure can still report memory.
+            gpu.VramTile.Value = GpuMemoryFormatter.Format(sample.DedicatedUsedBytes, gpu.VramBytes);
+
             if (sample.Overall is not { } reading) {
                 // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
                 // nothing rather than as a broken tab.
@@ -902,27 +916,24 @@ public partial class PerformanceViewModel : ViewModelBase,
             gpu.Row.Unit = "%";
             gpu.Row.Points = gpu.History.Points(100);
             gpu.Row.ChartStatus = ChartStatus.For(gpu.History);
-            gpu.ThreeDTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
+            var threeD = Math.Round(Math.Clamp(ThreeDReading(sample, overall), 0, 100));
+            gpu.ThreeDTile.Value = $"{threeD.ToString(CultureInfo.InvariantCulture)} %";
             UpdateGpuEngines(gpu, sample.Engines);
         }
     }
 
     /// <summary>
-    /// Rebuilds one GPU's per-engine mini charts from its raw engtype map. Drivers expose different,
+    /// Rebuilds one GPU's per-engine mini charts from its engtype map (each type's busiest engine). Drivers expose different,
     /// variably-cased engine sets (e.g. "3d", "compute 0", "videodecode", "high priority 3d"), so the charts
-    /// are discovered dynamically rather than hardcoded: raw engtype instances are aggregated by base engine
-    /// (dropping a trailing instance index, so "compute 0" + "compute 1" fold into "Compute"), and a chart is
-    /// added the first time each engine reports. Sampled every tick so the Detailed view is warm when opened.
+    /// are discovered dynamically rather than hardcoded: raw engtype instances are folded by base engine
+    /// (see <see cref="FoldEngines"/>), and a chart is added the first time each engine reports. Sampled every
+    /// tick so the Detailed view is warm when opened.
     /// </summary>
     private static void UpdateGpuEngines(GpuResource gpu, IReadOnlyDictionary<string, double> rawEngines) {
         if (rawEngines.Count == 0)
             return;
 
-        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
-        foreach (var (token, value) in rawEngines) {
-            var key = NormalizeEngine(token);
-            byEngine[key] = byEngine.GetValueOrDefault(key) + value;
-        }
+        var byEngine = FoldEngines(rawEngines);
 
         if (AddNewEngines(gpu, byEngine.Keys))
             PublishGpuEngines(gpu);
@@ -932,6 +943,26 @@ public partial class PerformanceViewModel : ViewModelBase,
             engine.History.Push(Math.Clamp(value, 0, 100));
             engine.Chart.Points = engine.History.Points(100);
         }
+    }
+
+    /// <summary>The "3D" tile's figure: the adapter's 3D engine, as Task Manager's 3D graph reads it, falling
+    /// back to the overall figure where a platform publishes no per-engine map.</summary>
+    internal static double ThreeDReading(GpuAdapterSample sample, double overall) {
+        foreach (var (type, value) in sample.Engines)
+            if (string.Equals(type, "3D", StringComparison.OrdinalIgnoreCase))
+                return value;
+        return sample.Engines.Count == 0 ? overall : 0;
+    }
+
+    /// <summary>Folds engine types that differ only by a trailing index ("compute 0", "compute 1") into one base
+    /// engine. The fold keeps the busiest, never a sum: each is a separate engine, as in Task Manager.</summary>
+    internal static Dictionary<string, double> FoldEngines(IReadOnlyDictionary<string, double> rawEngines) {
+        var byEngine = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var (token, value) in rawEngines) {
+            var key = NormalizeEngine(token);
+            byEngine[key] = Math.Max(byEngine.GetValueOrDefault(key), value);
+        }
+        return byEngine;
     }
 
     /// <summary>Adds a mini chart for any base engine this GPU hasn't shown before; returns whether the set
@@ -1024,21 +1055,11 @@ public partial class PerformanceViewModel : ViewModelBase,
             disk.Row.Points = disk.History.Points(100);
             disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
-            disk.ReadTile.Value = FormatRate(sample.ReadBytesPerSec);
-            disk.WriteTile.Value = FormatRate(sample.WriteBytesPerSec);
+            disk.ReadTile.Value = ByteRateFormatter.Format(sample.ReadBytesPerSec);
+            disk.WriteTile.Value = ByteRateFormatter.Format(sample.WriteBytesPerSec);
             // Avg. Disk sec/Transfer is in seconds; show it in milliseconds like Task Manager's "Response".
             disk.ResponseTile.Value = $"{(sample.ResponseSeconds * 1000).ToString("0.0", CultureInfo.InvariantCulture)} ms";
         }
-    }
-
-    /// <summary>Formats a byte/second throughput as "N MB/s" (binary MiB), whole at ≥ 10 and one
-    /// decimal below so small transfers stay legible.</summary>
-    private static string FormatRate(double bytesPerSec) {
-        var mib = bytesPerSec / (1L << 20);
-        var value = mib >= 10
-            ? Math.Round(mib).ToString(CultureInfo.InvariantCulture)
-            : mib.ToString("F1", CultureInfo.InvariantCulture);
-        return $"{value} MB/s";
     }
 
     /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
@@ -1182,6 +1203,9 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required ResourceRow Row { get; init; }
         public required MetricHistory History { get; init; }
         public required StatTile ThreeDTile { get; init; }
+        public required StatTile VramTile { get; init; }
+        /// <summary>The adapter's dedicated total from the inventory; null or 0 when unknown.</summary>
+        public ulong? VramBytes { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }
         public GpuPciId? Pci { get; init; }

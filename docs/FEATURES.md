@@ -313,6 +313,13 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
   itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
   showing, since they open directly beneath a pointer the expand button has already left there.
+- **The dropdown's open state has one source of truth.** `Popup.IsOpen` is bound **TwoWay** because
+  Avalonia 12 binds it OneWay by default and the popup can close itself, which a OneWay binding never
+  reports: the view model stayed "open" and every later open was a no-op until a restart (work item 66).
+  Picking a recent triggered it — focus sat in the popup, was restored to the box during the close, and
+  the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
+  that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
+  from a focus handler without that guard.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -350,7 +357,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
     cannot scroll it away. The shortcut chain treats it as modal — every shortcut is swallowed and Esc
     cancels — **except Enter**, which falls through so a focused button still presses. Tab cycles inside
     the card; the wheel takes focus on open and the row's swatch gets it back on close. The body scrolls,
-    so the footer stays reachable at 200 % in a short window.
+    so the footer stays reachable at 200 % in a short window. **The card fits its window by the shared
+    `modalCard` style**, the same one Help uses (see *Help*).
   - **The strips are the real shared styles**, not imitations. `AccentPreviewScope` is a
     `ThemeVariantScope` that writes the draft into its own `Resources` through `AccentResources`, the same
     key list `ThemeService` writes to the application; the accent keys are top-level, so a subtree can
@@ -1177,8 +1185,9 @@ and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File
 Settings. Panels:
 - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
   (green connected / blue virtual / grey disconnected), status and link speed, via
-  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
-  height-capped and scrolls so many adapters don't push the page down.
+  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list
+  asks for a capped height (`MeasureCap`) and scrolls, so many adapters don't push the page down,
+  then fills the card the row gives it. A `MaxHeight` on the scroller would center it in the card with a gap above and below.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
@@ -1247,8 +1256,7 @@ process under its parent only when the parent is in the snapshot **and shares th
 so Edge's ~27 `msedge.exe` helpers fold into one Edge row while unrelated apps aren't swallowed under
 `explorer.exe`. Data is **in-box, no new dependencies, no admin**: `System.Diagnostics.Process`
 (CPU % via `TotalProcessorTime` diff, memory, threads, status, exe path), a feature-local
-`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` grouped by the `pid_` token for
-GPU %, and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
+`GetProcessIoCounters` P/Invoke for Disk MB/s, PDH `\GPU Engine(*)` for GPU % (see the note below), and `ProcessClassifier`'s kernel32/user32/dwmapi P/Invoke for the two things managed
 enumeration can't report: **parent PIDs** (a Toolhelp32 snapshot) and the **category** — the classic
 "alt-tab window" test via `EnumWindows` marks an **App** (UWP frames re-attributed from
 `ApplicationFrameHost.exe` to the hosted process), Session 0 isolation via `ProcessIdToSessionId`
@@ -1274,6 +1282,10 @@ address space too, but it is the corpse of a user process and its cgroup still p
 `ProcessCategory.Windows` means "Windows process" on one platform and "system process" on the other; the
 enum member keeps its name because only the display strings differ. **Permanent gap:** per-process GPU has
 no rootless Linux source, so that column is always 0 — not a TODO.
+**The GPU column follows Task Manager's per-engine rule**, the same `GpuEngineLoad` the adapter totals use
+(see *Multi-GPU*): a process's figure is its busiest physical engine across every adapter, its instances on
+one engine summed. It used to sum by (PID, engine type) with no adapter, so a process on both GPUs, or on
+several Copy engines, read their total.
 **The per-process Network ("NET") column was REMOVED BY DESIGN** (2026-07, branch
 `processesRemoveNET`) — there is no in-box, non-admin per-process network-rate API on Windows (Task
 Manager uses ETW kernel providers, needing the `TraceEvent` package + admin), so rather than ship a
@@ -1343,6 +1355,10 @@ behind it that must not be quietly undone:
   thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
   into the selection first, **on the tunneling press**, so it lands before the flyout opens.
   `ContextRequested` was tried for that and silently never fired.
+- **A plain click on the row that is the whole selection deselects it** (`ProcessRowClick`). It is
+  decided on the tunneling press (click count 1, no modifier, left button) and carried out by the row's
+  tap, since by the tap a double-click's first click has already changed the state; a drag cancels the
+  tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
@@ -1423,15 +1439,15 @@ smaller number — 0.5 GB where Cached was 15 GB.) Deliberately a **page-local**
 the sampler is `WindowsMemoryUsageSampler` behind `IMemoryUsageSampler` — M6. The rationale above still
 holds; only the names and the folder changed.) Unlike the Speed tile it is read inside `UpdateMemory` on the shared memory tick,
 so it re-times with the Settings refresh interval, pauses with the Live pill, updates on Refresh, and
-blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM** tile is live too, and it is
-the one tile that is **not** sampled: DXGI's dedicated video memory is static per adapter, so
-`GpuAdapterProvider`'s `DedicatedVideoMemory` (already read for the multi-GPU work, previously discarded)
-is now carried on `DeviceInstance.VramBytes` and set once in `BuildGpuRows` when the row is built —
-re-read only when Refresh re-runs the inventory. It is formatted by **reusing** `FileSizeFormatter`
-(File Explorer's binary byte humanizer, already called cross-tab by Storage), so a 12 GB discrete card
-and a 512 MB integrated adapter each read naturally instead of forcing a fixed GB unit; zero/absent
-yields "—". `DeviceInstance` gained a trailing optional `ulong? VramBytes` and `DeviceInventory.Compose`
-passes it through (both under explicit sign-off; `GpuAdapterProvider` itself was untouched).
+blanks to "—" alongside its neighbours if that feed faults. The GPU **VRAM in use** tile reads
+**"used / total"**, the same convention as the Memory rail caption ("19.5 / 32 GB": used to one decimal,
+total whole from 10 GB up and to one decimal below, so a small total never reads under its usage), so the label states which quantity it shows and both numbers appear. The total is static
+(DXGI's dedicated video memory, carried on `DeviceInstance.VramBytes` from the inventory); the usage is
+sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
+Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both
+("0 / 460 MB"); an unknown usage reads "— / 12 GB", never a fake 0; an unknown total is a bare "—"
+(`GpuMemoryFormatter`). **The separate dedicated-vs-shared GPU memory work (the next sprint's item) builds
+on this convention: each tile is "usage / total" under a label naming the pool.**
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
@@ -1720,6 +1736,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   rank every tip below the tour. The shortcut table is deliberately **not** indexed here, since
   `ShortcutSearchProvider` already covers it and a binding listed twice under two tags only crowds the
   dropdown.
+- **The card fits its window.** Both modals share `Border.modalCard` (centered, a 24 margin on every side)
+  and set only a `MaxWidth` / `MaxHeight`: Help's are 660 and 640, with `HorizontalAlignment="Stretch"` so
+  it fills up to 660 in a roomy window. **Never a fixed `Width`.** Help's was 660, so below ~708 wide the
+  card overflowed the window, and with no margin a short window left it taller than itself: the end of the
+  body was cut off and unreachable, which read as the dialog being stuck after a resize. The body is the
+  `*` row, so it is what shrinks and scrolls while the header and tabs stay. The scrim is a stretched
+  `Border` in the shell's `Panel`, inside the `ScaleHost`, so nothing in the layer holds a size and the
+  card recenters on maximize, restore and edge drags. `ModalCardTests` pins the class and the missing Width.
 
 ## Storage
 
@@ -1852,6 +1876,31 @@ shape now exists once. Six rules, all load-bearing:
    `ScaleHost` edges land on the layout grid rather than on device pixels; it still keeps every child
    inside its panel, which is what the clip needs.
 
+**A widget held between two slots settles on one.** It used to flicker on every page with a board,
+worst on Network: the drop target was measured against the live slots, which include the preview, so
+moving the widget shifted the slots under a still pointer, which flipped the target back, which shifted
+them again. A narrow widget held over a wide one is over the wide one's slot in *both* orders, so there
+was no stable answer at all. `DropTarget` (`src/Shared/Layout`) fixes it in the drag model, not with a
+redraw delay, by two rules applied together:
+
+- **The target is measured against the slots frozen when the drag began**, which nothing during the
+  drag can move. The preview still re-packs live; only the question "which slot is this over" reads
+  the snapshot. It is retaken only when the slot count changes mid-drag — a child hidden, shown or
+  removed. A generator *adding* a child does not change it: the preview order never takes new ones in.
+- **Hysteresis: the target changes only once the dragged box's center is 0.2 of the smaller slot past
+  the boundary** (`DropTarget.Hysteresis`), on each axis. A fraction rather than a DIP margin, so it
+  scales with the interface size. Any fraction under 1 leaves every slot reachable; a fifth swallows a
+  hand's jitter while a swap still lands near the boundary the user sees. Straight down into the next
+  row still works — it just has to be a fifth of a row into it.
+
+**A known trade-off.** With unequal widths, the frozen slots no longer match the preview after the first
+swap, so the drop hint can sit away from the dragged box: a narrow widget swapped past a wide one is drawn
+over the wide one's new place while the hint marks its own. Rule 7's "where it already looks like it will
+land" holds at drag start. Equal-width slots are unaffected, since their geometry does not change.
+
+The keyboard path never asks a drop target anything: `TryMoveFocused` moves by one index, so it is
+unchanged.
+
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
 was deliberately left alone, and **Processes no longer drops columns at all** — see its own section below),
@@ -1917,7 +1966,8 @@ load-bearing:
 7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
-   landed one slot short — in two columns, the slot up and to the right.
+   landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
+   from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.
@@ -1948,6 +1998,13 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.
+- **Decision — utilization follows Task Manager's per-engine rule** (`GpuEngineLoad`). PDH reports one
+  instance per (process, physical engine); an engine's load is the sum over its instances, an adapter reads
+  its busiest engine, and a type ("3D", "Copy") reads its busiest engine of that type. **Engines of one type
+  are never summed**: the RTX 3060 has six Copy engines, and keying by type added them into a Copy figure no
+  engine was doing, which then competed for the adapter's headline. Evidence: under a ~50 % 3D load the
+  headline already matched Task Manager (48–52 vs 52, one 3D engine), so the inflation was in multi-engine
+  types.
 - The card set is **DXGI non-software adapters ∩ the LUIDs present in the PDH engine counters**
   (`DeviceInventory.Compose`). The intersection is required — DXGI can list one physical GPU under several
   LUIDs, and also enumerates a software "Microsoft Basic Render Driver"; both are discarded.

@@ -42,7 +42,7 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
     [DllImport("pdh.dll")]
     private static extern uint PdhCloseQuery(IntPtr query);
 
-    private const string CounterPath = @"\Processor Information(_Total)\% Processor Utility";
+    internal const string CounterPath = @"\Processor Information(_Total)\% Processor Utility";
 
     private IntPtr _query;
     private IntPtr _counter;

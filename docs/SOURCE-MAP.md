@@ -126,6 +126,10 @@ stays in its tab folder.
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
                                 single unit from the shared peak via UnitFor)
+      ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
+                                Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
+                                KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
+                                stays MB/s on purpose, as Task Manager's does)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
       TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
@@ -241,8 +245,11 @@ stays in its tab folder.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
-                                 selection ring, promoted from Settings) and modalClose (a modal card's ×,
-                                 promoted from the Help overlay), both once the accent picker wanted them…)
+                                 selection ring, promoted from Settings), modalClose (a modal card's ×,
+                                 promoted from the Help overlay), both once the accent picker wanted
+                                 them, and modalCard (centered + a 24 margin that bounds a modal card
+                                 inside its window; the card sets MaxWidth/MaxHeight, never a Width.
+                                 ModalCardTests pins it on every *Overlay.axaml)…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource} — EXCEPT the runtime-swapped block at the
                                  bottom: UiScale, PopupFontSize and the TextSize* ladder, which
@@ -308,7 +315,18 @@ stays in its tab folder.
                                  panel is in a board, and one that could not advertised a drag on three
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
-                                 it a whole column sideways the moment a reorder committed)
+                                 it a whole column sideways the moment a reorder committed. The drop
+                                 target goes through DropTarget, snapshotted as the drag begins; reading
+                                 the panel's live slots instead is the flicker loop. Press/MoveTo are
+                                 the pointer handlers' bodies, internal so ReorderDragTests can drive a
+                                 real board through re-layouts and catch a revert to live slots)
+        DropTarget.cs           (which slot a drag takes, against the slots FROZEN when it began, with
+                                 hysteresis: the target changes only once the dragged box's center is
+                                 Hysteresis (0.2) of the smaller slot past the boundary. The live layout
+                                 includes the preview, so moving the item shifted the slots under a
+                                 still pointer and flipped the answer back — a narrow widget held over a
+                                 wide one is over the wide one's slot in BOTH orders. Relative, not a
+                                 DIP constant, so it holds at every interface size)
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
                                  a drag does, so both persist through one path. It also makes every
                                  item it lays out a tab stop — a card is usually a plain Border, and
@@ -332,11 +350,12 @@ stays in its tab folder.
                                  counted in pixels exactly as the framework's clamp counts it; the length is
                                  kept 1e-4 px short so the framework's round-up cannot add a pixel by a
                                  floating-point error. The tests mirror Avalonia's arrange rounding)
-        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
-                                 handle is, and the previewed order. Reorder is always a permutation of
-                                 the panel's own index list — a panel that reordered Children instead
-                                 would re-enter its layout and, under an ItemsControl, fight the
-                                 generator)
+        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their arranged boxes and
+                                 row ends (SlotRects / SlotRowEnds — raw geometry, not a SlotAt, so the
+                                 drag can snapshot it), what a handle is, and the previewed order.
+                                 Reorder is always a permutation of the panel's own index list — a
+                                 panel that reordered Children instead would re-enter its layout and,
+                                 under an ItemsControl, fight the generator)
         WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
                                  without layout. SlotAt is what a drag TAKES, not a gap it is inserted
                                  into: the row whose band holds the point, then the slot in that row it
@@ -1035,14 +1054,36 @@ stays in its tab folder.
                                  SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
-                                 Performance rows each own one)
+                                 Performance rows each own one. A SECOND COUNTER on the same PDH query,
+                                 \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
+                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
+                                 still samples and usage stays null)
+        GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
+                                 token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
+                                 it joins the inventory key), and Join() onto the engine samples. A
+                                 memory-only LUID is dropped — the inventory keys GPUs off the engine
+                                 counter — and a missing reading stays null, never 0)
+        GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
+                                 eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
+                                 adapter carries several engines of a type (six Copy on an RTX 3060). The
+                                 LUID is re-formatted through GpuAdapter.FormatLuidToken so it joins the
+                                 inventory. Pure, so it runs on every CI leg. THE ONE PARSER: the
+                                 Processes tab's ProcessGpuSampler reads the same names through it)
+        GpuEngineLoad.cs        (Task Manager's rule over those instances: an engine's load = the SUM of its
+                                 process instances, clamped; adapter = busiest engine; a type = its busiest
+                                 engine; a process = its busiest engine. SAME-TYPE ENGINES ARE NEVER SUMMED —
+                                 keying by type inflated Copy past any one engine's load. ByProcess is
+                                 the Processes tab's GPU column, so a row and the adapter total it sits
+                                 under cannot follow different rules)
         LinuxGpuUsageSampler.cs (amdgpu gpu_busy_percent per card, keyed by the shared DrmCardFacts.Key.
                                  EVERY ADAPTER IS REPORTED, with a NULL Overall where the driver publishes
                                  no figure — omitting one would delete its card entirely, and a 0 would show
                                  real hardware as permanently idle. NO ENGINE BREAKDOWN: sysfs has one
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
-                                 construction; only the utilisation file is re-read per tick)
+                                 construction; only the utilization file and amdgpu's mem_info_vram_used
+                                 (dedicated VRAM in use; null for a driver that publishes none) are re-read
+                                 per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
                                  publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
@@ -1245,6 +1286,15 @@ stays in its tab folder.
                                  Global. Split out, like RefreshHint, because MainWindowViewModel
                                  builds every page and its samplers and cannot be constructed in a
                                  test; it takes the two modal view models, which can)
+      Search/UniversalSearchView.axaml(.cs), UniversalSearchViewModel.cs
+                                (the toolbar search box and its dropdown. The Popup's IsOpen is TWO-WAY:
+                                 Avalonia 12 binds it OneWay by default and the popup closes itself with
+                                 SetCurrentValue, which the view model never hears, so IsOpen stayed true
+                                 and every later open was a no-op (work item 66). The view model also
+                                 ignores NotifyFocused while it is writing IsOpen false, because the popup
+                                 restores focus to the box inside that write and the box's GotFocus would
+                                 re-open the dropdown mid-close. Every false write goes through
+                                 CloseDropdown, which holds that guard)
 ```
 
 ## `src/Shell/TrayNotice`
@@ -1285,7 +1335,10 @@ stays in its tab folder.
                                      ShortcutBindings, not the catalog, so the table lists the keys the
                                      user actually chose, and re-announces its groups on a rebind.
                                      The accent picker is the second overlay on this shape; see
-                                     AccentPickerOverlay under src/Tabs/Settings)
+                                     AccentPickerOverlay under src/Tabs/Settings. The Card takes the
+                                     shared modalCard class with MaxWidth 660 / MaxHeight 640 and
+                                     Stretch, NEVER a Width: a fixed 660 overflowed a narrow window
+                                     and, unbounded by height, left the body's end off screen)
         HelpContent.cs              (the CURATED copy — the description, the page tour, the tips. A
                                      static table like HardwareCatalog, so it is testable with no UI.
                                      The shortcut table is NOT here: it is generated from
@@ -1336,6 +1389,8 @@ stays in its tab folder.
 
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
+                                (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
+                                 its MetricHistory, keyed by LUID / disk number.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
@@ -1504,7 +1559,8 @@ stays in its tab folder.
                                                          counts as inside — IsVisualAncestorOf is false for
                                                          the element, and an empty spot reports the card — and
                                                          Tab cycles in the card. The body scrolls so the footer
-                                                         survives 200 % in a short window. Esc is the shell's;
+                                                         survives 200 % in a short window; the Card's margin and
+                                                         centering come from the shared modalCard class. Esc is the shell's;
                                                          Enter falls through its modal swallow so buttons press)
                                 AccentPreviewScope.cs   (a ThemeVariantScope writing the draft into its OWN
                                                          Resources through AccentResources — the accent keys
@@ -1626,6 +1682,10 @@ stays in its tab folder.
                                                          selector compiles and matches nothing.
                                                          Both carets sit on one Panel with exactly one
                                                          visible, for the same reason.
+                                                         The address field holds an invisible line of crumb
+                                                         text, so with no folder open (no crumbs) it keeps
+                                                         its height and the toolbar never jumps on first
+                                                         open; a fixed Height would not follow text scale.
                                                          VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
@@ -1778,6 +1838,11 @@ stays in its tab folder.
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
+                                MeasureCap.cs           (Decorator: caps what its child ASKS for when measured,
+                                                         then arranges it into the full slot. Wraps the Adapters
+                                                         list. A MaxHeight on the scroller instead clamps the
+                                                         arrange too, and a clamped Stretch child is CENTERED in
+                                                         a card stretched to its row: a gap above and below)
                                 PingMonitor.cs          (reused in-box Ping; rolling avg/loss + last-3
                                                          lines; soft-fails to a timeout. NO DEFAULT TARGET:
                                                          Target starts EMPTY. It used to default to 8.8.8.8,
@@ -1904,11 +1969,16 @@ stays in its tab folder.
                                  since disk and GPU rows arrive with an async inventory load.
                                  RebuildResources matches the surviving selection BY DEVICE ID, not by
                                  reference: a rebuilt disk or GPU row is a new object, so the toolbar
-                                 Refresh used to drop the selection back to the CPU.)
+                                 Refresh used to drop the selection back to the CPU. The rebuild also
+                                 carries each surviving disk's and GPU's MetricHistory (and the GPU's
+                                 per-engine charts) over, keyed by disk number / LUID.)
                                 CpuSpeedFormatter.cs    (Speed tile: the WMI base clock × the PDH clock
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
+                                GpuMemoryFormatter.cs   (VRAM in use tile: "used / total", Memory-caption
+                                                         style; MB under 1 GiB; "— / 12 GB" for an
+                                                         unknown usage, a bare "—" for an unknown total)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
                                 WindowsGpuSensorProvider.cs OPPOSITE SHAPES. Windows has no in-box sensor
                                 IGpuSensorReader.cs      API, so it fans out to one reader per vendor SDK:
@@ -1991,6 +2061,14 @@ stays in its tab folder.
                                                          rows. Process.Kill only requests termination, so
                                                          a row used to go on the request alone and come
                                                          back on the next poll)
+                                ProcessRowClick.cs      (pure rule: does a click deselect? Plain single left
+                                                         click on the sole selected row only. Decided on the
+                                                         press and applied on the tap, so a double-click's
+                                                         first click or a drag never clears the selection)
+                                ProcessGpuSampler.cs    (per-process GPU % from PDH \GPU Engine(*), Task
+                                                         Manager's counter, pinned by a test. PDH only: the
+                                                         parse and the per-engine rule are the shared
+                                                         GpuEngineInstance / GpuEngineLoad.ByProcess)
                                 IProcessInterop.cs      (seam + ForCurrentPlatform())
                                 WindowsProcessInterop.cs
                                                         (kernel32 I/O counters + shell32 Properties sheet.
