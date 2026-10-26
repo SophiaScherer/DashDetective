@@ -1,5 +1,7 @@
 using DashDetective.Shared.Shortcuts;
+using DashDetective.Shell.Navigation;
 using DashDetective.Shell.Search;
+using DashDetective.Shell.Search.Providers;
 using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
@@ -756,6 +758,30 @@ public class UniversalSearchViewModelTests {
 
         Assert.Empty(recents.Entries);
     }
+
+    /// <summary>An install from before the Toolkit page became Utilities has the old name stored; the
+    /// recent must list the new name and reopen the page rather than be forgotten.</summary>
+    [Fact]
+    public async Task Recents_AnOldToolkitPageRecentReopensTheUtilitiesPage() {
+        var recents = new RecentSearches();
+        recents.Load("PageToolkitToolkitCommon commands & diagnostics");
+        NavItem? navigated = null;
+        var utilities = new NavItem("Utilities", "Utilities", "Common commands & diagnostics", null!,
+                                    new StubPage(), _ => { }, ["Toolkit"]);
+        var vm = new UniversalSearchViewModel(
+            [new PageSearchProvider([utilities], item => navigated = item)], recents, new FakeUiTimer());
+
+        vm.Focus();
+        Assert.Equal("Utilities", Assert.Single(vm.Results).Title);
+        vm.ActivateSelected();
+        for (var i = 0; i < 100 && navigated is null; i++)
+            await Task.Delay(10);
+
+        Assert.Same(utilities, navigated);
+        Assert.Single(recents.Entries);
+    }
+
+    private sealed class StubPage : DashDetective.Shared.ViewModelBase;
 
     [Fact]
     public void Scope_IsTheSearchScope() {

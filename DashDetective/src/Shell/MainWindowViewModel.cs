@@ -254,8 +254,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Storage, _storage, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
                         Icons.Hardware, _hardware, Nav.Navigate),
-            new NavItem("Toolkit", "Toolkit", "Common commands & diagnostics",
-                        Icons.Toolkit, _toolkit, Nav.Navigate),
+            new NavItem("Utilities", "Utilities", "Common commands & diagnostics",
+                        Icons.Toolkit, _toolkit, Nav.Navigate, ["Toolkit", "Tools", "Commands"]),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });

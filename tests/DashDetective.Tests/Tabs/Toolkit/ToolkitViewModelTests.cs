@@ -261,7 +261,7 @@ public class ToolkitViewModelTests {
         // The header's second line is "now", which can tick between the two calls; everything after it is fixed.
         static string[] AfterHeader(string s) => s.Split(Environment.NewLine).Skip(2).ToArray();
         Assert.Equal(AfterHeader(vm.BuildLogText()), AfterHeader(text));
-        Assert.StartsWith("DashDetective — Toolkit execution log", text, StringComparison.Ordinal);
+        Assert.StartsWith("DashDetective — Utilities execution log", text, StringComparison.Ordinal);
     }
 
     /// <summary>The save dialog offers the system report's list, and each choice renders a different file.</summary>

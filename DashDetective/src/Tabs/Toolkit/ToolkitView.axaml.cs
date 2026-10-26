@@ -121,7 +121,7 @@ public partial class ToolkitView : UserControl {
         var path = await FileSave.SaveAsync(
             this,
             title: "Export execution log",
-            suggestedName: $"DashDetective-toolkit-log-{DateTime.Now:yyyyMMdd-HHmmss}",
+            suggestedName: $"DashDetective-utilities-log-{DateTime.Now:yyyyMMdd-HHmmss}",
             formats: DiagnosticsFormats.Offered,
             content: vm.BuildLog);
 

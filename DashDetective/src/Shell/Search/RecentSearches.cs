@@ -105,6 +105,16 @@ public sealed class RecentSearches {
             return false;
 
         entry = new RecentSearch(category, fields[1], fields[2], fields[3]);
+
+        // The Toolkit page became Utilities (work item 33); without this an old recent shows the stale
+        // name and reopening it finds no page by that identity, so it is silently forgotten.
+        if (category == SearchCategory.Page &&
+            string.Equals(entry.Key, "Toolkit", StringComparison.OrdinalIgnoreCase))
+            entry = entry with {
+                Key = "Utilities",
+                Title = string.Equals(entry.Title, "Toolkit", StringComparison.Ordinal) ? "Utilities" : entry.Title,
+            };
+
         return true;
     }
 
