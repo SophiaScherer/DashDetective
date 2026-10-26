@@ -131,7 +131,7 @@ public class NetworkViewModelTests {
     private static (NetworkViewModel Vm, FakeDnsLookupProvider Dns) CreateWithPendingDns() {
         var dns = new FakeDnsLookupProvider();
         return (new NetworkViewModel(
-            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener())), dns);
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener(), new FakePublicAddressProvider())), dns);
     }
 
     /// <summary>The bug: a single-label name takes seconds to fail, so replacing it with a real host and
