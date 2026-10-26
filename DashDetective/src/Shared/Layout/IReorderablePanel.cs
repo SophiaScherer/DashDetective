@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using System;
 using System.Collections.Generic;
 
 namespace DashDetective.Shared.Layout;
@@ -34,9 +35,12 @@ public interface IReorderablePanel {
     /// <summary>What this press may drag, if anything.</summary>
     bool TryGetHandle(Visual source, out ReorderHandle handle);
 
-    /// <summary>The slot the drag is over, as an index into <see cref="Items"/>. The dragged item
-    /// takes that slot; it is not inserted beside it.</summary>
-    int SlotAt(Point point);
+    /// <summary>Where each of <see cref="Items"/> was last arranged. A drag snapshots these as it
+    /// begins and measures every drop against the snapshot, never the live preview.</summary>
+    ReadOnlySpan<Rect2> SlotRects { get; }
+
+    /// <summary>The index just past each row of <see cref="SlotRects"/>.</summary>
+    ReadOnlySpan<int> SlotRowEnds { get; }
 
     /// <summary>Starts previewing a reorder: the shown order becomes the one being tried.</summary>
     void BeginPreview();

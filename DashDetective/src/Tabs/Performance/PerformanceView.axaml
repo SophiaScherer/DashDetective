@@ -46,16 +46,6 @@
             <Setter Property="FontSize" Value="{DynamicResource TextSizeMedium}"/>
         </Style>
 
-        <!-- The shared segment sized for the rail: no other tab puts one in a 180px column, so the
-             narrower padding and type stay local (a local style outranks the shared Border.seg). -->
-        <Style Selector="Border.seg.compact">
-            <Setter Property="Padding" Value="8,5"/>
-        </Style>
-        <Style Selector="Border.seg.compact TextBlock">
-            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
-
     </UserControl.Styles>
 
     <Grid>
@@ -66,31 +56,9 @@
         </Grid.ColumnDefinitions>
 
         <!-- ===== Resource selector (left) ===== -->
-        <Grid Grid.Column="0" RowDefinitions="Auto,*">
+        <Grid Grid.Column="0">
 
-            <!-- Rail scope: "Primary" shows one of each kind; "All devices" shows every detected instance
-                 (e.g. all disks). It heads the rail because the rail is all it filters — over the whole
-                 page it read as if it scoped the detail pane too. Equal columns rather than a horizontal
-                 StackPanel, so the pair splits the rail at any splitter position. -->
-            <Border Grid.Row="0" Classes="segments" Margin="0,0,2,8"
-                    ToolTip.Tip="Show one device of each kind, or every device detected">
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
-                    <Button Grid.Column="0" Classes="bare" Command="{Binding SelectPrimaryScopeCommand}"
-                            HorizontalContentAlignment="Stretch">
-                        <Border Classes="seg compact" Classes.selected="{Binding !ShowAllDevices}">
-                            <TextBlock Text="Primary"/>
-                        </Border>
-                    </Button>
-                    <Button Grid.Column="1" Classes="bare" Command="{Binding SelectAllScopeCommand}"
-                            HorizontalContentAlignment="Stretch">
-                        <Border Classes="seg compact" Classes.selected="{Binding ShowAllDevices}">
-                            <TextBlock Text="All devices"/>
-                        </Border>
-                    </Button>
-                </Grid>
-            </Border>
-
-            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl ItemsSource="{Binding Resources}" Margin="{StaticResource ScrollGutter}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -281,9 +249,10 @@
                 </StackPanel>
             </controls:WidgetPanel>
 
-            <!-- Stat tiles: the selected resource's readouts (design comp's statMap) four for most, six
-                 for CPU. Uncapped like the Dashboard card strip, so a wide pane gains columns rather than
-                 widening the tiles; 150px is the width below which one wraps. -->
+            <!-- Stat tiles: the selected resource's readouts (design comp's statMap): four for most, five for
+                 a GPU with a shared memory pool, six for CPU. Uncapped like the Dashboard card strip, so a
+                 wide pane gains columns rather than widening the tiles; 150px is the width below which one
+                 wraps. -->
             <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

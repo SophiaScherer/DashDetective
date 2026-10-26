@@ -12,8 +12,9 @@ public sealed record GpuPciId(uint VendorId, uint DeviceId, uint SubSysId, uint 
 /// <summary>One graphics adapter: <see cref="LuidToken"/>, the platform's own stable identity for it, the
 /// friendly <see cref="Name"/>, whether it is a placeholder rather than a real adapter
 /// (<see cref="IsSoftware"/>, to be filtered out), its dedicated VRAM in bytes (carried onto
-/// <see cref="DeviceInstance.VramBytes"/> for the Performance tab's GPU VRAM tile), and its
-/// <see cref="Pci"/> identity (which vendor sensor readings join on).
+/// <see cref="DeviceInstance.VramBytes"/> for the Performance tab's GPU VRAM tile), its
+/// <see cref="Pci"/> identity (which vendor sensor readings join on), and its shared system memory in bytes
+/// (<see cref="SharedSystemMemory"/>, null where the platform publishes none).
 ///
 /// <b><see cref="LuidToken"/> is named for Windows but is not always a LUID.</b> It is whatever this
 /// platform uses to say "the same adapter" across independent readers: the PDH-style
@@ -22,7 +23,8 @@ public sealed record GpuPciId(uint VendorId, uint DeviceId, uint SubSysId, uint 
 /// utilisation sampler derive it identically — the inventory intersects the two, so a mismatch yields no
 /// GPU at all rather than a wrong one.</summary>
 public sealed record GpuAdapter(
-    string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory, GpuPciId? Pci = null) {
+    string LuidToken, string Name, bool IsSoftware, ulong DedicatedVideoMemory, GpuPciId? Pci = null,
+    ulong? SharedSystemMemory = null) {
     /// <summary>Formats a LUID's high/low parts into the PDH instance-name token
     /// (<c>luid_0x00000000_0x0000e54b</c>) — lowercase, eight hex digits each — so it joins directly
     /// against the <c>\GPU Engine(*)</c> counter instances. Pure; unit-tested. Lives on the adapter model

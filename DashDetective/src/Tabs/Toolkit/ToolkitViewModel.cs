@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
 using System;
@@ -429,6 +430,14 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The Execution Log in the chosen export format. Text is the transcript <see cref="BuildLogText"/>
+    /// has always written; every other format renders the log as a report through the shared renderers.
+    /// </summary>
+    public string BuildLog(DiagnosticsFormat format) => format == DiagnosticsFormat.Text
+        ? BuildLogText()
+        : DiagnosticsFormats.Render(ToolkitLogExport.BuildReport(Log, DateTime.Now), format);
 
     partial void OnSearchChanged(string value) => RebuildGroups();
 

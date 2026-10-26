@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Network;
@@ -177,6 +178,28 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>The primary adapter's IPv4 configuration, for the IP Configuration panel.</summary>
     [ObservableProperty] private IpConfigInfo _ipConfig = IpConfigInfo.Unknown;
 
+    /// <summary>The public IPv4 for the IP Configuration panel: empty until the user asks, then the address,
+    /// <see cref="PublicLooking"/> or <see cref="PublicUnavailable"/>.</summary>
+    [ObservableProperty] private string _publicIpv4 = "";
+
+    /// <summary>The public IPv6, in the same states as <see cref="PublicIpv4"/>.</summary>
+    [ObservableProperty] private string _publicIpv6 = "";
+
+    /// <summary>Whether the user has asked for the public addresses this session. Until then the two rows
+    /// show a Look up action instead of a value, because the lookup leaves the machine.</summary>
+    [ObservableProperty] private bool _publicLookedUp;
+
+    internal const string PublicLooking = "Looking up…";
+    internal const string PublicUnavailable = "Unavailable";
+
+    /// <summary>The Look up action's tooltip: the disclosure that this call goes out.</summary>
+    public string PublicLookupTip => "Asks api.ipify.org and api6.ipify.org for the addresses the internet sees. "
+        + "Runs when you press Look up, and again on Refresh.";
+
+    /// <summary>Only the newest public-address lookup may publish, so a slow earlier one cannot overwrite
+    /// a newer answer.</summary>
+    private int _publicGeneration;
+
     /// <summary>Active TCP/UDP connections for the CURRENT page, for the table. Updated in place.</summary>
     public ObservableCollection<ConnectionRow> Connections { get; } = new();
 
@@ -238,6 +261,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>Whether a lookup has been run this session, so Refresh re-resolves what the user asked
     /// for rather than reaching out to a host they never requested.</summary>
     private bool _dnsResolved;
+
+    /// <summary>Bumped by every lookup; a result lands only while its number is still the latest.</summary>
+    private int _dnsGeneration;
 
     /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner; left null
     /// in a test, where there is nothing to draw on.</summary>
@@ -531,21 +557,69 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
     private async Task LoadDnsAsync() {
         _dnsResolved = true;
+        var generation = ++_dnsGeneration;
+        var host = DnsHost.Trim();
         try {
-            var result = await _providers.Dns.GetAsync(DnsHost);
+            var result = await _providers.Dns.GetAsync(host);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
+            if (generation != _dnsGeneration)
+                return;
+
             DnsConsole = result.Console;
             DnsFooter = result.Footer;
         } catch {
-            DnsConsole = $"Name:    {DnsHost}";
-            DnsFooter = $"Could not resolve {DnsHost}";
+            if (generation != _dnsGeneration)
+                return;
+
+            DnsConsole = $"Name:    {host}";
+            DnsFooter = $"Could not resolve {host}";
         }
     }
 
     /// <summary>Runs the DNS lookup for the host currently in the field (Enter / the Look up button). The
-    /// only thing that ever resolves a name: the panel stays idle until the user asks.</summary>
+    /// only thing that ever resolves a name: the panel stays idle until the user asks. Shows a pending
+    /// line at once, since a slow lookup would otherwise leave Enter looking ignored; Refresh re-resolves
+    /// without it so the panel does not flicker.</summary>
     [RelayCommand]
-    private void LookupDns() => _ = LoadDnsAsync();
+    private void LookupDns() {
+        var host = DnsHost.Trim();
+        if (host.Length > 0) {
+            DnsConsole = $"Name:    {host}";
+            DnsFooter = $"Resolving {host}…";
+        }
+
+        _ = LoadDnsAsync();
+    }
+
+    /// <summary>Asks the outside service for the public IPv4 and IPv6. Never throws; a family that fails
+    /// reads "Unavailable". Only the newest call publishes.</summary>
+    private async Task LoadPublicAddressesAsync() {
+        var generation = ++_publicGeneration;
+        PublicAddresses result;
+        try {
+            result = await _providers.PublicAddresses.GetAsync();
+        } catch (Exception e) when (e is InvalidOperationException or HttpRequestException or OperationCanceledException) {
+            // The provider never throws; a misbehaving one might, and the rows must not stay on
+            // "Looking up…" for the session. Narrow on purpose: anything else is a bug.
+            result = PublicAddresses.None;
+        }
+
+        // Awaited on the UI thread, so the continuation resumes there — safe to bind.
+        if (generation != _publicGeneration)
+            return;
+        PublicIpv4 = result.Ipv4 ?? PublicUnavailable;
+        PublicIpv6 = result.Ipv6 ?? PublicUnavailable;
+    }
+
+    /// <summary>The IP Configuration panel's Look up action: the user's first ask. Refresh repeats the
+    /// lookup afterwards, and nothing else ever starts one.</summary>
+    [RelayCommand]
+    private void LookupPublicAddresses() {
+        PublicIpv4 = PublicLooking;
+        PublicIpv6 = PublicLooking;
+        PublicLookedUp = true;
+        _ = LoadPublicAddressesAsync();
+    }
 
     // ----- Opening a target in the browser -----
     // Each panel's field carries a link icon, disabled rather than hidden while the field holds nothing
@@ -628,8 +702,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     }
 
     /// <summary>Toolbar Refresh: an immediate re-sample, adapter re-read and connections re-read. The ping
-    /// and DNS panels join in only once the user has started them — a refresh must not turn into the first
-    /// packet either one ever sent. Runs even while paused, like the Dashboard.</summary>
+    /// and DNS panels and the public-address rows join in only once the user has started them — a refresh
+    /// must not turn into the first request any of them ever sent. Runs even while paused, like the Dashboard.</summary>
     public void Refresh() {
         _networkChannel.SampleNow();
         _ = LoadAdaptersAsync();
@@ -638,6 +712,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             _ = RunPingAsync();
         if (_dnsResolved)
             _ = LoadDnsAsync();
+        if (PublicLookedUp)
+            _ = LoadPublicAddressesAsync();
     }
 
     /// <summary>
