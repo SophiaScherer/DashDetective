@@ -37,7 +37,6 @@ public class PerformanceAlertTests {
         // The constructor fires its own load and forgets it; letting that finish keeps the row set stable.
         await Task.Delay(100);
         await page.LoadInventoryAsync();
-        page.ShowAllDevices = true;
         return page;
     }
 

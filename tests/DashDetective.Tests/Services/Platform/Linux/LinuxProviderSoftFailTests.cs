@@ -106,6 +106,15 @@ public class LinuxProviderSoftFailTests {
         Assert.Empty(await new LinuxGpuAdapterProvider(proc).GetAsync());
     }
 
+    /// <summary>The GTT read sits inside the provider's catch like every other card file, so a denial there
+    /// soft-fails the whole adapter list to empty, exactly as a denied vendor or VRAM file does.</summary>
+    [Fact]
+    public async Task LinuxGpuAdapterProvider_DeniedGttTotal_ReportsNoAdapters() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().ThrowOn("/sys/class/drm/card0/device/mem_info_gtt");
+
+        Assert.Empty(await new LinuxGpuAdapterProvider(proc).GetAsync());
+    }
+
     [Fact]
     public async Task LinuxGraphicsInfoProvider_DeniedDrmTree_ReportsTheUnknownCard() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard().ThrowOn("/sys/class/drm");

@@ -19,6 +19,7 @@ public sealed class ReorderDrag {
     private static readonly Cursor GripCursor = new(StandardCursorType.Hand);
 
     private readonly IReorderablePanel _host;
+    private readonly DropTarget _target = new();
 
     private bool _pending;              // pointer is down on a handle, not yet past the threshold
     private bool _dragging;             // past it: previewing a reorder
@@ -81,8 +82,14 @@ public sealed class ReorderDrag {
         if (e.Source is not Visual source || !_host.TryGetHandle(source, out var handle))
             return;
 
+        Press(handle, e.GetPosition(_host.Surface));
+    }
+
+    /// <summary>Picks the item up at this point, pending the movement threshold. Internal so tests can
+    /// drive a drag without a pointer device.</summary>
+    internal void Press(ReorderHandle handle, Point press) {
         (_item, _lifted, _) = handle;
-        _press = e.GetPosition(_host.Surface);
+        _press = press;
         _size = handle.Item.Bounds.Size;
         _grabX = Fraction(_press.X - handle.Item.Bounds.X, _size.Width);
         _grabY = Fraction(_press.Y - handle.Item.Bounds.Y, _size.Height);
@@ -100,7 +107,16 @@ public sealed class ReorderDrag {
             return;
         }
 
-        _pointer = e.GetPosition(_host.Surface);
+        MoveTo(e.GetPosition(_host.Surface), e.Pointer);
+    }
+
+    /// <summary>Follows the pointer here: starts the drag once past the threshold, then previews the
+    /// slot it covers. <paramref name="device"/> is null only from tests, which have nothing to capture.</summary>
+    internal void MoveTo(Point pointer, IPointer? device) {
+        if (!_pending || _item is null)
+            return;
+
+        _pointer = pointer;
         if (!_dragging) {
             var delta = _pointer - _press;
             if (Math.Abs(delta.X) < PointerDrag.Threshold && Math.Abs(delta.Y) < PointerDrag.Threshold)
@@ -111,7 +127,8 @@ public sealed class ReorderDrag {
             // press, which would take this one straight back off us. Taking it on the first move
             // past the threshold instead cancels that click, which is what a drag should do.
             _dragging = true;
-            e.Pointer.Capture(_host.Surface);
+            _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
+            device?.Capture(_host.Surface);
             _host.BeginPreview();
             _lifted?.Classes.Add("dragging");
             _item.ZIndex = 10;
@@ -120,15 +137,30 @@ public sealed class ReorderDrag {
         }
 
         // Re-pack under the order being tried, so the others shift as the drag moves.
-        if (_host.PreviewMove(_item, DropTarget()))
+        if (_host.PreviewMove(_item, TargetSlot()))
             _host.Surface.InvalidateMeasure();
         _host.Surface.InvalidateArrange();
     }
 
     /// <summary>Where the dragged item belongs: the slot it is covering, which is where it already
-    /// looks like it will land.</summary>
-    private int DropTarget() =>
-        Math.Clamp(_host.SlotAt(Centre(DragBox())), 0, Math.Max(0, _host.Items.Count - 1));
+    /// looks like it will land. Measured against the slots as they were when the drag began, so the
+    /// preview cannot move the answer under a still pointer.</summary>
+    private int TargetSlot() {
+        // A child hidden, shown or removed mid-drag changes what the indices mean, so start over from
+        // now. A generator adding one does not: the preview order never takes in new children.
+        if (_target.SlotCount != _host.Items.Count)
+            _target.Begin(_host.SlotRects, _host.SlotRowEnds, IndexOfItem());
+
+        var center = Centre(DragBox());
+        return Math.Clamp(_target.Update(center.X, center.Y), 0, Math.Max(0, _host.Items.Count - 1));
+    }
+
+    private int IndexOfItem() {
+        for (var i = 0; i < _host.Items.Count; i++)
+            if (ReferenceEquals(_host.Items[i], _item))
+                return i;
+        return -1;
+    }
 
     // The middle of the item as drawn, not the pointer inside it. The pointer can be anywhere in the
     // item — half a card's width from its middle — so a card grabbed by its right edge and dragged

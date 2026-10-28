@@ -96,7 +96,9 @@ internal sealed class WindowsGpuAdapterProvider : IGpuAdapterProvider {
                         (desc.Description ?? "").Trim(),
                         (desc.Flags & DxgiAdapterFlagSoftware) != 0,
                         (ulong)desc.DedicatedVideoMemory,
-                        new GpuPciId(desc.VendorId, desc.DeviceId, desc.SubSysId, desc.Revision)));
+                        new GpuPciId(desc.VendorId, desc.DeviceId, desc.SubSysId, desc.Revision),
+                        // The figure Task Manager's "Shared GPU memory" total reads.
+                        (ulong)desc.SharedSystemMemory));
                 } finally {
                     GetMethod<ReleaseFn>(adapter, VtRelease)(adapter);
                 }

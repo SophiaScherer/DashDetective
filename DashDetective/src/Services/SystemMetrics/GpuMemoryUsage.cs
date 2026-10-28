@@ -4,8 +4,10 @@ using System.Collections.Generic;
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
-/// Turns raw <c>\GPU Adapter Memory(*)\Dedicated Usage</c> readings (bytes, one instance per
-/// <c>luid_0x…_0x…_phys_N</c>) into one figure per adapter, and joins them onto the engine-counter samples.
+/// Turns raw <c>\GPU Adapter Memory(*)</c> readings — <c>Dedicated Usage</c> or <c>Shared Usage</c>, bytes,
+/// one instance per <c>luid_0x…_0x…_phys_N</c> — into one figure per adapter, and joins both onto the
+/// engine-counter samples. Task Manager's dedicated and shared figures are these sums, with no other
+/// arithmetic.
 ///
 /// <b>The join never adds an adapter.</b> The inventory keys GPUs off the engine counter's LUIDs, so a
 /// memory-only LUID is dropped; an adapter with no memory reading keeps a null usage, never 0.
@@ -16,8 +18,8 @@ internal static class GpuMemoryUsage {
     private const string LuidToken = "luid_0x";
     private const string PhysToken = "_phys_";
 
-    /// <summary>Dedicated bytes in use per adapter LUID token, summed across physical indices. Names that
-    /// do not parse, and readings that are negative or not a number, are skipped.</summary>
+    /// <summary>Bytes in use per adapter LUID token, summed across physical indices — for either memory
+    /// counter. Names that do not parse, and readings that are negative or not a number, are skipped.</summary>
     internal static IReadOnlyDictionary<string, ulong> ByAdapter(IEnumerable<(string? Name, double Value)> readings) {
         var result = new Dictionary<string, ulong>(StringComparer.Ordinal);
         foreach (var (name, value) in readings) {
@@ -31,15 +33,24 @@ internal static class GpuMemoryUsage {
     }
 
     /// <summary>Returns <paramref name="samples"/> with each adapter's
-    /// <see cref="GpuAdapterSample.DedicatedUsedBytes"/> filled from <paramref name="memory"/> where it has an
-    /// entry. Adapters absent from the samples stay absent.</summary>
+    /// <see cref="GpuAdapterSample.DedicatedUsedBytes"/> and <see cref="GpuAdapterSample.SharedUsedBytes"/>
+    /// filled from <paramref name="dedicated"/> and <paramref name="shared"/> where each has an entry; a null
+    /// map is a counter that could not be read. Adapters absent from the samples stay absent.</summary>
     internal static IReadOnlyDictionary<string, GpuAdapterSample> Join(
-        IReadOnlyDictionary<string, GpuAdapterSample> samples, IReadOnlyDictionary<string, ulong> memory) {
+        IReadOnlyDictionary<string, GpuAdapterSample> samples,
+        IReadOnlyDictionary<string, ulong>? dedicated, IReadOnlyDictionary<string, ulong>? shared) {
         var joined = new Dictionary<string, GpuAdapterSample>(samples.Count, StringComparer.Ordinal);
-        foreach (var (luid, sample) in samples)
-            joined[luid] = memory.TryGetValue(luid, out var used) ? sample with { DedicatedUsedBytes = used } : sample;
+        foreach (var (luid, sample) in samples) {
+            joined[luid] = sample with {
+                DedicatedUsedBytes = Lookup(dedicated, luid) ?? sample.DedicatedUsedBytes,
+                SharedUsedBytes = Lookup(shared, luid) ?? sample.SharedUsedBytes,
+            };
+        }
         return joined;
     }
+
+    private static ulong? Lookup(IReadOnlyDictionary<string, ulong>? memory, string luid) =>
+        memory is not null && memory.TryGetValue(luid, out var used) ? used : null;
 
     private static ulong SaturatingAdd(ulong a, ulong b) => a > ulong.MaxValue - b ? ulong.MaxValue : a + b;
 
