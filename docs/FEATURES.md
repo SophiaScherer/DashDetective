@@ -20,10 +20,11 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Network](#network)
 - [Processes](#processes)
 - [Performance](#performance)
-- [Toolkit](#toolkit)
+- [Toolkit (shown as Utilities)](#toolkit-shown-as-utilities)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Help](#help)
 - [Storage](#storage)
+- [Hardware](#hardware)
 - [Page lifecycle](#page-lifecycle)
 - [Wheel scrolling](#wheel-scrolling)
 - [Widget system](#widget-system)
@@ -223,7 +224,8 @@ Information **RAM** row all read the real machine. GPU: one live GPU `StatCard` 
 adapter** (utilisation % + sparkline via PDH `\GPU Engine`, attributed by adapter LUID; adapters named
 via DXGI in `GpuAdapterProvider`) and the System Information **GPU** row listing every adapter. GPU
 **temperature** is now read live, but on the **Performance** tab only — appending it to this card's
-caption is unbuilt Dashboard UI work (see *Deferred work* above).
+caption is unbuilt Dashboard UI work (see *Deferred work* above). The cards carry **no alert bell**, on
+purpose: they are entry points into Performance, where the bells are (see *Settings → Alert bells*).
 Storage: the Storage `StatCard` shows live disk
 **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
 as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
@@ -313,6 +315,20 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   placed `BottomEdgeAlignedRight`, so a popup wider than the box grows leftwards instead of laying
   itself over the toolbar actions. The clear ×'s tooltip is switched off while the results are
   showing, since they open directly beneath a pointer the expand button has already left there.
+- **Enter during the debounce.** The list on screen still answers the previous term until the debounce
+  fires, so Enter in the same burst as the typing must not open its highlighted row (it opened the top
+  recent). Enter with a pending term runs the query for the typed text at once and opens that run's top
+  result when it lands; a further keystroke, `Close`, `Clear` or a dismissal drops the pending open, and
+  a run with no results opens nothing. Enter on a settled list, and a click on a row, are unchanged.
+  Esc stops the debounce too, and Enter on a closed dropdown opens nothing; reopening the box (Ctrl+F
+  or a click) reruns a term Esc cut short rather than showing the older rows.
+- **The dropdown's open state has one source of truth.** `Popup.IsOpen` is bound **TwoWay** because
+  Avalonia 12 binds it OneWay by default and the popup can close itself, which a OneWay binding never
+  reports: the view model stayed "open" and every later open was a no-op until a restart (work item 66).
+  Picking a recent triggered it — focus sat in the popup, was restored to the box during the close, and
+  the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
+  that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
+  from a focus handler without that guard.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -350,7 +366,8 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
     cannot scroll it away. The shortcut chain treats it as modal — every shortcut is swallowed and Esc
     cancels — **except Enter**, which falls through so a focused button still presses. Tab cycles inside
     the card; the wheel takes focus on open and the row's swatch gets it back on close. The body scrolls,
-    so the footer stays reachable at 200 % in a short window.
+    so the footer stays reachable at 200 % in a short window. **The card fits its window by the shared
+    `modalCard` style**, the same one Help uses (see *Help*).
   - **The strips are the real shared styles**, not imitations. `AccentPreviewScope` is a
     `ThemeVariantScope` that writes the draft into its own `Resources` through `AccentResources`, the same
     key list `ThemeService` writes to the application; the accent keys are top-level, so a subtree can
@@ -374,23 +391,25 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   coarse timers stay coarse (Dashboard uptime 30 s; Network adapters 5 s / connections 2.5 s /
   ping 2 s are NOT retimed). The three toggles are real templated `ToggleButton`s (shared
   `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
-  alerts** (the master switch for the Alerts card below), **Show in system tray**, **Launch at startup**.
+  alerts** (the master switch for the Alerts card below and every alert bell), **Show in system tray**, **Launch at startup**.
   **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
   (`src/Services/Startup`, soft-failing).
 - **Keyboard.** The rebinding list for every shortcut, rendered from the live bindings. Written up
   under *Keyboard shortcuts* below, since the behaviour is the shortcut layer's rather than this
   page's.
 - **Alerts.** Six rows — CPU, memory, GPU and disk-activity thresholds, a low-free-space threshold, and
-  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`),
-  plus a per-row switch. Runs of preset segments were tried first and pushed the description text into a
-  narrow column that truncated it; a threshold is also a number people want to state rather than pick
-  from a shortlist. **The switch and the number are separate values on purpose**: the service encodes
-  "not watched" as `0`, and a row storing only that would forget its threshold the moment it was switched
-  off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was chosen. The
-  shell folds the pair back into the zero-means-off contract, so the watcher never learns that a page has
-  two controls. "Warn after" has no switch (it is the wait before a warning, not a warning) and reserves
-  the switch column so every number still lines up. Every row is disabled on the whole `Border` while the
-  master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
+  how long a breach must last — each a **typed whole number with its unit beside it** (`NumericField`).
+  **Thresholds only:** whether each resource is watched is switched by an **alert bell on the resource
+  itself** (see *Alert bells* below), so turning one off never means leaving what you were looking at, and
+  each row's description says where its bell is. Runs of preset segments were tried first and pushed the
+  description text into a narrow column that truncated it; a threshold is also a number people want to
+  state rather than pick from a shortlist. **The switch and the number are separate values on purpose**:
+  the service encodes "not watched" as `0`, and storing only that would forget a threshold the moment it
+  was switched off — so GPU ships *off, with 90 already in the box*, and re-enabling restores what was
+  chosen. The number stays editable whether or not its bell is on, so it can be tuned before switching
+  the alert on. `ResourceAlertOptions.From` folds the pair back into the zero-means-off contract, so the
+  watcher never learns that there are two controls. Every row is disabled on the whole `Border` while
+  the master toggle is off, the `CanUseTray` idiom. `ResourceAlertWatcher`
   (`src/Services/SystemMetrics`) owns the logic, deliberately **outside** `SystemMetricsService`, which stays
   a pure fan-out of the three shared feeds: GPU and disk have no shared feed there because an aggregate
   across devices would report an average under one device's name. The watcher reads them anyway without
@@ -402,6 +421,28 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   Recovery/EFI partitions sit near-full by design and alerting on them is a banner that never clears. The
   shell shows the inline warning below the toolbar, with copy built from the breach (`×` dismisses the
   current one; a different resource taking over clears the dismissal).
+- **Alert bells.** The five per-resource on/off flags (`AlertCpuEnabled` … `AlertLowDiskFreeEnabled`, the
+  existing keys) are one `AlertSwitches` instance (`src/Services/SystemMetrics`) that the shell builds and
+  hands to the pages, so a flip anywhere is the state it persists and re-arms the watcher from — at once,
+  with no restart. Drawn by the shared `AlertBell` control (`src/Shared/Controls`): a filled bell when on,
+  an outlined bell struck through when off, so the state is in the shape rather than in a color. Placement:
+  - **Performance** — in the detail header beside the device's name: CPU, Memory, every GPU (one shared
+    GPU flag) and every disk (one shared disk-activity flag). The network adapter has no alert, so no bell.
+  - **Storage** — on every drive card's header, beside the health pill: the low-free-space flag, shared
+    by every drive, since it sits over the usage bar it is about.
+  - **Dashboard — none, deliberately.** Its cards are entry points into Performance, and a bell on each
+    would clutter the one page meant to be read at a glance.
+  - The **tooltip is the accessible name** and states the state, the live rule (threshold and wait, from
+    the current settings) and what a click does; "any GPU" / "any drive" says the one flag covers them all.
+    Set on the control itself, because the app's tooltip-as-name style matches the exact type `Button` and
+    never reaches a `ToggleButton`.
+  - **A flip changes only its own metric.** Every Settings edit and every flip re-applies the whole
+    option set, and the watcher used to clear all five streaks on each — so flipping the GPU bell hid a
+    low-space banner on screen until the next minute's read, and un-did its dismissal. It now clears only
+    the metrics whose threshold changed (every usage streak if the wait did), and switching low space on
+    reads the volumes at once instead of on its 60-second timer.
+  - **Master switch off** (Resource alerts, under Monitoring) disables every bell, which keeps showing its
+    state and says in its tooltip, shown on a disabled control, that alerts are off in Settings.
 - **System tray.** A `TrayIcon` declared in `App.axaml` (Show / Exit menu, wired in `App.axaml.cs`);
   with the setting on, closing the window hides to tray (`MainWindow.OnClosing`) instead of exiting.
   Real exit still runs the composition root's disposal.
@@ -1177,10 +1218,28 @@ and `iphlpapi` P/Invoke). The `Network` `NavItem` (globe icon) sits between File
 Settings. Panels:
 - **Adapters** — every adapter except loopback (physical + virtual), with a fixed-colour status dot
   (green connected / blue virtual / grey disconnected), status and link speed, via
-  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list is
-  height-capped and scrolls so many adapters don't push the page down.
+  `AdapterInfoProvider` (managed `NetworkInterface`, async snapshot on a 5 s timer). The list
+  asks for a capped height (`MeasureCap`) and scrolls, so many adapters don't push the page down,
+  then fills the card the row gives it. A `MaxHeight` on the scroller would center it in the card with a gap above and below.
 - **IP Configuration** — the primary adapter's IPv4 / mask / gateway / DNS / MAC / DHCP (monospace),
   from the same provider. Primary is chosen by `NetworkUsageSampler.SelectPrimary` (one source of truth).
+  Two more rows, **Public IPv4 / Public IPv6**, show the address the internet sees. Like the Ping and
+  DNS panels they send something off the machine, so they are **opt-in**: each shows a small Look up
+  button whose tooltip names both `api.ipify.org` and `api6.ipify.org` and says it runs on Look up and
+  again on Refresh (each button has its own accessible name). Nothing is requested at startup, on the
+  sampling timers or on a Refresh that precedes the first ask; after the first Look up, toolbar Refresh
+  repeats it (`PublicLookedUp`, the `_dnsResolved` shape). Both families are read concurrently over
+  **https only**, off the UI thread (`Task.Run` inside `PublicAddressProvider`, so first-send proxy
+  detection cannot stall the page), with a 4 s bound each. The shared `HttpClient` sends
+  `Connection: close` and pools for 10 s at most, so a VPN or Wi-Fi switch shows on the next lookup, and
+  the body is read through a 64-byte cap rather than buffered whole. A body counts only if it is a
+  canonical address of the family asked for (IPv4: exactly four 1-3 digit octets, since
+  `IPAddress.TryParse` accepts "12345" and "1.2"; IPv6: contains `:`), so a captive portal's HTML page
+  or a v4 answer on the v6 endpoint reads "Unavailable". Each family fails independently — IPv6 missing
+  on a v4-only network is a normal outcome (logged at Info), not an error banner. A generation counter
+  lets only the newest lookup publish. **The public addresses are deliberately not in the diagnostics
+  export** (`GetPrimaryConfigRows`): an export is shared, and it would carry the one address the user
+  has not otherwise given anyone. The Network Help topic discloses the call as well.
 - **Throughput** — live down/up **Mbps** as TWO stacked sparklines with **independent** dynamic
   scales (the comp's layout — unlike the Dashboard's single shared scale), via a second
   `NetworkUsageSampler` instance on a 1 Hz timer.
@@ -1209,7 +1268,11 @@ Settings. Panels:
   `CancellationTokenSource`), console-style output with record type (`DnsLookupProvider`). The field is
   seeded with `example.com` but **nothing resolves until Look up is pressed**, and Refresh re-resolves
   only once a lookup has been run — a manual refresh must not become the first packet the panel ever
-  sent. It, too, used to fire from the constructor.
+  sent. It, too, used to fire from the constructor. **The latest submit wins:** each lookup takes a
+  generation number and publishes only while it is still current, because a single-label name can take
+  seconds to fail and used to land after, and overwrite, a newer lookup. Look up shows a `Resolving
+  <host>…` footer at once so a slow answer does not read as an ignored Enter; Refresh re-resolves
+  without it.
 - **Open in browser** — both probe panels' fields carry a small link icon that opens the typed host in
   the default browser (`HostLink` composes the URL, `IWebLinkOpener` launches it). **https only**, the
   rule `ToolkitRunner` already enforces on every URL the app opens: a router's admin page reached from
@@ -1346,6 +1409,10 @@ behind it that must not be quietly undone:
   thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
   into the selection first, **on the tunneling press**, so it lands before the flyout opens.
   `ContextRequested` was tried for that and silently never fired.
+- **A plain click on the row that is the whole selection deselects it** (`ProcessRowClick`). It is
+  decided on the tunneling press (click count 1, no modifier, left button) and carried out by the row's
+  tap, since by the tap a double-click's first click has already changed the state; a drag cancels the
+  tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
@@ -1365,6 +1432,15 @@ behind it that must not be quietly undone:
   comment says. `SortableColumnHeader` gained `ContentAlignment`: both call
   sites used to align the *control*, which shrank it to its label and left the rest of the column dead
   to a click.
+- **Alignment rule: text columns left, numeric columns right, each header aligned with its values; the
+  toolbar filter left and its actions right.** Numeric means a measure (CPU, Memory, Disk, GPU) or an
+  identifier (PID), so PID is right-aligned like the rest and its header leads with the sort arrow
+  (`ArrowFirst`) so the label sits flush with the digits. PID alone carries a small right inset (`PidInset`)
+  on header, cells and placeholder bar, because the column gap is 4px and STATUS, its default neighbor, is
+  left-aligned text. The header takes it through `SortableColumnHeader.ContentInset` (button padding), never
+  a Margin, so the whole cell stays clickable and the drag drop-targets keep their full bounds. PID's
+  minimum width is 59px, the most that leaves CPU (72 / 0.85) as the column that sets `MinTableWidth`; a
+  seven-digit PID can still clip at that floor. Keep any new column to the same rule.
 Shared code this produced: `OrderResolver` (`WidgetOrders.Resolve`'s body, now reached by columns too),
 `EnumListCodec`, and the promotion of `CheckBox.optionCheck` and `ToggleButton.optionsToggle` to
 `SharedStyles` (their File Explorer copies deleted — a local style silently outranks the shared one).
@@ -1381,10 +1457,12 @@ CPU %/Memory % come from the shared `SystemMetricsService`.
 drill-down per the design comp: a left **resource-selector** rail (CPU · Memory · Disk 0 (C:) · GPU ·
 Ethernet) of `ResourceRow` item VMs swaps a right **detail pane** — one large utilization chart
 (reuses the shared `Sparkline`, fixed 0–100 axis + gradient fill + background grid) plus a 4-tile stat
-strip (`StatTile` item VMs). The **rail scope** segments ("Primary" / "All devices", which collapse the
-multi-instance categories to one row each) head the rail itself: over the whole page they read as if they
-scoped the detail pane, which they never did. The **adapter row** shows both directions, "↓ receive" over
-"↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
+strip (`StatTile` item VMs). The rail **always lists every detected device**: a Primary / All devices
+toggle (and the persisted `PerformanceShowAllDevices` setting behind it) was removed because "All devices"
+is the only view worth having, and hiding a second disk or GPU behind a switch made the page look as if it
+were missing hardware. An old `settings.json` still carrying that key loads fine, since the store ignores
+members `AppSettings` no longer has (`SchemaVersion` stays 1). The **adapter row** shows both directions,
+"↓ receive" over "↑ send", each in its own series tint — under the adapter's name a receive-only figure described half its
 traffic. This is the one chart on which every grid line is labelled both ways, both axes are named, and the
 per-core / per-engine cells carry their two ends; see the charting grades in AGENTS.md. Self-contained tab under `src/Tabs/Performance/` (`PerformanceView` +
 `PerformanceViewModel`), master-detail like File Explorer via **`ISelfScrollingPage`**, reusing the
@@ -1433,8 +1511,19 @@ total whole from 10 GB up and to one decimal below, so a small total never reads
 sampled per tick (`GpuAdapterSample.DedicatedUsedBytes`: PDH `\GPU Adapter Memory(*)\Dedicated Usage` on
 Windows, amdgpu's `mem_info_vram_used` on Linux). An adapter whose total is under 1 GiB reads MB for both
 ("0 / 460 MB"); an unknown usage reads "— / 12 GB", never a fake 0; an unknown total is a bare "—"
-(`GpuMemoryFormatter`). **The separate dedicated-vs-shared GPU memory work (the next sprint's item) builds
-on this convention: each tile is "usage / total" under a label naming the pool.**
+(`GpuMemoryFormatter`). **Shared GPU memory has its own tile, "Shared memory in use"**, right after the
+VRAM one and on the same convention: each tile is "usage / total" under a label naming its pool. The total is
+DXGI's `SharedSystemMemory` (`DeviceInstance.SharedBytes`) and the usage is PDH
+`\GPU Adapter Memory(*)\Shared Usage` summed across `_phys_N` — the third counter on the sampler's one query,
+and exactly the pair Task Manager's "Shared GPU memory" reads, with no other arithmetic. On Linux it is
+amdgpu's GTT (`mem_info_gtt_total` / `mem_info_gtt_used`), the system memory the card can map; other drivers
+publish none. **An adapter whose shared total is unknown or 0 gets no tile at all** rather than a dash or a
+zero, so a GPU row has four tiles or five. An integrated GPU shows both: a small dedicated carve-out and a
+large shared pool. A saved tile order from before the tile existed places it beside "VRAM in use", its
+declared neighbor. **One saved tile order covers every GPU** (`performance.stats.gpu`), so reordering tiles
+on a GPU with no shared pool saves an order without the shared tile; on a GPU that has one, the tile then
+returns beside "VRAM in use" rather than where it was last dragged. On Windows every real adapter reports a
+shared total, so in practice this arises only on Linux with a non-AMD card beside an AMD one.
 
 **GPU Temp and Power are live too** (2026-07). This **supersedes the old claim that
 there was no source** — there is none *in-box*, but every display driver installs its vendor's own SDK, so
@@ -1468,18 +1557,36 @@ outside `src/Tabs/Performance/` only to add `GpuPciId` to `GpuAdapterProvider` a
 
 **`Reveal(deviceId)` is the jump in**, the counterpart to the detail header's jumps out, and the Dashboard
 is its first caller. Rows carry the `DeviceInstance` id they were built from, so an id names one device
-rather than a kind. Two decisions inside it: a reveal **expands the rail to "All devices"** when the
-Primary scope hides the device — the caller asked for that one, not the primary of its kind — and one
-that arrives **before its row exists** is held until the async inventory load builds it, the arrangement
-the Network tab already uses for an early adapter reveal. That second one needed a fix to hold: the rail
+rather than a kind. Two decisions inside it. Every device is always in the rail, so a reveal never has
+anything to un-hide. And a reveal that arrives **before its row exists** is held until the async inventory
+load builds it, the arrangement the Network tab already uses for an early adapter reveal. That second one
+needed a fix to hold: the rail
 matched its surviving selection **by reference**, and a rebuilt disk or GPU row is a new object, so the
 toolbar Refresh dropped the selection back to the CPU. It matches by device id now.
 
-## Toolkit
+**The detail header carries the resource's alert bell**, beside its name and before the jump link: each
+`ResourceRow` holds the shared `AlertSwitch` for its kind (`Alert`), so every disk shows the one
+disk-activity switch and every GPU the one GPU switch, exactly as the watcher reads them; the adapter row
+holds none and the bell hides itself, so the link sits where it always did. Written up under *Settings → Alert bells*.
 
-Designed as a **"Commands"** tab and shipped as **Toolkit** (nav label, folder, namespace and type
-names). "Commands" survives only in older discussion; nothing in the repo uses it, so **always write
-Toolkit**. It is the **ninth** tab, sitting between Hardware and Settings, which is why the
+## Toolkit (shown as Utilities)
+
+Designed as a **"Commands"** tab, built as **Toolkit**, and renamed **Utilities** in the UI (work item
+33): Toolkit sat badly beside the plain-noun page names. **The UI name is Utilities** — nav label, page
+header, Help copy and the Help shortcuts group — while code, folders, namespaces, type names,
+`ShortcutScope.Toolkit`, widget ids (`toolkit.form`, `toolkit.log`) and the persisted settings
+(`PinnedCommands`, `CustomCommands`) all keep **Toolkit**, so no saved state moves. Write "Utilities"
+in anything a user reads and "Toolkit" for the code.
+- **The old name still finds the page.** `NavItem.Keywords` carries aliases (`Toolkit`, `Tools`,
+  `Commands`) and `PageSearchProvider` scores them after the subtitle, so a current name always outranks
+  an alias. Because the page results are read from the nav list, a future rename needs only a keyword.
+- **Stored recents heal on load.** `RecentSearches.TryDecode` maps a persisted Page recent keyed
+  `Toolkit` to `Utilities` (key and, when it is the old name, the title), so an existing install lists the
+  new name and reopening finds the page. Narrow on purpose: Page category and that one key only.
+- The Execution Log export suggests `DashDetective-utilities-log-…`, and its text header reads
+  "Utilities execution log". The Help topic key `page.toolkit` is an internal identity and stays.
+
+It is the **ninth** tab, sitting between Hardware and Settings, which is why the
 Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 - **What is built:** a filter bar (search box + category chips + result count) over a grouped command
   list, beside a pinned 340px **Execution Log** panel. The taxonomy is treated as *format*, not data:
@@ -1562,9 +1669,16 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   collapses it back to the one section asked for. Two consequences: `RebuildGroups` counts **distinct rows**
   for the count label, and `ToolkitView.FindRows` flashes **every** row carrying a revealed command rather
   than the first. Pinning still lifts rather than copies, so a pinned labelled row leaves both sections.
-- The Execution Log **exports** to a text file (`BuildLogText` + a save picker in the view code-behind,
-  the `SettingsView.SaveAsync` flow). Stanzas keep the order they are shown in — newest first — so the
-  file reads as what was on screen.
+- The Execution Log **exports** in the same five formats as the system report (`DiagnosticsFormats.Offered`,
+  never a second list) through the shared `FileSave` dialog. **Text is still the `BuildLogText` transcript**,
+  untouched, because users rely on its layout; every other format renders `ToolkitLogExport.BuildReport` —
+  a `DiagnosticsReport` with one "Run n" section per stanza and Started / Command / Output rows — through
+  the shared renderers, and `ToolkitViewModel.BuildLog(format)` is the one place that choice is made.
+  Stanzas keep the order they are shown in — newest first — so the file reads as what was on screen. The
+  Markdown renderer turns a newline into `<br>` so multi-line output stays inside its table cell. No exit
+  code row: a `ToolkitLogEntry` does not carry one. Known limits: Markdown does not escape `&` or `\`
+  (doing so would change the system report's existing output), so output holding `&amp;` or a trailing
+  backslash can render differently from how it was written.
 - **Pinned favourites** persist through `AppSettings.PinnedCommands`, encoded by `ToolkitPins` as one
   opaque string (the `RecentSearches` pattern, ASCII record separator). Pins are stored **by command
   text, not by index**, so a list that gains or loses a row between sessions cannot silently re-point
@@ -1741,6 +1855,14 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   rank every tip below the tour. The shortcut table is deliberately **not** indexed here, since
   `ShortcutSearchProvider` already covers it and a binding listed twice under two tags only crowds the
   dropdown.
+- **The card fits its window.** Both modals share `Border.modalCard` (centered, a 24 margin on every side)
+  and set only a `MaxWidth` / `MaxHeight`: Help's are 660 and 640, with `HorizontalAlignment="Stretch"` so
+  it fills up to 660 in a roomy window. **Never a fixed `Width`.** Help's was 660, so below ~708 wide the
+  card overflowed the window, and with no margin a short window left it taller than itself: the end of the
+  body was cut off and unreachable, which read as the dialog being stuck after a resize. The body is the
+  `*` row, so it is what shrinks and scrolls while the header and tabs stay. The scrim is a stretched
+  `Border` in the shell's `Panel`, inside the `ScaleHost`, so nothing in the layer holds a size and the
+  card recenters on maximize, restore and edge drags. `ModalCardTests` pins the class and the missing Width.
 
 ## Storage
 
@@ -1760,6 +1882,28 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
   `ILiveSamplingPage` / `IActivatablePage`. Non-NVMe drives show "—" for Temp; SATA/HDD/USB drive temperature stays deferred
   (needs admin or vendor SDKs). No new packages, no new shared controls. (**GPU** temperature is no longer
   deferred — it is live on the Performance tab via per-vendor SDKs; see the write-up in the Appendix.)
+  Each drive card's header carries the **low-free-space alert bell** beside its health pill — one shared
+  flag (`StorageViewModel.LowDiskSpaceAlert`, handed to every `DriveCard`), placed on the drive because
+  the alert is about the usage bar beneath it. See *Settings → Alert bells*.
+
+## Hardware
+
+*Shipped — branch `hardwareCardHeights`, 2026-10.*
+
+**Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
+already arranges every child at its row's height (the tallest card's). The cards used to opt out with
+`VerticalAlignment="Top"`, so each drew at its own content height and a row's bottoms never lined up
+(Processor beside Graphics, Storage Devices beside Memory). Two decisions inside it:
+
+- **Alignment is the panel's job, not a height ladder.** A fixed height per card would clip the moment
+  Text size grows — the `TextSize*` ladder is rewritten at runtime and a Dimensions token is not — while
+  the row height tracks the tallest card's content at any text or interface size, and is the same arrange
+  pass the drag preview uses. Do not put a `Height` on the card or restore `Top` alignment;
+  `HardwareCardHeightTests` pins both.
+- **The one token is a floor.** `HardwareCardMinHeight` (Dimensions.axaml) keeps a short card alone on its
+  row (Sensors, or Storage Devices once the grid wraps) from looking stubby. It is a `MinHeight`, so a card
+  still grows past it with its rows and with text size, and content stays top-aligned inside the stretched
+  surface, the spare space falling at the bottom.
 
 ## Page lifecycle
 
@@ -1825,7 +1969,7 @@ single to read and no Linux arm — it takes `Unsupported*` and the default.
 
 **A widget is a `WidgetPanel`, and a page's widgets are children of one `WidgetBoard`.** Nineteen
 widgets across seven tabs were hand-rolled `Border Classes="panel"` + `StackPanel` + `panelTitle`; that
-shape now exists once. Five rules, all load-bearing:
+shape now exists once. Six rules, all load-bearing:
 
 1. **A titled panel is a `WidgetPanel`.** `Title`, `Subtitle`, `HeaderLead` (content against the title),
    `HeaderContent` (content at the far end), `WidgetId` as `{page}.{slug}`. A surviving
@@ -1855,6 +1999,48 @@ shape now exists once. Five rules, all load-bearing:
    the pointer capture on *any* release, which stripped the capture a button took on its own press —
    every button on Dashboard, Network and Storage was dead for three phases, with build, tests and
    screenshots all clean. Only a drag that actually took the capture may release it.
+6. **A reorderable panel arranges every child on whole device pixels** (work item 89). Avalonia's
+   arrange rounds a child's origin to the nearest pixel and its size *up*, separately, so a slot with
+   fractional edges could end one pixel past its panel — and the nearest clipping ancestor (a
+   `UserControl`, an `ItemsControl`, `WidgetPanel` itself, all of which clip to their bounds by
+   default) cut off the card's right border and the bottom of its top-right corner. It showed at 125 %
+   display scale and High contrast, on roughly two window widths in three. `ReorderablePanel.Placed`
+   now snaps both edges of every slot through `PixelSnap` with the framework's own layout scale, so its
+   rounding is a no-op, and both panels measure at the snapped width they will arrange at. Three
+   decisions: the edges round **half up**, not to even, so a span moved by whole pixels keeps its
+   length; a span that would snap under its child's `MinWidth` grows to it **away from the panel's
+   edge**, since the arrange would otherwise center the overflow across both sides, and that minimum is
+   counted in pixels **the framework's way** (truncated to 8 digits, then rounded up), or at a scale
+   such as 110 % its clamp adds back the pixel the snap left out; and the length is kept a hair
+   (1e-4 px) short, so the framework's round-up cannot add a pixel through a floating-point error,
+   which at 110 % it does for about one width in a hundred. The snap is in local units, so inside a
+   `ScaleHost` edges land on the layout grid rather than on device pixels; it still keeps every child
+   inside its panel, which is what the clip needs.
+
+**A widget held between two slots settles on one.** It used to flicker on every page with a board,
+worst on Network: the drop target was measured against the live slots, which include the preview, so
+moving the widget shifted the slots under a still pointer, which flipped the target back, which shifted
+them again. A narrow widget held over a wide one is over the wide one's slot in *both* orders, so there
+was no stable answer at all. `DropTarget` (`src/Shared/Layout`) fixes it in the drag model, not with a
+redraw delay, by two rules applied together:
+
+- **The target is measured against the slots frozen when the drag began**, which nothing during the
+  drag can move. The preview still re-packs live; only the question "which slot is this over" reads
+  the snapshot. It is retaken only when the slot count changes mid-drag — a child hidden, shown or
+  removed. A generator *adding* a child does not change it: the preview order never takes new ones in.
+- **Hysteresis: the target changes only once the dragged box's center is 0.2 of the smaller slot past
+  the boundary** (`DropTarget.Hysteresis`), on each axis. A fraction rather than a DIP margin, so it
+  scales with the interface size. Any fraction under 1 leaves every slot reachable; a fifth swallows a
+  hand's jitter while a swap still lands near the boundary the user sees. Straight down into the next
+  row still works — it just has to be a fifth of a row into it.
+
+**A known trade-off.** With unequal widths, the frozen slots no longer match the preview after the first
+swap, so the drop hint can sit away from the dragged box: a narrow widget swapped past a wide one is drawn
+over the wide one's new place while the hint marks its own. Rule 7's "where it already looks like it will
+land" holds at drag start. Equal-width slots are unaffected, since their geometry does not change.
+
+The keyboard path never asks a drop target anything: `TryMoveFocused` moves by one index, so it is
+unchanged.
 
 Also shipped on this branch: `WidgetTable` (header above a scrolling body, one gutter for both — Network
 connections and Storage partitions only; File Explorer measures column drops off its own header width and
@@ -1921,7 +2107,8 @@ load-bearing:
 7. **A drag takes the slot it covers, measured from the box rather than the pointer inside it.** Asking
    which side of a slot's middle the *pointer* sits on made the answer depend on where in the item it
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
-   landed one slot short — in two columns, the slot up and to the right.
+   landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
+   from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.
@@ -1948,7 +2135,8 @@ the disk multi-instance pattern. Key pieces (the DXGI research below was correct
   authoritative LUID→name map and flags software adapters. Called via **raw vtable function pointers, not
   `[ComImport]`** (built-in COM is disabled by a runtime switch: `NotSupportedException: Built-in COM has
   been disabled`); no `unsafe`, no csproj change. Also exposes true VRAM (WMI `AdapterRAM` is 4 GB-capped),
-  which now feeds the Performance tab's GPU **VRAM** tile — carried per adapter on
+  which now feeds the Performance tab's GPU **VRAM** tile (and its shared total the **Shared memory**
+  tile) — carried per adapter on
   `DeviceInstance.VramBytes` (see the Performance write-up in the Appendix). No longer deferred.
 - Per-GPU utilisation is **attributed by adapter LUID**: the PDH `\GPU Engine(*)` instances are keyed by
   `luid_0x{High:x8}_0x{Low:x8}`; `GpuUsageSampler.SampleAdapters()` groups by that token.

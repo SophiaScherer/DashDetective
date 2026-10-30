@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Shared;
 using System;
+using System.Collections.Generic;
 using System.Windows.Input;
 
 namespace DashDetective.Shell.Navigation;
@@ -15,8 +16,9 @@ namespace DashDetective.Shell.Navigation;
 /// </summary>
 public partial class NavItem : ObservableObject {
     public NavItem(string label, string title, string subtitle, Geometry icon,
-                   ViewModelBase page, Action<NavItem> onSelected) {
+                   ViewModelBase page, Action<NavItem> onSelected, IReadOnlyList<string>? keywords = null) {
         Label = label;
+        Keywords = keywords ?? [];
         Title = title;
         Subtitle = subtitle;
         Icon = icon;
@@ -27,6 +29,9 @@ public partial class NavItem : ObservableObject {
     public string Label { get; }
     public string Title { get; }
     public string Subtitle { get; }
+
+    /// <summary>Other names the page answers to in search, so a renamed page is still found by its old name.</summary>
+    public IReadOnlyList<string> Keywords { get; }
     public Geometry Icon { get; }
     public ViewModelBase Page { get; }
     public ICommand SelectCommand { get; }

@@ -51,7 +51,6 @@ public sealed class SettingsStoreTests : IDisposable {
             AlertSustainSeconds = 30,
             RefreshIntervalSeconds = 2,
             LaunchAtStartup = true,
-            PerformanceShowAllDevices = true,
             CpuDetailedView = true,
             GpuDetailedView = true,
             NvidiaGpuMetrics = true,
@@ -99,6 +98,23 @@ public sealed class SettingsStoreTests : IDisposable {
         Assert.True(loaded.AlertCpuEnabled);
         Assert.False(loaded.AlertGpuEnabled);   // ships off, but with a number already in the box
         Assert.Equal(90, loaded.AlertGpuPercent);
+    }
+
+    /// <summary>Performance's Primary/All scope was removed. A file still carrying its key must load, with
+    /// every other key honored and the omitted ones at their defaults; SchemaVersion stays 1 because an
+    /// unknown member is ignored, not a break.</summary>
+    [Fact]
+    public void Load_FileWithTheRemovedPerformanceScopeKey_LoadsAndIgnoresIt() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "Theme": "Light", "PerformanceShowAllDevices": true, "CpuDetailedView": true }
+            """);
+
+        var loaded = new SettingsStore(_path).Load();
+
+        Assert.Equal(AppTheme.Light, loaded.Theme);
+        Assert.True(loaded.CpuDetailedView);
+        Assert.True(loaded.ShowInTray);   // an omitted key still gets its non-default initializer
+        Assert.Equal(90, loaded.AlertCpuPercent);
     }
 
     /// <summary>A file saved before Graph colors existed keeps its choice under the old key.</summary>

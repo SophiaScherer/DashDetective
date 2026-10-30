@@ -52,8 +52,15 @@ public static class MarkdownReportFormatter {
     }
 
     /// <summary>A pipe would end the table cell early, and the values carry them (the Network adapter
-    /// names and the "↓ x / ↑ y" throughput line are the realistic sources).</summary>
-    private static string Escape(string value) => value.Replace("|", "\\|", StringComparison.Ordinal);
+    /// names and the "↓ x / ↑ y" throughput line are the realistic sources). A newline would end the row,
+    /// so it becomes a <c>&lt;br&gt;</c>, and a literal "&lt;" (a "&lt;DIR&gt;" in command output) is
+    /// entity-escaped so it is not read as a tag.</summary>
+    private static string Escape(string value) => value
+        .Replace("|", "\\|", StringComparison.Ordinal)
+        .Replace("<", "&lt;", StringComparison.Ordinal)
+        .Replace("\r\n", "<br>", StringComparison.Ordinal)
+        .Replace("\n", "<br>", StringComparison.Ordinal)
+        .Replace("\r", "<br>", StringComparison.Ordinal);
 }
 
 /// <summary>

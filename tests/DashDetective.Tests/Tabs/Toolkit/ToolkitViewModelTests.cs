@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using DashDetective.Tabs.Toolkit;
 using DashDetective.Tests.Fakes;
 using System;
@@ -249,6 +250,61 @@ public class ToolkitViewModelTests {
 
         Assert.Contains("DashDetective", text, System.StringComparison.Ordinal);
         Assert.False(string.IsNullOrWhiteSpace(text));
+    }
+
+    /// <summary>Text keeps the transcript users already rely on; it must not be re-rendered as a report.</summary>
+    [Fact]
+    public async Task BuildLog_Text_IsTheTranscriptBuildLogTextWrites() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var text = vm.BuildLog(DiagnosticsFormat.Text);
+
+        // The header's second line is "now", which can tick between the two calls; everything after it is fixed.
+        static string[] AfterHeader(string s) => s.Split(Environment.NewLine).Skip(2).ToArray();
+        Assert.Equal(AfterHeader(vm.BuildLogText()), AfterHeader(text));
+        Assert.StartsWith("DashDetective — Utilities execution log", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>The save dialog offers the system report's list, and each choice renders a different file.</summary>
+    [Fact]
+    public async Task BuildLog_EveryOfferedFormat_RendersTheLoggedCommand() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var rendered = DiagnosticsFormats.Offered.Select(vm.BuildLog).ToList();
+
+        Assert.True(DiagnosticsFormats.Offered.Count > 1);
+        Assert.All(rendered, r => Assert.Contains("first-command", r, StringComparison.Ordinal));
+        Assert.Equal(rendered.Count, rendered.Distinct().Count());
+    }
+
+    /// <summary>Exporting before anything has run must still write a file the format can open.</summary>
+    [Theory]
+    [InlineData(DiagnosticsFormat.Text)]
+    [InlineData(DiagnosticsFormat.Json)]
+    [InlineData(DiagnosticsFormat.Markdown)]
+    [InlineData(DiagnosticsFormat.Html)]
+    [InlineData(DiagnosticsFormat.Csv)]
+    public void BuildLog_EmptyLog_RendersAWellFormedFile(DiagnosticsFormat format) {
+        var rendered = Page().BuildLog(format);
+
+        Assert.False(string.IsNullOrWhiteSpace(rendered));
+        if (format == DiagnosticsFormat.Json)
+            System.Text.Json.JsonDocument.Parse(rendered).Dispose();
+    }
+
+    [Fact]
+    public async Task BuildLog_StructuredFormat_KeepsTheOrderTheLogIsShownIn() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("older"));
+        await vm.RunCommand.ExecuteAsync(MissingTool("newer"));
+
+        var markdown = vm.BuildLog(DiagnosticsFormat.Markdown);
+
+        Assert.True(markdown.IndexOf("newer", StringComparison.Ordinal) <
+                    markdown.IndexOf("older", StringComparison.Ordinal),
+                    "export order does not match the panel");
     }
 
     // ----- Pins -----

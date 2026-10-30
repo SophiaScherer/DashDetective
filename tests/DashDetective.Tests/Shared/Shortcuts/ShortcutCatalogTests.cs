@@ -92,6 +92,14 @@ public class ShortcutCatalogTests {
     }
 
     [Fact]
+    public void HelpGroups_TitleTheUtilitiesScopeByThePagesName() {
+        var titles = ShortcutCatalog.HelpGroups.Select(g => g.Title).ToList();
+
+        Assert.Contains("Utilities", titles);
+        Assert.DoesNotContain("Toolkit", titles);
+    }
+
+    [Fact]
     public void HelpGroups_KeepEachScopeToOneGroup() {
         var titles = ShortcutCatalog.HelpGroups.Select(g => g.Title).ToList();
 

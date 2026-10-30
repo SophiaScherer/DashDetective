@@ -15,6 +15,9 @@ public static class Log {
     private static readonly object Gate = new();
     private static readonly string? LogPath = BuildLogPath();
 
+    /// <summary>Records an expected, ordinary outcome worth a trace (e.g. no IPv6 route on a v4-only network).</summary>
+    public static void Info(string context, Exception? error = null) => Write("INFO", context, error);
+
     /// <summary>Records a soft-failed operation (the caller still recovers). <paramref name="context"/>
     /// is a short "where/what" string.</summary>
     public static void Warn(string context, Exception? error = null) => Write("WARN", context, error);

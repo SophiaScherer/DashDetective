@@ -401,10 +401,11 @@ internal static class ProcFixtures {
 
     /// <summary>
     /// Stages a discrete AMD card (Radeon RX 6800 XT, <c>1002:73df</c>) as the amdgpu driver exposes it:
-    /// the PCI id files, the two symlinks an adapter is identified by, the utilisation and VRAM
-    /// attributes, and the card's own hwmon. Values follow <c>Documentation/ABI/testing/sysfs-driver-amdgpu</c>
+    /// the PCI id files, the two symlinks an adapter is identified by, the utilisation, VRAM and GTT
+    /// (shared system memory) attributes, and the card's own hwmon. Values follow <c>Documentation/ABI/testing/sysfs-driver-amdgpu</c>
     /// and <c>sysfs-class-hwmon</c> — <c>gpu_busy_percent</c> is a bare 0–100 integer,
-    /// <c>mem_info_vram_total</c> is <b>bytes</b>, <c>temp1_input</c> is <b>millidegrees</b> and
+    /// <c>mem_info_vram_total</c> and <c>mem_info_gtt_total</c> are <b>bytes</b>, <c>temp1_input</c> is
+    /// <b>millidegrees</b> and
     /// <c>power1_average</c> is <b>microwatts</b>. The three unit scales are the point: each is a
     /// different divisor, and a reader that picks the wrong one still produces a plausible-looking number.
     /// <c>renderD128</c> is staged so a walk that does not skip render nodes double-counts the card.
@@ -421,6 +422,8 @@ internal static class ProcFixtures {
             .WithFile("/sys/class/drm/card0/device/gpu_busy_percent", "37\n")
             .WithFile("/sys/class/drm/card0/device/mem_info_vram_total", "17179869184\n")
             .WithFile("/sys/class/drm/card0/device/mem_info_vram_used", "1073741824\n")
+            .WithFile("/sys/class/drm/card0/device/mem_info_gtt_total", "8589934592\n")
+            .WithFile("/sys/class/drm/card0/device/mem_info_gtt_used", "268435456\n")
             .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/name", "amdgpu\n")
             .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/temp1_input", "52000\n")
             .WithFile("/sys/class/drm/card0/device/hwmon/hwmon4/temp1_label", "edge\n")
@@ -430,7 +433,7 @@ internal static class ProcFixtures {
     /// <summary>
     /// Stages a discrete NVIDIA card (<c>10de:2504</c>, an RTX 3060) as the proprietary driver exposes it —
     /// the complement to <see cref="WithAmdgpuCard"/>. The PCI id files are the same kernel-generic set, but
-    /// there is <b>no <c>gpu_busy_percent</c>, no <c>mem_info_vram_total</c> and no hwmon</b>: the blob
+    /// there is <b>no <c>gpu_busy_percent</c>, no <c>mem_info_vram_total</c>, no GTT and no hwmon</b>: the blob
     /// publishes none of them, which is why utilisation needs <c>nvidia-smi</c> and why this card must
     /// degrade to "—" rather than to zero. <c>driver/module/version</c> is present, as the NVIDIA module's
     /// is; amdgpu's is not, so the pair covers both branches of the driver-version read.
