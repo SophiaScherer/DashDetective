@@ -1412,10 +1412,11 @@ stays in its tab folder.
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
-                                     First/Last stop-bar variants are the Network pager's alone: paging is
-                                     navigation rather than disclosure, and a stop bar only reads against a
-                                     stroked arrow)
+                                     caret sets Fill, not Stroke. The stroked ChevronLeft/Right pair is the
+                                     Network pager's step arrows alone: paging is navigation rather than
+                                     disclosure. CaretFirst/CaretLast, the pager's skip pair, are FILLED
+                                     (a Caret triangle plus a stop-bar rectangle) so the mark reads as a
+                                     triangle, not a letter, and shares the caret family's fill)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
         ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
@@ -1927,10 +1928,29 @@ stays in its tab folder.
                                                          the control stays general; its tooltip is on a
                                                          WRAPPER because a disabled button takes no
                                                          pointer-over and the disabled state is the one
-                                                         needing an explanation. The box is Classes="flat"
+                                                         needing an explanation. THE CONSOLE LINE HEIGHT IS
+                                                         SET IN CODE from the font size (ConsoleCapacity.
+                                                         LineHeightFor), never a literal, so Text size
+                                                         spaces lines instead of overlapping them. The box is Classes="flat"
                                                          like every box inside a field Border — Fluent's
                                                          focus block otherwise paints a filled rectangle
                                                          around the text alone, beside the icon)
+                                ConsoleCapacity.cs      (pure arithmetic for the console box: lines that
+                                                         fit a height, and the line height derived from the
+                                                         font size at 1.25x — 15 at the default. Derived,
+                                                         never a literal, so Text size spaces lines rather
+                                                         than overlapping them; the box's padding, footer
+                                                         line and gap are the reserved height)
+                                ConnectionsTableLayout.cs
+                                                        (the connections table's responsive columns:
+                                                         Protocol drops first, then State, then Remote;
+                                                         Process stays. Minimums are at 100 % text and are
+                                                         MULTIPLIED BY THE TEXT SCALE, which the view reads
+                                                         off the header's font size. All columns are STARS:
+                                                         the header and each row are separate grids, so an
+                                                         Auto column would size to each one's own content
+                                                         and misalign. Over TableColumns, like File
+                                                         Explorer's list)
                                 HostLink.cs             (the https URL a typed target means, or null when
                                                          it is not a usable host — which is what leaves the
                                                          link icon disabled. Uri.CheckHostName decides, and

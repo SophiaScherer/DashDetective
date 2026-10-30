@@ -133,8 +133,34 @@ stays in `PagerMath`. `HasPreviousPage`/`HasNextPage` drive `CanExecute` and are
 `RebuildPageLinks`; **the failure path must reset them by hand** (unlike `PageLinks`, stable commands
 survive a `Clear()`, so an unavailable list would otherwise keep a live pager over nothing). Styled
 `Button.pageArrow`, which copies File Explorer's `navBtn` disabled treatment — dim the glyph, keep the
-surface transparent — because Fluent's default disabled state paints a filled box. No ellipsis: the
+surface transparent — because Fluent's default disabled state paints a filled box. **The skip pair is
+filled and the step pair is stroked, on purpose.** First/last draw `Icons.CaretFirst`/`CaretLast` — a
+Caret-family triangle against a filled stop-bar rectangle, as `Path.filled` — because the stroked
+bar-and-chevron read as a letter and sat apart from the app's one disclosure glyph. Prev/next stay stroked
+chevrons: a single step is not a skip, and the pair is left alone until a second reason to change it. The
+bar is a closed rectangle, not a stroke, so one `Fill` colors the whole mark and the disabled dim (an
+`Opacity`) needs no per-geometry case. Geometry rather than a font glyph, so it renders the same on
+Windows and Linux. No ellipsis: the
 provider's 1000-row cap over a page size of 100 means at most ten numbers, which fit on one row.
+
+- **Network type follows the shared scale.** Each Network text element takes the rung its equivalent
+elsewhere uses: connection rows (process, remote address, state, protocol) are **Body**, as the Processes
+and Storage table rows are; headers are the shared `colHead`; IP Configuration is the shared `InfoRow`;
+adapter name/description match the Performance device cards; the console is Caption like the Toolkit log.
+Nothing is a literal. Three things around the text had to learn to grow with it, because a fixed size
+holding scaled text is where Text size breaks: the **connection row** and the **pager buttons** use
+`MinHeight` rather than `Height`; the **console's line height is derived from its font size**
+(`ConsoleCapacity.LineHeightFor`, 1.25x, so 15 at the default) instead of a literal 15, and the capacity
+it reports is re-derived when the size changes — a fixed 15 overlapped the lines at 200 %. The **connections table drops columns as it narrows or the text grows**
+(`ConnectionsTableLayout`: Protocol, then State, then Remote address; Process stays), its minimums scaled by
+the text size, and every cell ellipsizes inside its own column so values and headers never run into the next.
+The Throughput readouts wrap onto a second line before they would meet the peak caption, and the Ping/DNS
+field and its button use minimum heights so they grow together. The Throughput caption wraps, as it is a
+short sentence. **The console text is clipped by design, not wrapped**: it is a fixed-width terminal whose
+line count is the capacity arithmetic, so a wrapped line would break `ConsoleCapacity`; a long line is cut
+at the box edge like a real terminal. The page size
+(100 rows) and the table's 240px body cap do not depend on row height: the body scrolls. Pager step
+arrows are `IconSizeSmall`, like other row-level icon buttons.
 
 - **Cross-tab jumps from Performance.** The Performance detail header carries a **"View in …" link** to the
 tab that owns the selected device: a disk row to **Storage** (selecting that drive), the network row to

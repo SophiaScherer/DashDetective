@@ -106,11 +106,6 @@ public static class Icons {
     public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
     public static readonly Geometry ChevronRight = Geometry.Parse("M7,4 L12,9 L7,14");
 
-    // Skip-to-end chevrons for the same pager: the same stroke against a stop bar, so the four arrows
-    // read as one set with ChevronLeft/ChevronRight above.
-    public static readonly Geometry ChevronFirst = Geometry.Parse("M12,4 L7,9 L12,14 M5,4 V14");
-    public static readonly Geometry ChevronLast = Geometry.Parse("M6,4 L11,9 L6,14 M13,4 V14");
-
     // Filled disclosure carets — the app's one expand/collapse glyph, matching the ▾/▸ the widget
     // headers and the Processes table draw as text. FILLED, not stroked like everything above: a
     // consumer must set Fill rather than Stroke. Authored as an 8x5 triangle centred in the 18x18 space,
@@ -119,6 +114,12 @@ public static class Icons {
     public static readonly Geometry CaretRight = Geometry.Parse("M6.5,5 L6.5,13 L11.5,9 Z");
     public static readonly Geometry CaretUp = Geometry.Parse("M5,11.5 L13,11.5 L9,6.5 Z");
     public static readonly Geometry CaretDown = Geometry.Parse("M5,6.5 L13,6.5 L9,11.5 Z");
+
+    // Skip-to-start/end for the Network pager: a Caret-family triangle against a filled stop bar, so a
+    // skip reads as the same glyph family as the step arrows and the disclosure carets. FILLED like the
+    // carets (set Fill, not Stroke); the bar is a closed rectangle rather than a stroke for that reason.
+    public static readonly Geometry CaretFirst = Geometry.Parse("M4.5,5 H6 V13 H4.5 Z M12.5,5 V13 L7.5,9 Z");
+    public static readonly Geometry CaretLast = Geometry.Parse("M12,5 H13.5 V13 H12 Z M5.5,5 V13 L10.5,9 Z");
 
     /// <summary>
     /// The disclosure caret for a direction, used by the nav bar's edge puck. A plain map — the rule

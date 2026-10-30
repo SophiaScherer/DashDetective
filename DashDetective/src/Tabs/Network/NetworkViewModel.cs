@@ -436,6 +436,42 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         }
     }
 
+    // ----- Responsive connections columns -----
+
+    // Unconstrained until the view reports, so the first layout pass shows every column.
+    private double _tableWidth = double.PositiveInfinity;
+    private double _tableTextScale = 1;
+    private int _visibleColumns = ConnectionsTableLayout.Minimums.Length;
+
+    /// <summary>The connections table's ColumnDefinitions at the current width and text size; the header
+    /// and the row template both bind to it, so they cannot drift apart.</summary>
+    public string ConnectionColumns => ConnectionsTableLayout.Definitions(_tableWidth, _tableTextScale);
+
+    public bool ShowRemoteColumn => _visibleColumns >= 2;
+
+    public bool ShowStateColumn => _visibleColumns >= 3;
+
+    public bool ShowProtocolColumn => _visibleColumns >= 4;
+
+    /// <summary>Reports the table's width and text scale (from the view: there is no converter-free
+    /// path from either to here). Re-notifies only when the column set changes.</summary>
+    public void SetConnectionsTableMetrics(double width, double textScale) {
+        if (!double.IsFinite(width) || width <= 0)
+            return;
+
+        _tableWidth = width;
+        _tableTextScale = textScale;
+        var visible = ConnectionsTableLayout.VisibleCount(width, textScale);
+        if (visible == _visibleColumns)
+            return;
+
+        _visibleColumns = visible;
+        OnPropertyChanged(nameof(ConnectionColumns));
+        OnPropertyChanged(nameof(ShowRemoteColumn));
+        OnPropertyChanged(nameof(ShowStateColumn));
+        OnPropertyChanged(nameof(ShowProtocolColumn));
+    }
+
     /// <summary>Raised when the user navigates to a different connections page (not on the periodic
     /// refresh), so the view can reset the list back to the top rather than keeping the old offset.</summary>
     public event Action? ConnectionsPageChanged;
