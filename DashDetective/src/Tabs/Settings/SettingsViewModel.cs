@@ -105,6 +105,9 @@ public partial class SettingsViewModel : ViewModelBase {
         RevealRequested?.Invoke(id);
     }
 
+    /// <summary>Show seconds on the toolbar clock, in either clock format.</summary>
+    [ObservableProperty] private bool _clockShowSeconds;
+
     /// <summary>Start DashDetective with Windows (per-user HKCU Run entry).</summary>
     [ObservableProperty] private bool _launchAtStartup;
 
@@ -253,6 +256,7 @@ public partial class SettingsViewModel : ViewModelBase {
         // registry state, which is the ground truth if it was changed outside the app.
         _launchAtStartup = _startup.IsEnabled();
         _showInTray = settings.ShowInTray;
+        _clockShowSeconds = settings.ClockShowSeconds;
         _resourceAlerts = settings.ResourceAlerts;
         _nvidiaGpuMetrics = settings.NvidiaGpuMetrics;
 
@@ -555,6 +559,8 @@ public partial class SettingsViewModel : ViewModelBase {
     }
 
     partial void OnShowInTrayChanged(bool value) => Changed?.Invoke();
+
+    partial void OnClockShowSecondsChanged(bool value) => Changed?.Invoke();
 
     partial void OnResourceAlertsChanged(bool value) => Changed?.Invoke();
 

@@ -17,7 +17,7 @@ public sealed class SettingCatalog {
 
     private SettingCatalog() {
         All = [
-            Theme, GraphColors, AccentColor, ClockFormat,
+            Theme, GraphColors, AccentColor, ClockFormat, ClockShowSeconds,
             UiScale, TextScale, HighContrast, DistinguishWithoutColor, ColorVision, AnnounceUpdates, ReduceMotion,
             KeyboardReordering, AccessibilityDefaults,
             NavPosition, NavCollapse,
@@ -49,6 +49,10 @@ public sealed class SettingCatalog {
     public SettingEntry ClockFormat { get; } = new(
         SettingId.ClockFormat, "Appearance", "Clock format", "Show times as 24-hour or 12-hour",
         Keywords: "12 hour 24 hour am pm military clock time");
+
+    public SettingEntry ClockShowSeconds { get; } = new(
+        SettingId.ClockShowSeconds, "Appearance", "Show seconds", "Include seconds on the toolbar clock",
+        Keywords: "seconds clock time hours minutes");
 
     // ----- Accessibility -----
 

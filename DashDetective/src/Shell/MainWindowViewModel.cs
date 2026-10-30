@@ -65,8 +65,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly HardwareViewModel _hardware = new();
     private readonly ToolkitViewModel _toolkit = new();
     private readonly SettingsViewModel _settings;
-    private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _clockTimer = new();
     private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
+    private bool _clockShowSeconds = true;
 
     // Resource-alert banner state: the breach the watcher currently reports, and whether the user
     // dismissed it. The banner shows only while there is one, unignored, and alerts are on.
@@ -311,11 +312,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.NetworkRevealRequested += RevealAdapter;
         _performance.HardwareRevealRequested += ShowHardware;
 
-        // Seed once so the clock is correct on the first frame, then tick every second.
-        UpdateClock();
-        _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // The clock was seeded by ApplySettings; each tick re-aims the timer at the next second (or
+        // minute) boundary.
         _clockTimer.Tick += (_, _) => UpdateClock();
-        _clockTimer.Start();
     }
 
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
@@ -360,7 +359,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
-        ApplyClockFormat(settings.ClockFormat);
+        ApplyClockFormat(settings.ClockFormat, settings.ClockShowSeconds);
         _alertSwitches.Load(settings);
         ApplyAlertSettings(settings);
         _recents.Load(settings.RecentSearches);
@@ -427,6 +426,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,
+        ClockShowSeconds = _settings.ClockShowSeconds,
         UiScalePercent = _accessibility.ScalePercent,
         TextScalePercent = _accessibility.TextScalePercent,
         HighContrast = _accessibility.HighContrast,
@@ -479,7 +479,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
-        ApplyClockFormat(_settings.ClockFormat);
+        ApplyClockFormat(_settings.ClockFormat, _settings.ClockShowSeconds);
         ApplyAlertSettings(CaptureCurrent());
     }
 
@@ -497,11 +497,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _alertSwitches.Reflect(settings);
     }
 
-    /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
+    /// <summary>Mirrors the clock-format preferences onto the toolbar clock and the Toolkit log — the two
     /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and
-    /// the clock is re-stamped at once so the change is visible without waiting for the next tick.</summary>
-    private void ApplyClockFormat(ClockFormat format) {
+    /// the clock is re-stamped at once so the change is visible without waiting for the next tick. Seconds
+    /// apply to the toolbar clock only: the Toolkit log keeps them to order commands run together.</summary>
+    private void ApplyClockFormat(ClockFormat format, bool showSeconds) {
         _clockFormat = format;
+        _clockShowSeconds = showSeconds;
         _toolkit.ClockFormat = format;
         UpdateClock();
     }
@@ -572,7 +574,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// calls the view model it already resolved from its DataContext.</summary>
     public void Notify(string message) => _notices.Show(message);
 
-    private void UpdateClock() => Clock = TimeOfDayFormatter.Format(DateTime.Now, _clockFormat);
+    /// <summary>Re-stamps the clock and sets the next tick for just past the next second (or minute)
+    /// boundary, so the display changes when the time does.</summary>
+    private void UpdateClock() {
+        var now = DateTime.Now;
+        Clock = TimeOfDayFormatter.Format(now, _clockFormat, _clockShowSeconds);
+        _clockTimer.Stop();
+        _clockTimer.Interval = TimeOfDayFormatter.DelayToNextTick(now, _clockShowSeconds);
+        _clockTimer.Start();
+    }
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
