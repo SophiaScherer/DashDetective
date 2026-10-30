@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -23,9 +24,10 @@ namespace DashDetective.Tabs.Toolkit;
 /// process itself, and only ever runs actions authored in an <see cref="IToolkitCatalog"/> or built
 /// from what the user typed into the form.
 /// </summary>
-public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
-    private readonly ToolkitRunner _runner = new();
+public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget, IDisposable {
+    private readonly ToolkitRunner _runner;
     private readonly IToolkitCatalog _catalog;
+    private CancellationTokenSource? _runCts;
     private ToolkitCategory? _category;
     private string? _pendingReveal;
 
@@ -37,8 +39,13 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>Test seam: the same page over an explicit command set. The public ctor resolves this
     /// machine's, so the shell still builds this with <c>new()</c>.</summary>
-    internal ToolkitViewModel(IToolkitCatalog catalog) {
+    internal ToolkitViewModel(IToolkitCatalog catalog) : this(catalog, new ToolkitRunner()) { }
+
+    /// <summary>Test seam: the same page over an explicit runner, so a captured command can be held in
+    /// flight and cancelled without a real process.</summary>
+    internal ToolkitViewModel(IToolkitCatalog catalog, ToolkitRunner runner) {
         _catalog = catalog;
+        _runner = runner;
 
         var options = new List<ToolkitCategoryOption> {
             new("All", null, SelectCategory),
@@ -211,6 +218,25 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task OpenExternally(ToolkitEntry? entry) => Execute(entry);
 
+    /// <summary>Whether a captured command is in flight, and so whether there is anything to cancel. Not
+    /// a busy flag for the page — that is still <see cref="RunCommand"/> refusing concurrency.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
+    private bool _isCapturing;
+
+    /// <summary>
+    /// Stops the captured command in flight: its process tree is killed and its stanza is replaced, like
+    /// any completion, by what it had printed plus a line saying it was cancelled. Nothing is left half
+    /// open — the run command is executable again as soon as the run unwinds. Idle, there is nothing to
+    /// cancel and the command reports itself unavailable.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(IsCapturing))]
+    private void CancelRun() => _runCts?.Cancel();
+
+    /// <summary>Cancels a run still in flight at shutdown so no child is orphaned. Leaving the page does
+    /// not do this: a run keeps going and lands in the log, as it always has.</summary>
+    public void Dispose() => _runCts?.Cancel();
+
     /// <summary>
     /// Runs a command row and records the outcome in the Execution Log, newest first. The commands that
     /// reach here (<see cref="RunCommand"/>, <see cref="OpenExternallyCommand"/>) refuse concurrent runs
@@ -247,16 +273,43 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         // The "$" line shows the resolved command line, not the row's label: a parameterised label is a
         // placeholder ("ping <host>"), and a row may carry flags it does not spell out.
         var line = action.CommandLine;
-        var pending = new ToolkitLogEntry(time, line, ToolkitOutputFormatter.Running, ClockFormat);
+
+        // Only a captured command is awaited for long enough to be worth cancelling; a launch returns at
+        // once and an elevated one is deliberately not waited on, so their stanzas never offer Cancel.
+        var cancellable = action.CapturesOutput;
+        var pending = new ToolkitLogEntry(
+            time, line, ToolkitOutputFormatter.Running, ClockFormat, isRunning: cancellable);
         Log.Insert(0, pending);
 
-        var result = await _runner.RunAsync(action);
+        // Only a cancellable run takes the source and the flag. Run and OpenExternally are separate
+        // commands with separate concurrency gates, so a launch can start while a capture is in flight;
+        // it must leave the capture's source and Cancel state alone.
+        var cts = cancellable ? new CancellationTokenSource() : null;
+        if (cts is not null) {
+            _runCts = cts;
+            IsCapturing = true;
+        }
 
-        // Reference equality: if the user cleared the log while the command was in flight, the
-        // placeholder is gone and the result goes with it — they asked for an empty log, so putting a
-        // stanza back would be ignoring them.
-        if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
-            Log[0] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
+        ToolkitRunResult result;
+        try {
+            result = await _runner.RunAsync(action, cts?.Token ?? CancellationToken.None);
+        } finally {
+            // Cleared before the source is disposed, so a late Cancel finds nothing rather than a corpse.
+            if (cts is not null && ReferenceEquals(_runCts, cts)) {
+                IsCapturing = false;
+                _runCts = null;
+            }
+
+            cts?.Dispose();
+        }
+
+        // By reference, not by position: a launch row can insert its own stanza above this one while the
+        // capture runs. If the user cleared the log while the command was in flight, the placeholder is
+        // gone and the result goes with it — they asked for an empty log, so putting a stanza back would
+        // be ignoring them.
+        var index = Log.IndexOf(pending);
+        if (index >= 0)
+            Log[index] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
     }
 
     /// <summary>
