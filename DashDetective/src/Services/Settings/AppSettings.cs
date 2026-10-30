@@ -94,9 +94,10 @@ public sealed record AppSettings {
     /// are only watched while this is on.</summary>
     public bool ResourceAlerts { get; init; }
 
-    /// <summary>Whether each resource is watched. Separate from the threshold beside it so a switched-off
-    /// row still remembers its number: GPU and disk activity ship off — sustained saturation of either is
-    /// what legitimate heavy work looks like — but with a sensible figure already in the box.</summary>
+    /// <summary>Whether each resource is watched — switched by the bell on the resource's own page. Stored
+    /// separately from the threshold so a switched-off resource still remembers its number: GPU and disk
+    /// activity ship off — sustained saturation of either is what legitimate heavy work looks like — but
+    /// with a sensible figure already in the box.</summary>
     public bool AlertCpuEnabled { get; init; } = true;
     public bool AlertMemoryEnabled { get; init; } = true;
     public bool AlertGpuEnabled { get; init; }
@@ -119,10 +120,6 @@ public sealed record AppSettings {
     /// the only metric in the app that costs a process launch, and the card reads "—" without it. No
     /// effect on Windows, where the same figure comes from a performance counter.</summary>
     public bool NvidiaGpuMetrics { get; init; }
-
-    /// <summary>Performance tab: show every detected instance in the left rail ("All devices") rather than
-    /// only the primary of each kind ("Primary"). Meaningful when a category has more than one instance.</summary>
-    public bool PerformanceShowAllDevices { get; init; }
 
     /// <summary>Performance tab: the CPU resource shows a per-logical-processor chart grid ("Detailed")
     /// rather than the single overall utilization chart.</summary>

@@ -47,6 +47,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     private readonly SystemMetricsService _metrics;
     private readonly ResourceAlertWatcher _alerts;
+
+    // The per-resource alert flags. One instance, handed to every page that draws a bell, so a flip on any
+    // of them is the state this persists and feeds the watcher from.
+    private readonly AlertSwitches _alertSwitches = new();
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
     private readonly AccessibilityService _accessibility;
@@ -206,8 +210,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Help = new HelpViewModel(Shortcuts);
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
-        _performance = new PerformanceViewModel(metrics, _theme);
-        _storage = new StorageViewModel(metrics);
+        _performance = new PerformanceViewModel(metrics, _theme, _alertSwitches);
+        _storage = new StorageViewModel(metrics, _alertSwitches);
 
         // Apply the persisted appearance + layout through the seams that own them, before wiring the
         // controls that observe them. ThemeService stays the only code that writes to the application.
@@ -231,12 +235,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.HelpRequested += Help.Open;
         Nav.PropertyChanged += OnNavPropertyChanged;
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
-        _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
         _processes.PreferencesChanged += Persist;
         foreach (var order in SavedOrders)
             order.Changed += Persist;
         _alerts.AlertChanged += OnAlertChanged;
+        _alertSwitches.Changed += OnAlertSwitchChanged;
         _notices.Changed += OnNoticeChanged;
         _accessibility.Changed += OnAccessibilityChanged;
 
@@ -256,8 +260,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Storage, _storage, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
                         Icons.Hardware, _hardware, Nav.Navigate),
-            new NavItem("Toolkit", "Toolkit", "Common commands & diagnostics",
-                        Icons.Toolkit, _toolkit, Nav.Navigate),
+            new NavItem("Utilities", "Utilities", "Common commands & diagnostics",
+                        Icons.Toolkit, _toolkit, Nav.Navigate, ["Toolkit", "Tools", "Commands"]),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });
@@ -352,11 +356,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // that command is on the page.
         _toolkit.LoadCommands(settings.CustomCommands);
         _toolkit.LoadPins(settings.PinnedCommands);
-        _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
         ApplyClockFormat(settings.ClockFormat, settings.ClockShowSeconds);
+        _alertSwitches.Load(settings);
         ApplyAlertSettings(settings);
         _recents.Load(settings.RecentSearches);
 
@@ -415,7 +419,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     }
 
     /// <summary>Captures the live state of every persisted seam into an immutable snapshot.</summary>
-    private AppSettings CaptureCurrent() => new() {
+    private AppSettings CaptureCurrent() => _alertSwitches.CaptureInto(new() {
         Theme = _theme.CurrentTheme,
         GraphColorsName = _theme.CurrentGraphColors?.Name,
         AccentColor = _theme.CurrentAccent == AccentPreset.Default ? null : _theme.CurrentAccent.Hex,
@@ -439,11 +443,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
-        AlertCpuEnabled = _settings.CpuAlert.IsEnabled,
-        AlertMemoryEnabled = _settings.MemoryAlert.IsEnabled,
-        AlertGpuEnabled = _settings.GpuAlert.IsEnabled,
-        AlertDiskActiveEnabled = _settings.DiskActiveAlert.IsEnabled,
-        AlertLowDiskFreeEnabled = _settings.LowDiskFreeAlert.IsEnabled,
         AlertCpuPercent = _settings.CpuAlert.Value,
         AlertMemoryPercent = _settings.MemoryAlert.Value,
         AlertGpuPercent = _settings.GpuAlert.Value,
@@ -451,7 +450,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AlertLowDiskFreePercent = _settings.LowDiskFreeAlert.Value,
         AlertSustainSeconds = _settings.AlertSustain.Value,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
-        PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
@@ -469,7 +467,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             ? ProcessSortState.Encode(_processes.SortKey, _processes.SortAscending)
             : "",
         ShortcutOverrides = ShortcutOverrideCodec.Encode(Shortcuts.Overrides),
-    };
+    });
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
     private void Persist() => _store.Save(CaptureCurrent());
@@ -485,26 +483,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ApplyAlertSettings(CaptureCurrent());
     }
 
-    /// <summary>Pushes the alert thresholds and the master switch onto the watcher. Thresholds first: the
-    /// setter clears every streak, so applying them after enabling would discard the first samples.
-    /// The watcher holds the CPU and memory feeds open on its own, which is why it follows the setting
-    /// rather than running unconditionally.</summary>
-    private void ApplyAlertSettings(AppSettings settings) {
-        // Folded into the watcher's zero-means-off contract here: the service has no reason to know that a
-        // threshold and a switch are two controls on a page, and this keeps a disabled row's number.
-        _alerts.Options = new ResourceAlertOptions {
-            CpuPercent = Watched(settings.AlertCpuEnabled, settings.AlertCpuPercent),
-            MemoryPercent = Watched(settings.AlertMemoryEnabled, settings.AlertMemoryPercent),
-            GpuPercent = Watched(settings.AlertGpuEnabled, settings.AlertGpuPercent),
-            DiskActivePercent = Watched(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent),
-            LowDiskFreePercent = Watched(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent),
-            SustainSeconds = settings.AlertSustainSeconds,
-        };
-        _alerts.Enabled = settings.ResourceAlerts;
+    /// <summary>A bell on a page flipped an alert: persist it and re-arm the watcher at once.</summary>
+    private void OnAlertSwitchChanged() {
+        Persist();
+        ApplyAlertSettings(CaptureCurrent());
     }
 
-    /// <summary>A threshold as the watcher wants it: the number when the resource is watched, else zero.</summary>
-    private static int Watched(bool enabled, int percent) => enabled ? percent : 0;
+    /// <summary>Pushes the alert thresholds and the master switch onto the watcher, and mirrors them onto
+    /// the bells so their tooltips describe the live rule. The watcher holds the CPU and memory feeds open
+    /// on its own, which is why it follows the setting rather than running unconditionally.</summary>
+    private void ApplyAlertSettings(AppSettings settings) {
+        _alerts.Apply(settings);
+        _alertSwitches.Reflect(settings);
+    }
 
     /// <summary>Mirrors the clock-format preferences onto the toolbar clock and the Toolkit log — the two
     /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and

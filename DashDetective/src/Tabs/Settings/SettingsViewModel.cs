@@ -47,7 +47,8 @@ public partial class SettingsViewModel : ViewModelBase {
     public ObservableCollection<ColorVisionOption> ColorVisionOptions { get; }
     public ObservableCollection<IntervalOption> IntervalOptions { get; }
 
-    // ----- Alerts: one row per watched resource, plus how long a breach must last -----
+    // ----- Alerts: one threshold per watched resource, plus how long a breach must last. The on/off
+    // switches are the bells on Performance and Storage, so this card holds only the numbers. -----
 
     public AlertThresholdRow CpuAlert { get; }
     public AlertThresholdRow MemoryAlert { get; }
@@ -240,16 +241,15 @@ public partial class SettingsViewModel : ViewModelBase {
         // field accepts the whole meaningful span rather than a shortlist. Free space is inverted — it
         // warns when the number drops BELOW — and stops at 99, since "warn while the disk is 100% free"
         // is a warning that never stops.
-        CpuAlert = Threshold(settings.AlertCpuEnabled, settings.AlertCpuPercent, 100, "%");
-        MemoryAlert = Threshold(settings.AlertMemoryEnabled, settings.AlertMemoryPercent, 100, "%");
-        GpuAlert = Threshold(settings.AlertGpuEnabled, settings.AlertGpuPercent, 100, "%");
-        DiskActiveAlert = Threshold(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent, 100, "%");
-        LowDiskFreeAlert = Threshold(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent, 99, "%");
+        CpuAlert = Threshold(settings.AlertCpuPercent, 100);
+        MemoryAlert = Threshold(settings.AlertMemoryPercent, 100);
+        GpuAlert = Threshold(settings.AlertGpuPercent, 100);
+        DiskActiveAlert = Threshold(settings.AlertDiskActivePercent, 100);
+        LowDiskFreeAlert = Threshold(settings.AlertLowDiskFreePercent, 99);
 
-        // The wait is not a warning of its own, so it has no switch — only the seconds. Capped at an hour,
-        // past which nothing would ever be reported.
+        // The wait, in seconds. Capped at an hour, past which nothing would ever be reported.
         AlertSustain = new AlertThresholdRow(
-            isEnabled: true, settings.AlertSustainSeconds, minimum: 1, maximum: 3600, "s", RaiseChanged);
+            settings.AlertSustainSeconds, minimum: 1, maximum: 3600, "s", RaiseChanged);
 
         // Seed the toggles by assigning the backing fields directly, so the OnChanged hooks don't fire
         // (no spurious registry write / persistence) during construction. Startup reflects the real
@@ -454,10 +454,10 @@ public partial class SettingsViewModel : ViewModelBase {
         Changed?.Invoke();
     }
 
-    /// <summary>Builds one percentage row. Every one shares a floor of 1: zero is how the settings layer
-    /// encodes "not watched", and the row's switch says that instead.</summary>
-    private AlertThresholdRow Threshold(bool isEnabled, int percent, int maximum, string suffix) =>
-        new(isEnabled, percent, minimum: 1, maximum, suffix, RaiseChanged);
+    /// <summary>Builds one percentage row. Every one shares a floor of 1: zero is how the watcher encodes
+    /// "not watched", and the resource's bell says that instead.</summary>
+    private AlertThresholdRow Threshold(int percent, int maximum) =>
+        new(percent, minimum: 1, maximum, "%", RaiseChanged);
 
     /// <summary>The alert rows' change callback. Guarded like the other seeded controls, though the rows
     /// only report real edits anyway.</summary>

@@ -117,12 +117,15 @@
                         layout:WidgetBoard.DragGrip="Item"
                         AutomationProperties.Name="{Binding Name}">
                     <StackPanel Spacing="0">
-                        <!-- Header: name + health pill. -->
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <!-- Header: name, then the low-space alert bell beside the health pill. The bell is
+                             about free space, the usage bar just below, so it sits on the drive itself
+                             rather than on a panel; the drag refuses a press that starts on it. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
                             <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="{DynamicResource TextSizeTitle}"
                                        FontWeight="SemiBold" Foreground="{DynamicResource TextStrong}"
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            <Border Grid.Column="1" Classes="healthPill"
+                            <controls:AlertBell Grid.Column="1" Margin="8,0,6,0" Switch="{Binding Alert}"/>
+                            <Border Grid.Column="2" Classes="healthPill"
                                     Background="{Binding HealthBackground}">
                                 <TextBlock Text="{Binding Health}" Foreground="{Binding HealthForeground}"/>
                             </Border>

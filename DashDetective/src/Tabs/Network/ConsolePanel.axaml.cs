@@ -73,6 +73,11 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
 
     public ConsolePanel() {
         InitializeComponent();
+        ApplyLineHeight();
+        ConsoleOut.PropertyChanged += (_, e) => {
+            if (e.Property == TextBlock.FontSizeProperty)
+                ApplyLineHeight();
+        };
     }
 
     public string? Title {
@@ -145,12 +150,27 @@ public partial class ConsolePanel : UserControl, IWidgetIdentity {
         set => SetValue(CapacityProperty, value);
     }
 
-    // Matches the console TextBlocks' LineHeight, and the box's 10px padding plus the footer line and
-    // its 3px gap.
-    private const double LineHeight = 15;
-    private const double Reserved = 20 + LineHeight + 3;
+    private double _lineHeight;
+    private double _boxHeight = double.NaN;
 
-    private void OnConsoleBoxSizeChanged(object? sender, SizeChangedEventArgs e) =>
-        Capacity = ConsoleCapacity.LinesForHeight(e.NewSize.Height, LineHeight, Reserved,
+    /// <summary>Re-derives the line height from the console font (a Text-size token, so it changes at
+    /// runtime) and re-reports the capacity it implies.</summary>
+    private void ApplyLineHeight() {
+        _lineHeight = ConsoleCapacity.LineHeightFor(ConsoleOut.FontSize);
+        ConsoleOut.LineHeight = _lineHeight;
+        ConsoleFoot.LineHeight = _lineHeight;
+        UpdateCapacity();
+    }
+
+    private void UpdateCapacity() {
+        if (double.IsNaN(_boxHeight))
+            return;
+        Capacity = ConsoleCapacity.LinesForHeight(_boxHeight, _lineHeight, ConsoleCapacity.ReservedFor(_lineHeight),
                                                   PingMonitor.MinLines, PingMonitor.MaxLines);
+    }
+
+    private void OnConsoleBoxSizeChanged(object? sender, SizeChangedEventArgs e) {
+        _boxHeight = e.NewSize.Height;
+        UpdateCapacity();
+    }
 }

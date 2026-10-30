@@ -97,6 +97,13 @@ public static class ToolkitOutputFormatter {
         return captured.Length == 0 ? note : captured + "\n" + note;
     }
 
+    /// <summary>The body for a run the user cancelled, carrying whatever it had printed by then.</summary>
+    public static string Cancelled(TimeSpan elapsed, string captured) {
+        var seconds = elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture);
+        var note = $"Cancelled after {seconds} s — the command was stopped.";
+        return captured.Length == 0 ? note : captured + "\n" + note;
+    }
+
     /// <summary>The body for a command that ran but reported failure, carrying its output.</summary>
     public static string ExitedWith(int exitCode, string captured) {
         var note = $"Exited with code {exitCode.ToString(CultureInfo.InvariantCulture)}.";

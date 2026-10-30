@@ -32,7 +32,8 @@ public sealed class PageSearchProvider : ISearchProvider {
         foreach (var item in _items) {
             // The subtitle is the weakest field: "Live processes & resource usage" shouldn't outrank the
             // page actually called Processes.
-            var score = SearchRanker.ScoreBest(term, item.Label, item.Title, item.Subtitle);
+            // Keywords rank last: they are aliases (a page's former name), not what it is called now.
+            var score = SearchRanker.ScoreBest(term, [item.Label, item.Title, item.Subtitle, .. item.Keywords]);
             if (score == SearchRanker.NoMatch)
                 continue;
 

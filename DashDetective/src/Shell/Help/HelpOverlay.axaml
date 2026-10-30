@@ -24,9 +24,10 @@
          the modal modal — it swallows pointer input bound for the window behind it. -->
     <Border x:Name="Scrim" Background="{StaticResource ScrimBackground}" PointerPressed="OnScrimPointerPressed">
 
-        <!-- Tab cycles within the card, so focus cannot reach the page behind the scrim. -->
-        <Border x:Name="Card" Classes="panel" Padding="0" Width="660" MaxHeight="640"
-                HorizontalAlignment="Center" VerticalAlignment="Center"
+        <!-- modalCard bounds the card inside the window; Stretch up to MaxWidth keeps the 660 look in a roomy
+             one. Tab cycles within the card, so focus cannot reach the page behind the scrim. -->
+        <Border x:Name="Card" Classes="panel modalCard" Padding="0" MaxWidth="660" MaxHeight="640"
+                HorizontalAlignment="Stretch"
                 BoxShadow="{StaticResource ShadowModal}" KeyboardNavigation.TabNavigation="Cycle">
             <Grid RowDefinitions="Auto,Auto,*">
 

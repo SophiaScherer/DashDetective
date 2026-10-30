@@ -24,6 +24,18 @@ public class HelpContentTests {
         Assert.Contains("DashDetective", HelpContent.Description);
     }
 
+    /// <summary>The page was renamed Utilities (work item 33); the old name survives only in code.</summary>
+    [Theory]
+    [MemberData(nameof(Sections))]
+    public void Section_NeverCallsTheUtilitiesPageToolkit(string name) {
+        Assert.DoesNotContain(Section(name), t => t.Body.Contains("Toolkit") || t.Title?.Contains("Toolkit") == true);
+    }
+
+    [Fact]
+    public void GettingStarted_NamesThePageUtilities() {
+        Assert.Contains(HelpContent.GettingStarted, t => t.Key == "page.toolkit" && t.Title == "Utilities");
+    }
+
     [Theory]
     [MemberData(nameof(Sections))]
     public void Section_IsNotEmpty(string name) {

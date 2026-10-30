@@ -11,6 +11,7 @@
          control itself shrinks it to its text, leaving the rest of the cell dead to the click. -->
     <Button Classes="bare" HorizontalAlignment="Stretch"
             HorizontalContentAlignment="{Binding #Root.ContentAlignment}"
+            Padding="{Binding #Root.ContentInset}"
             Command="{Binding #Root.Column.SortCommand}">
         <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
             <TextBlock Classes="sortArrow" Text="{Binding #Root.Column.Arrow}"
