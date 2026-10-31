@@ -82,12 +82,28 @@ public sealed partial class ToolkitEntry : ObservableObject {
     /// default is discoverable without trying it.</summary>
     public string DefaultActionText => DefaultActionFor(Action.Kind, CanOpenInApp, OperatingSystem.IsWindows());
 
-    /// <summary>The row body's tooltip: the default action, then what the command is for.</summary>
-    public string ActivationTip => DefaultActionText + "\n" + Description;
+    /// <summary>How a row is activated, said where the action is: a click only selects.</summary>
+    public const string ActivationGesture = "Double-click or press Enter";
+
+    /// <summary>The row body's tooltip: how to activate it and what that does, then what the command is
+    /// for.</summary>
+    public string ActivationTip => ActivationGesture + ": " + DefaultActionText + "\n" + Description;
 
     /// <summary>The row body's screen-reader name. Leads with the command, which the tooltip does not
     /// carry, so each row announces which command it would act on.</summary>
     public string AccessibleName => Command + ": " + DefaultActionText;
+
+    /// <summary>Whether activating the row starts a program, which earns it an explicit play button. A
+    /// folder or a link only navigates, so a double click or Enter is enough there.</summary>
+    public bool HasRunButton => Action.Kind is ToolkitActionKind.Launch or ToolkitActionKind.Capture
+                                    or ToolkitActionKind.Elevated;
+
+    /// <summary>The play button's screen-reader name: the action first, since that is what it does.</summary>
+    public string RunButtonName => DefaultActionText + ": " + Command;
+
+    /// <summary>Whether this is the page's selected row. Owned by <see cref="ToolkitViewModel.SelectedEntry"/>;
+    /// observable so the highlight follows without rebuilding the list.</summary>
+    [ObservableProperty] private bool _isSelected;
 
     /// <summary>Test seam: the wording per action kind, with the platform passed in so the file-manager
     /// name is checkable from either host.</summary>

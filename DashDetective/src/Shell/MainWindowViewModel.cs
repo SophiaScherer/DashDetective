@@ -868,10 +868,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Help.Reveal(tab, topicKey);
     }
 
-    /// <summary>Opens the Toolkit with the given command scrolled into view and flashed.</summary>
-    private void RevealToolkit(string command) {
+    /// <summary>Opens the Toolkit with the given row scrolled into view, flashed and selected.</summary>
+    private void RevealToolkit(ToolkitEntry entry) {
         NavigateToPage(_toolkit);
-        _toolkit.Reveal(command);
+        _toolkit.Reveal(entry);
     }
 
     /// <summary>Opens Processes filtered to the given process, with its row selected.</summary>

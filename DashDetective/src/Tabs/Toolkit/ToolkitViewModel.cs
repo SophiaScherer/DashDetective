@@ -19,7 +19,8 @@ namespace DashDetective.Tabs.Toolkit;
 /// command column and the log panel scroll independently, so the log stays pinned in view.
 ///
 /// The list is narrowed by a category chip and a search box together, through
-/// <see cref="ToolkitFilter"/>. Picking a row runs its <see cref="ToolkitEntry.Action"/> through
+/// <see cref="ToolkitFilter"/>. A single click selects a row; a double click, Enter or its play button
+/// activates it, running its <see cref="ToolkitEntry.Action"/> through
 /// <see cref="ToolkitRunner"/> and prepends what happened to the log; the view model never touches a
 /// process itself, and only ever runs actions authored in an <see cref="IToolkitCatalog"/> or built
 /// from what the user typed into the form.
@@ -29,7 +30,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     private readonly IToolkitCatalog _catalog;
     private CancellationTokenSource? _runCts;
     private ToolkitCategory? _category;
-    private string? _pendingReveal;
+    private ToolkitEntry? _pendingReveal;
 
     /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner and is the
     /// only thing that can draw one; left null in a test, where there is nothing to draw on.</summary>
@@ -41,8 +42,9 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// machine's, so the shell still builds this with <c>new()</c>.</summary>
     internal ToolkitViewModel(IToolkitCatalog catalog) : this(catalog, new ToolkitRunner()) { }
 
-    /// <summary>Test seam: the same page over an explicit runner, so a captured command can be held in
-    /// flight and cancelled without a real process.</summary>
+    /// <summary>Test seam: the same page over an explicit runner, so a test can see exactly what reached
+    /// the process launcher (and that selecting a row reached nothing), or hold a command in flight and
+    /// cancel it without a real process.</summary>
     internal ToolkitViewModel(IToolkitCatalog catalog, ToolkitRunner runner) {
         _catalog = catalog;
         _runner = runner;
@@ -135,29 +137,39 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
     public event Action? SearchFocusRequested;
 
-    /// <summary>Nudges the view to reveal the pending command. Carries nothing: the command lives in
+    /// <summary>Nudges the view to reveal the pending row. Carries nothing: the row lives in
     /// <see cref="TakePendingReveal"/>, so a reveal that arrives before the view exists is not lost.</summary>
     public event Action? RevealRequested;
 
-    /// <summary>Brings a command into view after universal search navigated here. The filter is reset
-    /// first: a chip or a half-typed search from earlier could otherwise have hidden the very row the
-    /// user just picked.</summary>
-    public void Reveal(string command) {
+    /// <summary>Brings a row into view after universal search navigated here. The filter is reset first:
+    /// a chip or a half-typed search from earlier could otherwise have hidden the very row the user just
+    /// picked. The row is selected by identity — a custom row and a catalog row can share a label — and
+    /// never run: picking a search result is not an activation. A row no longer on the page clears the
+    /// selection, so Enter cannot run whatever was selected before.</summary>
+    public void Reveal(ToolkitEntry target) {
         SelectCategory(Categories[0]);
         Search = "";
+        SelectedEntry = null;
+        foreach (var entry in AllEntries) {
+            if (ReferenceEquals(entry, target)) {
+                SelectedEntry = entry;
+                break;
+            }
+        }
+
 
         // Held rather than passed to the event, because on the first jump to this tab the view has not
         // been built yet and so is not listening — the shell navigates and reveals in one breath, but
         // the page's visual tree only appears on the next layout pass. The view drains this when it
         // attaches, and the event covers the case where it was already attached.
-        _pendingReveal = command;
+        _pendingReveal = target;
         RevealRequested?.Invoke();
     }
 
-    /// <summary>Takes the command waiting to be revealed, if any, clearing it. Called by the view both
+    /// <summary>Takes the row waiting to be revealed, if any, clearing it. Called by the view both
     /// when it attaches and when <see cref="RevealRequested"/> fires, so whichever comes first wins and
     /// the other finds nothing.</summary>
-    internal string? TakePendingReveal() {
+    internal ToolkitEntry? TakePendingReveal() {
         var pending = _pendingReveal;
         _pendingReveal = null;
         return pending;
@@ -176,9 +188,23 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
                 ClearSearch();
                 return true;
 
+            case ShortcutId.Activate:
+                return ActivateFromEnter();
+
             default:
                 return false;
         }
+    }
+
+    // Unconsumed when focus is on another control, nothing is selected, or a run is in flight, so the key
+    // still reaches whatever has focus.
+    private bool ActivateFromEnter() {
+        var (focus, row) = FocusProbe?.Invoke() ?? (ToolkitActivation.Focus.Other, null);
+        if (ToolkitActivation.EnterTarget(focus, row, SelectedEntry) is not { } entry || !RunCommand.CanExecute(entry))
+            return false;
+
+        _ = Activate(entry);
+        return true;
     }
 
     /// <summary>Raised when a row asks to be opened in the app's own File Explorer, carrying the resolved
@@ -186,6 +212,37 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// idea another tab exists, exactly as <see cref="PinsChanged"/> has no idea a settings file
     /// does.</summary>
     public event Action<string>? FileExplorerRevealRequested;
+
+    /// <summary>The row a single click, or keyboard focus, last picked. Selecting never runs anything:
+    /// a double click, Enter or the row's play button does.</summary>
+    [ObservableProperty] private ToolkitEntry? _selectedEntry;
+
+    partial void OnSelectedEntryChanged(ToolkitEntry? oldValue, ToolkitEntry? newValue) {
+        if (oldValue is not null)
+            oldValue.IsSelected = false;
+        if (newValue is not null)
+            newValue.IsSelected = true;
+    }
+
+    /// <summary>Asked by Enter, at press time, what holds keyboard focus — window-wide, since a focused
+    /// toolbar or nav control must keep Enter too. Set by the view; null (no view yet) reads as focus
+    /// elsewhere, so nothing runs.</summary>
+    internal Func<(ToolkitActivation.Focus Focus, ToolkitEntry? Row)>? FocusProbe { get; set; }
+
+    /// <summary>A single click on a row body: selects it, and nothing else.</summary>
+    [RelayCommand]
+    private void Select(ToolkitEntry? entry) => SelectedEntry = entry;
+
+    /// <summary>A double click or Enter: selects the row and runs its default action through
+    /// <see cref="RunCommand"/>, the same path the play button takes. A run already in flight refuses it,
+    /// as it refuses the button.</summary>
+    public Task Activate(ToolkitEntry? entry) {
+        if (entry is null)
+            return Task.CompletedTask;
+
+        SelectedEntry = entry;
+        return RunCommand.CanExecute(entry) ? RunCommand.ExecuteAsync(entry) : Task.CompletedTask;
+    }
 
     /// <summary>
     /// Activates a row: its default action, which <see cref="ToolkitEntry.DefaultActionText"/> words. A
@@ -508,6 +565,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             foreach (var item in group.Items)
                 matched.Add(item);
         }
+
+        // A selection the filter hid is dropped, so Enter cannot run a row the user can no longer see.
+        if (SelectedEntry is { } selected && !matched.Contains(selected))
+            SelectedEntry = null;
 
         HasCommands = matched.Count > 0;
         CountLabel = matched.Count == 1

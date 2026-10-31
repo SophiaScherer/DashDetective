@@ -1435,7 +1435,8 @@ stays in its tab folder.
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked ChevronLeft/Right pair is the
+                                     caret sets Fill, not Stroke. Play (the Toolkit's run button) is filled
+                                     in the same family, a size up, and drawn at Stretch="None". The stroked ChevronLeft/Right pair is the
                                      Network pager's step arrows and the toolbar's Back: paging is navigation
                                      rather than disclosure. CaretFirst/CaretLast, the pager's skip pair, are
                                      FILLED (a Caret triangle plus a stop-bar rectangle) so the mark reads as
@@ -1508,10 +1509,16 @@ stays in its tab folder.
                                  IDisposable only so MainWindowViewModel.Dispose cancels a run at
                                  shutdown; leaving the page does NOT cancel. View code-behind
                                  owns the search focus + the search-reveal flash, like
-                                 ProcessesView/SettingsView. The row is a chrome-less Button so Enter
-                                 works on a focused row natively — ShortcutId.Activate falls through
-                                 MainWindowViewModel's global switch unconsumed, so no IShortcutTarget
-                                 case is needed. The copy button is a SIBLING of it, not nested)
+                                 ProcessesView/SettingsView. The row body is a chrome-less Button whose
+                                 click only SELECTS; a double click (code-behind), Enter (the page's
+                                 Activate case) and the play button all run through RunCommand. Enter
+                                 asks the view's FocusProbe what holds focus WINDOW-WIDE at press time,
+                                 so a focused toolbar or nav button keeps the key. The row's buttons are
+                                 SIBLINGS of the body, not nested)
+                                ToolkitActivation.cs    (pure activation decisions: which row Enter runs
+                                                         for what holds focus — a row body, nothing, or
+                                                         anything else, which keeps the key — and the play
+                                                         button's repeat-press guard)
                                 ToolkitCategory.cs      (enum: the four sections, declaration order =
                                                          display order)
                                 ToolkitEntryKind.cs     (enum: Folder / App / Command / Panel / Link —

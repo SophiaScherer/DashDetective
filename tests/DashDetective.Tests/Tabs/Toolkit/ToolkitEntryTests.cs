@@ -52,10 +52,10 @@ public class ToolkitEntryTests {
                      Row(ToolkitAction.OpenPath("shell:startup")).DefaultActionText);
 
     [Fact]
-    public void ActivationTip_LeadsWithTheDefaultActionThenTheDescription() {
+    public void ActivationTip_LeadsWithTheGestureAndTheDefaultActionThenTheDescription() {
         var entry = Row(ToolkitAction.Elevated("sfc", "/scannow"), description: "Scans system files");
 
-        Assert.Equal("Run as administrator\nScans system files", entry.ActivationTip);
+        Assert.Equal("Double-click or press Enter: Run as administrator\nScans system files", entry.ActivationTip);
     }
 
     /// <summary>The tooltip does not carry the command, so the name has to, or every row of one kind
@@ -76,9 +76,37 @@ public class ToolkitEntryTests {
 
         Assert.All(rows, entry => {
             Assert.False(string.IsNullOrWhiteSpace(entry.DefaultActionText));
-            Assert.StartsWith(entry.DefaultActionText + "\n", entry.ActivationTip, StringComparison.Ordinal);
+            Assert.StartsWith(ToolkitEntry.ActivationGesture + ": " + entry.DefaultActionText + "\n",
+                              entry.ActivationTip, StringComparison.Ordinal);
         });
     }
+
+    /// <summary>Only a row whose default starts a program gets a play button; a folder or a link only
+    /// navigates, and a double click or Enter covers that.</summary>
+    [Theory]
+    [InlineData(ToolkitActionKind.Launch, true)]
+    [InlineData(ToolkitActionKind.Capture, true)]
+    [InlineData(ToolkitActionKind.Elevated, true)]
+    [InlineData(ToolkitActionKind.OpenPath, false)]
+    [InlineData(ToolkitActionKind.OpenUrl, false)]
+    public void HasRunButton_OnlyForRowsThatStartAProgram(ToolkitActionKind kind, bool expected) {
+        var action = kind switch {
+            ToolkitActionKind.Launch => ToolkitAction.Launch("regedit"),
+            ToolkitActionKind.Capture => ToolkitAction.Capture("whoami"),
+            ToolkitActionKind.Elevated => ToolkitAction.Elevated("sfc", "/scannow"),
+            ToolkitActionKind.OpenPath => ToolkitAction.OpenPath(Folder),
+            _ => ToolkitAction.OpenUrl("https://example.com"),
+        };
+
+        Assert.Equal(expected, Row(action).HasRunButton);
+    }
+
+    /// <summary>The play button names its action first and the command it acts on, so thirty of them
+    /// do not all announce "Run".</summary>
+    [Fact]
+    public void RunButtonName_NamesTheActionAndTheCommand() =>
+        Assert.Equal("Run as administrator: sfc /scannow",
+                     Row(ToolkitAction.Elevated("sfc", "/scannow"), command: "sfc /scannow").RunButtonName);
 
     /// <summary>A row the user authored states its default like any catalog row does.</summary>
     [Theory]
