@@ -256,6 +256,8 @@ Win+arrows, double-click to maximize and the Windows 11 snap flyout. Any window 
   bounds, so `MainWindow` reports `TitleBarRules.Reserved` to the view model and the minimum is the scaled
   page height plus that — the real decoration margin, and 0 where the system title bar is outside.
 
+**The app icon is the brand mark at the default accent.** `Assets/dashdetective.ico` is the nav brand's gradient tile with its four white squares, drawn at 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 px (all PNG-compressed entries). The 16 and 20 px images are pixel-snapped with a 1 px gutter rather than scaled. The window, the tray icon and the tray notice reference it through the Avalonia resource, and the csproj's `ApplicationIcon` stamps it into the executable for the taskbar and Explorer. It is a static file, so a custom accent never changes it; only the in-app mark follows the accent. Regenerating it means redrawing the same tile at each size, not editing one image.
+
 **Known gaps:**
 - **Alt+Space does not open the system menu.** Avalonia swallows keyboard `SC_KEYMENU` in its window
   procedure (upstream issue 14545, open), extended or not.
