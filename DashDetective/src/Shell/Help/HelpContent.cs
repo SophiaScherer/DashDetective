@@ -23,7 +23,7 @@ public static class HelpContent {
     /// built without a render backend, and this copy has to stay testable headlessly.</summary>
     public static readonly IReadOnlyList<HelpTopic> GettingStarted = [
         new("page.dashboard", "Dashboard",
-            "A real-time overview of the whole machine: CPU, memory, GPU, disk and network at a glance."),
+            "A real-time overview of the whole machine: CPU, memory, GPU, disk and network at a glance. Double-click a card or chart to open it in Performance."),
         new("page.fileExplorer", "File Explorer",
             "Browse files and folders, with sizes and types, and an address bar you can type a path into."),
         new("page.processes", "Processes",
