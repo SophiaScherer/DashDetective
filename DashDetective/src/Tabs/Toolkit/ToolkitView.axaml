@@ -122,6 +122,17 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
+        <!-- The running stanza's Cancel: console type on the console inset, so it takes the inset's own
+             blue (the "$" line's) rather than the page's text ramp, which is not measured against it. -->
+        <Style Selector="Button.stanzaCancel">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="{DynamicResource TextSizeCaption}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ConsoleBlue}"/>
+        </Style>
+        <Style Selector="Button.stanzaCancel:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource ConsoleFg}"/>
+        </Style>
+
         <!-- ===== "+ Add command" form ===== -->
         <!-- The form's five fields use the shared Border.field (src/Shared/Styles/SharedStyles.axaml),
              which is the same chrome the Network tab's ping/DNS targets draw. -->
@@ -626,8 +637,16 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ToolkitLogEntry">
                                         <StackPanel Margin="0,0,0,9">
-                                            <TextBlock Text="{Binding Time}" Classes="console"
-                                                       Foreground="{DynamicResource ConsoleMuted}"/>
+                                            <!-- Cancel shows only on the in-flight stanza of a captured command; the finished
+                                                 stanza is a new instance, so it goes away with no state to reset. -->
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding Time}" Classes="console"
+                                                           Foreground="{DynamicResource ConsoleMuted}"/>
+                                                <Button Grid.Column="1" Classes="bare stanzaCancel" Content="Cancel"
+                                                        IsVisible="{Binding IsRunning}"
+                                                        Command="{Binding $parent[UserControl].((vm:ToolkitViewModel)DataContext).CancelRunCommand}"
+                                                        ToolTip.Tip="Stop this command"/>
+                                            </Grid>
                                             <TextBlock Classes="console"
                                                        Foreground="{DynamicResource ConsoleBlue}"
                                                        Text="{Binding Command, StringFormat='$ {0}'}"/>

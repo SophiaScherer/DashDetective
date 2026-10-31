@@ -45,14 +45,14 @@ public class NetworkViewModelTests {
     private static (NetworkViewModel Vm, RecordingDns Dns) Create() {
         var dns = new RecordingDns();
         return (new NetworkViewModel(
-            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener())), dns);
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener(), new FakePublicAddressProvider())), dns);
     }
 
     /// <summary>The page over a link opener the test keeps hold of, for the browser-link commands.</summary>
     private static (NetworkViewModel Vm, FakeWebLinkOpener Links) CreateWithLinks() {
         var links = new FakeWebLinkOpener();
         return (new NetworkViewModel(
-            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), new RecordingDns(), links)), links);
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), new RecordingDns(), links, new FakePublicAddressProvider())), links);
     }
 
     [Fact]
@@ -126,6 +126,125 @@ public class NetworkViewModelTests {
         Assert.Equal("Start", vm.PingButtonText);
     }
 
+    // ---- DNS: the latest submit wins ----
+
+    private static (NetworkViewModel Vm, FakeDnsLookupProvider Dns) CreateWithPendingDns() {
+        var dns = new FakeDnsLookupProvider();
+        return (new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), dns, new FakeWebLinkOpener(), new FakePublicAddressProvider())), dns);
+    }
+
+    /// <summary>The bug: a single-label name takes seconds to fail, so replacing it with a real host and
+    /// pressing Enter again let the older answer land last and overwrite the newer one.</summary>
+    [Fact]
+    public void LookupDns_OlderLookupFinishingLast_DoesNotOverwriteTheNewerOne() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("github.com");
+        dns.Complete("slow.invalid");
+
+        Assert.Contains("github.com", vm.DnsConsole);
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_LookupsFinishingInOrder_ShowTheLatest() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("slow.invalid");
+        // The superseded answer is dropped; the pending line for the newer one stays until it lands.
+        Assert.Equal("Resolving github.com…", vm.DnsFooter);
+
+        dns.Complete("github.com");
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_OlderLookupFailingLast_DoesNotOverwriteTheNewerOne() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "slow.invalid";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Complete("github.com");
+        dns.Fail("slow.invalid");
+
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_LatestLookupFailing_NamesTheHostItWasStartedWith() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "first.invalid";
+        vm.LookupDnsCommand.Execute(null);
+
+        // Editing the field mid-flight must not change which name the failure blames.
+        vm.DnsHost = "typing-something-else";
+        dns.Fail("first.invalid");
+
+        Assert.Equal("Could not resolve first.invalid", vm.DnsFooter);
+        Assert.Contains("first.invalid", vm.DnsConsole);
+    }
+
+    [Fact]
+    public void LookupDns_ShowsAPendingFooterAtOnce() {
+        var (vm, _) = CreateWithPendingDns();
+        vm.DnsHost = "github.com";
+
+        vm.LookupDnsCommand.Execute(null);
+
+        Assert.Equal("Resolving github.com…", vm.DnsFooter);
+        Assert.Contains("github.com", vm.DnsConsole);
+    }
+
+    [Fact]
+    public void Refresh_ReResolvingAfterALookup_DoesNotShowThePendingFooter() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "github.com";
+        vm.LookupDnsCommand.Execute(null);
+        dns.Complete("github.com");
+
+        vm.Refresh();
+
+        Assert.Equal("Resolved github.com", vm.DnsFooter);
+    }
+
+    [Fact]
+    public void LookupDns_HostWithPaddingFailing_NamesTheTrimmedHost() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "  first.invalid  ";
+        vm.LookupDnsCommand.Execute(null);
+
+        dns.Fail("first.invalid");
+
+        Assert.Equal("Could not resolve first.invalid", vm.DnsFooter);
+    }
+
+    /// <summary>A toolbar Refresh starts a newer lookup, so a user lookup still out must not land over it.</summary>
+    [Fact]
+    public void Refresh_SupersedingAnInFlightLookup_DropsTheOlderAnswer() {
+        var (vm, dns) = CreateWithPendingDns();
+        vm.DnsHost = "older.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "newer.test";
+        vm.Refresh();
+
+        dns.Complete("older.test");
+        Assert.Equal("Resolving older.test…", vm.DnsFooter);
+
+        dns.Complete("newer.test");
+        Assert.Equal("Resolved newer.test", vm.DnsFooter);
+    }
+
     // ---- Soft-fail ----
 
     /// <summary>A failed connections read empties the table and says so, rather than leaving the last
@@ -136,7 +255,7 @@ public class NetworkViewModelTests {
             Fail = new System.InvalidOperationException("the TCP table is gone"),
         };
         var vm = new NetworkViewModel(
-            new NetworkProviders(new EmptyAdapters(), connections, new RecordingDns(), new FakeWebLinkOpener()));
+            new NetworkProviders(new EmptyAdapters(), connections, new RecordingDns(), new FakeWebLinkOpener(), new FakePublicAddressProvider()));
 
         vm.Refresh();
         await Task.Yield();
@@ -154,7 +273,7 @@ public class NetworkViewModelTests {
             Fail = new System.InvalidOperationException("the adapter enumeration is gone"),
         };
         var vm = new NetworkViewModel(
-            new NetworkProviders(adapters, new EmptyConnections(), new RecordingDns(), new FakeWebLinkOpener()));
+            new NetworkProviders(adapters, new EmptyConnections(), new RecordingDns(), new FakeWebLinkOpener(), new FakePublicAddressProvider()));
 
         vm.Refresh();
         await Task.Yield();
@@ -224,5 +343,132 @@ public class NetworkViewModelTests {
         links.Succeeds = false;
         vm.OpenDnsSiteCommand.Execute(null);
         Assert.Contains("https://example.com/", Assert.Single(notices));
+    }
+
+    // ----- Public addresses -----
+
+    private static (NetworkViewModel Vm, FakePublicAddressProvider Public) CreateWithPublic() {
+        var provider = new FakePublicAddressProvider();
+        return (new NetworkViewModel(
+            new NetworkProviders(new EmptyAdapters(), new EmptyConnections(), new RecordingDns(),
+                                 new FakeWebLinkOpener(), provider)), provider);
+    }
+
+    [Fact]
+    public void Construction_AndRefresh_NeverAskForThePublicAddresses() {
+        var (vm, provider) = CreateWithPublic();
+        Assert.Equal(0, provider.Calls);
+
+        vm.Refresh();
+
+        Assert.Equal(0, provider.Calls);
+        Assert.False(vm.PublicLookedUp);
+        Assert.Equal("", vm.PublicIpv4);
+        Assert.Equal("", vm.PublicIpv6);
+    }
+
+    [Fact]
+    public void LookupPublicAddresses_PublishesBothRows() {
+        var (vm, provider) = CreateWithPublic();
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        Assert.Equal(1, provider.Calls);
+        Assert.True(vm.PublicLookedUp);
+        Assert.Equal("203.0.113.7", vm.PublicIpv4);
+        Assert.Equal("2001:db8::7", vm.PublicIpv6);
+    }
+
+    [Fact]
+    public void LookupPublicAddresses_WhileInFlight_ReadsLookingUp() {
+        var (vm, provider) = CreateWithPublic();
+        provider.Hold();
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        Assert.Equal(NetworkViewModel.PublicLooking, vm.PublicIpv4);
+        Assert.Equal(NetworkViewModel.PublicLooking, vm.PublicIpv6);
+    }
+
+    [Fact]
+    public void LookupPublicAddresses_WhenOneFamilyFails_ShowsUnavailableForThatFamilyOnly() {
+        var (vm, provider) = CreateWithPublic();
+        provider.Result = new PublicAddresses("203.0.113.7", null);
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        Assert.Equal("203.0.113.7", vm.PublicIpv4);
+        Assert.Equal("Unavailable", vm.PublicIpv6);
+    }
+
+    [Fact]
+    public void LookupPublicAddresses_WhenOffline_ShowsUnavailableForBoth() {
+        var (vm, provider) = CreateWithPublic();
+        provider.Result = PublicAddresses.None;
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        Assert.Equal("Unavailable", vm.PublicIpv4);
+        Assert.Equal("Unavailable", vm.PublicIpv6);
+    }
+
+    /// <summary>The provider's contract is never to throw, but a page left on "Looking up…" for the
+    /// session would be a worse failure than a defensive catch.</summary>
+    [Fact]
+    public void LookupPublicAddresses_WhenTheProviderThrows_ShowsUnavailable() {
+        var (vm, provider) = CreateWithPublic();
+        provider.Throwing = true;
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        Assert.Equal("Unavailable", vm.PublicIpv4);
+        Assert.Equal("Unavailable", vm.PublicIpv6);
+    }
+
+    [Fact]
+    public void Refresh_AfterALookup_AsksAgain() {
+        var (vm, provider) = CreateWithPublic();
+        vm.LookupPublicAddressesCommand.Execute(null);
+        provider.Result = new PublicAddresses("198.51.100.9", "2001:db8::9");
+
+        vm.Refresh();
+
+        Assert.Equal(2, provider.Calls);
+        Assert.Equal("198.51.100.9", vm.PublicIpv4);
+    }
+
+    [Fact]
+    public void LookupPublicAddresses_StaleReply_DoesNotOverwriteANewerOne() {
+        var (vm, provider) = CreateWithPublic();
+        var first = provider.Hold();
+        var second = provider.Hold();
+
+        vm.LookupPublicAddressesCommand.Execute(null);
+        vm.Refresh();   // the second, newer lookup
+        second.SetResult(new PublicAddresses("198.51.100.9", "2001:db8::9"));
+        first.SetResult(new PublicAddresses("203.0.113.1", "2001:db8::1"));
+
+        Assert.Equal("198.51.100.9", vm.PublicIpv4);
+        Assert.Equal("2001:db8::9", vm.PublicIpv6);
+    }
+
+    /// <summary>The exported report is shared, so the public address must not ride along in it.</summary>
+    [Fact]
+    public void GetPrimaryConfigRows_NeverIncludeThePublicAddresses() {
+        var (vm, _) = CreateWithPublic();
+        vm.LookupPublicAddressesCommand.Execute(null);
+
+        var rows = vm.GetPrimaryConfigRows();
+
+        Assert.DoesNotContain(rows, row => row.Key.Contains("Public") || row.Value.Contains("203.0.113.7"));
+    }
+
+    [Fact]
+    public void PublicLookupTip_NamesTheServiceThatIsContacted() {
+        var (vm, _) = CreateWithPublic();
+
+        Assert.Contains("api.ipify.org", vm.PublicLookupTip);
+        Assert.Contains("api6.ipify.org", vm.PublicLookupTip);
+        Assert.Contains("Refresh", vm.PublicLookupTip);
     }
 }

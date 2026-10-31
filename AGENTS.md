@@ -39,7 +39,8 @@ incrementally, one feature at a time, in a modular style. Each feature lives in 
 is largely isolated from the others.
 
 The nine top-level features — Dashboard, File Explorer, Processes, Performance, Network, Storage,
-Hardware, Toolkit and Settings — are **all built**. Keep changes inside the one a task names.
+Hardware, Toolkit (shown as Utilities) and Settings — are **all built**. Keep changes inside the one a
+task names.
 
 ## Current Scope — READ THIS FIRST
 
@@ -47,8 +48,8 @@ Hardware, Toolkit and Settings — are **all built**. Keep changes inside the on
 new task explicitly assigns, and do not modify a live feature without an explicit scope expansion.
 
 The nine tabs — Dashboard, File Explorer, Processes, Performance, Network, Storage, Hardware,
-**Toolkit** and Settings — plus the shell **Navigation bar**, **universal search**, **keyboard
-shortcuts**, the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
+**Toolkit** (shown as Utilities) and Settings — plus the shell **Navigation bar**, **universal search**,
+**keyboard shortcuts**, the **page lifecycle** and the **widget system** are all live, as are two cross-cutting
 passes (repo-hygiene / portfolio; de-duplication / composition). **Read
 [docs/FEATURES.md](docs/FEATURES.md) before touching any of them** — it holds the write-up for each,
 including the decisions inside it that must not be undone. The **widget system** entry changes how
@@ -783,7 +784,8 @@ reading, a GPU at 130 °C is a hot one.
 - **A setting that can be switched off encodes "off" in the value where that is unambiguous.** An alert
   threshold of `0` means "not watched", which keeps one control per row and one check in the watcher.
   Where the *number* has to survive being switched off, the switch is a separate persisted flag — that
-  is why the alert rows store both, so GPU can ship off with 90 already in the box.
+  is why each alert stores its flag and its threshold separately (the switch now lives on the resource's
+  bell), so GPU can ship off with 90 already in the box.
 - **`SettingId` and `SettingCatalog` are a bijection**, pinned by a test: a new id without an entry
   fails the build. The page's labels bind to the catalog rather than holding literals, so the copy on
   screen is by construction the copy universal search matches against.

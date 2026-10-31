@@ -66,19 +66,11 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// Dashboard's network scale floor.</summary>
     private const double MinNetworkScaleMbps = 1.0;
 
-    /// <summary>The resource rows shown in the left rail, in display order (filtered by <see cref="ShowAllDevices"/>).</summary>
+    /// <summary>The resource rows shown in the left rail, in display order: every detected device.</summary>
     public ObservableCollection<ResourceRow> Resources { get; } = new();
 
     /// <summary>The currently selected resource, whose detail the right pane shows.</summary>
     [ObservableProperty] private ResourceRow _selectedResource = null!;
-
-    /// <summary>Whether the rail shows every detected instance ("All devices") or just the primary of each kind
-    /// ("Primary"). Persisted by the shell; today it only changes the disk rows (the sole multi-instance
-    /// category), but the filtering is instance-count-agnostic.</summary>
-    [ObservableProperty] private bool _showAllDevices;
-
-    /// <summary>Raised when <see cref="ShowAllDevices"/> changes, so the shell can persist the choice.</summary>
-    public event Action? ScopeChanged;
 
     // ----- Jumps to the tab that owns the selected device -----
     // The same shape as ToolkitViewModel.FileExplorerRevealRequested: this page names a device and says
@@ -115,17 +107,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         ApplyPendingReveal();
     }
 
-    /// <summary>Applies a pending reveal once its row exists, expanding the rail when the Primary scope
-    /// hides the device — the user asked for that one, not the primary of its kind. Cleared before the
-    /// scope flip, whose rebuild calls back in here.</summary>
+    /// <summary>Applies a pending reveal once its row exists.</summary>
     private void ApplyPendingReveal() {
         if (_pendingReveal is not { } deviceId || FindRow(deviceId) is not { } row)
             return;
 
         _pendingReveal = null;
-        if (!Resources.Contains(row))
-            ShowAllDevices = true;
-
         Select(row);
     }
 
@@ -201,7 +188,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     // ---- Disks (live, one row per physical disk) ----
     // Rows are built from the DeviceInventory; each disk's active-time / read / write / response come from the
     // page-local per-disk sampler (the shared storage feed is _Total-only) on its own timer, keyed by disk
-    // number. This is the multi-instance category the Primary/All toggle expands or collapses.
+    // number. Every disk gets a row.
     private readonly List<DiskResource> _disks = new();
     private readonly Dictionary<int, DiskResource> _disksByNumber = new();
     private readonly IPhysicalDiskThroughputSampler _throughputSampler;
@@ -210,8 +197,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     // ---- GPUs (live, one row per physical adapter) ----
     // Rows are built from the DeviceInventory; each GPU's overall busiest-engine % + per-engine Detailed charts
     // come from the page-local per-adapter sampler (the shared GPU feed reports only one combined figure) on the
-    // throughput timer, keyed by adapter LUID. Like disks, this is a multi-instance category the Primary/All
-    // toggle expands or collapses; the Detailed flag is shared across every GPU row.
+    // throughput timer, keyed by adapter LUID. Like disks, every adapter gets a row; the Detailed flag is
+    // shared across every GPU row.
     private readonly List<GpuResource> _gpus = new();
     private readonly Dictionary<string, GpuResource> _gpusByLuid = new(StringComparer.Ordinal);
     private readonly IGpuUsageSampler _gpuSampler;
@@ -235,13 +222,17 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// <summary>Where the rows' colours come from. This page assigns brushes in code rather than binding
     /// {DynamicResource}, so it has to be told when the accent moves the palette.</summary>
     private readonly ThemeService _theme;
+
+    /// <summary>The alert switches each row's bell flips. One flag per kind, so every disk shares the
+    /// disk-activity switch and every GPU the GPU one, exactly as the watcher reads them.</summary>
+    private readonly AlertSwitches _alerts;
     private readonly ResourceRow _networkRow;
     private readonly StatTile _netReceiveTile;
     private readonly StatTile _netSendTile;
     private readonly StatTile _netErrorsTile;
 
-    public PerformanceViewModel(SystemMetricsService service, ThemeService theme)
-        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme) { }
+    public PerformanceViewModel(SystemMetricsService service, ThemeService theme, AlertSwitches alerts)
+        : this(service, HardwareProviders.ForCurrentPlatform(), theme: theme, alerts: alerts) { }
 
     /// <summary>Test seam: the same page over an explicit provider set, and optionally an explicit GPU
     /// sampler source — the one dependency the page resolves for itself, so without this a test cannot reach
@@ -249,11 +240,13 @@ public partial class PerformanceViewModel : ViewModelBase,
     ///
     /// <paramref name="gpuSamplerFactory"/> must mint a fresh sampler per call: this page keeps the first
     /// and the inventory load disposes one of its own.
-    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.</summary>
+    /// <paramref name="throughputSampler"/> supplies the per-disk readings; tests pass a fake.
+    /// <paramref name="alerts"/> are the shell's shared alert switches; a page left without them gets its own.</summary>
     internal PerformanceViewModel(
         SystemMetricsService service, HardwareProviders providers,
         Func<IGpuUsageSampler>? gpuSamplerFactory = null, ThemeService? theme = null,
-        IPhysicalDiskThroughputSampler? throughputSampler = null) {
+        IPhysicalDiskThroughputSampler? throughputSampler = null, AlertSwitches? alerts = null) {
+        _alerts = alerts ?? new AlertSwitches();
         _throughputSampler = throughputSampler ?? IPhysicalDiskThroughputSampler.ForCurrentPlatform();
         // A page of its own rather than a shared one is fine here: ThemeService holds the palette, and an
         // unshared instance simply never hears an accent change.
@@ -298,6 +291,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
                                   }, Select) {
             DeviceId = DeviceIds.Cpu, Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
+            Alert = _alerts.Cpu,
         };
 
         _memoryRow = new ResourceRow("Memory", "", "", "0", "%", ChartSeries.Memory,
@@ -307,7 +301,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                          _memCachedTile, _memCommittedTile,
                                      }, Select) {
             DeviceId = DeviceIds.Memory, Link = HardwareLink(),
-            StatOrder = StatOrderFor(ChartSeries.Memory),
+            StatOrder = StatOrderFor(ChartSeries.Memory), Alert = _alerts.Memory,
         };
 
         // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
@@ -372,26 +366,18 @@ public partial class PerformanceViewModel : ViewModelBase,
         _ = LoadInventoryAsync();
     }
 
-    /// <summary>Rebuilds the rail from the current rows, filtered by <see cref="ShowAllDevices"/>: the single
-    /// categories always show, while the disks collapse to the primary drive ("Primary") or expand to every
-    /// drive ("All devices"). Keeps the current selection when it survives the filter, else selects the first
-    /// row.</summary>
+    /// <summary>Rebuilds the rail from the current rows: every device, grouped by kind. Keeps the current
+    /// selection when its device survives, else selects the first row.</summary>
     private void RebuildResources() {
         var previous = SelectedResource;
 
         Resources.Clear();
         Resources.Add(_cpuRow);
         Resources.Add(_memoryRow);
-        if (ShowAllDevices)
-            foreach (var disk in _disks)
-                Resources.Add(disk.Row);
-        else if (_disks.Count > 0)
-            Resources.Add(_disks[0].Row);
-        if (ShowAllDevices)
-            foreach (var gpu in _gpus)
-                Resources.Add(gpu.Row);
-        else if (_gpus.Count > 0)
-            Resources.Add(_gpus[0].Row);
+        foreach (var disk in _disks)
+            Resources.Add(disk.Row);
+        foreach (var gpu in _gpus)
+            Resources.Add(gpu.Row);
         Resources.Add(_networkRow);
 
         // Rows built after construction (disks, GPUs) inherit the current window and palette here.
@@ -419,15 +405,6 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? Resources.FirstOrDefault(row => row.DeviceId == deviceId)
             : null;
     }
-
-    partial void OnShowAllDevicesChanged(bool value) {
-        RebuildResources();
-        ScopeChanged?.Invoke();
-    }
-
-    /// <summary>Rail scope segments: "Primary" (one of each kind) and "All devices" (every instance).</summary>
-    [RelayCommand] private void SelectPrimaryScope() => ShowAllDevices = false;
-    [RelayCommand] private void SelectAllScope() => ShowAllDevices = true;
 
     /// <summary>Detail segments (shown only for resources that <see cref="ResourceRow.SupportsDetail"/>):
     /// "Overall" (one chart) and "Detailed" (per-subunit mini charts) on the selected resource.</summary>
@@ -671,7 +648,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select) {
                 DeviceId = disk.Id, Link = StorageLink(disk.DiskNumber),
-                StatOrder = StatOrderFor(ChartSeries.Storage),
+                StatOrder = StatOrderFor(ChartSeries.Storage), Alert = _alerts.DiskActivity,
             };
             var resource = new DiskResource {
                 DiskNumber = number, Row = row, History = history,
@@ -713,19 +690,25 @@ public partial class PerformanceViewModel : ViewModelBase,
             // usage arrives per tick, so it is seeded total-only. Temp / Power are sampled per tick from the
             // vendor SDK for this adapter's PCI vendor, and stay "—" for a vendor with no reader.
             var vramTile = new StatTile("VRAM in use", GpuMemoryFormatter.Format(null, gpu.VramBytes));
+            // Shared memory follows the same convention, but an adapter with no shared pool gets no tile at
+            // all rather than a dash or a zero.
+            var sharedTile = gpu.SharedBytes is > 0
+                ? new StatTile("Shared memory in use", GpuMemoryFormatter.Format(null, gpu.SharedBytes))
+                : null;
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
+            StatTile[] tiles = sharedTile is null
+                ? [threeDTile, vramTile, tempTile, powerTile]
+                : [threeDTile, vramTile, sharedTile, tempTile, powerTile];
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
-                                      history.Points(100),
-                                      new[] {
-                                          threeDTile, vramTile, tempTile, powerTile,
-                                      }, Select) {
+                                      history.Points(100), tiles, Select) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
-                StatOrder = StatOrderFor(ChartSeries.Gpu),
+                StatOrder = StatOrderFor(ChartSeries.Gpu), Alert = _alerts.Gpu,
             };
             var resource = new GpuResource {
                 Luid = luid, Row = row, History = history, ThreeDTile = threeDTile,
-                VramTile = vramTile, VramBytes = gpu.VramBytes, TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
+                VramTile = vramTile, VramBytes = gpu.VramBytes, SharedTile = sharedTile, SharedBytes = gpu.SharedBytes,
+                TempTile = tempTile, PowerTile = powerTile, Pci = gpu.GpuPci,
             };
             if (previous is { Engines.Count: > 0 }) {
                 foreach (var engine in previous.Engines) {
@@ -898,6 +881,8 @@ public partial class PerformanceViewModel : ViewModelBase,
 
             // Before the utilization guard: an adapter with no utilization figure can still report memory.
             gpu.VramTile.Value = GpuMemoryFormatter.Format(sample.DedicatedUsedBytes, gpu.VramBytes);
+            if (gpu.SharedTile is { } sharedTile)
+                sharedTile.Value = GpuMemoryFormatter.Format(sample.SharedUsedBytes, gpu.SharedBytes);
 
             if (sample.Overall is not { } reading) {
                 // The row keeps its "—". Say why, so a card of dashes reads as a driver that publishes
@@ -1206,6 +1191,11 @@ public partial class PerformanceViewModel : ViewModelBase,
         public required StatTile VramTile { get; init; }
         /// <summary>The adapter's dedicated total from the inventory; null or 0 when unknown.</summary>
         public ulong? VramBytes { get; init; }
+        /// <summary>Null when the adapter has no shared pool, which is why it has no tile.</summary>
+        public StatTile? SharedTile { get; init; }
+        /// <summary>The adapter's shared total from the inventory; only read when <see cref="SharedTile"/>
+        /// exists, so it is known and above 0 there.</summary>
+        public ulong? SharedBytes { get; init; }
         public required StatTile TempTile { get; init; }
         public required StatTile PowerTile { get; init; }
         public GpuPciId? Pci { get; init; }

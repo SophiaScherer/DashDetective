@@ -12,7 +12,7 @@ using Xunit;
 namespace DashDetective.Tests.Tabs.Performance;
 
 /// <summary>Covers <see cref="PerformanceViewModel.Reveal"/>, the jump into this page: an inventory id
-/// selects its own row, a device the Primary scope hides brings the rail with it, and a reveal that
+/// selects its own row, every device is already in the rail to be selected, and a reveal that
 /// arrives before the rows are built waits for them. Also pins what makes that last one hold — a rebuilt
 /// rail keeps the selected device, which it could not do while rows were matched by reference.</summary>
 public class PerformanceRevealTests {
@@ -69,25 +69,32 @@ public class PerformanceRevealTests {
     }
 
     [Fact]
-    public async Task Reveal_ADiskHiddenByThePrimaryScope_ExpandsTheRailAndSelectsIt() {
+    public async Task Reveal_ASecondaryDisk_FindsItInTheRailAndSelectsIt() {
         var page = await LoadedAsync();
-        Assert.False(page.ShowAllDevices);
-        Assert.DoesNotContain(page.Resources, row => row.DeviceId == DeviceIds.Disk(SecondDisk));
+        Assert.Contains(page.Resources, row => row.DeviceId == DeviceIds.Disk(SecondDisk));
 
         page.Reveal(DeviceIds.Disk(SecondDisk));
 
-        Assert.True(page.ShowAllDevices);
         Assert.Equal(DeviceIds.Disk(SecondDisk), page.SelectedResource.DeviceId);
+        Assert.Contains(page.SelectedResource, page.Resources);
     }
 
     [Fact]
-    public async Task Reveal_AVisibleDisk_LeavesTheScopeAlone() {
+    public async Task Reveal_TheFirstDisk_SelectsIt() {
         var page = await LoadedAsync();
 
         page.Reveal(DeviceIds.Disk(FirstDisk));
 
-        Assert.False(page.ShowAllDevices);
         Assert.Equal(DeviceIds.Disk(FirstDisk), page.SelectedResource.DeviceId);
+    }
+
+    [Fact]
+    public async Task Rail_ListsEveryDetectedDisk() {
+        var page = await LoadedAsync();
+
+        var disks = page.Resources.Where(row => row.Series == ChartSeries.Storage).Select(row => row.DeviceId);
+
+        Assert.Equal([DeviceIds.Disk(FirstDisk), DeviceIds.Disk(SecondDisk)], disks);
     }
 
     [Fact]
@@ -124,13 +131,11 @@ public class PerformanceRevealTests {
         page.Reveal("");
 
         Assert.Same(selected, page.SelectedResource);
-        Assert.False(page.ShowAllDevices);
     }
 
     [Fact]
     public async Task EveryRailRow_CarriesTheInventoryIdItWasBuiltFrom() {
         var page = await LoadedAsync();
-        page.ShowAllDevices = true;
 
         Assert.All(page.Resources, row => Assert.False(string.IsNullOrEmpty(row.DeviceId)));
         Assert.Equal(page.Resources.Count, page.Resources.Select(row => row.DeviceId).Distinct().Count());

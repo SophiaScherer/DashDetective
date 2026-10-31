@@ -6,8 +6,9 @@ using Xunit;
 namespace DashDetective.Tests.Services.Platform.Linux;
 
 /// <summary>Covers <see cref="DrmCardFacts"/>: the node filter that keeps one GPU from becoming several,
-/// the PCI-address identity every GPU reader has to agree on, the hex id parse, and the name formatting
-/// that has to stay informative for a card the bundled vendor table has never seen.</summary>
+/// the PCI-address identity every GPU reader has to agree on, the hex id parse, the GTT total that stays null
+/// rather than 0 when absent, and the name formatting that has to stay informative for a card the bundled
+/// vendor table has never seen.</summary>
 public class DrmCardFactsTests {
     private static FakeProcFileSystem Amd() => new FakeProcFileSystem().WithAmdgpuCard();
 
@@ -72,6 +73,30 @@ public class DrmCardFactsTests {
         Assert.Equal("nvidia", card.Driver);
         Assert.Equal(0u, card.VramBytes);
         Assert.Equal("", card.HwmonPath);
+    }
+
+    /// <summary>amdgpu's GTT total is the shared system memory the card can map — the Linux analogue of
+    /// DXGI's shared figure, in plain bytes.</summary>
+    [Fact]
+    public void Read_AmdCard_ReadsTheGttTotal() {
+        Assert.Equal(8589934592UL, Assert.Single(DrmCardFacts.Read(Amd())).GttBytes);
+    }
+
+    /// <summary>A driver that publishes no GTT is null, not 0: the shared tile is omitted for it rather than
+    /// claiming an empty pool.</summary>
+    [Fact]
+    public void Read_NvidiaCard_ReportsNoGtt() {
+        Assert.Null(Assert.Single(DrmCardFacts.Read(new FakeProcFileSystem().WithNvidiaCard())).GttBytes);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("N/A\n")]
+    [InlineData("-1\n")]
+    public void Read_UnparseableGttTotal_IsNull(string body) {
+        var proc = Amd().WithFile("/sys/class/drm/card0/device/mem_info_gtt_total", body);
+
+        Assert.Null(Assert.Single(DrmCardFacts.Read(proc)).GttBytes);
     }
 
     /// <summary>A DRM node with no PCI identity has no name, no ids and no sensors — a card built from it
