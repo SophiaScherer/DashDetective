@@ -128,154 +128,174 @@
         <GridSplitter Grid.Column="1" Classes="paneSplitter"/>
 
         <!-- ===== Detail pane (right) ===== -->
-        <!-- Stacks the utilization chart (Phase 4); the stat tiles (Phase 5) go below it. -->
-        <StackPanel Grid.Column="2" Spacing="12">
+        <!-- Stacks the utilization chart, the stat tiles and a GPU's details. Scrolls on its own, since
+             the page is self-scrolling and a large interface or text size pushes the details past the
+             window's foot. -->
+        <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="12" Margin="{StaticResource ScrollGutter}">
 
-            <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
-                 in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
-            <controls:WidgetPanel WidgetId="performance.chart"
-                                  Title="{Binding SelectedResource.Name}">
-                <!-- The jump link goes in HeaderLead so it sits against the name rather than making the
-                     title itself clickable: a bare title offers no resting cue that it goes anywhere.
-                     Hidden on a resource with no home tab (HasLink), the same way the Overall/Detailed
-                     toggle below is gated on SupportsDetail. The alert bell sits against the name too,
-                     since it is about this resource; it takes no room on one nothing watches. -->
-                <controls:WidgetPanel.HeaderLead>
-                    <StackPanel Orientation="Horizontal" Margin="8,0,0,0" Spacing="4">
-                        <controls:AlertBell Switch="{Binding SelectedResource.Alert}"/>
-                        <Button Classes="link"
-                                IsVisible="{Binding SelectedResource.HasLink}"
-                                Command="{Binding SelectedResource.Link.Command}"
-                                ToolTip.Tip="Open this device on the tab that owns it">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding SelectedResource.Link.Label}"
-                                           VerticalAlignment="Center"/>
-                                <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
-                                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                                      VerticalAlignment="Center"
-                                      Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
-                            </StackPanel>
-                        </Button>
+                <!-- Utilization chart: header (name + spec), caption, and the fixed-axis area chart tinted
+                     in the resource's colour. Reuses the shared Sparkline with the background grid, like the Dashboard. -->
+                <controls:WidgetPanel WidgetId="performance.chart"
+                                      Title="{Binding SelectedResource.Name}">
+                    <!-- The jump link goes in HeaderLead so it sits against the name rather than making the
+                         title itself clickable: a bare title offers no resting cue that it goes anywhere.
+                         Hidden on a resource with no home tab (HasLink), the same way the Overall/Detailed
+                         toggle below is gated on SupportsDetail. The alert bell sits against the name too,
+                         since it is about this resource; it takes no room on one nothing watches. -->
+                    <controls:WidgetPanel.HeaderLead>
+                        <StackPanel Orientation="Horizontal" Margin="8,0,0,0" Spacing="4">
+                            <controls:AlertBell Switch="{Binding SelectedResource.Alert}"/>
+                            <Button Classes="link"
+                                    IsVisible="{Binding SelectedResource.HasLink}"
+                                    Command="{Binding SelectedResource.Link.Command}"
+                                    ToolTip.Tip="Open this device on the tab that owns it">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding SelectedResource.Link.Label}"
+                                               VerticalAlignment="Center"/>
+                                    <Path Classes="linkArrow" Width="11" Height="11" Stretch="Uniform"
+                                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                          VerticalAlignment="Center"
+                                          Data="M2,9 L9,2 M4,2 L9,2 L9,7"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </controls:WidgetPanel.HeaderLead>
+                    <controls:WidgetPanel.HeaderContent>
+                        <TextBlock Classes="cardSub" Text="{Binding SelectedResource.Spec}"/>
+                    </controls:WidgetPanel.HeaderContent>
+                    <StackPanel Spacing="8">
+                        <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
+                             supports it: CPU logical processors / GPU engines). -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <!-- Trims: the star column shrinks under the toggle beside it, and an untrimmed
+                                 TextBlock overflows its column rather than clipping to it. -->
+                            <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Text="{Binding SelectedResource.ChartCaption}"/>
+                            <Border Grid.Column="1" Classes="segments"
+                                    IsVisible="{Binding SelectedResource.SupportsDetail}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Classes="bare" Command="{Binding SelectOverallViewCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding !SelectedResource.IsDetailed}">
+                                            <TextBlock Text="Overall"/>
+                                        </Border>
+                                    </Button>
+                                    <Button Classes="bare" Command="{Binding SelectDetailedViewCommand}">
+                                        <Border Classes="seg" Classes.selected="{Binding SelectedResource.IsDetailed}">
+                                            <TextBlock Text="{Binding SelectedResource.DetailLabel}"/>
+                                        </Border>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Why the chart below is empty, for a resource that reports no figure (a GPU whose
+                             driver publishes none). Takes no space when there is nothing to say. -->
+                        <TextBlock Classes="cardSub" TextWrapping="Wrap"
+                                   IsVisible="{Binding SelectedResource.HasNote}"
+                                   Text="{Binding SelectedResource.Note}"/>
+
+                        <!-- The key for the one row that draws two series; a single line needs none, since the
+                             header above already names it. -->
+                        <controls:ChartLegend HorizontalAlignment="Right"
+                                              IsVisible="{Binding SelectedResource.HasSecondSeries}"
+                                              Label1="{Binding SelectedResource.LegendLabel1}"
+                                              Brush1="{Binding SelectedResource.TraceBrush}"
+                                              Pattern2="{DynamicResource ChartPatterns}"
+                                              Label2="{Binding SelectedResource.LegendLabel2}"
+                                              Brush2="{Binding SelectedResource.TraceBrush2}"/>
+
+                        <!-- Overall: one fixed-axis area chart tinted in the resource's colour, plus an optional
+                             second series on the same axis (the adapter row's upload beside its download). -->
+                        <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
+                                            YMin="0" YMax="100"
+                                            IsVisible="{Binding !SelectedResource.IsDetailed}"
+                                            Stroke="{Binding SelectedResource.TraceBrush}"
+                                            Points="{Binding SelectedResource.Points}"
+                                            Stroke2="{Binding SelectedResource.TraceBrush2}"
+                                            Points2="{Binding SelectedResource.Points2}"
+                                            PatternSecondSeries="{DynamicResource ChartPatterns}"
+                                            AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
+                                            AxisTimeLabels="{Binding ChartTimeLabels}"
+                                            AxisYTitle="{Binding SelectedResource.AxisYTitle}"
+                                            AxisXTitle="Time"
+                                            StatusText="{Binding SelectedResource.ChartStatus}"/>
+
+                        <!-- Detailed: one mini chart per logical processor / engine. Uncapped like the
+                             Dashboard card strip, so the cells reflow to fill the pane instead of stretching;
+                             110px is the width below which one wraps. The panel sizes to its content up to
+                             MaxHeight, so a small grid shows flush while many cores scroll. -->
+                        <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
+                                      IsVisible="{Binding SelectedResource.IsDetailed}">
+                            <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}"
+                                          Margin="{StaticResource ScrollGutter}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <layout:UniformFlowPanel MinItemWidth="140" ColumnSpacing="8" RowSpacing="8"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SubChart">
+                                        <Border Padding="8" CornerRadius="6"
+                                                Background="{DynamicResource AppBackground}">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding Label}" FontSize="{DynamicResource TextSizeCaption}"
+                                                           Foreground="{DynamicResource TextMuted}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <controls:Sparkline Classes="chartCell" Fill="True" ShowGrid="True"
+                                                                    GridRows="2" GridColumns="6" YMin="0" YMax="100"
+                                                                    Stroke="{Binding Stroke}" Points="{Binding Points}"
+                                                                    AxisValueLabels="{Binding AxisLabels}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </StackPanel>
-                </controls:WidgetPanel.HeaderLead>
-                <controls:WidgetPanel.HeaderContent>
-                    <TextBlock Classes="cardSub" Text="{Binding SelectedResource.Spec}"/>
-                </controls:WidgetPanel.HeaderContent>
-                <StackPanel Spacing="8">
-                    <!-- Caption + the per-resource Overall/Detailed toggle (shown only when the resource
-                         supports it: CPU logical processors / GPU engines). -->
-                    <Grid ColumnDefinitions="*,Auto">
-                        <!-- Trims: the star column shrinks under the toggle beside it, and an untrimmed
-                             TextBlock overflows its column rather than clipping to it. -->
-                        <TextBlock Grid.Column="0" Classes="cardSub" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="{Binding SelectedResource.ChartCaption}"/>
-                        <Border Grid.Column="1" Classes="segments"
-                                IsVisible="{Binding SelectedResource.SupportsDetail}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Classes="bare" Command="{Binding SelectOverallViewCommand}">
-                                    <Border Classes="seg" Classes.selected="{Binding !SelectedResource.IsDetailed}">
-                                        <TextBlock Text="Overall"/>
-                                    </Border>
-                                </Button>
-                                <Button Classes="bare" Command="{Binding SelectDetailedViewCommand}">
-                                    <Border Classes="seg" Classes.selected="{Binding SelectedResource.IsDetailed}">
-                                        <TextBlock Text="{Binding SelectedResource.DetailLabel}"/>
-                                    </Border>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                </controls:WidgetPanel>
 
-                    <!-- Why the chart below is empty, for a resource that reports no figure (a GPU whose
-                         driver publishes none). Takes no space when there is nothing to say. -->
-                    <TextBlock Classes="cardSub" TextWrapping="Wrap"
-                               IsVisible="{Binding SelectedResource.HasNote}"
-                               Text="{Binding SelectedResource.Note}"/>
+                <!-- Stat tiles: the selected resource's readouts (design comp's statMap): four for most, six for
+                     CPU, and four to eight for a GPU (its Copy / Video Encode / Video Decode engines and shared
+                     memory pool appear only where it has them). Uncapped like the Dashboard card strip, so a
+                     wide pane gains columns rather than widening the tiles; 150px is the width below which one
+                     wraps. -->
+                <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"
+                                                     DragGrip="Item"
+                                                     Order="{Binding SelectedResource.StatOrder.Order, Mode=TwoWay}"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StatTile">
+                            <Border Classes="card">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="tileLabel" Text="{Binding Label}"/>
+                                    <TextBlock Classes="tileValue" Text="{Binding Value}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                    <!-- The key for the one row that draws two series; a single line needs none, since the
-                         header above already names it. -->
-                    <controls:ChartLegend HorizontalAlignment="Right"
-                                          IsVisible="{Binding SelectedResource.HasSecondSeries}"
-                                          Label1="{Binding SelectedResource.LegendLabel1}"
-                                          Brush1="{Binding SelectedResource.TraceBrush}"
-                                          Pattern2="{DynamicResource ChartPatterns}"
-                                          Label2="{Binding SelectedResource.LegendLabel2}"
-                                          Brush2="{Binding SelectedResource.TraceBrush2}"/>
-
-                    <!-- Overall: one fixed-axis area chart tinted in the resource's colour, plus an optional
-                         second series on the same axis (the adapter row's upload beside its download). -->
-                    <controls:Sparkline Classes="chartHero" Fill="True" ShowGrid="True" StrokeThickness="1.8"
-                                        YMin="0" YMax="100"
-                                        IsVisible="{Binding !SelectedResource.IsDetailed}"
-                                        Stroke="{Binding SelectedResource.TraceBrush}"
-                                        Points="{Binding SelectedResource.Points}"
-                                        Stroke2="{Binding SelectedResource.TraceBrush2}"
-                                        Points2="{Binding SelectedResource.Points2}"
-                                        PatternSecondSeries="{DynamicResource ChartPatterns}"
-                                        AxisValueLabels="{Binding SelectedResource.AxisValueLabels}"
-                                        AxisTimeLabels="{Binding ChartTimeLabels}"
-                                        AxisYTitle="{Binding SelectedResource.AxisYTitle}"
-                                        AxisXTitle="Time"
-                                        StatusText="{Binding SelectedResource.ChartStatus}"/>
-
-                    <!-- Detailed: one mini chart per logical processor / engine. Uncapped like the
-                         Dashboard card strip, so the cells reflow to fill the pane instead of stretching;
-                         110px is the width below which one wraps. The panel sizes to its content up to
-                         MaxHeight, so a small grid shows flush while many cores scroll. -->
-                    <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled"
-                                  IsVisible="{Binding SelectedResource.IsDetailed}">
-                        <ItemsControl ItemsSource="{Binding SelectedResource.SubCharts}"
-                                      Margin="{StaticResource ScrollGutter}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <layout:UniformFlowPanel MinItemWidth="140" ColumnSpacing="8" RowSpacing="8"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SubChart">
-                                    <Border Padding="8" CornerRadius="6"
-                                            Background="{DynamicResource AppBackground}">
-                                        <StackPanel Spacing="4">
-                                            <TextBlock Text="{Binding Label}" FontSize="{DynamicResource TextSizeCaption}"
-                                                       Foreground="{DynamicResource TextMuted}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <controls:Sparkline Classes="chartCell" Fill="True" ShowGrid="True"
-                                                                GridRows="2" GridColumns="6" YMin="0" YMax="100"
-                                                                Stroke="{Binding Stroke}" Points="{Binding Points}"
-                                                                AxisValueLabels="{Binding AxisLabels}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </StackPanel>
-            </controls:WidgetPanel>
-
-            <!-- Stat tiles: the selected resource's readouts (design comp's statMap): four for most, five for
-                 a GPU with a shared memory pool, six for CPU. Uncapped like the Dashboard card strip, so a
-                 wide pane gains columns rather than widening the tiles; 150px is the width below which one
-                 wraps. -->
-            <ItemsControl ItemsSource="{Binding SelectedResource.Stats}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"
-                                                 DragGrip="Item"
-                                                 Order="{Binding SelectedResource.StatOrder.Order, Mode=TwoWay}"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:StatTile">
-                        <Border Classes="card">
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="tileLabel" Text="{Binding Label}"/>
-                                <TextBlock Classes="tileValue" Text="{Binding Value}"/>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
+                <!-- Static facts (a GPU's driver, DirectX version and location), like Task Manager's list beside
+                     its graphs. Capped in width so a key and its value stay readable as one line on a wide pane;
+                     InfoRow wraps a long value flush-right. Absent rows are never built, so this is hidden
+                     when there is nothing to list. -->
+                <Border Classes="card" HorizontalAlignment="Left" MinWidth="320" MaxWidth="560"
+                        IsVisible="{Binding SelectedResource.HasDetails}">
+                    <ItemsControl ItemsSource="{Binding SelectedResource.Details}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DetailRow">
+                                <controls:InfoRow Key="{Binding Key}" Value="{Binding Value}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

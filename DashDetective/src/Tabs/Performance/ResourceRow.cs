@@ -37,7 +37,7 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
         Unit = unit;
         Series = series;
         Points = points;
-        Stats = stats;
+        _stats = stats;
         SelectCommand = new RelayCommand(() => onSelected(this));
     }
 
@@ -154,9 +154,20 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     /// shadows the class it comes from.</summary>
     [ObservableProperty] private string _chartStatus = Shared.Charts.ChartStatus.Collecting;
 
-    /// <summary>The four resource-specific readouts shown in the detail stat strip (per the design comp's
-    /// statMap). The list is fixed; each tile's value is updated in place each sampling tick.</summary>
-    public IReadOnlyList<StatTile> Stats { get; }
+    /// <summary>The resource-specific readouts shown in the detail stat strip (per the design comp's
+    /// statMap); each tile's value is updated in place each sampling tick. Observable because a GPU gains
+    /// its Copy and video engine tiles only once its first sample shows it has those engines.</summary>
+    [ObservableProperty] private IReadOnlyList<StatTile> _stats;
+
+    /// <summary>Static facts listed under the stat tiles (a GPU's driver, DirectX version and location).
+    /// Empty for a resource with none, which then draws no list. Observable because a GPU's arrive after
+    /// its row, from a separate read.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDetails))]
+    private IReadOnlyList<DetailRow> _details = Array.Empty<DetailRow>();
+
+    /// <summary>Whether <see cref="Details"/> has anything to show — the list's visibility.</summary>
+    public bool HasDetails => Details.Count > 0;
 
     /// <summary>Why this resource shows "—" rather than a value, or "" when it has one. Set per tick for a
     /// GPU whose driver publishes no utilisation, so an honestly blank chart doesn't read as a broken one.

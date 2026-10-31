@@ -24,7 +24,9 @@ public enum DeviceCategory { Cpu, Memory, Gpu, Disk, Network }
 /// memory, <see cref="SharedBytes"/> its shared system memory (null where none is published) and
 /// <see cref="GpuPci"/> its PCI identity — all static per adapter, so they ride along with the identity
 /// rather than being sampled. <see cref="GpuPci"/> is what the Performance tab's per-vendor GPU
-/// sensor readers attribute a temperature/power reading by.
+/// sensor readers attribute a temperature/power reading by. A GPU's driver, DirectX and location facts are
+/// NOT carried here: they cost a Direct3D probe, so only the Performance tab asks for them
+/// (<see cref="IGpuDetailsProvider"/>).
 /// </summary>
 public sealed record DeviceInstance(
     DeviceCategory Category, string Id, string Name, string Sub, string Spec,

@@ -46,7 +46,7 @@ public class PerformanceRefreshHistoryTests {
                 volumes: () => Task.FromResult(Volumes())),
             gpuSampler, throughputSampler: throughput);
 
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadInventoryAsync();
         return viewModel;
     }

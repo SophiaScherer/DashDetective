@@ -35,7 +35,8 @@ internal sealed record DrmCardFacts(
     uint Revision,
     ulong VramBytes,
     string HwmonPath,
-    ulong? GttBytes = null) {
+    ulong? GttBytes = null,
+    string DriverVersion = "") {
 
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string DrmRoot = "/sys/class/drm";
@@ -164,8 +165,17 @@ internal sealed record DrmCardFacts(
             ParseUInt64(proc.ReadAllText(device + "/mem_info_vram_total")),
             HwmonPathOf(proc, device),
             // amdgpu's GTT: the system memory the GPU can map, Linux's analogue of DXGI's shared memory.
-            ParseOptionalUInt64(proc.ReadAllText(device + "/mem_info_gtt_total")));
+            ParseOptionalUInt64(proc.ReadAllText(device + "/mem_info_gtt_total")),
+            DriverVersionOf(proc, device));
     }
+
+    /// <summary>
+    /// The driver module's own version string. Out-of-tree modules publish one (the proprietary NVIDIA
+    /// driver does); an in-tree driver like amdgpu ships with the kernel and publishes none, so this is ""
+    /// rather than the kernel release, which would be a different fact under this one's label.
+    /// </summary>
+    private static string DriverVersionOf(IProcFileSystem proc, string device) =>
+        proc.ReadAllText(device + "/driver/module/version")?.Trim() ?? "";
 
     /// <summary>The card's hwmon directory, or "" when it has none. amdgpu and the open NVIDIA drivers
     /// register one per card; the proprietary NVIDIA blob registers none, which is why its temperature has

@@ -24,7 +24,7 @@ namespace DashDetective.Services.SystemMetrics;
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsGpuAdapterProvider : IGpuAdapterProvider {
-    public Task<IReadOnlyList<GpuAdapter>> GetAsync() => Task.Run(Read);
+    public Task<IReadOnlyList<GpuAdapter>> GetAsync() => Task.Run(() => (IReadOnlyList<GpuAdapter>)Enumerate());
 
     // ---- DXGI interop (vtable slots per the IDXGIFactory1 / IDXGIAdapter1 layouts) ----
 
@@ -70,7 +70,12 @@ internal sealed class WindowsGpuAdapterProvider : IGpuAdapterProvider {
         public uint Flags;
     }
 
-    private static IReadOnlyList<GpuAdapter> Read() {
+    /// <summary>
+    /// Walks every DXGI adapter. <paramref name="visit"/>, when given, is handed each adapter with its live
+    /// <c>IDXGIAdapter1</c> pointer before it is released — how <see cref="WindowsGpuDetailsProvider"/> asks
+    /// Direct3D 12 about one without a second walk. The inventory passes none.
+    /// </summary>
+    internal static List<GpuAdapter> Enumerate(Action<GpuAdapter, IntPtr>? visit = null) {
         var adapters = new List<GpuAdapter>();
         var factory = IntPtr.Zero;
         try {
@@ -91,14 +96,16 @@ internal sealed class WindowsGpuAdapterProvider : IGpuAdapterProvider {
                     if (getDesc1(adapter, out var desc) != SOk)
                         continue;
 
-                    adapters.Add(new GpuAdapter(
+                    var entry = new GpuAdapter(
                         GpuAdapter.FormatLuidToken(desc.LuidHigh, desc.LuidLow),
                         (desc.Description ?? "").Trim(),
                         (desc.Flags & DxgiAdapterFlagSoftware) != 0,
                         (ulong)desc.DedicatedVideoMemory,
                         new GpuPciId(desc.VendorId, desc.DeviceId, desc.SubSysId, desc.Revision),
                         // The figure Task Manager's "Shared GPU memory" total reads.
-                        (ulong)desc.SharedSystemMemory));
+                        (ulong)desc.SharedSystemMemory);
+                    adapters.Add(entry);
+                    visit?.Invoke(entry, adapter);
                 } finally {
                     GetMethod<ReleaseFn>(adapter, VtRelease)(adapter);
                 }

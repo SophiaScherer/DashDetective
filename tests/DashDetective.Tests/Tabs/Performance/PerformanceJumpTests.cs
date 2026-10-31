@@ -35,7 +35,7 @@ public class PerformanceJumpTests {
             () => new FakeGpuUsageSampler());
 
         // The constructor fires its own load and forgets it; letting that finish keeps the row set stable.
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadInventoryAsync();
         return viewModel;
     }
