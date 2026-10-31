@@ -33,6 +33,9 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
     // drivers publish none, so usage stays null for them.
     private const string VramUsedFile = "/mem_info_vram_used";
 
+    // amdgpu's GTT (shared system memory) in use, beside DrmCardFacts' mem_info_gtt_total.
+    private const string GttUsedFile = "/mem_info_gtt_used";
+
     private static readonly IReadOnlyDictionary<string, GpuAdapterSample> Empty =
         new Dictionary<string, GpuAdapterSample>();
 
@@ -47,7 +50,7 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
 
     // Key → the files this sampler re-reads per tick, or null for one the card does not publish. Cards
     // with no source are kept so the adapter still appears, reporting a null utilisation.
-    private readonly List<(string Key, string? BusyPath, string? VramUsedPath)> _cards = [];
+    private readonly List<(string Key, string? BusyPath, string? VramUsedPath, string? GttUsedPath)> _cards = [];
 
     private bool _hasNvidiaCard;
 
@@ -62,8 +65,8 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         try {
             foreach (var card in DrmCardFacts.Read(proc)) {
                 var path = card.DevicePath + BusyFile;
-                var vramPath = card.DevicePath + VramUsedFile;
-                _cards.Add((card.Key, proc.Exists(path) ? path : null, proc.Exists(vramPath) ? vramPath : null));
+                _cards.Add((card.Key, Published(path), Published(card.DevicePath + VramUsedFile),
+                            Published(card.DevicePath + GttUsedFile)));
                 _hasNvidiaCard |= card.VendorId == NvidiaVendorId;
             }
         } catch (Exception e) {
@@ -83,12 +86,13 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         var nvidia = NvidiaReadings();
 
         var samples = new Dictionary<string, GpuAdapterSample>(_cards.Count, StringComparer.Ordinal);
-        foreach (var (key, path, vramPath) in _cards) {
+        foreach (var (key, path, vramPath, gttPath) in _cards) {
             // sysfs first: it is free, current, and the only source for AMD. nvidia-smi fills in only the
             // cards sysfs cannot answer for.
             var percent = path is null ? null : ParsePercent(_proc.ReadAllText(path));
             var vramUsed = vramPath is null ? null : ParseBytes(_proc.ReadAllText(vramPath));
-            samples[key] = new GpuAdapterSample(percent ?? nvidia?.Utilisation(key), NoEngines, vramUsed);
+            var gttUsed = gttPath is null ? null : ParseBytes(_proc.ReadAllText(gttPath));
+            samples[key] = new GpuAdapterSample(percent ?? nvidia?.Utilisation(key), NoEngines, vramUsed, gttUsed);
         }
 
         return samples;
@@ -117,8 +121,11 @@ internal sealed class LinuxGpuUsageSampler : IGpuUsageSampler {
         return Math.Clamp(value, 0, 100);
     }
 
-    /// <summary>Parses a <c>mem_info_vram_used</c> body (plain bytes) or <c>null</c> when the file has gone
-    /// away or holds something else — never 0, which would claim an empty card. Pure; unit-tested.</summary>
+    private string? Published(string path) => _proc.Exists(path) ? path : null;
+
+    /// <summary>Parses a <c>mem_info_vram_used</c> or <c>mem_info_gtt_used</c> body (plain bytes), or
+    /// <c>null</c> when the file has gone away or holds something else — never 0, which would claim an empty
+    /// pool. Pure; unit-tested.</summary>
     internal static ulong? ParseBytes(string? text) =>
         text is not null
         && ulong.TryParse(text.AsSpan().Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)

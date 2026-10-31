@@ -124,6 +124,37 @@ public class RecentSearchesTests {
         Assert.Equal(original.Entries[0], loaded.Entries[0]);
     }
 
+    // What an install from before the Toolkit page became Utilities (work item 33) has on disk.
+    private const string OldToolkitRecent = "PageToolkitToolkitCommon commands & diagnostics";
+
+    [Fact]
+    public void Load_RenamesTheOldToolkitPageRecentToUtilities() {
+        var recents = new RecentSearches();
+
+        recents.Load(OldToolkitRecent);
+
+        var entry = Assert.Single(recents.Entries);
+        Assert.Equal(new RecentSearch(
+            SearchCategory.Page, "Utilities", "Utilities", "Common commands & diagnostics"), entry);
+    }
+
+    [Fact]
+    public void Load_LeavesAToolkitEntryOfAnotherCategoryAlone() {
+        var recents = new RecentSearches();
+
+        recents.Load("ProcessToolkitToolkitPID 4");
+
+        Assert.Equal("Toolkit", Assert.Single(recents.Entries).Key);
+    }
+
+    [Fact]
+    public void Load_StillReEncodesTheMigratedEntryUnderTheNewName() {
+        var recents = new RecentSearches();
+        recents.Load(OldToolkitRecent);
+
+        Assert.StartsWith("PageUtilitiesUtilities", recents.Encode());
+    }
+
     [Fact]
     public void Load_ReplacesWhateverWasThere() {
         var recents = WithEntries("stale");

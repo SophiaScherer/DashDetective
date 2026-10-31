@@ -41,7 +41,9 @@ public partial class MainWindow : Window {
             () => (DataContext as MainWindowViewModel)?.Shortcuts ?? Defaults,
             () => (DataContext as MainWindowViewModel)?.ActiveScope ?? ShortcutScope.Global,
             id => TryMoveFocusedItem(id) ||
-                  ((DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false));
+                  ((DataContext as MainWindowViewModel)?.HandleShortcut(id) ?? false),
+            (button, textInputFocused) =>
+                (DataContext as MainWindowViewModel)?.HandleMouseButton(button, textInputFocused) ?? false);
         Closed += (_, _) => _shortcuts.Dispose();
     }
 

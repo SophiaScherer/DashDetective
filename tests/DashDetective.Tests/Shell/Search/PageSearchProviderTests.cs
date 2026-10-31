@@ -92,6 +92,40 @@ public class PageSearchProviderTests {
         Assert.Equal("Storage", Assert.Single(results).Title);
     }
 
+    private static NavItem Utilities() =>
+        new("Utilities", "Utilities", "Common commands & diagnostics", null!, new StubPage(), _ => { },
+            ["Toolkit", "Tools", "Commands"]);
+
+    [Fact]
+    public async Task QueryAsync_FindsARenamedPageByItsNewName() {
+        var results = await Query("utilities", [Utilities()]);
+
+        Assert.Equal("Utilities", Assert.Single(results).Title);
+    }
+
+    [Fact]
+    public async Task QueryAsync_FindsARenamedPageByItsOldName() {
+        var results = await Query("toolkit", [Utilities()]);
+
+        var result = Assert.Single(results);
+        Assert.Equal("Utilities", result.Title);
+        Assert.Equal("Utilities", result.Completion);
+    }
+
+    [Fact]
+    public async Task QueryAsync_RanksTheCurrentNameAboveAnAlias() {
+        // "tools" is an alias of one page and the name of another; the named page must win.
+        var bar = new List<NavItem>(Bar) { Item("Tools", "Tools", "Something else"), Utilities() };
+        var ordered = (await Query("tools", bar)).OrderByDescending(r => r.Score).ToList();
+
+        Assert.Equal("Tools", ordered[0].Title);
+    }
+
+    [Fact]
+    public async Task QueryAsync_APageWithoutKeywordsStillMatchesNormally() {
+        Assert.Equal("Network", Assert.Single(await Query("netw")).Title);
+    }
+
     [Fact]
     public async Task QueryAsync_ReturnsNothingForATermNoTabMatches() {
         Assert.Empty(await Query("zzzz"));

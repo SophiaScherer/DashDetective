@@ -13,11 +13,10 @@
          through AccentPreviewScope; nothing reaches the app until Apply. -->
     <Border x:Name="Scrim" Background="{StaticResource ScrimBackground}" PointerPressed="OnScrimPointerPressed">
 
-        <!-- The margin keeps the card inside a short window, where the body scrolls rather than pushing
+        <!-- modalCard keeps the card inside a short window, where the body scrolls rather than pushing
              the header and footer off screen. Tab cycles within the card, so focus cannot reach the page
              behind the scrim. -->
-        <Border x:Name="Card" Classes="panel" Padding="0" Margin="24"
-                HorizontalAlignment="Center" VerticalAlignment="Center"
+        <Border x:Name="Card" Classes="panel modalCard" Padding="0"
                 BoxShadow="{StaticResource ShadowModal}" KeyboardNavigation.TabNavigation="Cycle">
             <Grid RowDefinitions="Auto,*,Auto">
 

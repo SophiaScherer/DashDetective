@@ -160,8 +160,8 @@ public partial class ToolkitView : UserControl {
         DispatcherTimer.RunOnce(() => button.Classes.Remove("copied"), CopiedDuration);
     }
 
-    /// <summary>Saves the Execution Log through the shared save dialog. A transcript is text and nothing
-    /// else, so unlike the system report it offers the one format.</summary>
+    /// <summary>Saves the Execution Log through the shared save dialog, offering the same formats as the
+    /// system report.</summary>
     private async void OnExportLogClick(object? sender, RoutedEventArgs e) {
         if (DataContext is not ToolkitViewModel vm)
             return;
@@ -169,9 +169,9 @@ public partial class ToolkitView : UserControl {
         var path = await FileSave.SaveAsync(
             this,
             title: "Export execution log",
-            suggestedName: $"DashDetective-toolkit-log-{DateTime.Now:yyyyMMdd-HHmmss}",
-            formats: [DiagnosticsFormat.Text],
-            content: _ => vm.BuildLogText());
+            suggestedName: $"DashDetective-utilities-log-{DateTime.Now:yyyyMMdd-HHmmss}",
+            formats: DiagnosticsFormats.Offered,
+            content: vm.BuildLog);
 
         if (path is not null)
             vm.Notify?.Invoke(Notices.Exported(path));

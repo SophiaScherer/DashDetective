@@ -42,7 +42,8 @@ internal sealed class LinuxGpuAdapterProvider : IGpuAdapterProvider {
                     card.AdapterName,
                     card.IsSoftware,
                     card.VramBytes,
-                    new GpuPciId(card.VendorId, card.DeviceId, PackSubSysId(card), card.Revision)));
+                    new GpuPciId(card.VendorId, card.DeviceId, PackSubSysId(card), card.Revision),
+                    card.GttBytes));
 
             return adapters;
         } catch (Exception e) {

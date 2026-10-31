@@ -1,6 +1,8 @@
 using DashDetective.Services.Diagnostics;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -33,15 +35,20 @@ public sealed class ToolkitRunner {
     /// Runs the action off the UI thread and returns a display-ready result. Even the launch path is
     /// moved off the thread: an elevated start blocks until the user answers the UAC prompt, which would
     /// otherwise freeze the window behind it.
+    ///
+    /// <paramref name="cancellationToken"/> stops a **captured** command (its process tree is killed) and
+    /// reads as a worded failure. A launch has already returned by the time anyone could cancel it, and an
+    /// elevated one is deliberately not waited on, so the token is ignored for both.
     /// </summary>
-    public async Task<ToolkitRunResult> RunAsync(ToolkitAction action) {
+    public async Task<ToolkitRunResult> RunAsync(
+        ToolkitAction action, CancellationToken cancellationToken = default) {
         // A documentation entry may only ever reach the browser. Checked here rather than when the
         // catalog is built, so a typo surfaces as a visible refusal instead of a startup crash.
         if (action.Kind == ToolkitActionKind.OpenUrl && !IsHttps(action.Target))
             return ToolkitRunResult.Failure(ToolkitOutputFormatter.BlockedUrl(action.Target));
 
         return action.CapturesOutput
-            ? await CaptureAsync(action).ConfigureAwait(false)
+            ? await CaptureAsync(action, cancellationToken).ConfigureAwait(false)
             : await Task.Run(() => Launch(action)).ConfigureAwait(false);
     }
 
@@ -58,13 +65,19 @@ public sealed class ToolkitRunner {
         }
     }
 
-    private async Task<ToolkitRunResult> CaptureAsync(ToolkitAction action) {
+    private async Task<ToolkitRunResult> CaptureAsync(
+        ToolkitAction action, CancellationToken cancellationToken) {
+        var clock = Stopwatch.StartNew();
         try {
             var capture = await _launcher
-                .CaptureAsync(Resolve(action.Target), action.Arguments, action.Timeout)
+                .CaptureAsync(Resolve(action.Target), action.Arguments, action.Timeout, cancellationToken)
                 .ConfigureAwait(false);
 
             var body = ToolkitOutputFormatter.Combine(capture.StandardOutput, capture.StandardError);
+
+            if (capture.Cancelled)
+                return ToolkitRunResult.Failure(
+                    ToolkitOutputFormatter.Cancelled(clock.Elapsed, body), capture.ExitCode);
 
             if (capture.TimedOut)
                 return ToolkitRunResult.Failure(
@@ -76,6 +89,9 @@ public sealed class ToolkitRunner {
 
             return ToolkitRunResult.Ok(
                 body.Length == 0 ? ToolkitOutputFormatter.NoOutput : body, capture.ExitCode);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            // A launcher that threw rather than reporting the cancel: still the user's doing, not a fault.
+            return ToolkitRunResult.Failure(ToolkitOutputFormatter.Cancelled(clock.Elapsed, ""));
         } catch (Exception error) {
             Log.Warn($"Toolkit capture failed: {action.Target}", error);
             return ToolkitRunResult.Failure(ToolkitOutputFormatter.Failed(error.Message));

@@ -24,7 +24,8 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
-                <Border Classes="panel" VerticalAlignment="Top"
+                <!-- No Height and no Top alignment: the panel stretches each card to its row's height. -->
+                <Border Classes="panel" MinHeight="{StaticResource HardwareCardMinHeight}"
                         AutomationProperties.Name="{Binding Title}">
                     <StackPanel Spacing="12">
                         <!-- Header: tinted icon tile + title / subtitle. A Grid rather than a

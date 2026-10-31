@@ -1,4 +1,5 @@
 using Avalonia.Automation;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +48,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
 
     private readonly SystemMetricsService _metrics;
     private readonly ResourceAlertWatcher _alerts;
+
+    // The per-resource alert flags. One instance, handed to every page that draws a bell, so a flip on any
+    // of them is the state this persists and feeds the watcher from.
+    private readonly AlertSwitches _alertSwitches = new();
     private readonly SettingsStore _store;
     private readonly ThemeService _theme = new();
     private readonly AccessibilityService _accessibility;
@@ -61,8 +66,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private readonly HardwareViewModel _hardware = new();
     private readonly ToolkitViewModel _toolkit = new();
     private readonly SettingsViewModel _settings;
-    private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _clockTimer = new();
     private ClockFormat _clockFormat = ClockFormat.TwentyFourHour;
+    private bool _clockShowSeconds = true;
 
     // Resource-alert banner state: the breach the watcher currently reports, and whether the user
     // dismissed it. The banner shows only while there is one, unignored, and alerts are on.
@@ -106,6 +112,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// selects (see <see cref="OnNavSelected"/>) and the toolbar reads its title/subtitle.</summary>
     public NavigationViewModel Nav { get; } = new();
 
+    /// <summary>The pages visited, for Back. Held here rather than on the bar, so collapsing or re-docking
+    /// the bar cannot touch it, and fed from <see cref="OnNavSelected"/>, the one place every route to a
+    /// page (click, Ctrl+digit, search, a cross-page reveal) ends up.</summary>
+    private readonly PageHistory<NavItem> _pageHistory = new();
+
     /// <summary>The live keyboard bindings: the catalog's defaults with the user's rebinds applied. One
     /// instance, shared by the key handler, Help, universal search and the Settings page, so all four
     /// describe and act on the same thing.</summary>
@@ -137,6 +148,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// <summary>What the toolbar's Refresh button promises on the current page — see
     /// <see cref="RefreshHint"/> for why it is worded rather than disabled.</summary>
     public string RefreshToolTip => RefreshHint.For(CurrentPage, IsLive);
+
+    /// <summary>Whether Back has a page to return to. Drives the toolbar button's enabled state.</summary>
+    public bool CanGoBack => _pageHistory.CanGoBack;
+
+    /// <summary>The toolbar Back button's tooltip, naming the page it opens — see <see cref="BackHint"/>.</summary>
+    public string BackToolTip => BackHint.For(_pageHistory.Previous?.Title, Shortcuts);
 
     /// <summary>Whether the app should hide to the tray (rather than exit) when the window is closed.
     /// Gated on <see cref="TrayIntegration.HidesOnClose"/>, so a desktop with no tray closes normally
@@ -205,8 +222,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Help = new HelpViewModel(Shortcuts);
         _dashboard = new DashboardViewModel(metrics);
         _processes = new ProcessesViewModel(metrics);
-        _performance = new PerformanceViewModel(metrics, _theme);
-        _storage = new StorageViewModel(metrics);
+        _performance = new PerformanceViewModel(metrics, _theme, _alertSwitches);
+        _storage = new StorageViewModel(metrics, _alertSwitches);
 
         // Apply the persisted appearance + layout through the seams that own them, before wiring the
         // controls that observe them. ThemeService stays the only code that writes to the application.
@@ -230,12 +247,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         Nav.HelpRequested += Help.Open;
         Nav.PropertyChanged += OnNavPropertyChanged;
         _fileExplorer.PropertyChanged += OnFileExplorerPropertyChanged;
-        _performance.ScopeChanged += Persist;
         _performance.DetailChanged += Persist;
         _processes.PreferencesChanged += Persist;
         foreach (var order in SavedOrders)
             order.Changed += Persist;
         _alerts.AlertChanged += OnAlertChanged;
+        _alertSwitches.Changed += OnAlertSwitchChanged;
         _notices.Changed += OnNoticeChanged;
         _accessibility.Changed += OnAccessibilityChanged;
 
@@ -255,13 +272,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
                         Icons.Storage, _storage, Nav.Navigate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
                         Icons.Hardware, _hardware, Nav.Navigate),
-            new NavItem("Toolkit", "Toolkit", "Common commands & diagnostics",
-                        Icons.Toolkit, _toolkit, Nav.Navigate),
+            new NavItem("Utilities", "Utilities", "Common commands & diagnostics",
+                        Icons.Toolkit, _toolkit, Nav.Navigate, ["Toolkit", "Tools", "Commands"]),
             new NavItem("Settings", "Settings", "Application preferences",
                         Icons.Settings, _settings, Nav.Navigate),
         });
         _currentPage = Nav.SelectedNav.Page;
+        _pageHistory.Visit(Nav.SelectedNav);
         Nav.SelectionChanged += OnNavSelected;
+        Shortcuts.Changed += OnShortcutsChanged;
 
         // Start the page the bar selected; every other page stays idle until it is navigated to.
         UpdatePageActivity();
@@ -307,11 +326,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _performance.NetworkRevealRequested += RevealAdapter;
         _performance.HardwareRevealRequested += ShowHardware;
 
-        // Seed once so the clock is correct on the first frame, then tick every second.
-        UpdateClock();
-        _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        // The clock was seeded by ApplySettings; each tick re-aims the timer at the next second (or
+        // minute) boundary.
         _clockTimer.Tick += (_, _) => UpdateClock();
-        _clockTimer.Start();
     }
 
     /// <summary>The interface size moved, so the window's floor moves with it.</summary>
@@ -353,11 +370,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // that command is on the page.
         _toolkit.LoadCommands(settings.CustomCommands);
         _toolkit.LoadPins(settings.PinnedCommands);
-        _performance.ShowAllDevices = settings.PerformanceShowAllDevices;
         _performance.GpuDetailedView = settings.GpuDetailedView;
         _performance.CpuDetailedView = settings.CpuDetailedView;
         ApplyNvidiaGpuMetrics(settings.NvidiaGpuMetrics);
-        ApplyClockFormat(settings.ClockFormat);
+        ApplyClockFormat(settings.ClockFormat, settings.ClockShowSeconds);
+        _alertSwitches.Load(settings);
         ApplyAlertSettings(settings);
         _recents.Load(settings.RecentSearches);
 
@@ -416,13 +433,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     }
 
     /// <summary>Captures the live state of every persisted seam into an immutable snapshot.</summary>
-    private AppSettings CaptureCurrent() => new() {
+    private AppSettings CaptureCurrent() => _alertSwitches.CaptureInto(new() {
         Theme = _theme.CurrentTheme,
         GraphColorsName = _theme.CurrentGraphColors?.Name,
         AccentColor = _theme.CurrentAccent == AccentPreset.Default ? null : _theme.CurrentAccent.Hex,
         NavOrientation = Nav.Orientation,
         NavCollapsed = Nav.IsCollapsed,
         ClockFormat = _settings.ClockFormat,
+        ClockShowSeconds = _settings.ClockShowSeconds,
         UiScalePercent = _accessibility.ScalePercent,
         TextScalePercent = _accessibility.TextScalePercent,
         HighContrast = _accessibility.HighContrast,
@@ -439,11 +457,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShowInTray = _settings.ShowInTray,
         TrayNoticeShown = _trayNoticeShown,
         ResourceAlerts = _settings.ResourceAlerts,
-        AlertCpuEnabled = _settings.CpuAlert.IsEnabled,
-        AlertMemoryEnabled = _settings.MemoryAlert.IsEnabled,
-        AlertGpuEnabled = _settings.GpuAlert.IsEnabled,
-        AlertDiskActiveEnabled = _settings.DiskActiveAlert.IsEnabled,
-        AlertLowDiskFreeEnabled = _settings.LowDiskFreeAlert.IsEnabled,
         AlertCpuPercent = _settings.CpuAlert.Value,
         AlertMemoryPercent = _settings.MemoryAlert.Value,
         AlertGpuPercent = _settings.GpuAlert.Value,
@@ -451,7 +464,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         AlertLowDiskFreePercent = _settings.LowDiskFreeAlert.Value,
         AlertSustainSeconds = _settings.AlertSustain.Value,
         NvidiaGpuMetrics = _settings.NvidiaGpuMetrics,
-        PerformanceShowAllDevices = _performance.ShowAllDevices,
         GpuDetailedView = _performance.GpuDetailedView,
         CpuDetailedView = _performance.CpuDetailedView,
         RecentSearches = _recents.Encode(),
@@ -469,7 +481,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
             ? ProcessSortState.Encode(_processes.SortKey, _processes.SortAscending)
             : "",
         ShortcutOverrides = ShortcutOverrideCodec.Encode(Shortcuts.Overrides),
-    };
+    });
 
     /// <summary>Debounced save of the current settings snapshot.</summary>
     private void Persist() => _store.Save(CaptureCurrent());
@@ -481,36 +493,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         OnPropertyChanged(nameof(ShowInTray));
         UpdateAlertBanner();
         ApplyNvidiaGpuMetrics(_settings.NvidiaGpuMetrics);
-        ApplyClockFormat(_settings.ClockFormat);
+        ApplyClockFormat(_settings.ClockFormat, _settings.ClockShowSeconds);
         ApplyAlertSettings(CaptureCurrent());
     }
 
-    /// <summary>Pushes the alert thresholds and the master switch onto the watcher. Thresholds first: the
-    /// setter clears every streak, so applying them after enabling would discard the first samples.
-    /// The watcher holds the CPU and memory feeds open on its own, which is why it follows the setting
-    /// rather than running unconditionally.</summary>
-    private void ApplyAlertSettings(AppSettings settings) {
-        // Folded into the watcher's zero-means-off contract here: the service has no reason to know that a
-        // threshold and a switch are two controls on a page, and this keeps a disabled row's number.
-        _alerts.Options = new ResourceAlertOptions {
-            CpuPercent = Watched(settings.AlertCpuEnabled, settings.AlertCpuPercent),
-            MemoryPercent = Watched(settings.AlertMemoryEnabled, settings.AlertMemoryPercent),
-            GpuPercent = Watched(settings.AlertGpuEnabled, settings.AlertGpuPercent),
-            DiskActivePercent = Watched(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent),
-            LowDiskFreePercent = Watched(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent),
-            SustainSeconds = settings.AlertSustainSeconds,
-        };
-        _alerts.Enabled = settings.ResourceAlerts;
+    /// <summary>A bell on a page flipped an alert: persist it and re-arm the watcher at once.</summary>
+    private void OnAlertSwitchChanged() {
+        Persist();
+        ApplyAlertSettings(CaptureCurrent());
     }
 
-    /// <summary>A threshold as the watcher wants it: the number when the resource is watched, else zero.</summary>
-    private static int Watched(bool enabled, int percent) => enabled ? percent : 0;
+    /// <summary>Pushes the alert thresholds and the master switch onto the watcher, and mirrors them onto
+    /// the bells so their tooltips describe the live rule. The watcher holds the CPU and memory feeds open
+    /// on its own, which is why it follows the setting rather than running unconditionally.</summary>
+    private void ApplyAlertSettings(AppSettings settings) {
+        _alerts.Apply(settings);
+        _alertSwitches.Reflect(settings);
+    }
 
-    /// <summary>Mirrors the clock-format preference onto the toolbar clock and the Toolkit log — the two
+    /// <summary>Mirrors the clock-format preferences onto the toolbar clock and the Toolkit log — the two
     /// places that show a wall-clock time. Pushed rather than read, matching the NVIDIA opt-in above, and
-    /// the clock is re-stamped at once so the change is visible without waiting for the next tick.</summary>
-    private void ApplyClockFormat(ClockFormat format) {
+    /// the clock is re-stamped at once so the change is visible without waiting for the next tick. Seconds
+    /// apply to the toolbar clock only: the Toolkit log keeps them to order commands run together.</summary>
+    private void ApplyClockFormat(ClockFormat format, bool showSeconds) {
         _clockFormat = format;
+        _clockShowSeconds = showSeconds;
         _toolkit.ClockFormat = format;
         UpdateClock();
     }
@@ -581,7 +588,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     /// calls the view model it already resolved from its DataContext.</summary>
     public void Notify(string message) => _notices.Show(message);
 
-    private void UpdateClock() => Clock = TimeOfDayFormatter.Format(DateTime.Now, _clockFormat);
+    /// <summary>Re-stamps the clock and sets the next tick for just past the next second (or minute)
+    /// boundary, so the display changes when the time does.</summary>
+    private void UpdateClock() {
+        var now = DateTime.Now;
+        Clock = TimeOfDayFormatter.Format(now, _clockFormat, _clockShowSeconds);
+        _clockTimer.Stop();
+        _clockTimer.Interval = TimeOfDayFormatter.DelayToNextTick(now, _clockShowSeconds);
+        _clockTimer.Start();
+    }
 
     /// <summary>Pauses/resumes all live metric sampling on every page that samples (Dashboard,
     /// Network, …), routed through the <see cref="ILiveSamplingPage"/> marker so no per-page wiring
@@ -642,6 +657,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         return HandleGlobal(id);
     }
 
+    /// <summary>Runs the mouse's back or forward button. The decision lives in <see cref="MouseNavigation"/>
+    /// so it is testable; this supplies the shell's state.</summary>
+    public bool HandleMouseButton(PointerUpdateKind button, bool textInputFocused) =>
+        MouseNavigation.Handle(button, textInputFocused, _settings.IsCapturingShortcut, Help, AccentPicker,
+                               CurrentPage as IShortcutTarget, TryGoBack);
+
+    /// <summary>A rebind can change Back's key, which its tooltip names.</summary>
+    private void OnShortcutsChanged() => OnPropertyChanged(nameof(BackToolTip));
+
     /// <summary>Handles the shortcuts that work anywhere, whatever page is showing.</summary>
     private bool HandleGlobal(ShortcutId id) => id switch {
         // The nine tab jumps are contiguous in the enum, so the offset from the first is the nav
@@ -652,6 +676,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         ShortcutId.PreviousTab => CycleTab(-1),
         ShortcutId.ToggleNavCollapse => Run(Nav.ToggleCollapseCommand),
         ShortcutId.OpenSettings => NavigateToPage(_settings),
+        ShortcutId.Back => TryGoBack(),
         ShortcutId.ToggleLive => Run(ToggleLiveCommand),
         ShortcutId.Refresh => Run(RefreshCommand),
         ShortcutId.Export => Raise(ExportRequested),
@@ -707,6 +732,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         DismissAlert();
         return true;
     }
+
+    /// <summary>Returns to the previous page. Unconsumed at the start of history, so the key or button
+    /// press is left alone rather than swallowed by a Back that did nothing.</summary>
+    private bool TryGoBack() {
+        if (!_pageHistory.TryGoBack(out var item))
+            return false;
+
+        // The history already holds this page as current, so the visit this navigation reports is a no-op.
+        Nav.Navigate(item);
+        return true;
+    }
+
+    /// <summary>The toolbar's Back button.</summary>
+    [RelayCommand(CanExecute = nameof(CanGoBack))]
+    private void GoBack() => TryGoBack();
 
     /// <summary>Selects the nav item at the given position. An index past the end of the bar (Ctrl+8
     /// on a shorter bar) is simply ignored.</summary>
@@ -774,6 +814,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
     private void OnNavSelected(NavItem item) {
         CurrentPage = item.Page;
         UpdatePageActivity();
+
+        _pageHistory.Visit(item);
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(BackToolTip));
+        GoBackCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Whether the user still has to be told that closing the window leaves the app running in

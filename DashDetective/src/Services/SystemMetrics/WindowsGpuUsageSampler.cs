@@ -14,10 +14,12 @@ namespace DashDetective.Services.SystemMetrics;
 /// reports at all, so returning nothing hides the hardware, while returning 0 would show a real GPU as
 /// permanently idle. Windows always fills it.
 ///
-/// <see cref="DedicatedUsedBytes"/> is the adapter's dedicated video memory in use, or null when the
-/// platform or driver reports none — never 0 for "unknown", since 0 is a real reading.</summary>
+/// <see cref="DedicatedUsedBytes"/> and <see cref="SharedUsedBytes"/> are the adapter's dedicated video
+/// memory and shared system memory in use, each null when the platform or driver reports none — never 0
+/// for "unknown", since 0 is a real reading.</summary>
 public sealed record GpuAdapterSample(
-    double? Overall, IReadOnlyDictionary<string, double> Engines, ulong? DedicatedUsedBytes = null);
+    double? Overall, IReadOnlyDictionary<string, double> Engines, ulong? DedicatedUsedBytes = null,
+    ulong? SharedUsedBytes = null);
 
 /// <summary>
 /// Samples total GPU utilisation via the Windows PDH <c>\GPU Engine(*)\Utilization Percentage</c>
@@ -69,11 +71,14 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
 
     internal const string CounterPath = @"\GPU Engine(*)\Utilization Percentage";
     private const string MemoryCounterPath = @"\GPU Adapter Memory(*)\Dedicated Usage";
+    private const string SharedCounterPath = @"\GPU Adapter Memory(*)\Shared Usage";
 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
-    // Zero when the memory counter could not be added: utilization then samples alone and usage stays null.
+    // Zero when a memory counter could not be added: utilization then samples without it and that usage
+    // stays null.
     private readonly IntPtr _memoryCounter;
+    private readonly IntPtr _sharedCounter;
     private readonly bool _ready;
     private bool _disposed;
 
@@ -92,9 +97,11 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
                 return;
             }
 
-            // A second counter on the same query, so one collect serves both. Its failure is not fatal.
+            // The memory counters share the query, so one collect serves all three. Neither failing is fatal.
             if (PdhAddEnglishCounter(_query, MemoryCounterPath, IntPtr.Zero, out _memoryCounter) != ErrorSuccess)
                 _memoryCounter = IntPtr.Zero;
+            if (PdhAddEnglishCounter(_query, SharedCounterPath, IntPtr.Zero, out _sharedCounter) != ErrorSuccess)
+                _sharedCounter = IntPtr.Zero;
 
             // Seed one collect so the first sample reflects a real interval. The utilisation counter
             // is a rate that needs two data points, so priming here mirrors CpuUsageSampler seeding
@@ -130,11 +137,14 @@ internal sealed class WindowsGpuUsageSampler : IGpuUsageSampler {
             return EmptyAdapters;
 
         var samples = AggregateAdapters(engines);
-        if (_memoryCounter == IntPtr.Zero || ReadCounter(_memoryCounter) is not { } memory)
-            return samples;
-
-        return GpuMemoryUsage.Join(samples, GpuMemoryUsage.ByAdapter(memory));
+        var dedicated = ReadMemory(_memoryCounter);
+        var shared = ReadMemory(_sharedCounter);
+        return dedicated is null && shared is null ? samples : GpuMemoryUsage.Join(samples, dedicated, shared);
     }
+
+    /// <summary>One memory counter's bytes per adapter, or null when it was never added or PDH refuses.</summary>
+    private static IReadOnlyDictionary<string, ulong>? ReadMemory(IntPtr counter) =>
+        counter != IntPtr.Zero && ReadCounter(counter) is { } readings ? GpuMemoryUsage.ByAdapter(readings) : null;
 
     /// <summary>Reads every instance of one counter on the collected query, or null when PDH refuses.</summary>
     private static List<(string? Name, double Value)>? ReadCounter(IntPtr counter) {

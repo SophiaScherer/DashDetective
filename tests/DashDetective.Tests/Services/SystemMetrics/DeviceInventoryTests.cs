@@ -118,6 +118,21 @@ public class DeviceInventoryTests {
         Assert.Null(inv.Primary(DeviceCategory.Disk)!.VramBytes);
     }
 
+    /// <summary>The shared pool rides along the same way, and an adapter that publishes none stays null so
+    /// the Performance tab can omit its tile.</summary>
+    [Fact]
+    public void Compose_GpuIdentity_CarriesSharedMemoryOrNull() {
+        var gpus = new[] {
+            new GpuAdapter("luid_a", "NVIDIA GeForce RTX 3060", false, 12UL << 30, SharedSystemMemory: 16UL << 30),
+            new GpuAdapter("luid_b", "NVIDIA nvidia (10de:2504)", false, 0),
+        };
+        var inv = DeviceInventory.Compose(
+            Cpu, Memory, gpus, new HashSet<string> { "luid_a", "luid_b" }, [], [], "Ethernet", "");
+
+        Assert.Equal(new ulong?[] { 16UL << 30, null }, inv.All(DeviceCategory.Gpu).Select(x => x.SharedBytes));
+        Assert.Null(inv.Primary(DeviceCategory.Cpu)!.SharedBytes);
+    }
+
     [Fact]
     public void Compose_MultipleGpus_EnumeratesRealAdaptersIndexedByLuid() {
         var gpus = new[] {

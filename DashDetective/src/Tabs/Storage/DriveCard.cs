@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Shared.Controls;
 using System;
 using System.Windows.Input;
@@ -37,6 +38,9 @@ public sealed partial class DriveCard : ObservableObject, IWidgetIdentity {
 
     /// <summary>Drive model subtitle, e.g. "Samsung 990 Pro 2TB".</summary>
     public string Model { get; init; } = "";
+
+    /// <summary>The low-free-space alert's switch, the bell in the card's header. Shared by every card.</summary>
+    public AlertSwitch? Alert { get; init; }
 
     /// <summary>Health label shown in the pill ("Healthy" / "Caution").</summary>
     [ObservableProperty] private string _health = "";
