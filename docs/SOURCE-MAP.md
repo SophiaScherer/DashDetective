@@ -132,7 +132,13 @@ stays in its tab folder.
                                 stays MB/s on purpose, as Task Manager's does)
       UptimeFormatter.cs       ("Nd Nh Nm" with leading zero units dropped)
       ClockFormat.cs           (24-hour / 12-hour, the persisted clock preference)
-      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference. Invariant on BOTH
+      TimeOfDayFormatter.cs    (on-screen wall-clock times under that preference, with or without seconds
+                                (default with: the Toolkit log). DelayToNextTick is the time to the next
+                                displayed change, so the toolbar clock's timer can sit on minute boundaries
+                                when seconds are off (plus a 5 ms cushion so an early tick cannot repaint
+                                the old value). Invariant on BOTH arms: the 12-hour one must say AM/PM
+                                whatever the host locale designates, and the 24-hour one must not pick up
+                                a locale's separator)
       FileSave.cs              (the ONE save-file flow: offer the formats, take a destination from the
                                 native dialog, write what the chosen extension asked for. Replaced three
                                 near-identical copies — toolbar Export, the two Settings buttons, the
@@ -245,8 +251,11 @@ stays in its tab folder.
                                  Also the reusable class styles: card, panel, seg, toggle, buttons,
                                  paneSplitter, revealFlash (the cross-tab reveal tint + its fade),
                                  tileLabel/tileValue, card.selectable, swatch (a colour chip with a
-                                 selection ring, promoted from Settings) and modalClose (a modal card's ×,
-                                 promoted from the Help overlay), both once the accent picker wanted them…)
+                                 selection ring, promoted from Settings), modalClose (a modal card's ×,
+                                 promoted from the Help overlay), both once the accent picker wanted
+                                 them, and modalCard (centered + a 24 margin that bounds a modal card
+                                 inside its window; the card sets MaxWidth/MaxHeight, never a Width.
+                                 ModalCardTests pins it on every *Overlay.axaml)…)
         Dimensions.axaml        (layout tokens: spacing, insets, radii, control heights. Theme-invariant,
                                  so always {StaticResource} — EXCEPT the runtime-swapped block at the
                                  bottom: UiScale, PopupFontSize and the TextSize* ladder, which
@@ -312,7 +321,18 @@ stays in its tab folder.
                                  panel is in a board, and one that could not advertised a drag on three
                                  tabs that have none. A dragged item is anchored to the pointer and
                                  frozen at its pickup size — offsetting it from its previewed slot threw
-                                 it a whole column sideways the moment a reorder committed)
+                                 it a whole column sideways the moment a reorder committed. The drop
+                                 target goes through DropTarget, snapshotted as the drag begins; reading
+                                 the panel's live slots instead is the flicker loop. Press/MoveTo are
+                                 the pointer handlers' bodies, internal so ReorderDragTests can drive a
+                                 real board through re-layouts and catch a revert to live slots)
+        DropTarget.cs           (which slot a drag takes, against the slots FROZEN when it began, with
+                                 hysteresis: the target changes only once the dragged box's center is
+                                 Hysteresis (0.2) of the smaller slot past the boundary. The live layout
+                                 includes the preview, so moving the item shifted the slots under a
+                                 still pointer and flipped the answer back — a narrow widget held over a
+                                 wide one is over the wide one's slot in BOTH orders. Relative, not a
+                                 DIP constant, so it holds at every interface size)
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
                                  a drag does, so both persist through one path. It also makes every
                                  item it lays out a tab stop — a card is usually a plain Border, and
@@ -325,12 +345,23 @@ stays in its tab folder.
                                  to live anywhere else. Layout vocabulary stays with the panels. An EMPTY
                                  Order is a reset, not "nothing saved": it routes to ChildOrder.Reset, and
                                  it deliberately does not write Order back, so the two-way binding cannot
-                                 echo the reset into the page that asked for it)
-        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their boxes, what a
-                                 handle is, and the previewed order. Reorder is always a permutation of
-                                 the panel's own index list — a panel that reordered Children instead
-                                 would re-enter its layout and, under an ItemsControl, fight the
-                                 generator)
+                                 echo the reset into the page that asked for it.
+                                 PIXEL SNAP: Placed snaps every slot to whole pixels before arranging, and
+                                 SnappedWidth gives both panels the same width to MEASURE at. Without it a
+                                 fractional slot ended a pixel past the panel and a clipping ancestor cut
+                                 the card's right border off — work item 89)
+        PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half UP
+                                 so a moved span keeps its length; a span snapped under its child's
+                                 MinWidth grows to it away from the panel's edge, with the minimum
+                                 counted in pixels exactly as the framework's clamp counts it; the length is
+                                 kept 1e-4 px short so the framework's round-up cannot add a pixel by a
+                                 floating-point error. The tests mirror Avalonia's arrange rounding)
+        IReorderablePanel.cs    (what ReorderDrag needs of a panel: its items, their arranged boxes and
+                                 row ends (SlotRects / SlotRowEnds — raw geometry, not a SlotAt, so the
+                                 drag can snapshot it), what a handle is, and the previewed order.
+                                 Reorder is always a permutation of the panel's own index list — a
+                                 panel that reordered Children instead would re-enter its layout and,
+                                 under an ItemsControl, fight the generator)
         WidgetBoardLayout.cs    (its arithmetic + SlotAt + DragRect — no Avalonia types, so it tests
                                  without layout. SlotAt is what a drag TAKES, not a gap it is inserted
                                  into: the row whose band holds the point, then the slot in that row it
@@ -364,7 +395,10 @@ stays in its tab folder.
         UniformFlowPanel.cs     (equal-width columns that wrap rather than shrink past MinItemWidth.
                                  With DragGrip set it also drags to reorder, through the same ReorderDrag
                                  a board uses — its children are usually generated, so the order is
-                                 re-applied every time the generator rebuilds them)
+                                 re-applied every time the generator rebuilds them. Every child but the
+                                 dragged one (arranged at its pickup size) is ARRANGED at its row's height, so a child that stretches vertically
+                                 shares a bottom edge with its row-mates — give a card no Height and no
+                                 VerticalAlignment="Top" if it should, as the Hardware cards do)
         FlowLayout, GridColumns, TableColumns, WeightedRowLayout
 ```
 
@@ -434,6 +468,15 @@ stays in its tab folder.
                                         MinHeight so a larger text size grows the bar instead of clipping.
                                         TitleBarRules holds the pure part — the platform decision, the
                                         geometry, and the Windows 11 caption metrics the theme reads)
+        AlertBell.axaml(.cs)           (one resource's alert switch as a bell, bound to a shared AlertSwitch:
+                                        filled when on, outlined and struck through when off, so the state
+                                        is in the shape. HIDES ITSELF when Switch is null — hiding only the
+                                        inner button left a zero-size child a panel's Spacing still counted.
+                                        A ToggleButton
+                                        with its Fluent template replaced, and its accessible name set HERE
+                                        from the tooltip, since the app-wide tooltip-as-name rule matches the
+                                        exact type Button. Its tooltip shows while disabled, the state that
+                                        most needs explaining — the master switch off)
         CollapsedWidgets.cs            (the codec for which widgets are folded, beside the thing it
                                         encodes as WidgetOrders is. By id, never by index: a page that
                                         gains or loses a widget must not silently fold a different one)
@@ -613,8 +656,11 @@ stays in its tab folder.
                                  byte by a test — a saved report and a new one still have to diff
                                  cleanly. Each escapes what its own syntax reserves, which is not
                                  hypothetical: every DNS list holds a comma and a machine name is
-                                 user-controlled text. EXEMPT from the palette-ownership rule, since an
-                                 exported page is a browser document with no access to the theme)
+                                 user-controlled text. Markdown also turns a newline into <br> (a raw
+                                 one ends the table row — the Toolkit log's multi-line output) and
+                                 entity-escapes "<" so a "<DIR>" is not read as a tag. EXEMPT from the
+                                 palette-ownership rule, since an exported page is a browser document
+                                 with no access to the theme)
         DiagnosticsJsonContext.cs
                                 (source-gen context for the JSON export, like SettingsJsonContext — it
                                  is what keeps the trimming/AOT gate clean)
@@ -915,7 +961,10 @@ stays in its tab folder.
                                  the strip and every id reads 0. IsSoftware flags ONLY simpledrm/vkms: unlike
                                  DXGI's flag, a paravirtualised GPU IS the VM's real display adapter and
                                  hiding it leaves the VM with no GPU card at all. Bundled vendor table +
-                                 driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex)
+                                 driver name gives "AMD amdgpu (1002:73df)", degrading to raw hex. GttBytes
+                                 (amdgpu's mem_info_gtt_total, the shared pool) is NULL, not 0, when absent:
+                                 a driver that publishes no GTT is not a zero-sized pool, and it matches
+                                 GpuAdapter's nullable shared total)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
@@ -1037,15 +1086,17 @@ stays in its tab folder.
                                  SampleAdapters() = per-physical-GPU split keyed by adapter LUID token, and
                                  the whole surface: the combined Sample()/SampleEngines() pair the multi-GPU
                                  split replaced has been removed. Page-local per tab — the Dashboard cards +
-                                 Performance rows each own one. A SECOND COUNTER on the same PDH query,
-                                 \GPU Adapter Memory(*)\Dedicated Usage, fills GpuAdapterSample.
-                                 DedicatedUsedBytes from the same collect; if it fails to add, utilization
-                                 still samples and usage stays null)
-        GpuMemoryUsage.cs       (pure half of that counter: luid_..._phys_N instances → bytes per LUID
-                                 token (summed across phys, parsed with GpuEngineInstance.TryParseLuid so
-                                 it joins the inventory key), and Join() onto the engine samples. A
-                                 memory-only LUID is dropped — the inventory keys GPUs off the engine
-                                 counter — and a missing reading stays null, never 0)
+                                 Performance rows each own one. TWO MORE COUNTERS on the same PDH query,
+                                 \GPU Adapter Memory(*)\Dedicated Usage and \Shared Usage, fill
+                                 GpuAdapterSample.DedicatedUsedBytes / SharedUsedBytes from the same collect;
+                                 if either fails to add, utilization still samples and that usage stays null)
+        GpuMemoryUsage.cs       (pure half of those counters, one parser for both: luid_..._phys_N
+                                 instances → bytes per LUID token (summed across phys, parsed with
+                                 GpuEngineInstance.TryParseLuid so it joins the inventory key), and Join()
+                                 of both maps onto the engine samples. These sums ARE Task Manager's
+                                 dedicated and shared figures — no other arithmetic. A memory-only LUID is
+                                 dropped — the inventory keys GPUs off the engine counter — and a missing
+                                 reading stays null, never 0)
         GpuEngineInstance.cs    (parses one \GPU Engine(*) instance name into pid (optional) / luid / phys /
                                  eng / type. phys + eng NAME THE ENGINE; the type only labels it — one
                                  adapter carries several engines of a type (six Copy on an RTX 3060). The
@@ -1065,8 +1116,8 @@ stays in its tab folder.
                                  scalar per card and the per-engine split is root-only debugfs, so the
                                  Performance tab's Detailed toggle stays hidden. Card list resolved once at
                                  construction; only the utilization file and amdgpu's mem_info_vram_used
-                                 (dedicated VRAM in use; null for a driver that publishes none) are re-read
-                                 per tick)
+                                 and mem_info_gtt_used (dedicated VRAM and GTT/shared memory in use; null
+                                 for a driver that publishes none) are re-read per tick)
         NvidiaSmiReader.cs      (the only rootless NVIDIA utilisation source — the proprietary driver
                                  publishes nothing in sysfs. SPAWNS A PROCESS, so it is off the sampling
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
@@ -1106,7 +1157,9 @@ stays in its tab folder.
                                 (DXGI adapter enumeration via raw vtable fn-pointers — LUID→name + software
                                  flag + VRAM; the authoritative LUID→name map for multi-GPU, async. Its
                                  DedicatedVideoMemory rides through DeviceInventory onto
-                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile)
+                                 DeviceInstance.VramBytes → the Performance GPU VRAM tile, and
+                                 SharedSystemMemory onto DeviceInstance.SharedBytes → its shared memory tile;
+                                 that total is the one Task Manager's "Shared GPU memory" reads)
         IPhysicalDiskProvider.cs / WindowsPhysicalDiskProvider.cs
                                 (all-disks WMI enumeration; takes IDiskTemperatureProvider by ctor —
                                  ForCurrentPlatform shares ONE reader with the Storage page)
@@ -1177,13 +1230,28 @@ stays in its tab folder.
                                  threshold. Named because "a GPU is busy" on a two-GPU machine is not
                                  actionable)
         ResourceAlertOptions.cs (the user's thresholds. ZERO MEANS OFF, which collapses "enabled" into the
-                                 value — one control per row, one check in the watcher. GPU and disk
-                                 activity default off: sustained saturation of either is what legitimate
-                                 heavy work looks like)
+                                 value — one check in the watcher. GPU and disk activity default off:
+                                 sustained saturation of either is what legitimate heavy work looks like.
+                                 From(AppSettings) is the ONE fold of the persisted switch + threshold
+                                 pairs into that shape, so it is testable without the shell)
+        AlertSwitch.cs, AlertSwitches.cs
+                                (the five per-resource alert on/off flags, ONE instance built by the shell
+                                 and handed to Performance and Storage, so a bell flipped on either page is
+                                 the state the shell persists and re-arms the watcher from. Load sets the
+                                 flags silently; a user flip raises Changed. Reflect mirrors the master
+                                 switch, thresholds and wait onto the switches ONLY so each bell's
+                                 Description (its tooltip and accessible name) states the live rule — it
+                                 never moves a flag. CaptureInto writes the flags under the existing
+                                 AppSettings keys)
         ResourceAlertWatcher.cs (watches CPU/memory (shared feeds) plus GPU, disk activity and free space
                                  against those thresholds. Owns its OWN GPU + disk samplers, which their
                                  contracts require, and never aggregates — it takes the WORST device and
-                                 names it, so the no-shared-aggregate rule above still holds. Sustain is
+                                 names it, so the no-shared-aggregate rule above still holds. Setting
+                                 Options clears ONLY the metrics whose threshold changed (all usage streaks
+                                 if the wait did): every Settings edit and every bell flip re-applies the
+                                 whole set, and clearing all five made one bell retract another resource's
+                                 banner — and its dismissal. Free space switched on is read AT ONCE, not on
+                                 the minute timer. Apply(AppSettings) is the shell's one entry. Sustain is
                                  SECONDS converted against the live interval, not a sample count, which
                                  used to mean 5 s at the 0.5 s cadence and 50 s at the 5 s one. Free space
                                  skips UNLETTERED volumes: Recovery/EFI sit near-full by design, so
@@ -1278,6 +1346,15 @@ stays in its tab folder.
                                  Global. Split out, like RefreshHint, because MainWindowViewModel
                                  builds every page and its samplers and cannot be constructed in a
                                  test; it takes the two modal view models, which can)
+      Search/UniversalSearchView.axaml(.cs), UniversalSearchViewModel.cs
+                                (the toolbar search box and its dropdown. The Popup's IsOpen is TWO-WAY:
+                                 Avalonia 12 binds it OneWay by default and the popup closes itself with
+                                 SetCurrentValue, which the view model never hears, so IsOpen stayed true
+                                 and every later open was a no-op (work item 66). The view model also
+                                 ignores NotifyFocused while it is writing IsOpen false, because the popup
+                                 restores focus to the box inside that write and the box's GotFocus would
+                                 re-open the dropdown mid-close. Every false write goes through
+                                 CloseDropdown, which holds that guard)
 ```
 
 ## `src/Shell/TrayNotice`
@@ -1318,7 +1395,10 @@ stays in its tab folder.
                                      ShortcutBindings, not the catalog, so the table lists the keys the
                                      user actually chose, and re-announces its groups on a rebind.
                                      The accent picker is the second overlay on this shape; see
-                                     AccentPickerOverlay under src/Tabs/Settings)
+                                     AccentPickerOverlay under src/Tabs/Settings. The Card takes the
+                                     shared modalCard class with MaxWidth 660 / MaxHeight 640 and
+                                     Stretch, NEVER a Width: a fixed 660 overflowed a narrow window
+                                     and, unbounded by height, left the body's end off screen)
         HelpContent.cs              (the CURATED copy — the description, the page tour, the tips. A
                                      static table like HardwareCatalog, so it is testable with no UI.
                                      The shortcut table is NOT here: it is generated from
@@ -1350,14 +1430,16 @@ stays in its tab folder.
                                      horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
                                      follow theme + accent)
-        NavItem.cs, Icons.cs        (NavItem is a pure data model; Icons holds the glyph geometries, all
+        NavItem.cs, Icons.cs        (NavItem is a pure data model, with optional search Keywords so a
+                                     renamed page keeps its old name; Icons holds the glyph geometries, all
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
                                      is FILLED and is the app's one disclosure glyph, matching the ▾/▸ the
                                      widget headers and the Processes table draw as text. A consumer of a
-                                     caret sets Fill, not Stroke. The stroked Chevron* pair and its
-                                     First/Last stop-bar variants are for navigation rather than
-                                     disclosure: the Network pager, and ChevronLeft for the toolbar's Back.
-                                     A stop bar only reads against a stroked arrow)
+                                     caret sets Fill, not Stroke. The stroked ChevronLeft/Right pair is the
+                                     Network pager's step arrows and the toolbar's Back: paging is navigation
+                                     rather than disclosure. CaretFirst/CaretLast, the pager's skip pair, are
+                                     FILLED (a Caret triangle plus a stop-bar rectangle) so the mark reads as
+                                     a triangle, not a letter, and shares the caret family's fill)
         NavOrientation.cs           (enum: the dock edge — Left/Right/Top/Bottom)
         ChevronDirection.cs         (enum: which way the puck's chevron points. Split from the geometry
                                      so the rule is testable — Geometry.Parse needs a render backend,
@@ -1420,7 +1502,11 @@ stays in its tab folder.
                                  chips + count) over a grouped command list, beside a pinned 340px
                                  Execution Log. ISelfScrollingPage (each column scrolls itself) +
                                  IShortcutTarget. Running a row is an async RelayCommand that refuses
-                                 concurrent runs and prepends one stanza to the log. View code-behind
+                                 concurrent runs and prepends one stanza to the log. CancelRunCommand
+                                 stops a CAPTURED command in flight (IsCapturing gates it; the VM owns
+                                 one CancellationTokenSource per run and nulls it before disposing).
+                                 IDisposable only so MainWindowViewModel.Dispose cancels a run at
+                                 shutdown; leaving the page does NOT cancel. View code-behind
                                  owns the search focus + the search-reveal flash, like
                                  ProcessesView/SettingsView. The row is a chrome-less Button so Enter
                                  works on a focused row natively — ShortcutId.Activate falls through
@@ -1440,7 +1526,17 @@ stays in its tab folder.
                                                          OBSERVABLE, and it keeps the raw Timestamp beside
                                                          the formatted Time: the clock-format preference can
                                                          change while rows are on screen, and a row storing
-                                                         only its pre-formatted string could not be re-stamped)
+                                                         only its pre-formatted string could not be re-stamped.
+                                                         IsRunning marks the in-flight placeholder of a
+                                                         CAPTURED command, the one stanza that shows Cancel;
+                                                         fixed at construction, because the finished stanza
+                                                         is a new instance)
+                                ToolkitLogExport.cs     (the log as a DiagnosticsReport — one "Run n"
+                                                         section per stanza in panel order, rows Started /
+                                                         Command / Output — so every non-text format reuses
+                                                         the shared renderers. Text is NOT rendered from it:
+                                                         ToolkitViewModel.BuildLog sends Text to the
+                                                         BuildLogText transcript, which users rely on)
                                 ToolkitCatalog.cs       (static COPY table only — categories, section
                                                          headers, badge labels. Reads the same on every
                                                          platform, which is why it stayed static when the
@@ -1476,14 +1572,17 @@ stays in its tab folder.
                                                          appends exactly one element, so a parameterised
                                                          entry's value can never split into a flag)
                                 ToolkitRunner.cs        (THE single entry point for running a row. Never
-                                                         throws — a missing tool, non-zero exit, timeout
-                                                         or declined UAC prompt all become worded
+                                                         throws — a missing tool, non-zero exit, timeout,
+                                                         cancel or declined UAC prompt all become worded
                                                          failures. Expands env vars in the TARGET only;
-                                                         refuses any OpenUrl that isn't https://)
+                                                         refuses any OpenUrl that isn't https://. Takes
+                                                         the cancel token for a CAPTURE only; a launch
+                                                         ignores it)
                                 ToolkitRunResult.cs     (record: Success / Output / ExitCode)
                                 ToolkitOutputFormatter.cs (pure statics: stream merge, CRLF normalising,
                                                          console sign-off trim, 200-line / 16 KB caps with
-                                                         the trim announced, plus the outcome wording)
+                                                         the trim announced, plus the outcome wording —
+                                                         TimedOut and Cancelled stay separate wordings)
                                 IProcessLauncher.cs +   (the process seam + its real implementation — the
                                 SystemProcessLauncher.cs only place in the app that starts a process.
                                                          Arguments go via ProcessStartInfo.ArgumentList,
@@ -1491,6 +1590,12 @@ stays in its tab folder.
                                                          drained CONCURRENTLY and WITHOUT the timeout
                                                          token, or a command that floods its pipe
                                                          deadlocks and a killed one loses what it printed.
+                                                         A cancel and the timeout share one linked token,
+                                                         and the process TREE is killed from that token's
+                                                         own callback (synchronous, so a cancel at app
+                                                         shutdown cannot lose the race with the exit);
+                                                         ProcessCapture.Cancelled vs TimedOut says which
+                                                         fired, and the user's cancel wins a tie.
                                                          BuildLaunchInfo takes the platform as a parameter
                                                          so both elevation arms are testable from either
                                                          host: runas verb on Windows, pkexec as the file
@@ -1546,7 +1651,8 @@ stays in its tab folder.
                                                          counts as inside — IsVisualAncestorOf is false for
                                                          the element, and an empty spot reports the card — and
                                                          Tab cycles in the card. The body scrolls so the footer
-                                                         survives 200 % in a short window. Esc is the shell's;
+                                                         survives 200 % in a short window; the Card's margin and
+                                                         centering come from the shared modalCard class. Esc is the shell's;
                                                          Enter falls through its modal swallow so buttons press)
                                 AccentPreviewScope.cs   (a ThemeVariantScope writing the draft into its OWN
                                                          Resources through AccentResources — the accent keys
@@ -1611,11 +1717,11 @@ stays in its tab folder.
                                 ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
                                                          whether it is custom, and the note explaining a
                                                          refused capture where it happened)
-                                AlertThresholdRow.cs    (one Alerts row: IsEnabled + Value, kept APART so a
-                                                         switched-off row remembers its number. The
-                                                         settings layer encodes "not watched" as 0, which
-                                                         alone would forget it, so GPU could not ship
-                                                         "off, defaulted to 90")
+                                AlertThresholdRow.cs    (one Alerts row: the threshold ONLY. Whether the
+                                                         resource is watched is its bell's AlertSwitch,
+                                                         so the number stays editable and is kept while
+                                                         the resource is off — GPU ships "off, defaulted
+                                                         to 90")
                                 GpuMetricsSupport.cs    (whether reading NVIDIA GPU utilization costs a
                                                          helper process here. LINUX ONLY: there the figure
                                                          exists solely through nvidia-smi, which is why the
@@ -1668,6 +1774,10 @@ stays in its tab folder.
                                                          selector compiles and matches nothing.
                                                          Both carets sit on one Panel with exactly one
                                                          visible, for the same reason.
+                                                         The address field holds an invisible line of crumb
+                                                         text, so with no folder open (no crumbs) it keeps
+                                                         its height and the toolbar never jumps on first
+                                                         open; a fixed Height would not follow text scale.
                                                          VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
@@ -1769,6 +1879,16 @@ stays in its tab folder.
                                                          Windows-only field (DHCP) is guarded inline → "—")
                                 AdapterInfo.cs          (record + AdapterKind enum; fixed status-dot brushes)
                                 IpConfigInfo.cs         (record: IPv4/mask/gateway/DNS/MAC/DHCP; .Unknown)
+                                IPublicAddressProvider.cs
+                                                        (seam + the PublicAddresses record; null per family
+                                                         = unavailable. IT LEAVES THE MACHINE, so callers run it
+                                                         only when the user asks)
+                                PublicAddressProvider.cs
+                                                        (ipify over https, v4 and v6 concurrently, 4 s bound
+                                                         each, one shared HttpClient. Accepts a body only if
+                                                         it parses as the family asked for — a captive
+                                                         portal page must not be shown as an address. Filtered
+                                                         catch; portable, no platform arms)
                                 IConnectionsInterop.cs  (seam + ForCurrentPlatform() + the RawConnection
                                                          struct. ADDRESS FAMILIES ARE WHATEVER THE PLATFORM
                                                          CAN SUPPLY, not a fixed set — Linux includes IPv6,
@@ -1820,6 +1940,11 @@ stays in its tab folder.
                                 ConnectionInfo.cs       (record + composite identity Key)
                                 ConnectionRow.cs        (mutable row VM: only State/StateBrush observable,
                                                          reused across polls via the keyed diff)
+                                MeasureCap.cs           (Decorator: caps what its child ASKS for when measured,
+                                                         then arranges it into the full slot. Wraps the Adapters
+                                                         list. A MaxHeight on the scroller instead clamps the
+                                                         arrange too, and a clamped Stretch child is CENTERED in
+                                                         a card stretched to its row: a gap above and below)
                                 PingMonitor.cs          (reused in-box Ping; rolling avg/loss + last-3
                                                          lines; soft-fails to a timeout. NO DEFAULT TARGET:
                                                          Target starts EMPTY. It used to default to 8.8.8.8,
@@ -1833,10 +1958,29 @@ stays in its tab folder.
                                                          the control stays general; its tooltip is on a
                                                          WRAPPER because a disabled button takes no
                                                          pointer-over and the disabled state is the one
-                                                         needing an explanation. The box is Classes="flat"
+                                                         needing an explanation. THE CONSOLE LINE HEIGHT IS
+                                                         SET IN CODE from the font size (ConsoleCapacity.
+                                                         LineHeightFor), never a literal, so Text size
+                                                         spaces lines instead of overlapping them. The box is Classes="flat"
                                                          like every box inside a field Border — Fluent's
                                                          focus block otherwise paints a filled rectangle
                                                          around the text alone, beside the icon)
+                                ConsoleCapacity.cs      (pure arithmetic for the console box: lines that
+                                                         fit a height, and the line height derived from the
+                                                         font size at 1.25x — 15 at the default. Derived,
+                                                         never a literal, so Text size spaces lines rather
+                                                         than overlapping them; the box's padding, footer
+                                                         line and gap are the reserved height)
+                                ConnectionsTableLayout.cs
+                                                        (the connections table's responsive columns:
+                                                         Protocol drops first, then State, then Remote;
+                                                         Process stays. Minimums are at 100 % text and are
+                                                         MULTIPLIED BY THE TEXT SCALE, which the view reads
+                                                         off the header's font size. All columns are STARS:
+                                                         the header and each row are separate grids, so an
+                                                         Auto column would size to each one's own content
+                                                         and misalign. Over TableColumns, like File
+                                                         Explorer's list)
                                 HostLink.cs             (the https URL a typed target means, or null when
                                                          it is not a usable host — which is what leaves the
                                                          link icon disabled. Uri.CheckHostName decides, and
@@ -1862,7 +2006,9 @@ stays in its tab folder.
                                                          IRefreshablePage; Sensors card left as "—".
                                                          Every card drags to reorder — the grid is a
                                                          UniformFlowPanel with Reorder="Item", saved under
-                                                         the "hardware" key)
+                                                         the "hardware" key. The card Border fills its
+                                                         row's height and sets only a MinHeight floor
+                                                         from Dimensions.axaml — see FEATURES.md)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the
@@ -1940,9 +2086,9 @@ stays in its tab folder.
                                  does. The chart panel between them does not move.)
                                 (Reveal(deviceId) is the jump INTO this page, the counterpart to the
                                  detail header's jumps out of it. Rows carry the DeviceInstance id they
-                                 were built from. Two things it must keep doing: EXPAND THE RAIL when the
-                                 Primary scope hides the device — the caller asked for that one, not the
-                                 primary of its kind — and HOLD a reveal whose row does not exist yet,
+                                 were built from. The rail always lists every device (the old Primary/All
+                                 toggle is gone), so a reveal has nothing to un-hide; it must HOLD a
+                                 reveal whose row does not exist yet,
                                  since disk and GPU rows arrive with an async inventory load.
                                  RebuildResources matches the surviving selection BY DEVICE ID, not by
                                  reference: a rebuilt disk or GPU row is a new object, so the toolbar
@@ -1953,7 +2099,8 @@ stays in its tab folder.
                                                          ratio, as GHz; "—" when either is missing)
                                 MemoryCacheFormatter.cs (Cached tile: bytes → binary GB, "—" when the
                                                          provider reports nothing)
-                                GpuMemoryFormatter.cs   (VRAM in use tile: "used / total", Memory-caption
+                                GpuMemoryFormatter.cs   (VRAM in use and Shared memory in use tiles:
+                                                         "used / total", Memory-caption
                                                          style; MB under 1 GiB; "— / 12 GB" for an
                                                          unknown usage, a bare "—" for an unknown total)
                                 IGpuSensorProvider.cs   (GPU Temp/Power tiles. THE TWO PLATFORMS HAVE
@@ -2038,6 +2185,10 @@ stays in its tab folder.
                                                          rows. Process.Kill only requests termination, so
                                                          a row used to go on the request alone and come
                                                          back on the next poll)
+                                ProcessRowClick.cs      (pure rule: does a click deselect? Plain single left
+                                                         click on the sole selected row only. Decided on the
+                                                         press and applied on the tap, so a double-click's
+                                                         first click or a drag never clears the selection)
                                 ProcessGpuSampler.cs    (per-process GPU % from PDH \GPU Engine(*), Task
                                                          Manager's counter, pinned by a test. PDH only: the
                                                          parse and the per-engine rule are the shared

@@ -166,6 +166,29 @@ public class LinuxGpuUsageSamplerTests {
     }
 
     [Fact]
+    public void SampleAdapters_AmdCard_ReadsGttUsedAsShared() {
+        using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem().WithAmdgpuCard());
+
+        Assert.Equal(268435456UL, Assert.Single(sampler.SampleAdapters()).Value.SharedUsedBytes);
+    }
+
+    [Fact]
+    public void SampleAdapters_CardWithoutGttUsedFile_ReportsNullShared() {
+        using var sampler = new LinuxGpuUsageSampler(new FakeProcFileSystem().WithNvidiaCard());
+
+        Assert.Null(Assert.Single(sampler.SampleAdapters()).Value.SharedUsedBytes);
+    }
+
+    [Fact]
+    public void SampleAdapters_UnreadableGttUsed_ReportsNullShared() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard()
+            .WithFile("/sys/class/drm/card0/device/mem_info_gtt_used", "N/A\n");
+        using var sampler = new LinuxGpuUsageSampler(proc);
+
+        Assert.Null(Assert.Single(sampler.SampleAdapters()).Value.SharedUsedBytes);
+    }
+
+    [Fact]
     public void SampleAdapters_UnreadableVramUsed_ReportsNullUsage() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard()
             .WithFile("/sys/class/drm/card0/device/mem_info_vram_used", "N/A\n");

@@ -119,6 +119,83 @@ public class PerformanceGpuRowTests {
         Assert.Contains(row.Stats, t => t.Label == "VRAM in use" && t.Value == "2.0 / 8.0 GB");
     }
 
+    /// <summary>Shared memory gets its own tile, labeled for its pool, read as used over total and placed
+    /// straight after the dedicated one — seeded total-only by the load, then filled by a tick.</summary>
+    [Fact]
+    public async Task SharedTile_KnownTotal_ShowsUsedOverTotalAfterVram() {
+        var (viewModel, sampler) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().ReportingMemory(Amd, 37, 1185382400, 3UL << 29),
+            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 12UL << 30, SharedSystemMemory: 16UL << 30));
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+
+        Assert.Equal(["3D", "VRAM in use", "Shared memory in use", "Temp", "Power"], row.Stats.Select(t => t.Label));
+        var tile = row.Stats[2];
+        Assert.Equal("1.5 / 16 GB", tile.Value);
+
+        sampler.ReportingMemory(Amd, 37, 1185382400, 2UL << 30);
+        viewModel.UpdateGpuAdapters();
+        Assert.Equal("2.0 / 16 GB", tile.Value);
+        Assert.Equal("1.1 / 12 GB", row.Stats[1].Value);
+    }
+
+    /// <summary>The acceptance criterion: an adapter with no shared pool omits the row rather than showing a
+    /// zero or a dash.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0UL)]
+    public async Task SharedTile_NoSharedTotal_IsOmitted(ulong? shared) {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().ReportingMemory(Amd, 37, 1185382400, 5),
+            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 12UL << 30, SharedSystemMemory: shared));
+
+        viewModel.UpdateGpuAdapters();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.Equal(["3D", "VRAM in use", "Temp", "Power"], row.Stats.Select(t => t.Label));
+    }
+
+    /// <summary>A shared total with no usage reading keeps the total beside a dash, never a fake 0.</summary>
+    [Fact]
+    public async Task SharedTile_AdapterReportingNoSharedUsage_KeepsTheTotalWithADash() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().ReportingMemory(Amd, 37, 1185382400),
+            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 12UL << 30, SharedSystemMemory: 16UL << 30));
+
+        viewModel.UpdateGpuAdapters();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.Contains(row.Stats, t => t.Label == "Shared memory in use" && t.Value == "— / 16 GB");
+    }
+
+    /// <summary>An integrated GPU: a small dedicated carve-out and a large shared pool, both shown, each
+    /// against its own total.</summary>
+    [Fact]
+    public async Task SharedTile_IntegratedGpu_ShowsBothPools() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().ReportingMemory(Amd, 4, 200UL << 20, 1UL << 30),
+            new GpuAdapter(Amd, "AMD Radeon(TM) Graphics", false, 512UL << 20, SharedSystemMemory: 15UL << 30));
+
+        viewModel.UpdateGpuAdapters();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.Contains(row.Stats, t => t.Label == "VRAM in use" && t.Value == "200 / 512 MB");
+        Assert.Contains(row.Stats, t => t.Label == "Shared memory in use" && t.Value == "1.0 / 15 GB");
+    }
+
+    /// <summary>A toolbar Refresh rebuilds the row; the shared tile comes back and is filled straight away
+    /// rather than waiting a tick at its seed.</summary>
+    [Fact]
+    public async Task SharedTile_AfterRefresh_IsRebuiltAndFilled() {
+        var (viewModel, _) = await LoadedAsync(
+            () => new FakeGpuUsageSampler().ReportingMemory(Amd, 37, 1185382400, 3UL << 29),
+            new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 12UL << 30, SharedSystemMemory: 16UL << 30));
+
+        await viewModel.LoadInventoryAsync();
+
+        var row = viewModel.Resources.Single(r => r.Name.StartsWith("GPU", StringComparison.Ordinal));
+        Assert.Contains(row.Stats, t => t.Label == "Shared memory in use" && t.Value == "1.5 / 16 GB");
+    }
+
     /// <summary>An adapter whose driver publishes no figure keeps the placeholder rather than a confident
     /// zero — the Linux NVIDIA/Intel case, and the thing a blanket "fill it in" fix would break.</summary>
     [Fact]

@@ -1,7 +1,10 @@
+using DashDetective.Services.Diagnostics;
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -20,9 +23,9 @@ public class ToolkitViewModelTests {
     // on the Linux CI leg instead of silently asserting against a table that has none of them.
     private static IReadOnlyList<ToolkitEntry> Catalog => WindowsToolkitCatalog.Instance.Entries;
 
-    // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
-    // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
-    // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
+    // Takes the search term rather than leaving callers to write an object initialiser, so this and
+    // HeldPage are the file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say
+    // `()`, which is how four of these once slipped past a bulk re-point and resolved the host's catalog.
     private static ToolkitViewModel Page(string search = "") =>
         new(WindowsToolkitCatalog.Instance) { Search = search };
 
@@ -247,6 +250,61 @@ public class ToolkitViewModelTests {
 
         Assert.Contains("DashDetective", text, System.StringComparison.Ordinal);
         Assert.False(string.IsNullOrWhiteSpace(text));
+    }
+
+    /// <summary>Text keeps the transcript users already rely on; it must not be re-rendered as a report.</summary>
+    [Fact]
+    public async Task BuildLog_Text_IsTheTranscriptBuildLogTextWrites() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var text = vm.BuildLog(DiagnosticsFormat.Text);
+
+        // The header's second line is "now", which can tick between the two calls; everything after it is fixed.
+        static string[] AfterHeader(string s) => s.Split(Environment.NewLine).Skip(2).ToArray();
+        Assert.Equal(AfterHeader(vm.BuildLogText()), AfterHeader(text));
+        Assert.StartsWith("DashDetective — Utilities execution log", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>The save dialog offers the system report's list, and each choice renders a different file.</summary>
+    [Fact]
+    public async Task BuildLog_EveryOfferedFormat_RendersTheLoggedCommand() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var rendered = DiagnosticsFormats.Offered.Select(vm.BuildLog).ToList();
+
+        Assert.True(DiagnosticsFormats.Offered.Count > 1);
+        Assert.All(rendered, r => Assert.Contains("first-command", r, StringComparison.Ordinal));
+        Assert.Equal(rendered.Count, rendered.Distinct().Count());
+    }
+
+    /// <summary>Exporting before anything has run must still write a file the format can open.</summary>
+    [Theory]
+    [InlineData(DiagnosticsFormat.Text)]
+    [InlineData(DiagnosticsFormat.Json)]
+    [InlineData(DiagnosticsFormat.Markdown)]
+    [InlineData(DiagnosticsFormat.Html)]
+    [InlineData(DiagnosticsFormat.Csv)]
+    public void BuildLog_EmptyLog_RendersAWellFormedFile(DiagnosticsFormat format) {
+        var rendered = Page().BuildLog(format);
+
+        Assert.False(string.IsNullOrWhiteSpace(rendered));
+        if (format == DiagnosticsFormat.Json)
+            System.Text.Json.JsonDocument.Parse(rendered).Dispose();
+    }
+
+    [Fact]
+    public async Task BuildLog_StructuredFormat_KeepsTheOrderTheLogIsShownIn() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("older"));
+        await vm.RunCommand.ExecuteAsync(MissingTool("newer"));
+
+        var markdown = vm.BuildLog(DiagnosticsFormat.Markdown);
+
+        Assert.True(markdown.IndexOf("newer", StringComparison.Ordinal) <
+                    markdown.IndexOf("older", StringComparison.Ordinal),
+                    "export order does not match the panel");
     }
 
     // ----- Pins -----
@@ -836,5 +894,258 @@ public class ToolkitViewModelTests {
         Assert.Equal("", vm.Search);
         Assert.True(vm.HasCommands);
         Assert.Contains(vm.Groups.SelectMany(g => g.Items), entry => entry.Command == "%temp%");
+    }
+
+    // ----- Cancelling a running command -----
+
+    // A page over a launcher that holds every capture in flight until the test ends it, so there is a
+    // moment in which the command is genuinely running. The one other `new ToolkitViewModel` in the file.
+    private static (ToolkitViewModel Vm, FakeProcessLauncher Launcher) HeldPage() {
+        var launcher = new FakeProcessLauncher { HoldCaptures = true };
+        var vm = new ToolkitViewModel(WindowsToolkitCatalog.Instance, new ToolkitRunner(launcher));
+        return (vm, launcher);
+    }
+
+    // A regression that stops a cancel working leaves a held run in flight forever; bounded, it fails
+    // the test instead of hanging the whole CI leg.
+    private static Task Done(Task run) => run.WaitAsync(TimeSpan.FromSeconds(10));
+
+    private static ToolkitEntry Slow(string command = "slowtool") =>
+        new(command, "Takes a while", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture(command));
+
+    /// <summary>The in-flight stanza of a captured command is the one that offers Cancel; the finished one
+    /// does not, and nothing has to be reset for it to go away.</summary>
+    [Fact]
+    public async Task Run_Capture_PendingStanzaOffersCancelAndTheFinishedOneDoesNot() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        Assert.True(Assert.Single(vm.Log).IsRunning);
+
+        launcher.Complete(new ProcessCapture(0, "done", "", false));
+        await Done(running);
+
+        Assert.False(Assert.Single(vm.Log).IsRunning);
+    }
+
+    /// <summary>The acceptance criterion in one test: cancelling mid-run replaces the stanza in place with
+    /// what had printed plus a line saying so, keeping the time the command started.</summary>
+    [Fact]
+    public async Task CancelRun_DuringACapture_ReplacesTheStanzaWithCancelledAndKeepsPartialOutput() {
+        var (vm, launcher) = HeldPage();
+        launcher.PartialOutput = "Pinging 10.255.255.1";
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        var startedAt = vm.Log[0].Time;
+
+        Assert.True(vm.CancelRunCommand.CanExecute(null));
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Contains("Pinging 10.255.255.1", logged.Output, StringComparison.Ordinal);
+        Assert.Contains("Cancelled after", logged.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Timed out", logged.Output, StringComparison.Ordinal);
+        Assert.Equal(startedAt, logged.Time);
+        Assert.False(logged.IsRunning);
+    }
+
+    /// <summary>No half-open state: once the cancel unwinds, the rows run again and the cancel control
+    /// reports itself unavailable, with no stale source left behind to cancel the next run.</summary>
+    [Fact]
+    public async Task CancelRun_AfterCancelling_RowsRunAgainAndTheNextRunIsNotPreCancelled() {
+        var (vm, launcher) = HeldPage();
+
+        var first = vm.RunCommand.ExecuteAsync(Slow("first"));
+        vm.CancelRunCommand.Execute(null);
+        await Done(first);
+
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+
+        var second = vm.RunCommand.ExecuteAsync(Slow("second"));
+        Assert.False(second.IsCompleted);
+        launcher.Complete(new ProcessCapture(0, "second ran", "", false));
+        await Done(second);
+
+        Assert.Equal(["second", "first"], vm.Log.Select(l => l.Command));
+        Assert.Equal("second ran", vm.Log[0].Output);
+    }
+
+    [Fact]
+    public void CancelRun_Idle_IsNotExecutable() {
+        var (vm, _) = HeldPage();
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>A launch returns at once and an elevated one is not waited on, so neither has anything to
+    /// cancel and neither stanza offers it.</summary>
+    [Fact]
+    public async Task CancelRun_ForALaunchRow_IsNeverExecutableAndItsStanzaDoesNotOfferIt() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(MissingTool());
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+        Assert.False(Assert.Single(vm.Log).IsRunning);
+
+        await Done(running);
+    }
+
+    [Fact]
+    public async Task CancelRun_AfterTheCommandFinished_IsANoOp() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        launcher.Complete(new ProcessCapture(0, "all done", "", false));
+        await Done(running);
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+        vm.CancelRunCommand.Execute(null);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Equal("all done", logged.Output);
+    }
+
+    /// <summary>The control follows the run: it becomes available when a capture starts and goes again
+    /// when it ends, announced through CanExecuteChanged so the button updates.</summary>
+    [Fact]
+    public async Task CancelRun_RaisesCanExecuteChangedAsACaptureStartsAndEnds() {
+        var (vm, launcher) = HeldPage();
+        var raised = 0;
+        vm.CancelRunCommand.CanExecuteChanged += (_, _) => raised++;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        Assert.Equal(1, raised);
+
+        launcher.Complete(new ProcessCapture(0, "", "", false));
+        await Done(running);
+
+        Assert.Equal(2, raised);
+    }
+
+    /// <summary>A timeout is the command's own overrun, not the user's doing, and must not borrow the
+    /// cancel wording even though both end with the process killed.</summary>
+    [Fact]
+    public async Task Run_TimedOut_StillReadsAsTimedOutNotCancelled() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        launcher.Complete(new ProcessCapture(-1, "partial", "", TimedOut: true));
+        await Done(running);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Contains("Timed out", logged.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cancelled", logged.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>Clearing the log mid-run and then cancelling still honours the clear: the cancelled
+    /// result drops with the placeholder rather than resurrecting a stanza.</summary>
+    [Fact]
+    public async Task CancelRun_AfterTheLogWasCleared_DoesNotResurrectTheStanza() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.ClearLogCommand.Execute(null);
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        Assert.Empty(vm.Log);
+        Assert.False(vm.HasLog);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+    }
+
+    /// <summary>A launcher that ignores its token cannot be stopped from here, so the cancel does
+    /// nothing visible — but the page is not left wedged: the run still ends the moment the process does,
+    /// and everything is available again.</summary>
+    [Fact]
+    public async Task CancelRun_WhenTheLauncherIgnoresTheToken_TheRunStillUnwindsCleanlyWhenItEnds() {
+        var (vm, launcher) = HeldPage();
+        launcher.IgnoreCancellation = true;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.CancelRunCommand.Execute(null);
+        Assert.False(running.IsCompleted);
+
+        launcher.Complete(new ProcessCapture(0, "finished anyway", "", false));
+        await Done(running);
+
+        Assert.Equal("finished anyway", Assert.Single(vm.Log).Output);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>A launcher that throws on cancel is the user's doing too, and the page ends up the same.</summary>
+    [Fact]
+    public async Task CancelRun_WhenTheLauncherThrows_ReadsAsCancelledAndLeavesThePageUsable() {
+        var (vm, launcher) = HeldPage();
+        launcher.ThrowOnCancellation = true;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+    }
+
+    /// <summary>Shutdown disposes the page, which cancels what is in flight so no child is orphaned.</summary>
+    [Fact]
+    public async Task Dispose_CancelsTheRunInFlight() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.Dispose();
+        await Done(running);
+
+        Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dispose_Idle_DoesNothing() {
+        var (vm, _) = HeldPage();
+
+        vm.Dispose();
+
+        Assert.Empty(vm.Log);
+    }
+
+    /// <summary>Run and OpenExternally have separate concurrency gates, so a launch can start while a
+    /// capture is in flight. It must not take the capture's cancel state: Cancel stays available, still
+    /// stops the capture, and the capture's result lands on its own stanza rather than being dropped.</summary>
+    [Fact]
+    public async Task CancelRun_WhileALaunchRunsAlongside_StillCancelsTheCapture() {
+        var (vm, launcher) = HeldPage();
+        launcher.PartialOutput = "partial";
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+
+        Assert.True(vm.IsCapturing);
+        Assert.True(vm.CancelRunCommand.CanExecute(null));
+
+        vm.CancelRunCommand.Execute(null);
+        await Done(capture);
+
+        Assert.Equal(["alongside", "slowtool"], vm.Log.Select(l => l.Command));
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.Contains("partial", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>The same overlap must not blind shutdown: a launch finishing first leaves the capture's
+    /// source in place, so Dispose still stops the child.</summary>
+    [Fact]
+    public async Task Dispose_AfterALaunchRanAlongside_StillCancelsTheCapture() {
+        var (vm, _) = HeldPage();
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+        vm.Dispose();
+        await Done(capture);
+
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
     }
 }

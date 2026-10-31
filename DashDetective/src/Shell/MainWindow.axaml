@@ -147,8 +147,8 @@
                             <Rectangle Width="1" Height="22" Fill="{DynamicResource Hairline}" Margin="3,0"/>
                             <!-- Fixed width so the proportional font (digit widths differ as it ticks)
                                  reserves constant space and never reflows the toolbar. Sized for the
-                                 wider 12-hour string ("11:59:59 PM"), so switching clock format does not
-                                 shift the toolbar either. -->
+                                 widest string (12-hour with seconds, "11:59:59 PM"), so switching clock
+                                 format or seconds does not shift the toolbar either. -->
                             <TextBlock Text="{Binding Clock}" FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextTertiary}"
                                        VerticalAlignment="Center" Width="{Binding ClockWidth}" TextAlignment="Center"/>
                             </StackPanel>

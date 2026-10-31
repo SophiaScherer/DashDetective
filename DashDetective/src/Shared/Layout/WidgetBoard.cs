@@ -167,14 +167,19 @@ public class WidgetBoard : ReorderablePanel {
 
             var rowHeight = 0.0;
             var rowWidth = 0.0;
+            var x = 0.0;
             for (var i = 0; i < count; i++) {
                 var child = Visible[start + i];
 
                 // The dragged widget keeps the width it was picked up at, so its content cannot
-                // re-wrap under the cursor while the rows behind it re-pack.
+                // re-wrap under the cursor while the rows behind it re-pack. The rest measure at the
+                // pixel-snapped width they will be arranged at.
                 var measureWidth = ReferenceEquals(child, Drag.Dragged)
                     ? Drag.DragSize.Width
-                    : rowWidths[i];
+                    : double.IsFinite(rowWidths[i])
+                        ? SnappedWidth(child, x, rowWidths[i], availableSize.Width)
+                        : rowWidths[i];
+                x += rowWidths[i] + ColumnSpacing;
                 child.Measure(new Size(measureWidth, double.PositiveInfinity));
                 rowHeight = Math.Max(rowHeight, child.DesiredSize.Height);
                 rowWidth += double.IsFinite(rowWidths[i]) ? rowWidths[i] : child.DesiredSize.Width;
@@ -211,7 +216,7 @@ public class WidgetBoard : ReorderablePanel {
                 // A dragged widget keeps its place in Children so nothing is reparented and no
                 // binding is torn down; only the box it is arranged at follows the pointer.
                 var index = start + i;
-                Visible[index].Arrange(Placed(index, new Rect(x, y, rowWidths[i], _rowHeights[r])));
+                Visible[index].Arrange(Placed(index, new Rect(x, y, rowWidths[i], _rowHeights[r]), finalSize));
                 x += rowWidths[i] + ColumnSpacing;
             }
 

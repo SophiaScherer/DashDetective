@@ -194,7 +194,7 @@ public static class ShortcutCatalog {
         ShortcutScope.Processes => "Processes",
         ShortcutScope.FileExplorer => "File Explorer",
         ShortcutScope.Network => "Network",
-        ShortcutScope.Toolkit => "Toolkit",
+        ShortcutScope.Toolkit => "Utilities",
         _ => "General",
     };
 

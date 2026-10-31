@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:nav="using:DashDetective.Shell.Navigation"
+             x:Class="DashDetective.Shared.Controls.AlertBell"
+             x:Name="Root" x:CompileBindings="False">
+    <!-- One resource's alert switch, drawn beside the resource itself. The state is in the SHAPE — filled
+         bell on, outlined and struck through off — so it never rests on color alone. -->
+    <UserControl.Styles>
+        <!-- Fluent's ToggleButton paints its checked state as an accent-filled box; this is a glyph, so
+             the template is replaced with a bare surface that only takes the hover overlay. -->
+        <Style Selector="ToggleButton.alertBell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}"/>
+            <Setter Property="Padding" Value="3"/>
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusHair}"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.alertBell:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverOverlay}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+        <!-- Off in Settings: faded like the File Explorer's dead nav arrows, still showing its state. -->
+        <Style Selector="ToggleButton.alertBell:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="ToggleButton.alertBell Path">
+            <Setter Property="Stroke" Value="{Binding $parent[ToggleButton].Foreground}"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- The tooltip is the accessible name too, set here because the app-wide rule doing that matches the
+         exact type Button and so never reaches a ToggleButton. It shows on a disabled bell, which is the
+         one state that most needs explaining. -->
+    <ToggleButton Classes="alertBell"
+                  IsChecked="{Binding #Root.Switch.IsOn, Mode=TwoWay}"
+                  IsEnabled="{Binding #Root.Switch.IsAvailable}"
+                  ToolTip.Tip="{Binding #Root.Switch.Description}"
+                  ToolTip.ShowOnDisabled="True"
+                  AutomationProperties.Name="{Binding #Root.Switch.Description}">
+        <Panel Width="{StaticResource IconSizeSmall}" Height="{StaticResource IconSizeSmall}">
+            <Path Data="{x:Static nav:Icons.Bell}" IsVisible="{Binding #Root.Switch.IsOn}"
+                  Fill="{Binding $parent[ToggleButton].Foreground}"/>
+            <Path Data="{x:Static nav:Icons.BellOff}" IsVisible="{Binding !#Root.Switch.IsOn}"/>
+        </Panel>
+    </ToggleButton>
+</UserControl>

@@ -23,6 +23,9 @@ public partial class SortableColumnHeader : UserControl {
         AvaloniaProperty.Register<SortableColumnHeader, HorizontalAlignment>(
             nameof(ContentAlignment), HorizontalAlignment.Left);
 
+    public static readonly StyledProperty<Thickness> ContentInsetProperty =
+        AvaloniaProperty.Register<SortableColumnHeader, Thickness>(nameof(ContentInset));
+
     public SortableColumnHeader() {
         InitializeComponent();
     }
@@ -52,5 +55,12 @@ public partial class SortableColumnHeader : UserControl {
     public HorizontalAlignment ContentAlignment {
         get => GetValue(ContentAlignmentProperty);
         set => SetValue(ContentAlignmentProperty, value);
+    }
+
+    /// <summary>Space between the cell's edge and its label, inside the button. Unlike a Margin on
+    /// the control, the whole cell stays clickable and the drag hit-test bounds do not shrink.</summary>
+    public Thickness ContentInset {
+        get => GetValue(ContentInsetProperty);
+        set => SetValue(ContentInsetProperty, value);
     }
 }

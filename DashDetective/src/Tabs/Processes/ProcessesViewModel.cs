@@ -895,7 +895,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         _anchorPid = 0;
         SelectedRow = null;
         ApplySelection();
+        ActionMessage = "";
     }
+
+    /// <summary>Whether a row is the entire selection — the case where a plain click on it deselects.</summary>
+    public bool IsOnlySelection(ProcessRow row) => _selectedPids.Count == 1 && _selectedPids.Contains(row.Pid);
 
     /// <summary>The selected PIDs, for the actions that operate on all of them.</summary>
     public IReadOnlyCollection<int> SelectedPids => _selectedPids;
