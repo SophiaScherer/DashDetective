@@ -1518,7 +1518,11 @@ stays in its tab folder.
                                                          what a command opens, driving its icon + badge)
                                 ToolkitEntry.cs         (immutable row model; its Icon/Badge* getters
                                                          resolve through ToolkitIcons ON READ, so the
-                                                         filter/catalog tests never load geometry)
+                                                         filter/catalog tests never load geometry.
+                                                         DefaultActionText words what activating the row
+                                                         does, per action kind, and leads its tooltip —
+                                                         plain strings, outside ToolkitIcons, so the
+                                                         wording is testable headlessly)
                                 ToolkitGroup.cs         (immutable category section: upper-cased header
                                                          + the entries that survived the filter)
                                 ToolkitCategoryOption.cs (filter-chip item VM, the FilterOption shape)
