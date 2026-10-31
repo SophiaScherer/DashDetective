@@ -1,3 +1,5 @@
+using DashDetective.Services.Settings;
+
 namespace DashDetective.Services.SystemMetrics;
 
 /// <summary>
@@ -31,4 +33,17 @@ public sealed record ResourceAlertOptions {
 
     /// <summary>The baseline: the CPU and memory behaviour the app shipped with, plus low-disk-space.</summary>
     public static ResourceAlertOptions Defaults { get; } = new();
+
+    /// <summary>Folds the persisted switch-and-threshold pairs into this zero-means-off shape. The pair is
+    /// kept apart in settings so a switched-off resource keeps its number; the watcher never needs to know.</summary>
+    public static ResourceAlertOptions From(AppSettings settings) => new() {
+        CpuPercent = Watched(settings.AlertCpuEnabled, settings.AlertCpuPercent),
+        MemoryPercent = Watched(settings.AlertMemoryEnabled, settings.AlertMemoryPercent),
+        GpuPercent = Watched(settings.AlertGpuEnabled, settings.AlertGpuPercent),
+        DiskActivePercent = Watched(settings.AlertDiskActiveEnabled, settings.AlertDiskActivePercent),
+        LowDiskFreePercent = Watched(settings.AlertLowDiskFreeEnabled, settings.AlertLowDiskFreePercent),
+        SustainSeconds = settings.AlertSustainSeconds,
+    };
+
+    private static int Watched(bool enabled, int percent) => enabled ? percent : 0;
 }

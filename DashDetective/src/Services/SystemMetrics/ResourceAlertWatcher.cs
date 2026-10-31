@@ -1,4 +1,5 @@
 using DashDetective.Services.Diagnostics;
+using DashDetective.Services.Settings;
 using DashDetective.Services.Threading;
 using System;
 using System.Collections.Generic;
@@ -119,16 +120,40 @@ internal sealed class ResourceAlertWatcher : IDisposable {
         }
     }
 
-    /// <summary>The thresholds to watch against. Setting them clears every streak: a streak counted
-    /// against the old threshold says nothing about the new one.</summary>
+    /// <summary>The thresholds to watch against. Setting them clears the streak of each metric whose
+    /// threshold changed — one counted against the old threshold says nothing about the new one — and every
+    /// usage streak if the wait changed. Metrics left as they were keep their state, so flipping one
+    /// resource's bell neither retracts nor re-announces another's banner. Free space switched on or
+    /// re-pointed is read at once rather than on its next minute.</summary>
     public ResourceAlertOptions Options {
         get => _options;
         set {
+            var previous = _options;
             _options = value;
-            ClearStates();
+
+            var waitChanged = value.SustainSeconds != previous.SustainSeconds;
+            ClearIf(AlertMetric.Cpu, waitChanged || value.CpuPercent != previous.CpuPercent);
+            ClearIf(AlertMetric.Memory, waitChanged || value.MemoryPercent != previous.MemoryPercent);
+            ClearIf(AlertMetric.Gpu, waitChanged || value.GpuPercent != previous.GpuPercent);
+            ClearIf(AlertMetric.DiskActivity, waitChanged || value.DiskActivePercent != previous.DiskActivePercent);
+            // Free space has no streak, so only switching it off clears it; a new threshold is re-read below.
+            ClearIf(AlertMetric.DiskSpace, value.LowDiskFreePercent <= 0);
+
             ApplyTimers();
+            if (value.LowDiskFreePercent > 0 && value.LowDiskFreePercent != previous.LowDiskFreePercent
+                && Enabled && _live)
+                _ = SampleSpaceAsync();
+
             Evaluate();
         }
+    }
+
+    /// <summary>Puts persisted alert settings into force: thresholds first, since setting them clears streaks
+    /// and applying them after enabling would discard the first samples, then the master switch. The
+    /// shell's one call for both a Settings edit and a bell flip.</summary>
+    public void Apply(AppSettings settings) {
+        Options = ResourceAlertOptions.From(settings);
+        Enabled = settings.ResourceAlerts;
     }
 
     /// <summary>Follows the toolbar's Live pill, like <c>ILiveSamplingPage</c>. The CPU and memory feeds
@@ -332,10 +357,17 @@ internal sealed class ResourceAlertWatcher : IDisposable {
     }
 
     private void ClearStates() {
-        foreach (var state in _states.Values) {
-            state.Streak = 0;
-            state.Breaching = false;
-        }
+        foreach (var metric in _states.Keys)
+            ClearIf(metric, true);
+    }
+
+    private void ClearIf(AlertMetric metric, bool clear) {
+        if (!clear)
+            return;
+
+        var state = _states[metric];
+        state.Streak = 0;
+        state.Breaching = false;
     }
 
     private string DiskName(int number) =>

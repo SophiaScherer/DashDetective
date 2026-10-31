@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.SystemMetrics;
 using DashDetective.Services.Theming;
 using DashDetective.Shared;
 using DashDetective.Shared.Charts;
@@ -193,6 +194,10 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
 
     /// <summary>Whether this resource offers a jump — the link button's visibility.</summary>
     public bool HasLink => Link is not null;
+
+    /// <summary>The alert switch for this kind of resource, shared with every other surface showing it, or
+    /// null for one nothing watches (a network adapter).</summary>
+    public AlertSwitch? Alert { get; init; }
 
     [ObservableProperty] private bool _isSelected;
 

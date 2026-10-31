@@ -1,7 +1,11 @@
+using DashDetective.Services.Diagnostics;
+using DashDetective.Shared.Shortcuts;
 using DashDetective.Tabs.Toolkit;
+using DashDetective.Tests.Fakes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -14,17 +18,19 @@ namespace DashDetective.Tests.Tabs.Toolkit;
 /// The rows exercised here deliberately point at a tool that does not exist, so the whole
 /// view-model → runner → launcher chain runs for real without anything being started.
 /// </summary>
-public class ToolkitViewModelTests {
+public sealed class ToolkitViewModelTests : IDisposable {
     // The Windows table by name rather than whichever ForCurrentPlatform() resolves: the assertions
     // below are written against its rows (%temp%, regedit, %appdata%), so naming it keeps them running
     // on the Linux CI leg instead of silently asserting against a table that has none of them.
     private static IReadOnlyList<ToolkitEntry> Catalog => WindowsToolkitCatalog.Instance.Entries;
 
-    // Takes the search term rather than leaving callers to write an object initialiser, so this stays the
-    // file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say `()`, which is how
-    // four of these once slipped past a bulk re-point and resolved the host's catalog instead.
-    private static ToolkitViewModel Page(string search = "") =>
-        new(WindowsToolkitCatalog.Instance) { Search = search };
+    // Takes the search term rather than leaving callers to write an object initialiser, so this and
+    // HeldPage are the file's only `new ToolkitViewModel` — an initialiser spelled by hand does not say
+    // `()`, which is how four of these once slipped past a bulk re-point and resolved the host's catalog.
+    private static ToolkitViewModel Page(string search = "", FakeProcessLauncher? launcher = null) =>
+        new(WindowsToolkitCatalog.Instance, launcher is null ? new ToolkitRunner() : new ToolkitRunner(launcher)) {
+            Search = search,
+        };
 
     // Label and target agree, as they do on every real row that takes no parameter (%appdata%,
     // regedit, ipconfig /all) — so the logged "$" line is the row's own text.
@@ -247,6 +253,61 @@ public class ToolkitViewModelTests {
 
         Assert.Contains("DashDetective", text, System.StringComparison.Ordinal);
         Assert.False(string.IsNullOrWhiteSpace(text));
+    }
+
+    /// <summary>Text keeps the transcript users already rely on; it must not be re-rendered as a report.</summary>
+    [Fact]
+    public async Task BuildLog_Text_IsTheTranscriptBuildLogTextWrites() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var text = vm.BuildLog(DiagnosticsFormat.Text);
+
+        // The header's second line is "now", which can tick between the two calls; everything after it is fixed.
+        static string[] AfterHeader(string s) => s.Split(Environment.NewLine).Skip(2).ToArray();
+        Assert.Equal(AfterHeader(vm.BuildLogText()), AfterHeader(text));
+        Assert.StartsWith("DashDetective — Utilities execution log", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>The save dialog offers the system report's list, and each choice renders a different file.</summary>
+    [Fact]
+    public async Task BuildLog_EveryOfferedFormat_RendersTheLoggedCommand() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("first-command"));
+
+        var rendered = DiagnosticsFormats.Offered.Select(vm.BuildLog).ToList();
+
+        Assert.True(DiagnosticsFormats.Offered.Count > 1);
+        Assert.All(rendered, r => Assert.Contains("first-command", r, StringComparison.Ordinal));
+        Assert.Equal(rendered.Count, rendered.Distinct().Count());
+    }
+
+    /// <summary>Exporting before anything has run must still write a file the format can open.</summary>
+    [Theory]
+    [InlineData(DiagnosticsFormat.Text)]
+    [InlineData(DiagnosticsFormat.Json)]
+    [InlineData(DiagnosticsFormat.Markdown)]
+    [InlineData(DiagnosticsFormat.Html)]
+    [InlineData(DiagnosticsFormat.Csv)]
+    public void BuildLog_EmptyLog_RendersAWellFormedFile(DiagnosticsFormat format) {
+        var rendered = Page().BuildLog(format);
+
+        Assert.False(string.IsNullOrWhiteSpace(rendered));
+        if (format == DiagnosticsFormat.Json)
+            System.Text.Json.JsonDocument.Parse(rendered).Dispose();
+    }
+
+    [Fact]
+    public async Task BuildLog_StructuredFormat_KeepsTheOrderTheLogIsShownIn() {
+        var vm = Page();
+        await vm.RunCommand.ExecuteAsync(MissingTool("older"));
+        await vm.RunCommand.ExecuteAsync(MissingTool("newer"));
+
+        var markdown = vm.BuildLog(DiagnosticsFormat.Markdown);
+
+        Assert.True(markdown.IndexOf("newer", StringComparison.Ordinal) <
+                    markdown.IndexOf("older", StringComparison.Ordinal),
+                    "export order does not match the panel");
     }
 
     // ----- Pins -----
@@ -759,43 +820,30 @@ public class ToolkitViewModelTests {
     /// <summary>The path reaches the File Explorer expanded — it cannot navigate to "%windir%" or
     /// "$HOME".</summary>
     [Fact]
-    public void OpenInApp_SendsTheResolvedPathNotTheAuthoredOne() {
+    public async Task Run_PathRow_SendsTheResolvedPathNotTheAuthoredOne() {
         var vm = Page();
         string? revealed = null;
         vm.FileExplorerRevealRequested += path => revealed = path;
 
-        vm.OpenInAppCommand.Execute(PathRow(OtherFolder));
+        await vm.RunCommand.ExecuteAsync(PathRow(OtherFolder));
 
         Assert.Equal(ToolkitPaths.Resolve(OtherFolder), revealed);
         Assert.NotEqual(OtherFolder, revealed);
     }
 
-    /// <summary>A shell: row has no filesystem path, so it offers the external icon only — and asking
-    /// for the in-app one anyway is refused rather than sending a path Explorer would reject.</summary>
-    [Fact]
-    public void OpenInApp_ShellLocation_IsNotOfferedAndDoesNothing() {
-        var vm = Page();
-        var shellRow = PathRow("shell:startup");
-        var revealed = 0;
-        vm.FileExplorerRevealRequested += _ => revealed++;
-
-        vm.OpenInAppCommand.Execute(shellRow);
-
-        Assert.True(shellRow.IsPathEntry);
-        Assert.False(shellRow.CanOpenInApp);
-        Assert.Equal(0, revealed);
-    }
-
-    /// <summary>A shell: row still activates as a run, because there is no in-app destination to prefer
-    /// — it is the one folder row whose click behaviour is unchanged.</summary>
+    /// <summary>A shell: row has no filesystem path, so it activates as a run instead — there is no
+    /// in-app destination to prefer, and sending one would hand Explorer a path it would reject.</summary>
     [Fact]
     public async Task Run_ShellLocationRow_StillGoesToTheShellAndIsLogged() {
         var vm = Page();
+        var shellRow = PathRow("shell:not-a-real-shell-location-xyz");
         var revealed = 0;
         vm.FileExplorerRevealRequested += _ => revealed++;
 
-        await vm.RunCommand.ExecuteAsync(PathRow("shell:not-a-real-shell-location-xyz"));
+        await vm.RunCommand.ExecuteAsync(shellRow);
 
+        Assert.True(shellRow.IsPathEntry);
+        Assert.False(shellRow.CanOpenInApp);
         Assert.Equal(0, revealed);
         Assert.Single(vm.Log);
     }
@@ -831,10 +879,477 @@ public class ToolkitViewModelTests {
     public void Reveal_ClearsTheFilterSoTheRowIsOnThePage() {
         var vm = Page("zzzz-no-such-command");
 
-        vm.Reveal("%temp%");
+        vm.Reveal(Catalog.First(e => e.Command == "%temp%"));
 
         Assert.Equal("", vm.Search);
         Assert.True(vm.HasCommands);
         Assert.Contains(vm.Groups.SelectMany(g => g.Items), entry => entry.Command == "%temp%");
+    }
+
+    // ----- Cancelling a running command -----
+
+    // A page over a launcher that holds every capture in flight until the test ends it, so there is a
+    // moment in which the command is genuinely running. The one other `new ToolkitViewModel` in the file.
+    private static (ToolkitViewModel Vm, FakeProcessLauncher Launcher) HeldPage() {
+        var launcher = new FakeProcessLauncher { HoldCaptures = true };
+        var vm = new ToolkitViewModel(WindowsToolkitCatalog.Instance, new ToolkitRunner(launcher));
+        return (vm, launcher);
+    }
+
+    // A regression that stops a cancel working leaves a held run in flight forever; bounded, it fails
+    // the test instead of hanging the whole CI leg.
+    private static Task Done(Task run) => run.WaitAsync(TimeSpan.FromSeconds(10));
+
+    private static ToolkitEntry Slow(string command = "slowtool") =>
+        new(command, "Takes a while", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture(command));
+
+    /// <summary>The in-flight stanza of a captured command is the one that offers Cancel; the finished one
+    /// does not, and nothing has to be reset for it to go away.</summary>
+    [Fact]
+    public async Task Run_Capture_PendingStanzaOffersCancelAndTheFinishedOneDoesNot() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        Assert.True(Assert.Single(vm.Log).IsRunning);
+
+        launcher.Complete(new ProcessCapture(0, "done", "", false));
+        await Done(running);
+
+        Assert.False(Assert.Single(vm.Log).IsRunning);
+    }
+
+    /// <summary>The acceptance criterion in one test: cancelling mid-run replaces the stanza in place with
+    /// what had printed plus a line saying so, keeping the time the command started.</summary>
+    [Fact]
+    public async Task CancelRun_DuringACapture_ReplacesTheStanzaWithCancelledAndKeepsPartialOutput() {
+        var (vm, launcher) = HeldPage();
+        launcher.PartialOutput = "Pinging 10.255.255.1";
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        var startedAt = vm.Log[0].Time;
+
+        Assert.True(vm.CancelRunCommand.CanExecute(null));
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Contains("Pinging 10.255.255.1", logged.Output, StringComparison.Ordinal);
+        Assert.Contains("Cancelled after", logged.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Timed out", logged.Output, StringComparison.Ordinal);
+        Assert.Equal(startedAt, logged.Time);
+        Assert.False(logged.IsRunning);
+    }
+
+    /// <summary>No half-open state: once the cancel unwinds, the rows run again and the cancel control
+    /// reports itself unavailable, with no stale source left behind to cancel the next run.</summary>
+    [Fact]
+    public async Task CancelRun_AfterCancelling_RowsRunAgainAndTheNextRunIsNotPreCancelled() {
+        var (vm, launcher) = HeldPage();
+
+        var first = vm.RunCommand.ExecuteAsync(Slow("first"));
+        vm.CancelRunCommand.Execute(null);
+        await Done(first);
+
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+
+        var second = vm.RunCommand.ExecuteAsync(Slow("second"));
+        Assert.False(second.IsCompleted);
+        launcher.Complete(new ProcessCapture(0, "second ran", "", false));
+        await Done(second);
+
+        Assert.Equal(["second", "first"], vm.Log.Select(l => l.Command));
+        Assert.Equal("second ran", vm.Log[0].Output);
+    }
+
+    [Fact]
+    public void CancelRun_Idle_IsNotExecutable() {
+        var (vm, _) = HeldPage();
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>A launch returns at once and an elevated one is not waited on, so neither has anything to
+    /// cancel and neither stanza offers it.</summary>
+    [Fact]
+    public async Task CancelRun_ForALaunchRow_IsNeverExecutableAndItsStanzaDoesNotOfferIt() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(MissingTool());
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+        Assert.False(Assert.Single(vm.Log).IsRunning);
+
+        await Done(running);
+    }
+
+    [Fact]
+    public async Task CancelRun_AfterTheCommandFinished_IsANoOp() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        launcher.Complete(new ProcessCapture(0, "all done", "", false));
+        await Done(running);
+
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+        vm.CancelRunCommand.Execute(null);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Equal("all done", logged.Output);
+    }
+
+    /// <summary>The control follows the run: it becomes available when a capture starts and goes again
+    /// when it ends, announced through CanExecuteChanged so the button updates.</summary>
+    [Fact]
+    public async Task CancelRun_RaisesCanExecuteChangedAsACaptureStartsAndEnds() {
+        var (vm, launcher) = HeldPage();
+        var raised = 0;
+        vm.CancelRunCommand.CanExecuteChanged += (_, _) => raised++;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        Assert.Equal(1, raised);
+
+        launcher.Complete(new ProcessCapture(0, "", "", false));
+        await Done(running);
+
+        Assert.Equal(2, raised);
+    }
+
+    /// <summary>A timeout is the command's own overrun, not the user's doing, and must not borrow the
+    /// cancel wording even though both end with the process killed.</summary>
+    [Fact]
+    public async Task Run_TimedOut_StillReadsAsTimedOutNotCancelled() {
+        var (vm, launcher) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        launcher.Complete(new ProcessCapture(-1, "partial", "", TimedOut: true));
+        await Done(running);
+
+        var logged = Assert.Single(vm.Log);
+        Assert.Contains("Timed out", logged.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cancelled", logged.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>Clearing the log mid-run and then cancelling still honours the clear: the cancelled
+    /// result drops with the placeholder rather than resurrecting a stanza.</summary>
+    [Fact]
+    public async Task CancelRun_AfterTheLogWasCleared_DoesNotResurrectTheStanza() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.ClearLogCommand.Execute(null);
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        Assert.Empty(vm.Log);
+        Assert.False(vm.HasLog);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+    }
+
+    /// <summary>A launcher that ignores its token cannot be stopped from here, so the cancel does
+    /// nothing visible — but the page is not left wedged: the run still ends the moment the process does,
+    /// and everything is available again.</summary>
+    [Fact]
+    public async Task CancelRun_WhenTheLauncherIgnoresTheToken_TheRunStillUnwindsCleanlyWhenItEnds() {
+        var (vm, launcher) = HeldPage();
+        launcher.IgnoreCancellation = true;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.CancelRunCommand.Execute(null);
+        Assert.False(running.IsCompleted);
+
+        launcher.Complete(new ProcessCapture(0, "finished anyway", "", false));
+        await Done(running);
+
+        Assert.Equal("finished anyway", Assert.Single(vm.Log).Output);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>A launcher that throws on cancel is the user's doing too, and the page ends up the same.</summary>
+    [Fact]
+    public async Task CancelRun_WhenTheLauncherThrows_ReadsAsCancelledAndLeavesThePageUsable() {
+        var (vm, launcher) = HeldPage();
+        launcher.ThrowOnCancellation = true;
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.CancelRunCommand.Execute(null);
+        await Done(running);
+
+        Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
+        Assert.True(vm.RunCommand.CanExecute(Slow()));
+    }
+
+    /// <summary>Shutdown disposes the page, which cancels what is in flight so no child is orphaned.</summary>
+    [Fact]
+    public async Task Dispose_CancelsTheRunInFlight() {
+        var (vm, _) = HeldPage();
+
+        var running = vm.RunCommand.ExecuteAsync(Slow());
+        vm.Dispose();
+        await Done(running);
+
+        Assert.Contains("Cancelled after", Assert.Single(vm.Log).Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dispose_Idle_DoesNothing() {
+        var (vm, _) = HeldPage();
+
+        vm.Dispose();
+
+        Assert.Empty(vm.Log);
+    }
+
+    /// <summary>Run and OpenExternally have separate concurrency gates, so a launch can start while a
+    /// capture is in flight. It must not take the capture's cancel state: Cancel stays available, still
+    /// stops the capture, and the capture's result lands on its own stanza rather than being dropped.</summary>
+    [Fact]
+    public async Task CancelRun_WhileALaunchRunsAlongside_StillCancelsTheCapture() {
+        var (vm, launcher) = HeldPage();
+        launcher.PartialOutput = "partial";
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+
+        Assert.True(vm.IsCapturing);
+        Assert.True(vm.CancelRunCommand.CanExecute(null));
+
+        vm.CancelRunCommand.Execute(null);
+        await Done(capture);
+
+        Assert.Equal(["alongside", "slowtool"], vm.Log.Select(l => l.Command));
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.Contains("partial", vm.Log[1].Output, StringComparison.Ordinal);
+        Assert.False(vm.CancelRunCommand.CanExecute(null));
+    }
+
+    /// <summary>The same overlap must not blind shutdown: a launch finishing first leaves the capture's
+    /// source in place, so Dispose still stops the child.</summary>
+    [Fact]
+    public async Task Dispose_AfterALaunchRanAlongside_StillCancelsTheCapture() {
+        var (vm, _) = HeldPage();
+
+        var capture = vm.RunCommand.ExecuteAsync(Slow());
+        await Done(vm.OpenExternallyCommand.ExecuteAsync(MissingTool("alongside")));
+        vm.Dispose();
+        await Done(capture);
+
+        Assert.Contains("Cancelled after", vm.Log[1].Output, StringComparison.Ordinal);
+    }
+
+    // ----- Selecting versus activating -----
+
+    // A captured row: the fake launcher answers it synchronously, so a run started by a fire-and-forget
+    // path (Enter) has finished by the time the call that started it returns.
+    private static ToolkitEntry CaptureRow(string command = "whoami") =>
+        new(command, "Captured", ToolkitCategory.Diagnostics, ToolkitEntryKind.Command,
+            ToolkitAction.Capture(command));
+
+    /// <summary>The whole point of the model: a single click picks a row and starts nothing.</summary>
+    [Fact]
+    public void Select_RunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        vm.SelectCommand.Execute(entry);
+
+        Assert.Same(entry, vm.SelectedEntry);
+        Assert.True(entry.IsSelected);
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+    }
+
+    [Fact]
+    public void Select_AFolderRow_DoesNotNavigate() {
+        var vm = Page();
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        vm.SelectCommand.Execute(PathRow());
+
+        Assert.Equal(0, revealed);
+    }
+
+    [Fact]
+    public void Select_AnotherRow_MovesTheHighlight() {
+        var vm = Page();
+        var first = CaptureRow("first");
+        var second = CaptureRow("second");
+
+        vm.SelectCommand.Execute(first);
+        vm.SelectCommand.Execute(second);
+
+        Assert.False(first.IsSelected);
+        Assert.True(second.IsSelected);
+    }
+
+    /// <summary>A double click runs the row exactly once, through the same path the play button binds.</summary>
+    [Fact]
+    public async Task Activate_RunsTheRowExactlyOnceAndSelectsIt() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var entry = CaptureRow();
+
+        await vm.Activate(entry);
+
+        Assert.Equal("whoami", launcher.Single.FileName);
+        Assert.Single(vm.Log);
+        Assert.Same(entry, vm.SelectedEntry);
+    }
+
+    [Fact]
+    public async Task Activate_AFolderRow_OpensItInTheAppOnce() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+
+        await vm.Activate(PathRow());
+
+        Assert.Equal(1, revealed);
+        Assert.Empty(launcher.Calls);
+    }
+
+
+    private static void FocusOn(ToolkitViewModel vm, ToolkitActivation.Focus focus, ToolkitEntry? row = null) =>
+        vm.FocusProbe = () => (focus, row);
+
+    [Fact]
+    public void HandleShortcut_ActivateWithARowSelectedAndNothingFocused_RunsThatRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
+
+        var consumed = vm.HandleShortcut(ShortcutId.Activate);
+
+        Assert.True(consumed);
+        Assert.Equal("whoami", launcher.Single.FileName);
+    }
+
+    /// <summary>A focused row body runs its own row, even if another was clicked earlier.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateOnAFocusedRowBody_RunsTheFocusedRow() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow("selected-earlier"));
+        FocusOn(vm, ToolkitActivation.Focus.RowBody, CaptureRow("focused-now"));
+
+        Assert.True(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Equal("focused-now", launcher.Single.FileName);
+        Assert.Equal("focused-now", vm.SelectedEntry?.Command);
+    }
+
+    /// <summary>Unconsumed, so Enter still reaches whatever would otherwise have taken it.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNothingSelected_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        FocusOn(vm, ToolkitActivation.Focus.Nothing);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>Enter on a focused pin, a toolbar button or a nav item must press that control — never
+    /// run the selected command, which could raise a UAC prompt the user did not ask for.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWhileAnyOtherControlHasFocus_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+        FocusOn(vm, ToolkitActivation.Focus.Other);
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    /// <summary>With no view to say what has focus, nothing is assumed: Enter runs nothing.</summary>
+    [Fact]
+    public void HandleShortcut_ActivateWithNoFocusProbe_IsLeftAlone() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        vm.SelectCommand.Execute(CaptureRow());
+
+        Assert.False(vm.HandleShortcut(ShortcutId.Activate));
+        Assert.Empty(launcher.Calls);
+    }
+
+    [Fact]
+    public void Search_HidingTheSelectedRow_ClearsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "zzzz-no-such-command";
+
+        Assert.Null(vm.SelectedEntry);
+        Assert.False(entry.IsSelected);
+    }
+
+    [Fact]
+    public void Search_StillShowingTheSelectedRow_KeepsTheSelection() {
+        var vm = Page();
+        var entry = vm.AllEntries.First(e => e.Command == "%temp%");
+        vm.SelectCommand.Execute(entry);
+
+        vm.Search = "temp";
+
+        Assert.Same(entry, vm.SelectedEntry);
+    }
+
+    /// <summary>Picking a universal-search result selects the row and flashes it, but never runs it —
+    /// running stays a second, deliberate action.</summary>
+    [Fact]
+    public void Reveal_SelectsTheRowAndRunsNothing() {
+        var launcher = new FakeProcessLauncher();
+        var vm = Page(launcher: launcher);
+        var revealed = 0;
+        vm.FileExplorerRevealRequested += _ => revealed++;
+        var target = Catalog.First(e => e.Command == "ipconfig /all");
+
+        vm.Reveal(target);
+
+        Assert.Same(target, vm.SelectedEntry);
+        Assert.Same(target, vm.TakePendingReveal());
+        Assert.Empty(launcher.Calls);
+        Assert.Empty(vm.Log);
+        Assert.Equal(0, revealed);
+    }
+
+    /// <summary>A row that is no longer on the page (deleted since the search ran) leaves nothing
+    /// selected, so the next Enter cannot run whatever was selected before.</summary>
+    [Fact]
+    public void Reveal_ARowNoLongerOnThePage_ClearsTheSelection() {
+        var vm = Page();
+        vm.SelectCommand.Execute(Catalog.First(e => e.Command == "%temp%"));
+
+        vm.Reveal(CaptureRow("gone"));
+
+        Assert.Null(vm.SelectedEntry);
+    }
+
+    /// <summary>A custom row sharing a catalog row's label is selected as itself, not as the catalog
+    /// row that happens to come first.</summary>
+    [Fact]
+    public void Reveal_ACustomRowSharingACatalogLabel_SelectsTheCustomRow() {
+        var vm = Page();
+        vm.AddCommand(new ToolkitCommand("ipconfig /all", "Mine", ToolkitCommandType.Capture, "ipconfig"));
+        var custom = vm.Custom.Single();
+
+        vm.Reveal(custom);
+
+        Assert.Same(custom, vm.SelectedEntry);
+    }
+
+    // The catalogs are singletons, so a selection left on one of their rows would leak into the next test
+    // — cleared here even when an assertion failed.
+    public void Dispose() {
+        foreach (var entry in Catalog)
+            entry.IsSelected = false;
+        GC.SuppressFinalize(this);
     }
 }

@@ -80,4 +80,47 @@ public class ConsoleCapacityTests {
             previous = lines;
         }
     }
+
+    [Fact]
+    public void LineHeightFor_DefaultConsoleSize_IsTheFifteenPixelsTheCapacityWasTunedFor() {
+        Assert.Equal(15, ConsoleCapacity.LineHeightFor(12));
+    }
+
+    [Fact]
+    public void LineHeightFor_LargerText_GrowsTheLineSoLinesDoNotOverlap() {
+        // Text size 200 % makes the 12px console 24px; a fixed 15 would draw each line over the next.
+        var line = ConsoleCapacity.LineHeightFor(24);
+        Assert.Equal(30, line);
+        Assert.True(line > 24);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-4)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void LineHeightFor_UnusableSize_IsZeroSoCapacityFallsToTheMinimum(double fontSize) {
+        var line = ConsoleCapacity.LineHeightFor(fontSize);
+        Assert.Equal(0, line);
+        Assert.Equal(Min, ConsoleCapacity.LinesForHeight(500, line, ConsoleCapacity.ReservedFor(line), Min, Max));
+    }
+
+    [Fact]
+    public void ReservedFor_AddsPaddingAndFooterLineAndGap() {
+        Assert.Equal(Reserved, ConsoleCapacity.ReservedFor(LineHeight));
+    }
+
+    [Fact]
+    public void Capacity_AtLargerText_StaysWithinTheSameBox() {
+        // The same 200px box at 200 % text: lines are twice as tall, so fewer fit, and the lines drawn
+        // never exceed the room the box has once the footer is counted.
+        const double box = 200;
+        var normalLine = ConsoleCapacity.LineHeightFor(12);
+        var normal = ConsoleCapacity.LinesForHeight(box, normalLine, ConsoleCapacity.ReservedFor(normalLine), Min, Max);
+        var line = ConsoleCapacity.LineHeightFor(24);
+        var large = ConsoleCapacity.LinesForHeight(box, line, ConsoleCapacity.ReservedFor(line), Min, Max);
+
+        Assert.True(large < normal);
+        Assert.True(large * line + ConsoleCapacity.ReservedFor(line) <= box || large == Min);
+    }
 }

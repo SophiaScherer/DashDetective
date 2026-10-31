@@ -5,7 +5,7 @@ namespace DashDetective.Shell.Navigation;
 /// <summary>
 /// Shared navigation icon geometries. Paths are authored in an 18x18 coordinate
 /// space (matching the design document) and are drawn as stroked outlines — except the
-/// <c>Caret*</c> disclosure set, which is filled.
+/// <c>Caret*</c> disclosure set and <c>Play</c>, which are filled.
 /// </summary>
 public static class Icons {
     // Four rounded tiles forming a dashboard grid.
@@ -81,6 +81,15 @@ public static class Icons {
         "M6.8,7 A2.2,2.2 0 1 1 9.9,9 C9.2,9.5 8.9,9.8 8.9,10.6 " +
         "M9,13 h0.01");
 
+    // A bell (an alert's switch): a domed body on a flared rim, with the clapper beneath. Drawn filled
+    // for an alert that is on and outlined with a slash for one that is off, so the state is in the shape
+    // rather than in a color.
+    private const string BellBody =
+        "M9,2.5 C6.6,2.5 5,4.4 5,6.8 V9.8 L3.5,12.5 H14.5 L13,9.8 V6.8 C13,4.4 11.4,2.5 9,2.5 Z " +
+        "M7.4,14.3 A1.7,1.7 0 0 0 10.6,14.3";
+    public static readonly Geometry Bell = Geometry.Parse(BellBody);
+    public static readonly Geometry BellOff = Geometry.Parse(BellBody + " M3,2.5 L15,15.5");
+
     // Panel/sidebar-split glyph (stroked) used for the collapse/expand affordance, matching the design
     // document: a rounded panel outline with a thin divider carving off a narrow rail. The divider sits
     // on the side the bar will move toward, so the glyph reads directionally per dock edge and state.
@@ -97,11 +106,6 @@ public static class Icons {
     public static readonly Geometry ChevronLeft = Geometry.Parse("M11,4 L6,9 L11,14");
     public static readonly Geometry ChevronRight = Geometry.Parse("M7,4 L12,9 L7,14");
 
-    // Skip-to-end chevrons for the same pager: the same stroke against a stop bar, so the four arrows
-    // read as one set with ChevronLeft/ChevronRight above.
-    public static readonly Geometry ChevronFirst = Geometry.Parse("M12,4 L7,9 L12,14 M5,4 V14");
-    public static readonly Geometry ChevronLast = Geometry.Parse("M6,4 L11,9 L6,14 M13,4 V14");
-
     // Filled disclosure carets — the app's one expand/collapse glyph, matching the ▾/▸ the widget
     // headers and the Processes table draw as text. FILLED, not stroked like everything above: a
     // consumer must set Fill rather than Stroke. Authored as an 8x5 triangle centred in the 18x18 space,
@@ -110,6 +114,16 @@ public static class Icons {
     public static readonly Geometry CaretRight = Geometry.Parse("M6.5,5 L6.5,13 L11.5,9 Z");
     public static readonly Geometry CaretUp = Geometry.Parse("M5,11.5 L13,11.5 L9,6.5 Z");
     public static readonly Geometry CaretDown = Geometry.Parse("M5,6.5 L13,6.5 L9,11.5 Z");
+
+    // Skip-to-start/end for the Network pager: a Caret-family triangle against a filled stop bar, so a
+    // skip reads as the same glyph family as the step arrows and the disclosure carets. FILLED like the
+    // carets (set Fill, not Stroke); the bar is a closed rectangle rather than a stroke for that reason.
+    public static readonly Geometry CaretFirst = Geometry.Parse("M4.5,5 H6 V13 H4.5 Z M12.5,5 V13 L7.5,9 Z");
+    public static readonly Geometry CaretLast = Geometry.Parse("M12,5 H13.5 V13 H12 Z M5.5,5 V13 L10.5,9 Z");
+
+    // The Toolkit's run button. Filled like the carets, and a size up from CaretRight so it reads as a
+    // button's glyph rather than a disclosure mark.
+    public static readonly Geometry Play = Geometry.Parse("M6,4 L6,14 L14,9 Z");
 
     /// <summary>
     /// The disclosure caret for a direction, used by the nav bar's edge puck. A plain map — the rule

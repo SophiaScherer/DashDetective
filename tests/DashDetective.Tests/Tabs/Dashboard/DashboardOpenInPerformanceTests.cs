@@ -82,7 +82,9 @@ public class DashboardOpenInPerformanceTests {
 
         Assert.Equal(DashboardCard.OpenHint, card.Tip);
 
+        // The note leads, and the hint stays below it: a single click opens nothing, so the double click
+        // has to be said somewhere.
         card.Note = "Why this reads —";
-        Assert.Equal("Why this reads —", card.Tip);
+        Assert.Equal("Why this reads —\n" + DashboardCard.OpenHint, card.Tip);
     }
 }

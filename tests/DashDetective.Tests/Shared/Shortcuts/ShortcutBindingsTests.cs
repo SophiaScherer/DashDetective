@@ -233,6 +233,68 @@ public class ShortcutBindingsTests {
     }
 
     [Fact]
+    public void KeysFor_Default_IsTheShippedCopy() =>
+        Assert.Equal("Alt+←", new ShortcutBindings().KeysFor(ShortcutId.Back));
+
+    /// <summary>The toolbar's Back tooltip names its key through this, so it must follow a rebind.</summary>
+    [Fact]
+    public void KeysFor_Rebound_IsTheNewGesture() {
+        var bindings = new ShortcutBindings();
+        bindings.TryRebind(ShortcutId.Back, new KeyGesture(Key.Back, KeyModifiers.Alt), out _);
+
+        Assert.Equal(GestureFormatter.Describe(new KeyGesture(Key.Back, KeyModifiers.Alt)),
+                     bindings.KeysFor(ShortcutId.Back));
+    }
+
+    /// <summary>Rebinding page Back leaves File Explorer's folder back on Alt+←, and the fall-through
+    /// moves with the rebind rather than staying on the old gesture.</summary>
+    [Fact]
+    public void Resolve_PageBackRebound_FileExplorerAltLeftNoLongerFallsThrough() {
+        var bindings = new ShortcutBindings();
+        bindings.TryRebind(ShortcutId.Back, new KeyGesture(Key.Back, KeyModifiers.Alt), out _);
+
+        Assert.Equal([ShortcutId.NavigateBack],
+                     bindings.Resolve(Key.Left, KeyModifiers.Alt, false, ShortcutScope.FileExplorer));
+        Assert.Equal([ShortcutId.Back],
+                     bindings.Resolve(Key.Back, KeyModifiers.Alt, false, ShortcutScope.FileExplorer));
+    }
+
+    /// <summary>Rebinding a global action onto a tab's gesture keeps the old shadowing: on that tab the press
+    /// is the tab's alone, even when the tab declines it (End Task with nothing selected).</summary>
+    [Fact]
+    public void Resolve_GlobalReboundOntoATabGesture_IsStillShadowedByTheTab() {
+        var bindings = new ShortcutBindings();
+        Assert.True(bindings.TryRebind(ShortcutId.Refresh, new KeyGesture(Key.Delete), out _));
+
+        Assert.Equal([ShortcutId.EndTask],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Processes));
+        Assert.Equal([ShortcutId.Refresh],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Network));
+    }
+
+    /// <summary>A rebind keeps Back's opt-in: moved onto a tab's gesture, it still catches what the tab declines.</summary>
+    [Fact]
+    public void Resolve_PageBackReboundOntoATabGesture_StillFallsThrough() {
+        var bindings = new ShortcutBindings();
+        Assert.True(bindings.TryRebind(ShortcutId.Back, new KeyGesture(Key.Delete), out _));
+
+        Assert.Equal([ShortcutId.EndTask, ShortcutId.Back],
+                     bindings.Resolve(Key.Delete, KeyModifiers.None, false, ShortcutScope.Processes));
+    }
+
+    /// <summary>Restore defaults is catalog-driven, so the new entry goes back with everything else.</summary>
+    [Fact]
+    public void ResetAll_PutsPageBackBackOnAltLeft() {
+        var bindings = new ShortcutBindings();
+        bindings.TryRebind(ShortcutId.Back, new KeyGesture(Key.Back, KeyModifiers.Alt), out _);
+
+        bindings.ResetAll();
+
+        Assert.Equal("Alt+←", bindings.KeysFor(ShortcutId.Back));
+        Assert.Equal([ShortcutId.Back], bindings.Resolve(Key.Left, KeyModifiers.Alt, false, ShortcutScope.Global));
+    }
+
+    [Fact]
     public void DefaultKeys_ReportsTheShippedCopy() =>
         Assert.Equal("Ctrl+E", ShortcutBindings.DefaultKeys(ShortcutId.Export));
 }

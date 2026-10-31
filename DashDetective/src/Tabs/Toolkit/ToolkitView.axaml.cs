@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -20,6 +22,50 @@ public partial class ToolkitView : UserControl {
 
     public ToolkitView() {
         InitializeComponent();
+
+        // Tunnel, so a repeat press is refused before the play button's own handler turns it into a click.
+        AddHandler(PointerPressedEvent, OnPlayPressed, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>What holds keyboard focus right now, window-wide — read when Enter is pressed rather than
+    /// tracked, so focus on a toolbar or nav control is seen too.</summary>
+    private (ToolkitActivation.Focus, ToolkitEntry?) ProbeFocus() {
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+        if (focused is null or TopLevel)
+            return (ToolkitActivation.Focus.Nothing, null);
+
+        if (focused is Button { DataContext: ToolkitEntry row } button && button.Classes.Contains("rowRun") &&
+            button.GetVisualAncestors().Contains(this))
+            return (ToolkitActivation.Focus.RowBody, row);
+
+        return (ToolkitActivation.Focus.Other, null);
+    }
+
+    // The second click of a double click on play is swallowed, so a launch that finished in between is
+    // not started again.
+    private void OnPlayPressed(object? sender, PointerPressedEventArgs e) {
+        if (ToolkitActivation.IsRepeatPress(e.ClickCount) && e.Source is Visual source &&
+            source.GetSelfAndVisualAncestors().OfType<Button>().FirstOrDefault() is { } button &&
+            button.Classes.Contains("play"))
+            e.Handled = true;
+    }
+
+    // Selection follows keyboard focus, so Enter on a row reached by Tab runs that row and not one
+    // clicked earlier. A pointer press is left to the click, which selects anyway.
+    private void OnRowGotFocus(object? sender, FocusChangedEventArgs e) {
+        if (e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional &&
+            sender is Control { DataContext: ToolkitEntry entry } && _boundViewModel is { } vm)
+            vm.SelectCommand.Execute(entry);
+    }
+
+    // Double-tap has no XAML command binding, so it is routed here — the File Explorer rows' shape. The
+    // two clicks inside it only select, so this is the gesture's one effect.
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e) {
+        if (sender is not Control { DataContext: ToolkitEntry entry } || _boundViewModel is not { } vm)
+            return;
+
+        _ = vm.Activate(entry);
+        e.Handled = true;
     }
 
     protected override void OnDataContextChanged(EventArgs e) {
@@ -28,6 +74,7 @@ public partial class ToolkitView : UserControl {
         if (_boundViewModel is not null) {
             _boundViewModel.SearchFocusRequested -= FocusSearch;
             _boundViewModel.RevealRequested -= ScheduleReveal;
+            _boundViewModel.FocusProbe = null;
         }
 
         _boundViewModel = DataContext as ToolkitViewModel;
@@ -35,6 +82,7 @@ public partial class ToolkitView : UserControl {
         if (_boundViewModel is not null) {
             _boundViewModel.SearchFocusRequested += FocusSearch;
             _boundViewModel.RevealRequested += ScheduleReveal;
+            _boundViewModel.FocusProbe = ProbeFocus;
 
             // A jump from universal search reaches the view model before this view exists, so the
             // reveal it left waiting is collected here rather than only on the event.
@@ -47,11 +95,11 @@ public partial class ToolkitView : UserControl {
     private void FocusSearch() => SearchBox.FocusAndSelectAll();
 
     /// <summary>
-    /// Scrolls the command waiting to be revealed into view and flashes it, if there is one. Rows are
-    /// found by the command in their <c>Tag</c>, so nothing here has to know the command set — the same
-    /// seam SettingsView uses.
+    /// Scrolls the row waiting to be revealed into view and flashes it, if there is one. Rows are found
+    /// by the entry in their <c>Tag</c> — by identity, so a custom row sharing a catalog row's label is
+    /// not flashed in its place.
     ///
-    /// **Every** row carrying the command is flashed, not just the first. A custom command the user filed
+    /// **Every** row carrying the entry is flashed, not just the first. A custom command the user filed
     /// under a category owns two rows — one under My Commands, one under that category — and flashing
     /// only one of them would leave the other looking like a different command that happens to share a
     /// name. The scroll goes to the first, since only one can be brought into view.
@@ -60,11 +108,11 @@ public partial class ToolkitView : UserControl {
     /// visual tree until that layout pass has run.
     /// </summary>
     private void ScheduleReveal() {
-        if (_boundViewModel?.TakePendingReveal() is not { } command)
+        if (_boundViewModel?.TakePendingReveal() is not { } entry)
             return;
 
         Dispatcher.UIThread.Post(() => {
-            var rows = FindRows(command);
+            var rows = FindRows(entry);
             if (rows.Count == 0)
                 return;
 
@@ -74,10 +122,10 @@ public partial class ToolkitView : UserControl {
         }, DispatcherPriority.Loaded);
     }
 
-    private List<Border> FindRows(string command) =>
+    private List<Border> FindRows(ToolkitEntry entry) =>
         [.. this.GetVisualDescendants()
                .OfType<Border>()
-               .Where(border => border.Tag is string tag && tag == command)];
+               .Where(border => ReferenceEquals(border.Tag, entry))];
 
     /// <summary>
     /// Copies the row's command to the clipboard. Lives here rather than in the view model because the
@@ -112,8 +160,8 @@ public partial class ToolkitView : UserControl {
         DispatcherTimer.RunOnce(() => button.Classes.Remove("copied"), CopiedDuration);
     }
 
-    /// <summary>Saves the Execution Log through the shared save dialog. A transcript is text and nothing
-    /// else, so unlike the system report it offers the one format.</summary>
+    /// <summary>Saves the Execution Log through the shared save dialog, offering the same formats as the
+    /// system report.</summary>
     private async void OnExportLogClick(object? sender, RoutedEventArgs e) {
         if (DataContext is not ToolkitViewModel vm)
             return;
@@ -121,9 +169,9 @@ public partial class ToolkitView : UserControl {
         var path = await FileSave.SaveAsync(
             this,
             title: "Export execution log",
-            suggestedName: $"DashDetective-toolkit-log-{DateTime.Now:yyyyMMdd-HHmmss}",
-            formats: [DiagnosticsFormat.Text],
-            content: _ => vm.BuildLogText());
+            suggestedName: $"DashDetective-utilities-log-{DateTime.Now:yyyyMMdd-HHmmss}",
+            formats: DiagnosticsFormats.Offered,
+            content: vm.BuildLog);
 
         if (path is not null)
             vm.Notify?.Invoke(Notices.Exported(path));

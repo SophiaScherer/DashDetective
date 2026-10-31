@@ -46,8 +46,6 @@ public class PerformanceRefreshHistoryTests {
                 volumes: () => Task.FromResult(Volumes())),
             gpuSampler, throughputSampler: throughput);
 
-        // The rail otherwise lists only the primary disk and GPU.
-        viewModel.ShowAllDevices = true;
         await viewModel.InitialLoad;
         await viewModel.LoadInventoryAsync();
         return viewModel;

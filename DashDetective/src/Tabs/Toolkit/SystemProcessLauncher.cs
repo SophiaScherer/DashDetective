@@ -63,7 +63,8 @@ internal sealed class SystemProcessLauncher : IProcessLauncher {
     }
 
     public async Task<ProcessCapture> CaptureAsync(
-        string fileName, IReadOnlyList<string> arguments, TimeSpan timeout) {
+        string fileName, IReadOnlyList<string> arguments, TimeSpan timeout,
+        CancellationToken cancellationToken = default) {
         var info = new ProcessStartInfo(fileName) {
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -78,27 +79,39 @@ internal sealed class SystemProcessLauncher : IProcessLauncher {
         using var process = Process.Start(info)
             ?? throw new InvalidOperationException($"Could not start {fileName}.");
 
-        // Both streams are drained concurrently and *without* the timeout token: a redirected pipe that
-        // fills up blocks the child forever, and these must still complete after a kill (which closes
-        // the pipes) so a timed-out command keeps whatever it managed to print.
+        // Both streams are drained concurrently and *without* the timeout or cancel token: a redirected
+        // pipe that fills up blocks the child forever, and these must still complete after a kill (which
+        // closes the pipes) so a stopped command keeps whatever it managed to print.
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
 
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutCts.Token, cancellationToken);
+
+        // Killed from the token's own callback rather than after the await resumes, so a cancel kills the
+        // tree synchronously: at app shutdown nothing is left running to resume a continuation, and a
+        // kill queued to the thread pool could lose the race with the exit. Deliberately left on the
+        // caller's (UI) thread: the kill is milliseconds, and moving it off would reopen that race.
+        using var killOnStop = linked.Token.Register(() => TryKill(process));
+
         var timedOut = false;
-        using var cts = new CancellationTokenSource(timeout);
+        var cancelled = false;
         try {
-            await process.WaitForExitAsync(cts.Token);
+            await process.WaitForExitAsync(linked.Token);
         } catch (OperationCanceledException) {
-            timedOut = true;
-            TryKill(process);
+            // The user's cancel wins a tie: they asked, whereas the timeout merely happened.
+            cancelled = cancellationToken.IsCancellationRequested;
+            timedOut = !cancelled;
         }
 
         var output = await stdout;
         var error = await stderr;
-        return new ProcessCapture(timedOut ? -1 : process.ExitCode, output, error, timedOut);
+        var stopped = timedOut || cancelled;
+        return new ProcessCapture(stopped ? -1 : process.ExitCode, output, error, timedOut, cancelled);
     }
 
-    // The process may have exited between the timeout firing and the kill landing, which throws.
+    // The process may have exited between the token firing and the kill landing, which throws.
     private static void TryKill(Process process) {
         try {
             process.Kill(entireProcessTree: true);

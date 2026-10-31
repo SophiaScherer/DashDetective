@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DashDetective.Services.Diagnostics;
 using DashDetective.Shared;
 using DashDetective.Shared.Shortcuts;
 using System;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Toolkit;
@@ -17,16 +19,18 @@ namespace DashDetective.Tabs.Toolkit;
 /// command column and the log panel scroll independently, so the log stays pinned in view.
 ///
 /// The list is narrowed by a category chip and a search box together, through
-/// <see cref="ToolkitFilter"/>. Picking a row runs its <see cref="ToolkitEntry.Action"/> through
+/// <see cref="ToolkitFilter"/>. A single click selects a row; a double click, Enter or its play button
+/// activates it, running its <see cref="ToolkitEntry.Action"/> through
 /// <see cref="ToolkitRunner"/> and prepends what happened to the log; the view model never touches a
 /// process itself, and only ever runs actions authored in an <see cref="IToolkitCatalog"/> or built
 /// from what the user typed into the form.
 /// </summary>
-public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget {
-    private readonly ToolkitRunner _runner = new();
+public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShortcutTarget, IDisposable {
+    private readonly ToolkitRunner _runner;
     private readonly IToolkitCatalog _catalog;
+    private CancellationTokenSource? _runCts;
     private ToolkitCategory? _category;
-    private string? _pendingReveal;
+    private ToolkitEntry? _pendingReveal;
 
     /// <summary>Where this page's confirmations go. Set by the shell, which owns the banner and is the
     /// only thing that can draw one; left null in a test, where there is nothing to draw on.</summary>
@@ -36,8 +40,14 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
     /// <summary>Test seam: the same page over an explicit command set. The public ctor resolves this
     /// machine's, so the shell still builds this with <c>new()</c>.</summary>
-    internal ToolkitViewModel(IToolkitCatalog catalog) {
+    internal ToolkitViewModel(IToolkitCatalog catalog) : this(catalog, new ToolkitRunner()) { }
+
+    /// <summary>Test seam: the same page over an explicit runner, so a test can see exactly what reached
+    /// the process launcher (and that selecting a row reached nothing), or hold a command in flight and
+    /// cancel it without a real process.</summary>
+    internal ToolkitViewModel(IToolkitCatalog catalog, ToolkitRunner runner) {
         _catalog = catalog;
+        _runner = runner;
 
         var options = new List<ToolkitCategoryOption> {
             new("All", null, SelectCategory),
@@ -127,29 +137,39 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// search box. UI-only; carries no state — the seam the Processes filter uses.</summary>
     public event Action? SearchFocusRequested;
 
-    /// <summary>Nudges the view to reveal the pending command. Carries nothing: the command lives in
+    /// <summary>Nudges the view to reveal the pending row. Carries nothing: the row lives in
     /// <see cref="TakePendingReveal"/>, so a reveal that arrives before the view exists is not lost.</summary>
     public event Action? RevealRequested;
 
-    /// <summary>Brings a command into view after universal search navigated here. The filter is reset
-    /// first: a chip or a half-typed search from earlier could otherwise have hidden the very row the
-    /// user just picked.</summary>
-    public void Reveal(string command) {
+    /// <summary>Brings a row into view after universal search navigated here. The filter is reset first:
+    /// a chip or a half-typed search from earlier could otherwise have hidden the very row the user just
+    /// picked. The row is selected by identity — a custom row and a catalog row can share a label — and
+    /// never run: picking a search result is not an activation. A row no longer on the page clears the
+    /// selection, so Enter cannot run whatever was selected before.</summary>
+    public void Reveal(ToolkitEntry target) {
         SelectCategory(Categories[0]);
         Search = "";
+        SelectedEntry = null;
+        foreach (var entry in AllEntries) {
+            if (ReferenceEquals(entry, target)) {
+                SelectedEntry = entry;
+                break;
+            }
+        }
+
 
         // Held rather than passed to the event, because on the first jump to this tab the view has not
         // been built yet and so is not listening — the shell navigates and reveals in one breath, but
         // the page's visual tree only appears on the next layout pass. The view drains this when it
         // attaches, and the event covers the case where it was already attached.
-        _pendingReveal = command;
+        _pendingReveal = target;
         RevealRequested?.Invoke();
     }
 
-    /// <summary>Takes the command waiting to be revealed, if any, clearing it. Called by the view both
+    /// <summary>Takes the row waiting to be revealed, if any, clearing it. Called by the view both
     /// when it attaches and when <see cref="RevealRequested"/> fires, so whichever comes first wins and
     /// the other finds nothing.</summary>
-    internal string? TakePendingReveal() {
+    internal ToolkitEntry? TakePendingReveal() {
         var pending = _pendingReveal;
         _pendingReveal = null;
         return pending;
@@ -168,9 +188,23 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
                 ClearSearch();
                 return true;
 
+            case ShortcutId.Activate:
+                return ActivateFromEnter();
+
             default:
                 return false;
         }
+    }
+
+    // Unconsumed when focus is on another control, nothing is selected, or a run is in flight, so the key
+    // still reaches whatever has focus.
+    private bool ActivateFromEnter() {
+        var (focus, row) = FocusProbe?.Invoke() ?? (ToolkitActivation.Focus.Other, null);
+        if (ToolkitActivation.EnterTarget(focus, row, SelectedEntry) is not { } entry || !RunCommand.CanExecute(entry))
+            return false;
+
+        _ = Activate(entry);
+        return true;
     }
 
     /// <summary>Raised when a row asks to be opened in the app's own File Explorer, carrying the resolved
@@ -179,10 +213,41 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// does.</summary>
     public event Action<string>? FileExplorerRevealRequested;
 
+    /// <summary>The row a single click, or keyboard focus, last picked. Selecting never runs anything:
+    /// a double click, Enter or the row's play button does.</summary>
+    [ObservableProperty] private ToolkitEntry? _selectedEntry;
+
+    partial void OnSelectedEntryChanged(ToolkitEntry? oldValue, ToolkitEntry? newValue) {
+        if (oldValue is not null)
+            oldValue.IsSelected = false;
+        if (newValue is not null)
+            newValue.IsSelected = true;
+    }
+
+    /// <summary>Asked by Enter, at press time, what holds keyboard focus — window-wide, since a focused
+    /// toolbar or nav control must keep Enter too. Set by the view; null (no view yet) reads as focus
+    /// elsewhere, so nothing runs.</summary>
+    internal Func<(ToolkitActivation.Focus Focus, ToolkitEntry? Row)>? FocusProbe { get; set; }
+
+    /// <summary>A single click on a row body: selects it, and nothing else.</summary>
+    [RelayCommand]
+    private void Select(ToolkitEntry? entry) => SelectedEntry = entry;
+
+    /// <summary>A double click or Enter: selects the row and runs its default action through
+    /// <see cref="RunCommand"/>, the same path the play button takes. A run already in flight refuses it,
+    /// as it refuses the button.</summary>
+    public Task Activate(ToolkitEntry? entry) {
+        if (entry is null)
+            return Task.CompletedTask;
+
+        SelectedEntry = entry;
+        return RunCommand.CanExecute(entry) ? RunCommand.ExecuteAsync(entry) : Task.CompletedTask;
+    }
+
     /// <summary>
-    /// Activates a row. A row that names a place on disk opens in the app's own File Explorer — staying
-    /// in the app is the point of having the tab — and the shell is still one click away on the row's
-    /// other icon. Everything else runs.
+    /// Activates a row: its default action, which <see cref="ToolkitEntry.DefaultActionText"/> words. A
+    /// row that names a place on disk opens in the app's own File Explorer — staying in the app is the
+    /// point of having the tab — and the shell is the row's one secondary icon. Everything else runs.
     /// </summary>
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task Run(ToolkitEntry? entry) {
@@ -194,21 +259,33 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         return Execute(entry);
     }
 
-    /// <summary>Opens the row's folder in the app's own File Explorer. Nothing is logged: the Execution
-    /// Log is a transcript of what ran, and this navigates rather than running anything.</summary>
-    [RelayCommand]
-    private void OpenInApp(ToolkitEntry? entry) {
-        if (entry is not { CanOpenInApp: true })
-            return;
+    // Nothing is logged: the Execution Log is a transcript of what ran, and this navigates instead.
+    private void OpenInApp(ToolkitEntry entry) => FileExplorerRevealRequested?.Invoke(entry.ResolvedPath);
 
-        FileExplorerRevealRequested?.Invoke(entry.ResolvedPath);
-    }
-
-    /// <summary>Opens the row's location in Windows Explorer — the row's original behaviour, kept as its
-    /// own icon now that the click goes to the in-app explorer. Goes through the ordinary run path, so
-    /// the Execution Log still records it.</summary>
+    /// <summary>Opens the row's location in Windows Explorer — the secondary action on a location row,
+    /// whose default is the in-app explorer. Goes through the ordinary run path, so the Execution Log
+    /// still records it.</summary>
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task OpenExternally(ToolkitEntry? entry) => Execute(entry);
+
+    /// <summary>Whether a captured command is in flight, and so whether there is anything to cancel. Not
+    /// a busy flag for the page — that is still <see cref="RunCommand"/> refusing concurrency.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
+    private bool _isCapturing;
+
+    /// <summary>
+    /// Stops the captured command in flight: its process tree is killed and its stanza is replaced, like
+    /// any completion, by what it had printed plus a line saying it was cancelled. Nothing is left half
+    /// open — the run command is executable again as soon as the run unwinds. Idle, there is nothing to
+    /// cancel and the command reports itself unavailable.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(IsCapturing))]
+    private void CancelRun() => _runCts?.Cancel();
+
+    /// <summary>Cancels a run still in flight at shutdown so no child is orphaned. Leaving the page does
+    /// not do this: a run keeps going and lands in the log, as it always has.</summary>
+    public void Dispose() => _runCts?.Cancel();
 
     /// <summary>
     /// Runs a command row and records the outcome in the Execution Log, newest first. The commands that
@@ -246,16 +323,43 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         // The "$" line shows the resolved command line, not the row's label: a parameterised label is a
         // placeholder ("ping <host>"), and a row may carry flags it does not spell out.
         var line = action.CommandLine;
-        var pending = new ToolkitLogEntry(time, line, ToolkitOutputFormatter.Running, ClockFormat);
+
+        // Only a captured command is awaited for long enough to be worth cancelling; a launch returns at
+        // once and an elevated one is deliberately not waited on, so their stanzas never offer Cancel.
+        var cancellable = action.CapturesOutput;
+        var pending = new ToolkitLogEntry(
+            time, line, ToolkitOutputFormatter.Running, ClockFormat, isRunning: cancellable);
         Log.Insert(0, pending);
 
-        var result = await _runner.RunAsync(action);
+        // Only a cancellable run takes the source and the flag. Run and OpenExternally are separate
+        // commands with separate concurrency gates, so a launch can start while a capture is in flight;
+        // it must leave the capture's source and Cancel state alone.
+        var cts = cancellable ? new CancellationTokenSource() : null;
+        if (cts is not null) {
+            _runCts = cts;
+            IsCapturing = true;
+        }
 
-        // Reference equality: if the user cleared the log while the command was in flight, the
-        // placeholder is gone and the result goes with it — they asked for an empty log, so putting a
-        // stanza back would be ignoring them.
-        if (Log.Count > 0 && ReferenceEquals(Log[0], pending))
-            Log[0] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
+        ToolkitRunResult result;
+        try {
+            result = await _runner.RunAsync(action, cts?.Token ?? CancellationToken.None);
+        } finally {
+            // Cleared before the source is disposed, so a late Cancel finds nothing rather than a corpse.
+            if (cts is not null && ReferenceEquals(_runCts, cts)) {
+                IsCapturing = false;
+                _runCts = null;
+            }
+
+            cts?.Dispose();
+        }
+
+        // By reference, not by position: a launch row can insert its own stanza above this one while the
+        // capture runs. If the user cleared the log while the command was in flight, the placeholder is
+        // gone and the result goes with it — they asked for an empty log, so putting a stanza back would
+        // be ignoring them.
+        var index = Log.IndexOf(pending);
+        if (index >= 0)
+            Log[index] = new ToolkitLogEntry(time, line, result.Output, ClockFormat);
     }
 
     /// <summary>
@@ -415,7 +519,7 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
     /// </summary>
     public string BuildLogText() {
         var sb = new StringBuilder();
-        sb.AppendLine("DashDetective — Toolkit execution log");
+        sb.AppendLine("DashDetective — Utilities execution log");
         sb.AppendLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         sb.AppendLine();
 
@@ -429,6 +533,14 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The Execution Log in the chosen export format. Text is the transcript <see cref="BuildLogText"/>
+    /// has always written; every other format renders the log as a report through the shared renderers.
+    /// </summary>
+    public string BuildLog(DiagnosticsFormat format) => format == DiagnosticsFormat.Text
+        ? BuildLogText()
+        : DiagnosticsFormats.Render(ToolkitLogExport.BuildReport(Log, DateTime.Now), format);
 
     partial void OnSearchChanged(string value) => RebuildGroups();
 
@@ -453,6 +565,10 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
             foreach (var item in group.Items)
                 matched.Add(item);
         }
+
+        // A selection the filter hid is dropped, so Enter cannot run a row the user can no longer see.
+        if (SelectedEntry is { } selected && !matched.Contains(selected))
+            SelectedEntry = null;
 
         HasCommands = matched.Count > 0;
         CountLabel = matched.Count == 1

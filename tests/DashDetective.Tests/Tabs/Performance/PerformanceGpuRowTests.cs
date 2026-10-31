@@ -245,11 +245,9 @@ public class PerformanceGpuRowTests {
         Assert.Null(row.NoteTip);
     }
 
-    /// <summary>The GPU row by name, with the rail showing every device so a second GPU is listed.</summary>
-    private static ResourceRow GpuRow(PerformanceViewModel viewModel, string name = "GPU") {
-        viewModel.ShowAllDevices = true;
-        return viewModel.Resources.Single(r => r.Name == name);
-    }
+    /// <summary>The GPU row by name; the rail lists every device, so a second GPU is there too.</summary>
+    private static ResourceRow GpuRow(PerformanceViewModel viewModel, string name = "GPU") =>
+        viewModel.Resources.Single(r => r.Name == name);
 
     /// <summary>NVIDIA publishes all three of Task Manager's other engines, so each gets a tile after 3D,
     /// in Task Manager's order, reading its busiest engine (six Copy engines read the busiest, not a sum).</summary>
