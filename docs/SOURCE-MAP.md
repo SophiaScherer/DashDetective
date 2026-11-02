@@ -54,6 +54,10 @@ stays in its tab folder.
   /src
 ```
 
+`Assets/dashdetective.ico` is the app, window, tray and executable icon; the csproj's `ApplicationIcon`
+stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/brand/` — kept out of
+`Assets/`, which is embedded whole.
+
 ## `src/Shared`
 
 ```
@@ -409,6 +413,11 @@ stays in its tab folder.
 
 ```
       /Controls
+        BrandMark.axaml(.cs)           (the app mark, filled AccentDeep; the ONLY place it is drawn.
+                                        Its Data is docs/brand/dashdetective-mark.svg verbatim on a
+                                        64-unit Canvas, which keeps the asset's margin. Not in Icons:
+                                        that static initializer needs a render backend, and
+                                        BrandMarkTests compares the markup to the SVG headless)
         ChartLegend.axaml(.cs)         (a chart's key: up to two series, each a swatch beside its name.
                                         Pattern2 swaps both swatches for line marks — solid and dashed —
                                         mirroring Sparkline.PatternSecondSeries, so the key shows the

@@ -3,6 +3,7 @@
         <!-- TargetFramework, Nullable and the analyzer gates come from Directory.Build.props. -->
         <OutputType>WinExe</OutputType>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationIcon>Assets\dashdetective.ico</ApplicationIcon>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
         <!-- Assembly / package metadata. Version flows into AssemblyVersion, FileVersion and the

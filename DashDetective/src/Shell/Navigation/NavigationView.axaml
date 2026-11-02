@@ -360,18 +360,7 @@
                    PointerReleased="OnBrandPointerReleased" PointerCaptureLost="OnBrandPointerCaptureLost">
                 <StackPanel Classes="brandMark" Orientation="Horizontal" Spacing="11"
                             VerticalAlignment="Center">
-                    <Border Width="30" Height="30" CornerRadius="7">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
-                                <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Viewbox Width="16" Height="16">
-                            <Path Fill="White"
-                                  Data="M2,2 H8 V8 H2 Z M10,2 H16 V8 H10 Z M2,10 H8 V16 H2 Z M10,10 H16 V16 H10 Z"/>
-                        </Viewbox>
-                    </Border>
+                    <controls:BrandMark Width="30" Height="30"/>
                     <StackPanel Spacing="1" VerticalAlignment="Center" IsVisible="{Binding ShowBrandText}">
                         <TextBlock Text="DashDetective" FontSize="{DynamicResource TextSizeSubhead}" FontWeight="SemiBold"/>
                         <TextBlock Text="System Information Suite" FontSize="{DynamicResource TextSizeCaption}" Foreground="{DynamicResource TextSubtle}"/>

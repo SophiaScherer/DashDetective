@@ -127,7 +127,7 @@ Directory.Build.props              shared TFM and analyzer gates
 DashDetective/
   Program.cs, App.axaml            application bootstrap
   app.manifest                     Win32 application manifest
-  Assets/                          application icon
+  Assets/                          application icon (dashdetective.ico; source SVGs in docs/brand)
   src/
     Shared/                        ViewModelBase, page marker interfaces, formatters,
                                    Charts, Controls, Layout, Shortcuts, Styles, Completion

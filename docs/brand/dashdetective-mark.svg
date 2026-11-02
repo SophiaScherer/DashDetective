@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>DashDetective</title>
+  <!-- Reflection mark. 64-unit grid, 56-unit footprint (4..60), even-odd fill.
+       1. Outer D     x 4..60, R28, centred on (32, 32)
+       2. Counter     inset 8 -> R20 (the D's own ring, 8 thick)
+       3. Core        a mirrored D, R13, flat edge at x = 38 (the second D, reflected) -->
+  <path fill="#0084c7" fill-rule="evenodd" d="M4 4H32A28 28 0 0 1 60 32V32A28 28 0 0 1 32 60H4ZM12 12H32A20 20 0 0 1 52 32V32A20 20 0 0 1 32 52H12ZM38 19H32A13 13 0 0 0 32 45H38Z"/>
+</svg>

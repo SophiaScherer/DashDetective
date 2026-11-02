@@ -38,12 +38,13 @@ internal static class AccentTone {
     /// dark surface. Blue already sits above it.</summary>
     internal const double DarkText = 58.0;
 
-    /// <summary>Below this the logo gradient's deep stop turns lighter instead, or it vanishes into black.</summary>
+    /// <summary>Below this the deep shade, the brand mark's fill, turns lighter instead, or it vanishes
+    /// into black.</summary>
     internal const double DeepFloor = 10.0;
 
     private const double AA = 4.5;
 
-    /// <summary>The graphic shades: logo, highlight bar, borders, buttons, swatches. One set for both
+    /// <summary>The graphic shades: brand mark, highlight bar, borders, buttons, swatches. One set for both
     /// themes — a brand colour that changed with the theme would not read as the same accent.</summary>
     internal static AccentShades Graphic(Color identity) {
         var lightness = Tone.Lightness(identity);

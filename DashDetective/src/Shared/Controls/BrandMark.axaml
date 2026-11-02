@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DashDetective.Shared.Controls.BrandMark">
+
+    <!-- docs/brand/dashdetective-mark.svg, verbatim. The 64-unit canvas keeps the asset's margin, so the
+         mark sits at the same size as the app icon. AccentDeep is the asset's fill at the default accent. -->
+    <Viewbox Stretch="Uniform">
+        <Canvas Width="64" Height="64">
+            <Path>
+                <Path.Data>
+                    <PathGeometry FillRule="EvenOdd"
+                                  Figures="M4 4H32A28 28 0 0 1 60 32V32A28 28 0 0 1 32 60H4ZM12 12H32A20 20 0 0 1 52 32V32A20 20 0 0 1 32 52H12ZM38 19H32A13 13 0 0 0 32 45H38Z"/>
+                </Path.Data>
+                <Path.Fill>
+                    <SolidColorBrush Color="{DynamicResource AccentDeep}"/>
+                </Path.Fill>
+            </Path>
+        </Canvas>
+    </Viewbox>
+</UserControl>

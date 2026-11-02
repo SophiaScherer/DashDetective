@@ -256,6 +256,19 @@ Win+arrows, double-click to maximize and the Windows 11 snap flyout. Any window 
   bounds, so `MainWindow` reports `TitleBarRules.Reserved` to the view model and the minimum is the scaled
   page height plus that — the real decoration margin, and 0 where the system title bar is outside.
 
+**The brand is the reflection D in `docs/brand`, the source of record.** `Assets/dashdetective.ico` is
+that mark at 16–256 px (BMP frames to 48, PNG above); the window, tray and tray notice load it, and the
+csproj's `ApplicationIcon` stamps it into the exe. In the app the mark is drawn only by `BrandMark`
+(title bar, nav brand, accent preview), filled `AccentDeep`:
+
+- **The mark follows the accent; the icon does not.** The asset's `#0084c7` is Blue's deep shade, so the
+  default is the asset exactly and a custom accent re-tints the mark. The OS caches
+  the icon, so it stays the brand blue.
+- **A very dark custom accent dims the mark on a dark surface.** `DeepFloor` lifts the shade off black and
+  `AccentGuard` warns; neither corrects it, the same recorded cost as the accent's other fills.
+- **The nav keeps live text beside the mark**, not the outlined wordmark: text follows the type ladder,
+  the theme and a screen reader, and the outline is fixed-size near-black.
+
 **Known gaps:**
 - **Alt+Space does not open the system menu.** Avalonia swallows keyboard `SC_KEYMENU` in its window
   procedure (upstream issue 14545, open), extended or not.
