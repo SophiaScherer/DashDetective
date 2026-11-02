@@ -178,6 +178,11 @@ default and the only authored accent. Its decisions are in [docs/FEATURES.md](do
 *Settings*; the one easiest to undo by accident is that `AccentPreviewScope` re-asserts its theme variant
 on every app theme switch.
 
+The **brand** is the reflection-D mark in `docs/brand`, the source of record for the app icon and the
+in-app mark. The app draws it only through `BrandMark` (`src/Shared/Controls`), filled `AccentDeep`;
+`BrandMarkTests` fails on a second copy or on markup that drifts from the SVG. Its decisions are in
+[docs/FEATURES.md](docs/FEATURES.md) under the title bar entry.
+
 **Nothing is out of scope for lack of a live feature** — every planned top-level feature is live. Only the
 narrow items under *Deferred work* below remain. Do not scaffold, stub, or "prepare" for them without an
 explicit task.

@@ -21,8 +21,8 @@ internal static class AccentResources {
         resources["AccentHover"] = new SolidColorBrush(shades.Hover);
         resources["OnAccent"] = new SolidColorBrush(shades.OnAccent);
         resources["AccentSoft"] = new SolidColorBrush(shades.Fill, SoftAlpha);
-        resources["AccentColor"] = shades.Fill;                   // brand-gradient top stop
-        resources["AccentDeep"] = shades.Deep;                    // brand-gradient bottom stop
+        resources["AccentColor"] = shades.Fill;                   // avatar-gradient top stop
+        resources["AccentDeep"] = shades.Deep;                    // brand mark fill, avatar-gradient bottom stop
         resources["AccentText"] = new SolidColorBrush(text.Fill); // the accent drawn as page text
         resources["AccentTextHover"] = new SolidColorBrush(text.Hover);
     }

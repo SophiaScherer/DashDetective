@@ -106,7 +106,7 @@
     <!-- 12%, not the 16% of the soft fills above: this one sits behind body text, where a stronger
          fill costs contrast. -->
     <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource BlueColor}" Opacity="0.12"/>
-    <!-- Colours (not brushes) for the brand-logo gradient stops. -->
+    <!-- Colors (not brushes): the avatar gradient stops; AccentDeep also fills the brand mark. -->
     <Color x:Key="AccentColor">#4cc2ff</Color>
     <Color x:Key="AccentDeep">#0084c7</Color>
 

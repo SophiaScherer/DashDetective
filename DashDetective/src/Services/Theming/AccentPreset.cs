@@ -5,7 +5,7 @@ namespace DashDetective.Services.Theming;
 
 /// <summary>
 /// One accent's graphic shades: the fill, its pointer-over step, the color of text drawn on it, and the
-/// brand gradient's bottom stop.
+/// deep shade that fills the brand mark.
 /// </summary>
 public sealed record AccentShades(Color Fill, Color Hover, Color OnAccent, Color Deep);
 
@@ -29,7 +29,7 @@ public sealed record AccentPreset(string Name, Color Identity) {
     /// <summary>The identity as "#rrggbb", the form it persists in.</summary>
     public string Hex => $"#{Identity.R:x2}{Identity.G:x2}{Identity.B:x2}";
 
-    /// <summary>The graphic shades. The same in both themes, which is what keeps the logo and the
+    /// <summary>The graphic shades. The same in both themes, which is what keeps the brand mark and the
     /// navigation highlight reading as one colour.</summary>
     public AccentShades Shades { get; } = AccentTone.Graphic(Identity);
 

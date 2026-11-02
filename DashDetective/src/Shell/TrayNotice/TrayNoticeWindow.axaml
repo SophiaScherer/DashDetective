@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="200"
         x:Class="DashDetective.Shell.TrayNotice.TrayNoticeWindow"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/dashdetective.ico"
         Title="DashDetective"
         Width="420"
         SizeToContent="Height"

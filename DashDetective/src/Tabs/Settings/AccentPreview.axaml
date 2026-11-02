@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              xmlns:nav="using:DashDetective.Shell.Navigation"
              x:Class="DashDetective.Tabs.Settings.AccentPreview">
 
@@ -11,17 +12,7 @@
         <StackPanel Spacing="10">
 
             <StackPanel Orientation="Horizontal" Spacing="10">
-                <Border Width="30" Height="30" CornerRadius="7">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                            <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
-                            <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <TextBlock Text="DD" FontSize="{DynamicResource TextSizeBody}" FontWeight="SemiBold"
-                               Foreground="{DynamicResource OnAccent}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <controls:BrandMark Width="30" Height="30" VerticalAlignment="Center"/>
 
                 <Border Background="{DynamicResource AccentSoft}" CornerRadius="6" Padding="11,7">
                     <Panel>

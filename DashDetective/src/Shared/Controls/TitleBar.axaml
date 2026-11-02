@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:DashDetective.Shared.Controls"
              x:Class="DashDetective.Shared.Controls.TitleBar"
              IsVisible="False">
 
@@ -13,19 +14,7 @@
             WindowDecorationProperties.ElementRole="TitleBar">
         <DockPanel Margin="12,0,0,0">
             <!-- The navigation bar's mark at caption size. -->
-            <Border DockPanel.Dock="Left" Width="16" Height="16" CornerRadius="{StaticResource RadiusHair}"
-                    VerticalAlignment="Center">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                        <GradientStop Offset="0" Color="{DynamicResource AccentColor}"/>
-                        <GradientStop Offset="1" Color="{DynamicResource AccentDeep}"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Viewbox Width="9" Height="9">
-                    <Path Fill="White"
-                          Data="M2,2 H8 V8 H2 Z M10,2 H16 V8 H10 Z M2,10 H8 V16 H2 Z M10,10 H16 V16 H10 Z"/>
-                </Viewbox>
-            </Border>
+            <controls:BrandMark DockPanel.Dock="Left" Width="16" Height="16" VerticalAlignment="Center"/>
             <TextBlock x:Name="TitleText" Margin="8,0,0,0" VerticalAlignment="Center"
                        FontSize="{DynamicResource TextSizeCompact}" Foreground="{DynamicResource TextSecondary}"
                        TextTrimming="CharacterEllipsis"/>
