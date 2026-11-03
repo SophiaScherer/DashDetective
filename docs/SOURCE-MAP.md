@@ -980,9 +980,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  driver/module/version, "" for an in-tree driver like amdgpu — never the
                                  kernel release; shared by the Hardware card and the GPU details.
                                  ReadNamed() IS THE SECOND ENTRY POINT — same walk plus one pci.ids scan,
-                                 so AdapterName becomes the product name. ONLY the two readers that DISPLAY
-                                 a name call it (graphics card, adapter enumeration); the per-tick
-                                 utilisation and sensor readers keep plain Read and pay nothing)
+                                 so AdapterName becomes the product name — the bracketed part of the entry
+                                 only (MarketingName: "GeForce RTX 3060", not "GA106 [...]"). ONLY the
+                                 two readers that DISPLAY a name call it (graphics card, adapter
+                                 enumeration); the per-tick utilisation and sensor readers keep plain
+                                 Read and pay nothing)
           PciIdDatabase.cs      (the system pci.ids table — what lspci reads, from hwdata/pciutils. EXISTS
                                  BECAUSE THE KERNEL IDENTIFIES HARDWARE BUT DOES NOT NAME IT: sysfs gives
                                  ids, the spec catalog keys on model tokens, so without this the Graphics

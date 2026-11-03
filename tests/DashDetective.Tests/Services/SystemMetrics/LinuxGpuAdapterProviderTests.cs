@@ -44,7 +44,7 @@ public class LinuxGpuAdapterProviderTests {
     public async Task GetAsync_PciIdsPresent_NamesTheAdapterAndKeepsItsToken() {
         var adapter = Assert.Single(await Read(new FakeProcFileSystem().WithNvidiaCard().WithPciIds()));
 
-        Assert.Equal("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", adapter.Name);
+        Assert.Equal("NVIDIA GeForce RTX 3060 Lite Hash Rate", adapter.Name);
         Assert.Equal("0000:01:00.0", adapter.LuidToken);
     }
 

@@ -162,16 +162,17 @@ internal sealed record DrmCardFacts(
     }
 
     /// <summary>
-    /// Composes the display name for a card the table named: "VMware SVGA II Adapter", "NVIDIA GA106
-    /// [GeForce RTX 3060]". <b>Keyed on the device name, not the vendor</b> — a table that names the vendor
-    /// but not the chip has told us nothing the ids did not already say, so that case returns "" and the
-    /// caller keeps its own composition.
+    /// Composes the display name for a card the table named: "VMware SVGA II Adapter", "NVIDIA GeForce RTX
+    /// 3060". <b>Keyed on the device name, not the vendor</b> — a table that names the vendor but not the
+    /// chip has told us nothing the ids did not already say, so that case returns "" and the caller keeps
+    /// its own composition. The chip codename is dropped (see <see cref="MarketingName"/>).
     ///
     /// The <i>bundled</i> vendor word wins over the table's where there is one, because <c>pci.ids</c>
     /// spells vendors out in full ("Advanced Micro Devices, Inc. [AMD/ATI]") and a card subtitle has no
     /// room for it. Pure; unit-tested.
     /// </summary>
     internal static string FormatProductName(uint vendorId, string tableVendor, string deviceName) {
+        deviceName = MarketingName(deviceName);
         if (deviceName.Length == 0)
             return "";
 
@@ -180,6 +181,22 @@ internal sealed record DrmCardFacts(
             vendor = tableVendor;
 
         return vendor.Length > 0 ? $"{vendor} {deviceName}" : deviceName;
+    }
+
+    /// <summary>
+    /// The bracketed product name in a <c>pci.ids</c> device entry — "GeForce RTX 3060" from "GA106
+    /// [GeForce RTX 3060]" — since the codename before it is the chip's, not anything a buyer would
+    /// recognize, and Windows names the same card without it. An entry with no bracket, or an empty one,
+    /// is returned whole. Pure; unit-tested.
+    /// </summary>
+    internal static string MarketingName(string deviceName) {
+        var open = deviceName.IndexOf('[');
+        var close = open < 0 ? -1 : deviceName.IndexOf(']', open + 1);
+        if (close < 0)
+            return deviceName;
+
+        var product = deviceName.AsSpan(open + 1, close - open - 1).Trim();
+        return product.Length > 0 ? product.ToString() : deviceName;
     }
 
     /// <summary>

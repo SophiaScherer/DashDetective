@@ -44,7 +44,7 @@ public class LinuxGraphicsInfoProviderTests {
         var adapter = Assert.Single(
             (await Read(new FakeProcFileSystem().WithNvidiaCard().WithPciIds())).Adapters);
 
-        Assert.Equal("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", adapter.Name);
+        Assert.Equal("NVIDIA GeForce RTX 3060 Lite Hash Rate", adapter.Name);
         // The blob publishes no VRAM, so this card's Memory row is the catalogue's too.
         Assert.Equal("12 GB GDDR6", adapter.Memory);
         Assert.Equal("3,584", adapter.CudaCores);
@@ -59,7 +59,7 @@ public class LinuxGraphicsInfoProviderTests {
         var adapter = Assert.Single(
             (await Read(new FakeProcFileSystem().WithAmdgpuCard().WithPciIds())).Adapters);
 
-        Assert.Equal("AMD Navi 22 [Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT]", adapter.Name);
+        Assert.Equal("AMD Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT", adapter.Name);
         Assert.Equal("—", adapter.CudaCores);
         Assert.Equal("—", adapter.Bus);
     }
@@ -75,17 +75,17 @@ public class LinuxGraphicsInfoProviderTests {
 
         var adapter = Assert.Single((await Read(proc)).Adapters);
 
-        Assert.Equal("AMD Navi 32 [Radeon RX 7700 XT / 7800 XT]", adapter.Name);
+        Assert.Equal("AMD Radeon RX 7700 XT / 7800 XT", adapter.Name);
         Assert.Equal("—", adapter.BoostClock);
         Assert.Equal("—", adapter.Bus);
         Assert.Equal("16 GB", adapter.Memory);
     }
 
     [Theory]
-    [InlineData("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", true)]
+    [InlineData("NVIDIA GeForce RTX 3060 Lite Hash Rate", true)]
     [InlineData("", true)]
-    [InlineData("AMD Navi 32 [Radeon RX 7700 XT / 7800 XT]", false)]
-    [InlineData("AMD Navi 23 [Radeon RX 6600/6600 XT/6600M]", false)]
+    [InlineData("AMD Radeon RX 7700 XT / 7800 XT", false)]
+    [InlineData("AMD Radeon RX 6600/6600 XT/6600M", false)]
     public void NamesOneModel_FlagsATableNameListingSeveralModels(string name, bool expected) {
         Assert.Equal(expected, LinuxGraphicsInfoProvider.NamesOneModel(name));
     }

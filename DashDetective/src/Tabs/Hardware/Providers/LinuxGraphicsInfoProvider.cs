@@ -62,8 +62,8 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
     }
 
     /// <summary>
-    /// False when <c>pci.ids</c> lists several models under one device id ("Navi 32 [Radeon RX 7700 XT /
-    /// 7800 XT]"). The catalog would match whichever model it lists first and fill a 7800 XT's rows with a
+    /// False when <c>pci.ids</c> lists several models under one device id ("AMD Radeon RX 7700 XT / 7800
+    /// XT"). The catalog would match whichever model it lists first and fill a 7800 XT's rows with a
     /// 7700 XT's datasheet, so such a name gets no lookup at all. Pure; unit-tested.
     /// </summary>
     internal static bool NamesOneModel(string productName) => !productName.Contains('/');

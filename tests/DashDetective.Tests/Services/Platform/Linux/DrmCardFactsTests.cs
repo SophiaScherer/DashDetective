@@ -205,8 +205,8 @@ public class DrmCardFactsTests {
             new FakeProcFileSystem().WithAmdgpuCard().WithNvidiaCard().WithPciIds());
 
         Assert.Equal(
-            ["AMD Navi 22 [Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT]",
-             "NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]"],
+            ["AMD Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT",
+             "NVIDIA GeForce RTX 3060 Lite Hash Rate"],
             cards.Select(c => c.AdapterName));
     }
 
@@ -279,6 +279,7 @@ public class DrmCardFactsTests {
     [InlineData(0x1002u, "Advanced Micro Devices, Inc. [AMD/ATI]", "Navi 22", "AMD Navi 22")]
     [InlineData(0x1a2bu, "Some Vendor Inc.", "Widget 9000", "Some Vendor Inc. Widget 9000")]
     [InlineData(0x1a2bu, "", "Widget 9000", "Widget 9000")]
+    [InlineData(0x10deu, "NVIDIA Corporation", "GA106 [GeForce RTX 3060]", "NVIDIA GeForce RTX 3060")]
     public void FormatProductName_PrefersTheShortVendorWord(
         uint vendorId, string tableVendor, string deviceName, string expected) {
         Assert.Equal(expected, DrmCardFacts.FormatProductName(vendorId, tableVendor, deviceName));
@@ -289,6 +290,21 @@ public class DrmCardFactsTests {
     [Fact]
     public void FormatProductName_NoDeviceName_IsEmpty() {
         Assert.Equal("", DrmCardFacts.FormatProductName(0x10deu, "NVIDIA Corporation", ""));
+    }
+
+    /// <summary>The codename is the chip's, not the product's: Windows names the same card "GeForce RTX
+    /// 3060", so the bracket is what the card shows. A multi-model bracket is kept whole, slashes and all,
+    /// because that is what keeps it out of the catalog.</summary>
+    [Theory]
+    [InlineData("GA106 [GeForce RTX 3060 Lite Hash Rate]", "GeForce RTX 3060 Lite Hash Rate")]
+    [InlineData("Navi 32 [Radeon RX 7700 XT / 7800 XT]", "Radeon RX 7700 XT / 7800 XT")]
+    [InlineData("Alder Lake-S GT1 [UHD Graphics 730]", "UHD Graphics 730")]
+    [InlineData("SVGA II Adapter", "SVGA II Adapter")]
+    [InlineData("Widget [ ]", "Widget [ ]")]
+    [InlineData("Widget [unclosed", "Widget [unclosed")]
+    [InlineData("", "")]
+    public void MarketingName_KeepsOnlyTheBracketedProduct(string deviceName, string expected) {
+        Assert.Equal(expected, DrmCardFacts.MarketingName(deviceName));
     }
 
     [Fact]

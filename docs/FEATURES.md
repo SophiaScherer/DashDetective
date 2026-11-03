@@ -2098,8 +2098,10 @@ already arranges every child at its row's height (the tallest card's). The cards
 **On Linux a GPU is named by its product, and an empty row falls back to the part's datasheet.** The kernel
 gives a graphics adapter's PCI ids and nothing more, so the Graphics card used to read
 `NVIDIA nvidia (10de:2504)` and match nothing in the spec catalog. `PciIdDatabase` reads the system's own
-`pci.ids` (the table `lspci` uses) and names the card `NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]`,
-which the catalog then matches. The Processor card's base clock, L3 and socket take the catalog's rated
+`pci.ids` (the table `lspci` uses) and names the card by the bracketed product in its entry, `NVIDIA
+GeForce RTX 3060 Lite Hash Rate` rather than `GA106 [GeForce RTX 3060 Lite Hash Rate]`, which the catalog
+then matches. The chip codename is dropped because Windows names the same card without it; an entry with no
+bracket is used whole. The Processor card's base clock, L3 and socket take the catalog's rated
 value where the machine reports none, which is the ordinary case in a VM. Two decisions inside it:
 
 - **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
