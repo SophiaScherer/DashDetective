@@ -3,9 +3,11 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Data;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace DashDetective.Shared.Layout;
@@ -34,7 +36,23 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     private Rect2[] _slotRects = Array.Empty<Rect2>();
     private bool _applyingOrder;
 
-    protected ReorderablePanel() => Drag = new ReorderDrag(this);
+    private readonly ReorderSlides _slides = new();
+    private readonly Dictionary<Control, Point> _drawnAt = new();
+    private bool _frameRequested;
+
+    protected ReorderablePanel() {
+        Drag = new ReorderDrag(this);
+        MotionReduced = () => TopLevel.GetTopLevel(this)?.Classes.Contains("reduceMotion") == true;
+        var clock = Stopwatch.StartNew();
+        Clock = () => clock.Elapsed;
+    }
+
+    /// <summary>Whether Reduce motion is on: the shell puts the class on the window. A seam so a test,
+    /// which has no window, can turn it on.</summary>
+    internal Func<bool> MotionReduced { get; set; }
+
+    /// <summary>The time slides are measured on. A seam so a test can step it.</summary>
+    internal Func<TimeSpan> Clock { get; set; }
 
     public IReadOnlyList<string>? Order {
         get => GetValue(OrderProperty);
@@ -167,6 +185,18 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         if (_slotRects.Length < _visible.Count)
             _slotRects = new Rect2[_visible.Count];
 
+        // Forget where a child no longer on screen was drawn: one shown again appears, it does not slide.
+        if (_drawnAt.Count > _visible.Count) {
+            var gone = new List<Control>();
+            foreach (var child in _drawnAt.Keys)
+                if (!_visible.Contains(child))
+                    gone.Add(child);
+            foreach (var child in gone) {
+                _drawnAt.Remove(child);
+                StopSlide(child);
+            }
+        }
+
         // Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
         // rather than per view because a card is usually a plain Border with no control inside: pages
         // whose items happened to contain a button were reachable, the rest were not reachable at all.
@@ -197,11 +227,88 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         slot = new Rect(x, y, width, height);
 
         _slotRects[index] = new Rect2(slot.X, slot.Y, slot.Width, slot.Height);
-        if (!ReferenceEquals(child, Drag.Dragged))
+        if (!ReferenceEquals(child, Drag.Dragged)) {
+            Slide(child, slot.Position);
             return slot;
+        }
 
+        // A held item is drawn at the pointer, so it must not also be sliding.
+        StopSlide(child);
         Drag.ShowHint(slot);
         return Drag.DragBox();
+    }
+
+    /// <summary>Eases a child that moved into its new slot instead of jumping: the others as a drag
+    /// re-packs them, and the dropped item from where it was let go. Nothing else moves it — a resize
+    /// or a cancelled drag lands at once, and Reduce motion turns all of it off.</summary>
+    private void Slide(Control child, Point slot) {
+        var settle = Drag.TakeSettle(child);
+        var moved = _drawnAt.TryGetValue(child, out var was) && was != slot;
+        _drawnAt[child] = slot;
+
+        if (MotionReduced()) {
+            StopSlide(child);
+            return;
+        }
+
+        var now = Clock();
+        if (settle is { } from) {
+            _slides.Start(child, from.X - slot.X, from.Y - slot.Y, now);
+            child.ZIndex = 10;      // over the neighbours it passes on the way in
+        } else if (moved && Drag.IsDragging) {
+            _slides.Start(child, was.X - slot.X, was.Y - slot.Y, now);
+        } else {
+            if (moved)
+                StopSlide(child);
+            return;
+        }
+
+        Draw(child, now);
+        RequestFrame();
+    }
+
+    private void StopSlide(Control child) {
+        if (!_slides.IsSliding(child))
+            return;
+
+        _slides.Stop(child);
+        child.RenderTransform = null;
+        child.ZIndex = 0;
+    }
+
+    private void Draw(Control child, TimeSpan now) {
+        var (x, y) = _slides.OffsetAt(child, now);
+        if (child.RenderTransform is TranslateTransform shift) {
+            shift.X = x;
+            shift.Y = y;
+        } else {
+            child.RenderTransform = new TranslateTransform(x, y);
+        }
+    }
+
+    private void RequestFrame() {
+        if (_frameRequested || TopLevel.GetTopLevel(this) is not { } top)
+            return;
+
+        _frameRequested = true;
+        top.RequestAnimationFrame(_ => OnFrame());
+    }
+
+    /// <summary>Advances every slide one frame. Internal so a test can step it without a render loop.</summary>
+    internal void OnFrame() {
+        _frameRequested = false;
+        var now = Clock();
+        foreach (var child in _slides.Finish(now)) {
+            var control = (Control)child;
+            control.RenderTransform = null;
+            if (!ReferenceEquals(control, Drag.Dragged))
+                control.ZIndex = 0;
+        }
+
+        foreach (var child in _slides.Items)
+            Draw((Control)child, now);
+        if (_slides.Count > 0)
+            RequestFrame();
     }
 
     private bool ApplySavedOrder() => _childOrder.ApplySaved(Order, DeclaredIds());

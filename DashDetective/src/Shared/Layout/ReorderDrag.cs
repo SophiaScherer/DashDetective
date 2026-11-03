@@ -32,6 +32,8 @@ public sealed class ReorderDrag {
     private Control? _lifted;
     private DragDropHint? _hint;
     private InputElement? _gripUnderPointer;
+    private Control? _settling;         // the item just dropped, until the panel's next arrange takes it
+    private Rect _settleFrom;           // where it was drawn as it was let go
 
     public ReorderDrag(IReorderablePanel host) => _host = host;
 
@@ -89,6 +91,7 @@ public sealed class ReorderDrag {
     /// drive a drag without a pointer device.</summary>
     internal void Press(ReorderHandle handle, Point press) {
         (_item, _lifted, _) = handle;
+        _settling = null;
         _press = press;
         _size = handle.Item.Bounds.Size;
         _grabX = Fraction(_press.X - handle.Item.Bounds.X, _size.Width);
@@ -175,18 +178,42 @@ public sealed class ReorderDrag {
             return;
         }
 
-        _host.CommitPreview();
-        e.Pointer.Capture(null);
+        Release(e.Pointer);
 
         // This release ends a drag, not a click, so it must not also press whatever is under it.
         e.Handled = true;
+    }
+
+    /// <summary>Drops the item where it is previewed and hands it to the panel to ease into its slot.
+    /// <paramref name="device"/> is null only from tests.</summary>
+    internal void Release(IPointer? device) {
+        _host.CommitPreview();
+
+        // Before the capture goes: releasing it raises CaptureLost, which ends the drag from there.
+        _settling = _item;
+        _settleFrom = DragBox();
+        device?.Capture(null);
         End();
     }
 
-    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
+    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) => Cancel();
+
+    /// <summary>Ends a drag that was never dropped: nothing commits and nothing animates, so the item
+    /// is simply back in its slot.</summary>
+    internal void Cancel() {
         if (_dragging)
             End();
         _pending = false;
+    }
+
+    /// <summary>The box a just-dropped item was let go at, once, for the arrange that places it, so it
+    /// can ease from there into its slot. Null for any other item, and for a drag that was cancelled.</summary>
+    internal Rect? TakeSettle(Control item) {
+        if (!ReferenceEquals(item, _settling))
+            return null;
+
+        _settling = null;
+        return _settleFrom;
     }
 
     private void OnExited(object? sender, PointerEventArgs e) {
