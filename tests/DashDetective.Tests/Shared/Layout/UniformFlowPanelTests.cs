@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using DashDetective.Shared.Layout;
 using System.Collections.Generic;
 using Xunit;
@@ -33,6 +34,48 @@ public class UniformFlowPanelTests {
         panel.InvalidateMeasure();
         panel.Measure(new Size(Width, double.PositiveInfinity));
         panel.Arrange(new Rect(0, 0, Width, panel.DesiredSize.Height));
+    }
+
+    /// <summary>A generated item whose template root is a button is reached through the button. Its
+    /// presenter as a tab stop too would put two stops on every card, the first doing nothing.</summary>
+    [Fact]
+    public void Layout_AGeneratedButton_LeavesItsPresenterOutOfTheTabOrder() {
+        var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Marked };
+        var presenter = new ContentPresenter { Content = new Button { Height = 80 } };
+        panel.Children.Add(presenter);
+        presenter.UpdateChild();    // what the item generator does; nothing headless does it otherwise
+        Layout(panel);
+
+        Assert.IsType<Button>(presenter.Child);
+        Assert.False(presenter.Focusable);
+    }
+
+    /// <summary>The app's order: the generator's presenter has no child when the panel first collects it,
+    /// and gains one while it is measured. The tab stop is decided at arrange, once the child is there.</summary>
+    [Fact]
+    public void Arrange_AButtonThePresenterGainedDuringMeasure_LeavesThePresenterOut() {
+        var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Marked };
+        var presenter = new ContentPresenter { Content = new Button { Height = 80 } };
+        panel.Children.Add(presenter);
+        panel.Measure(new Size(Width, double.PositiveInfinity));
+        presenter.UpdateChild();
+
+        panel.Arrange(new Rect(0, 0, Width, 80));
+
+        Assert.False(presenter.Focusable);
+    }
+
+    /// <summary>A card that is a plain surface has nothing else to focus, so its presenter is the stop.</summary>
+    [Fact]
+    public void Layout_AGeneratedSurface_MakesItsPresenterATabStop() {
+        var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Item };
+        var presenter = new ContentPresenter { Content = new Border { Height = 80 } };
+        panel.Children.Add(presenter);
+        presenter.UpdateChild();    // what the item generator does; nothing headless does it otherwise
+        Layout(panel);
+
+        Assert.IsType<Border>(presenter.Child);
+        Assert.True(presenter.Focusable);
     }
 
     [Fact]

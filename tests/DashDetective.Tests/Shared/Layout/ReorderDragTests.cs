@@ -114,6 +114,7 @@ public class ReorderDragTests {
 
         Assert.Equal("narrow wide", Shown(board));
     }
+
     /// <summary>The Dashboard's shape: an unnamed card row owns the top, the charts sit below it. A chart
     /// dragged up over the row stops below it instead of being dropped into its place.</summary>
     [Fact]

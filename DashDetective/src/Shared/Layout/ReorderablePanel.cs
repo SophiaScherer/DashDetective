@@ -212,13 +212,17 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
                 StopSlide(child);
             }
         }
+    }
 
-        // Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
-        // rather than per view because a card is usually a plain Border with no control inside: pages
-        // whose items happened to contain a button were reachable, the rest were not reachable at all.
+    /// <summary>Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
+    /// rather than per view because a card is usually a plain Border with no control inside: pages whose
+    /// items happened to contain a button were reachable, the rest were not reachable at all. A generated
+    /// item that IS a focusable control (a Dashboard card's link, a Performance rail row) is reachable
+    /// already, and its wrapper as a second stop would take focus and do nothing. Decided at arrange: a
+    /// presenter has no child until it is first measured, which is after measure has collected it.</summary>
+    private void MakeTabStop(Control child) {
         if (Reorderable)
-            foreach (var child in _visible)
-                child.Focusable = true;
+            child.Focusable = !(Inner(child) is { Focusable: true } inner && !ReferenceEquals(inner, child));
     }
 
     /// <summary>Device pixels per layout unit, as the framework's own rounding counts them; 0 where
@@ -241,6 +245,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         var (y, height) = PixelSnap.Span(slot.Y, slot.Height, Math.Max(child.MinHeight, inner.MinHeight),
                                          panel.Height, scale);
         slot = new Rect(x, y, width, height);
+        MakeTabStop(child);
 
         _slotRects[index] = new Rect2(slot.X, slot.Y, slot.Width, slot.Height);
         if (!ReferenceEquals(child, Drag.Dragged)) {
