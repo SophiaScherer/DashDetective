@@ -114,7 +114,8 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     /// caption and the Processor card's Base row both mirror. Sources, in order, each taking the highest
     /// across the cores so a hybrid chip reports its performance cores:
     /// <list type="number">
-    /// <item>intel_pstate's <c>cpufreq/base_frequency</c> (kHz).</item>
+    /// <item>intel_pstate's <c>cpufreq/base_frequency</c> (kHz), published only with HWP (Skylake and
+    /// later).</item>
     /// <item>ACPI CPPC's <c>acpi_cppc/nominal_freq</c> (MHz), which is where amd-pstate's nominal frequency
     /// is published; 0 there means the firmware does not implement the register.</item>
     /// <item>The clock in the model name ("… CPU @ 3.60GHz"), the rated base by definition, which also

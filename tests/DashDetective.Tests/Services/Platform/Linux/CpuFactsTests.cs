@@ -89,6 +89,16 @@ public class CpuFactsTests {
         Assert.Equal(4700, CpuFacts.Read(proc).BaseClockMhz);
     }
 
+    /// <summary>CPPC is the machine's own reading and outranks the clock printed in the model name, which
+    /// is the rating rather than this chip's figure.</summary>
+    [Fact]
+    public void Read_CppcNominalFrequency_WinsOverTheModelNameClock() {
+        var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "3500\n");
+
+        Assert.Equal(3500, CpuFacts.Read(proc).BaseClockMhz);
+    }
+
     /// <summary>Firmware that does not implement the CPPC frequency registers reads 0, which is "not known",
     /// not a 0 MHz part — so the next source is consulted.</summary>
     [Fact]

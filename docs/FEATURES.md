@@ -2113,11 +2113,12 @@ value where the machine reports none, which is the ordinary case in a VM. Three 
   the name sysfs alone can compose. Only the two readers that display a name pay for the scan
   (`DrmCardFacts.ReadNamed`); the per-tick samplers keep the free walk, and `DrmCardFacts.Key` is untouched.
 - **Linux's base clock is the rated base, never the turbo ceiling.** `CpuFacts.BaseClockMhz` reads intel_pstate's
-  `base_frequency`, then ACPI CPPC's `nominal_freq` (where amd-pstate publishes its nominal frequency), then
-  the model name's "@ 3.60GHz". `cpuinfo_max_freq` is not a source: under intel_pstate and amd-pstate it is
-  the maximum turbo, so it read "5.3 / 5.3 GHz" and hid the datasheet's base. With none of the three the
-  base is unknown and the catalog's rated base shows. The same figure feeds the Dashboard caption and the
-  CPU card subtitles, which on Windows show WMI's `MaxClockSpeed`, also the base.
+  `base_frequency` (present only with HWP, Skylake and later), then ACPI CPPC's `nominal_freq` (where
+  amd-pstate publishes its nominal frequency), then the model name's "@ 3.60GHz". `cpuinfo_max_freq` is not a
+  source: under intel_pstate and amd-pstate it is the maximum turbo, so it read "5.3 / 5.3 GHz" and hid the
+  datasheet's base. With none of the three the base is unknown and the catalog's rated base shows. The same
+  figure feeds the Dashboard caption and the CPU card subtitles, which on Windows show WMI's
+  `MaxClockSpeed`, also the base.
 
 ## Page lifecycle
 

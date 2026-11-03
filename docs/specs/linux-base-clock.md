@@ -9,7 +9,7 @@ Work item 97, Sprint 10, *Linux base clock shows the maximum turbo frequency on 
 ## What was built
 
 - **`CpuFacts.MaxClockMhz` is now `BaseClockMhz`**, and `BaseClockMhzOf` reads, in order:
-  1. `/sys/devices/system/cpu/cpuN/cpufreq/base_frequency` (kHz), which intel_pstate publishes.
+  1. `/sys/devices/system/cpu/cpuN/cpufreq/base_frequency` (kHz), which intel_pstate publishes when the processor has HWP (Skylake and later).
   2. `/sys/devices/system/cpu/cpuN/acpi_cppc/nominal_freq` (MHz), ACPI CPPC's nominal frequency, which is the nominal frequency amd-pstate works from. A 0 there means the firmware does not implement the register and is skipped.
   3. The clock in the model name ("… CPU @ 3.60GHz"), which is the rated base by definition.
 - Each sysfs source takes the highest value across the online cores, so a hybrid chip reports its performance cores' base.
