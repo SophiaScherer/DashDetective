@@ -25,6 +25,6 @@ Work item 97, Sprint 10, *Linux base clock shows the maximum turbo frequency on 
 
 ## How to verify
 
-1. Run the suite. `CpuFactsTests` (`Read_PrefersIntelPstateBaseFrequency`, `Read_TakesTheHighestBaseFrequencyAcrossCores`, `Read_WithNoBaseFrequency_UsesTheCppcNominalFrequency`, `Read_ZeroCppcNominalFrequency_FallsThroughToTheModelName`, `Read_NeverUsesCpuinfoMaxFreqAsTheBase`, `Read_UnparsableBaseFrequency_IsSkipped`), `LinuxProcessorInfoProviderTests` and `LinuxCpuInfoProviderTests` run against canned fixtures on every CI leg.
+1. Run the suite. `CpuFactsTests` (`Read_PrefersIntelPstateBaseFrequency`, `Read_TakesTheHighestBaseFrequencyAcrossCores`, `Read_WithNoBaseFrequency_UsesTheCppcNominalFrequency`, `Read_CppcNominalFrequency_WinsOverTheModelNameClock`, `Read_ZeroCppcNominalFrequency_FallsThroughToTheModelName`, `Read_NeverUsesCpuinfoMaxFreqAsTheBase`, `Read_UnparsableBaseFrequency_IsSkipped`), `LinuxProcessorInfoProviderTests` and `LinuxCpuInfoProviderTests` run against canned fixtures on every CI leg.
 2. On an intel_pstate machine, `cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency`. The Processor card's Base side and the Dashboard caption match it.
 3. On an amd-pstate machine, `cat /sys/devices/system/cpu/cpu0/acpi_cppc/nominal_freq`. The Base side matches it, and the Boost side is the catalog's rated boost.
