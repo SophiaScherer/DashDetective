@@ -378,6 +378,11 @@
     <Style Selector="ToolTip">
         <Setter Property="FontSize" Value="{DynamicResource PopupFontSize}"/>
     </Style>
+    <!-- An open tip follows the cursor across its owner, so a large widget's tip never sits where the pointer
+         entered. On every top level, popups included, so a tip inside a flyout follows it too. -->
+    <Style Selector=":is(TopLevel)">
+        <Setter Property="controls:ToolTipTracking.FollowsPointer" Value="True"/>
+    </Style>
 
     <!-- ===== Segmented selector ===== -->
     <Style Selector="Border.segments">
