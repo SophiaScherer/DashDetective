@@ -732,7 +732,8 @@ about that selector are easy to get wrong, and both were measured rather than as
   and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
   is undone from `SharedStyles.axaml`.
 
-**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, the
+drag-to-reorder slides (read in code from the window's class, since they are not a style transition), and
 the Processes loading pulse — the app's only endlessly repeating animation, which drops from
 `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
 
@@ -2271,7 +2272,7 @@ dragged by a card or by a marked grip.
 | Performance device rail | a grip per row | `performance.resources` |
 | Performance stat tiles | the tile | `performance.stats.{kind}` |
 
-Settings and Toolkit do not reorder, and their headers no longer claim to. Five rules, all
+Settings and Toolkit do not reorder, and their headers no longer claim to. Eight rules, all
 load-bearing:
 
 1. **The drag cursor comes from the predicate that starts the drag**, never from a style. A style
@@ -2299,6 +2300,13 @@ load-bearing:
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
    from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
+
+8. **A drag moves; it does not snap** (work item 14). The neighbours a preview re-packs slide to their
+   new slots, and the dropped item eases in from where it was let go, both over 180 ms with an ease-out
+   (`ReorderSlides`). The motion is a render transform, so layout, the frozen drop slots and the hint
+   never see it. Only a drag animates: a cancelled drag (capture lost before a release) puts everything
+   straight back, and a keyboard move, a resize or Reduce motion lands at once. A drop back onto the item's
+   own slot still eases in, since the release is accepted; "rejected" here means a drag that never dropped.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.
