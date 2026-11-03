@@ -55,50 +55,100 @@ public class CpuFactsTests {
         Assert.Equal(1, facts.LogicalCores);
     }
 
-    /// <summary>The rated clock's preferred source.</summary>
+    /// <summary>intel_pstate's own base, which wins over everything else — including the turbo ceiling
+    /// staged beside it.</summary>
     [Fact]
-    public void Read_PrefersCpuinfoMaxFreq() {
+    public void Read_PrefersIntelPstateBaseFrequency() {
         var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
-            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "4900000\n");
+            .WithFile(CpuRoot + "/cpu0/cpufreq/base_frequency", "3200000\n")
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "4900000\n")
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "3700\n");
 
-        Assert.Equal(4900, CpuFacts.Read(proc).MaxClockMhz);
+        Assert.Equal(3200, CpuFacts.Read(proc).BaseClockMhz);
     }
 
-    /// <summary>Taking the highest across cores rather than <c>cpu0</c>'s: on a heterogeneous chip
-    /// <c>cpu0</c> can be a little core, which would report the slow half of the machine as its rating.</summary>
+    /// <summary>Taking the highest across cores rather than <c>cpu0</c>'s: on a hybrid chip <c>cpu0</c> can
+    /// be an efficiency core, whose base is not the one the part is rated by.</summary>
     [Fact]
-    public void Read_TakesTheHighestMaxFreqAcrossCores() {
+    public void Read_TakesTheHighestBaseFrequencyAcrossCores() {
         var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
-            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "2000000\n")
-            .WithFile(CpuRoot + "/cpu1/cpufreq/cpuinfo_max_freq", "3800000\n");
+            .WithFile(CpuRoot + "/cpu0/cpufreq/base_frequency", "2500000\n")
+            .WithFile(CpuRoot + "/cpu1/cpufreq/base_frequency", "3500000\n");
 
-        Assert.Equal(3800, CpuFacts.Read(proc).MaxClockMhz);
+        Assert.Equal(3500, CpuFacts.Read(proc).BaseClockMhz);
+    }
+
+    /// <summary>amd-pstate publishes no base file of its own; its nominal frequency is ACPI CPPC's, in MHz
+    /// rather than cpufreq's kHz.</summary>
+    [Fact]
+    public void Read_WithNoBaseFrequency_UsesTheCppcNominalFrequency() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n")
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "4700\n");
+
+        Assert.Equal(4700, CpuFacts.Read(proc).BaseClockMhz);
+    }
+
+    /// <summary>Firmware that does not implement the CPPC frequency registers reads 0, which is "not known",
+    /// not a 0 MHz part — so the next source is consulted.</summary>
+    [Fact]
+    public void Read_ZeroCppcNominalFrequency_FallsThroughToTheModelName() {
+        var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "0\n");
+
+        Assert.Equal(3600, CpuFacts.Read(proc).BaseClockMhz);
+    }
+
+    /// <summary>
+    /// The bug this field was renamed for. Under intel_pstate and amd-pstate <c>cpuinfo_max_freq</c> is the
+    /// maximum turbo, so reading it as the base showed "5.3 / 5.3 GHz" and hid the datasheet's real base.
+    /// With no base source and no clock in the model name the base is unknown, and the turbo ceiling must
+    /// not stand in for it.
+    /// </summary>
+    [Fact]
+    public void Read_NeverUsesCpuinfoMaxFreqAsTheBase() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n");
+
+        Assert.Equal(0, CpuFacts.Read(proc).BaseClockMhz);
+    }
+
+    /// <summary>A malformed file is skipped, not taken as a clock.</summary>
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("garbage")]
+    public void Read_UnparsableBaseFrequency_IsSkipped(string body) {
+        var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/base_frequency", body + "\n");
+
+        Assert.Equal(3600, CpuFacts.Read(proc).BaseClockMhz);
     }
 
     /// <summary>cpufreq is usually absent under VirtualBox, so the clock in the model name is the only
     /// source a guest has. It is the rated base clock, which is what this field means.</summary>
     [Fact]
     public void Read_WithNoCpufreq_FallsBackToTheClockInTheModelName() =>
-        Assert.Equal(3600, CpuFacts.Read(WithCpuInfo(ProcFixtures.ProcCpuInfo)).MaxClockMhz);
+        Assert.Equal(3600, CpuFacts.Read(WithCpuInfo(ProcFixtures.ProcCpuInfo)).BaseClockMhz);
 
     /// <summary>
     /// <c>cpu MHz</c> is the core's clock at the instant of the read, so under a scaling governor it is an
-    /// idle 800 MHz. Reporting it as the maximum would put a number that means something else under the
+    /// idle 800 MHz. Reporting it as the base would put a number that means something else under the
     /// label — the near-miss this port refuses. The fixture's model name carries no "@ clock" suffix, so
     /// the only remaining candidate is the one that must not be used.
     /// </summary>
     [Fact]
-    public void Read_NeverUsesTheInstantaneousCpuMhzAsTheMaximum() {
+    public void Read_NeverUsesTheInstantaneousCpuMhzAsTheBase() {
         var facts = CpuFacts.Read(WithCpuInfo(ProcFixtures.AmdCpuInfo));
 
-        Assert.Equal(0, facts.MaxClockMhz);
+        Assert.Equal(0, facts.BaseClockMhz);
     }
 
     [Fact]
     public void Read_ModelNameInMhz_IsNotScaled() {
         var facts = CpuFacts.Read(WithCpuInfo("processor\t: 0\nmodel name\t: Some CPU @ 800MHz\n"));
 
-        Assert.Equal(800, facts.MaxClockMhz);
+        Assert.Equal(800, facts.BaseClockMhz);
     }
 
     /// <summary>An unreadable <c>/proc</c> yields the "nothing known" record rather than a half-populated

@@ -76,6 +76,37 @@ public class LinuxProcessorInfoProviderTests {
         Assert.Equal("4.7 / 5.3 GHz", info.BaseBoost);
     }
 
+    /// <summary>Under amd-pstate <c>cpuinfo_max_freq</c> is the turbo ceiling. Read as the base, it made the
+    /// row "5.3 / 5.3 GHz" and hid the datasheet's base, which is what the row now shows.</summary>
+    [Fact]
+    public async Task GetAsync_TurboCeilingOnly_ShowsTheDatasheetBase() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n");
+
+        Assert.Equal("4.7 / 5.3 GHz", (await Read(proc)).BaseBoost);
+    }
+
+    /// <summary>The machine's own base wins over the datasheet's, here from CPPC's nominal frequency.</summary>
+    [Fact]
+    public async Task GetAsync_CppcNominalFrequency_IsTheBase() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n")
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "4500\n");
+
+        Assert.Equal("4.5 / 5.3 GHz", (await Read(proc)).BaseBoost);
+    }
+
+    /// <summary>A base file that throws costs the card its reading, not a wrong one: staged against a
+    /// fixture whose base would otherwise read, so the test fails if the read escapes the catch.</summary>
+    [Fact]
+    public async Task GetAsync_BaseFrequencyDenied_ReportsUnknown() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/base_frequency", "4500000\n")
+            .ThrowOn(CpuRoot + "/cpu0/cpufreq/base_frequency");
+
+        Assert.Same(ProcessorInfo.Unknown, await Read(proc));
+    }
+
     /// <summary>The machine's own cache size wins over the datasheet — a fallback, never an override.</summary>
     [Fact]
     public async Task GetAsync_WithACacheTree_PrefersTheMachinesOwnSize() {

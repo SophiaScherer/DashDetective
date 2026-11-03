@@ -14,7 +14,7 @@ namespace DashDetective.Services.Platform.Linux;
 /// stand-in. Each consumer applies its own placeholder, because they differ ("Unknown processor" on the
 /// Dashboard, "—" on the Hardware card) and because a substitution made here would be invisible to both.
 /// </summary>
-internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores, double MaxClockMhz) {
+internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores, double BaseClockMhz) {
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string CpuInfoPath = "/proc/cpuinfo";
     private const string CpuRoot = "/sys/devices/system/cpu";
@@ -33,7 +33,7 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
 
         var name = ProcCpuinfoParser.Value(blocks[0], "model name");
 
-        return new CpuFacts(name, PhysicalCoresOf(blocks), blocks.Count, MaxClockMhzOf(proc, name));
+        return new CpuFacts(name, PhysicalCoresOf(blocks), blocks.Count, BaseClockMhzOf(proc, name));
     }
 
     /// <summary>
@@ -110,31 +110,49 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
-    /// The rated maximum clock in MHz. Prefers <c>cpufreq</c>'s <c>cpuinfo_max_freq</c> (kHz), taking the
-    /// highest across the online cores so a heterogeneous chip reports its fast cores rather than whichever
-    /// one happens to be <c>cpu0</c>. Falls back to the clock in the model name
-    /// ("… CPU @ 3.60GHz"), which is the rated base clock and survives the VMs where <c>cpufreq</c> is
-    /// absent entirely.
+    /// The rated base clock in MHz — what WMI's <c>MaxClockSpeed</c> reports on Windows, which the Dashboard
+    /// caption and the Processor card's Base row both mirror. Sources, in order, each taking the highest
+    /// across the cores so a hybrid chip reports its performance cores:
+    /// <list type="number">
+    /// <item>intel_pstate's <c>cpufreq/base_frequency</c> (kHz).</item>
+    /// <item>ACPI CPPC's <c>acpi_cppc/nominal_freq</c> (MHz), which is where amd-pstate's nominal frequency
+    /// is published; 0 there means the firmware does not implement the register.</item>
+    /// <item>The clock in the model name ("… CPU @ 3.60GHz"), the rated base by definition, which also
+    /// survives the VMs where neither file exists.</item>
+    /// </list>
+    /// Otherwise 0, and the Processor card falls back to the datasheet.
     ///
-    /// <b><c>cpu MHz</c> is deliberately not consulted.</b> It is the core's clock at the instant of the
-    /// read, so under a scaling governor it reports an idle 800 MHz under a "max" label — the near-miss
-    /// this port refuses to substitute. The live clock has its own reader in
-    /// <c>LinuxProcessorFrequencySampler</c>.
+    /// <b><c>cpuinfo_max_freq</c> is deliberately not consulted.</b> Under intel_pstate and amd-pstate it is
+    /// the maximum turbo, so it read as the base and hid the catalog's real one. <b>Nor is <c>cpu MHz</c></b>,
+    /// the core's clock at the instant of the read. Both are the near-miss this port refuses to substitute;
+    /// the live clock has its own reader in <c>LinuxProcessorFrequencySampler</c>.
     /// </summary>
-    private static double MaxClockMhzOf(IProcFileSystem proc, string modelName) {
-        double kHz = 0;
+    private static double BaseClockMhzOf(IProcFileSystem proc, string modelName) {
+        var baseKhz = HighestPerCore(proc, "/cpufreq/base_frequency");
+        if (baseKhz > 0)
+            return baseKhz / 1000.0;
+
+        var nominalMhz = HighestPerCore(proc, "/acpi_cppc/nominal_freq");
+        return nominalMhz > 0 ? nominalMhz : ModelNameMhz(modelName);
+    }
+
+    /// <summary>The highest positive number one per-core file holds across the online cores, or 0 when no
+    /// core has a readable one.</summary>
+    private static double HighestPerCore(IProcFileSystem proc, string file) {
+        double highest = 0;
         foreach (var entry in proc.ListDirectory(CpuRoot)) {
             if (!IsCpuDirectory(entry))
                 continue;
 
-            var text = proc.ReadAllText(CpuRoot + "/" + entry + "/cpufreq/cpuinfo_max_freq");
+            var text = proc.ReadAllText(CpuRoot + "/" + entry + file);
             if (text is not null
                 && double.TryParse(
-                    text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-                kHz = Math.Max(kHz, value);
+                    text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+                && double.IsFinite(value))
+                highest = Math.Max(highest, value);
         }
 
-        return kHz > 0 ? kHz / 1000.0 : ModelNameMhz(modelName);
+        return highest;
     }
 
     /// <summary>Whether a <c>/sys/devices/system/cpu</c> entry is a per-core directory (<c>cpu0</c>,

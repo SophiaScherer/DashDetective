@@ -59,6 +59,25 @@ public class LinuxCpuInfoProviderTests {
     public async Task GetAsync_WithNoTopologyKeys_LeavesPhysicalCoresAtZero() =>
         Assert.Equal(0, (await Read(WithCpuInfo("processor\t: 0\nprocessor\t: 1\n"))).PhysicalCores);
 
+    /// <summary>The caption mirrors WMI's <c>MaxClockSpeed</c>, which is the rated base, so a Linux turbo
+    /// ceiling must not appear there either.</summary>
+    [Fact]
+    public async Task GetAsync_TurboCeilingOnly_LeavesTheClockAtZero() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n");
+
+        Assert.Equal(0, (await Read(proc)).MaxClockMhz);
+    }
+
+    [Fact]
+    public async Task GetAsync_ReportsTheIntelPstateBase() {
+        var proc = WithCpuInfo(ProcFixtures.ProcCpuInfo)
+            .WithFile("/sys/devices/system/cpu/cpu0/cpufreq/base_frequency", "3600000\n")
+            .WithFile("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "4900000\n");
+
+        Assert.Equal(3600, (await Read(proc)).MaxClockMhz);
+    }
+
     [Fact]
     public async Task GetAsync_ReportsTheClockFromTheModelName() =>
         Assert.Equal(3600, (await Read(WithCpuInfo(ProcFixtures.ProcCpuInfo))).MaxClockMhz);
