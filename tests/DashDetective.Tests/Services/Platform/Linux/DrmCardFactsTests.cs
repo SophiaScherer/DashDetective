@@ -233,6 +233,29 @@ public class DrmCardFactsTests {
         Assert.Equal("VMware vmwgfx (15ad:9999)", Assert.Single(DrmCardFacts.ReadNamed(proc)).AdapterName);
     }
 
+    /// <summary>A table that throws on read costs the name, not the card: staged against a working sysfs
+    /// fixture and table, so the test fails if the denial empties the list.</summary>
+    [Fact]
+    public void ReadNamed_TableDenied_KeepsTheCardOnItsSysfsName() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().WithPciIds()
+            .ThrowOn("/usr/share").ThrowOn("/var/lib/pciutils");
+
+        var card = Assert.Single(DrmCardFacts.ReadNamed(proc));
+
+        Assert.Equal("AMD amdgpu (1002:73df)", card.AdapterName);
+    }
+
+    /// <summary>An unreadable device id parses to 0, which must not be looked up as device 0000.</summary>
+    [Fact]
+    public void ReadNamed_UnreadableDeviceId_IsNotNamedFromTheTable() {
+        var proc = new FakeProcFileSystem()
+            .WithFile("/sys/class/drm/card0/device/vendor", "0x15ad\n")
+            .WithLink("/sys/class/drm/card0/device/driver", "/sys/bus/pci/drivers/vmwgfx")
+            .WithFile("/usr/share/hwdata/pci.ids", "15ad  VMware\n\t0000  Not this card\n");
+
+        Assert.Equal("", Assert.Single(DrmCardFacts.ReadNamed(proc)).ProductName);
+    }
+
     /// <summary><see cref="DrmCardFacts.Key"/> is what the enumeration and the sampler join on; if naming
     /// ever touched it the inventory would build no GPU card at all, silently.</summary>
     [Fact]

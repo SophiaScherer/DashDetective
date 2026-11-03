@@ -1,6 +1,8 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 
 namespace DashDetective.Services.Platform.Linux;
 
@@ -84,6 +86,10 @@ internal sealed record DrmCardFacts(
     internal string AdapterName =>
         ProductName.Length > 0 ? ProductName : FormatAdapterName(VendorId, DeviceId, Driver);
 
+    // An unreadable vendor or device file parses to 0, and looking that up would name the card after
+    // whatever the table happens to list under 0000.
+    private static bool IsIdentified(DrmCardFacts card) => card.VendorId != 0 && card.DeviceId != 0;
+
     /// <summary>Reads and derives every card. Never throws: an unreadable source yields an empty
     /// list.</summary>
     internal static IReadOnlyList<DrmCardFacts> Read(IProcFileSystem proc) {
@@ -125,16 +131,32 @@ internal sealed record DrmCardFacts(
 
         var wanted = new List<(uint Vendor, uint Device)>(cards.Count);
         foreach (var card in cards)
-            wanted.Add((card.VendorId, card.DeviceId));
+            if (IsIdentified(card))
+                wanted.Add((card.VendorId, card.DeviceId));
+        if (wanted.Count == 0)
+            return cards;
 
-        var names = PciIdDatabase.Read(proc, wanted);
+        PciIdDatabase names;
+        try {
+            names = PciIdDatabase.Read(proc, wanted);
+        } catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+            // The name only decorates the list, so a table that cannot be read must not cost the cards.
+            Log.Warn("pci.ids could not be read; GPUs keep their sysfs names", e);
+            return cards;
+        }
 
         var named = new List<DrmCardFacts>(cards.Count);
-        foreach (var card in cards)
+        foreach (var card in cards) {
+            if (!IsIdentified(card)) {
+                named.Add(card);
+                continue;
+            }
+
             named.Add(card with {
                 ProductName = FormatProductName(
                     card.VendorId, names.Vendor(card.VendorId), names.Device(card.VendorId, card.DeviceId)),
             });
+        }
 
         return named;
     }
