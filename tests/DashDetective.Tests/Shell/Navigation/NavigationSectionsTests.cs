@@ -79,6 +79,18 @@ public class NavigationSectionsTests {
         Assert.Same(first, bar.SelectedNav);
     }
 
+    /// <summary>A page can gain sections without a page change (a form opening), so the press re-reads it
+    /// rather than trusting the count from the last page change.</summary>
+    [Fact]
+    public void Activate_PageGainedSectionsSinceLastRead_RereadsAndOpens() {
+        var (bar, first, _) = Bar();
+        bar.SectionsRefreshRequested += () => bar.SetSections(Two());
+
+        bar.Activate(first);
+
+        Assert.True(bar.IsSectionsOpen);
+    }
+
     [Fact]
     public void Activate_AnotherItem_NavigatesAndDropsTheOldPagesList() {
         var (bar, _, second) = Bar();
@@ -159,12 +171,26 @@ public class NavigationSectionsTests {
     }
 
     [Fact]
-    public void HandleSectionsShortcut_OtherKeysWhileOpen_FallThrough() {
+    public void HandleSectionsShortcut_OtherShortcutWhileOpen_ClosesAndStillRuns() {
         var (bar, _, _) = Bar();
         bar.SetSections(Two());
         bar.IsSectionsOpen = true;
 
-        Assert.False(bar.HandleSectionsShortcut(ShortcutId.Refresh));
+        Assert.False(bar.HandleSectionsShortcut(ShortcutId.ShowHelp));
+        Assert.False(bar.IsSectionsOpen);
+    }
+
+    /// <summary>Enter and the arrows are how a row is reached and picked, so they leave the list up.</summary>
+    [Theory]
+    [InlineData(ShortcutId.Activate)]
+    [InlineData(ShortcutId.SelectNextResult)]
+    [InlineData(ShortcutId.SelectPreviousResult)]
+    public void HandleSectionsShortcut_KeysThatWorkTheList_LeaveItOpen(ShortcutId id) {
+        var (bar, _, _) = Bar();
+        bar.SetSections(Two());
+        bar.IsSectionsOpen = true;
+
+        Assert.False(bar.HandleSectionsShortcut(id));
         Assert.True(bar.IsSectionsOpen);
     }
 

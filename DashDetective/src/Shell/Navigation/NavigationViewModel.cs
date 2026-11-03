@@ -584,8 +584,15 @@ public partial class NavigationViewModel : ViewModelBase {
     /// call, so none of those can open the list by landing on the page already showing.</summary>
     public void Activate(NavItem item) {
         if (item == SelectedNav) {
+            if (IsSectionsOpen) {
+                IsSectionsOpen = false;
+                return;
+            }
+
+            // Re-read first: a page can gain or lose sections without a page change (a form opening).
+            SectionsRefreshRequested?.Invoke();
             if (HasSections)
-                IsSectionsOpen = !IsSectionsOpen;
+                IsSectionsOpen = true;
             return;
         }
 
@@ -659,13 +666,17 @@ public partial class NavigationViewModel : ViewModelBase {
         SectionPicked?.Invoke(section);
     }
 
-    /// <summary>Esc closes an open section list. Only consumed while it is open, so the key otherwise
-    /// falls through the shell's chain as before.</summary>
+    /// <summary>Esc closes an open section list and is consumed. Any other shortcut also closes it but
+    /// still runs, since the popup's keys reach the window: Help or the rail collapsing must not open under
+    /// a list left standing. Enter and the arrows leave it open, being how a row is reached and picked.</summary>
     internal bool HandleSectionsShortcut(ShortcutId id) {
-        if (id != ShortcutId.Escape || !IsSectionsOpen)
+        if (!IsSectionsOpen)
+            return false;
+
+        if (id is ShortcutId.Activate or ShortcutId.SelectNextResult or ShortcutId.SelectPreviousResult)
             return false;
 
         IsSectionsOpen = false;
-        return true;
+        return id == ShortcutId.Escape;
     }
 }

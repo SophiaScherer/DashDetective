@@ -470,8 +470,10 @@
                                         <Rectangle Classes="navIndicatorH" Width="18" Height="3"
                                                    RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                                        <!-- Not hit-testable: its negative margins reach past the row, where it
+                                             would catch a press meant for the neighbouring item. -->
                                         <Path Classes="sectionsCaret" Width="8" Height="5" Stretch="Uniform"
-                                              Data="{x:Static nav:Icons.CaretDown}"/>
+                                              IsHitTestVisible="False" Data="{x:Static nav:Icons.CaretDown}"/>
                                         <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
                                             <Path Classes="navIcon" Width="{StaticResource IconSize}" Height="{StaticResource IconSize}" Stretch="Uniform"
                                                   Data="{Binding Icon}" StrokeThickness="1.4" StrokeLineCap="Round"
