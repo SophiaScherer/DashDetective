@@ -2160,7 +2160,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          DRIVE HEALTH IS PERMANENTLY "—" (SMART needs root).
                                                          LinuxGraphicsInfoProvider — DrmCardFacts.ReadNamed,
                                                          so the card carries its pci.ids product name and
-                                                         the spec catalog can match it; VRAM comes from the
+                                                         the spec catalog can match it — EXCEPT a name listing
+                                                         several models ("RX 7700 XT / 7800 XT"), which gets no
+                                                         lookup, or one model's datasheet fills another's rows;
+                                                         VRAM comes from the
                                                          driver, the other rows from that match.
                                                          UnsupportedMemoryModulesProvider is permanent too —
                                                          per-DIMM facts are SMBIOS type 17.

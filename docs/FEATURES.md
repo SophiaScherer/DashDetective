@@ -2104,7 +2104,9 @@ value where the machine reports none, which is the ordinary case in a VM. Two de
 
 - **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
   down-binned or power-limited chip would show someone else's numbers. WMI's socket designation, the
-  driver's VRAM and a live L3 read all keep their place.
+  driver's VRAM and a live L3 read all keep their place. The same honesty applies to the name: where
+  `pci.ids` lists several models under one device id ("Radeon RX 7700 XT / 7800 XT") the catalog is not
+  consulted at all, since its token match would pick one of them.
 - **Nothing is bundled.** `pci.ids` is read from the host (`hwdata`/`pciutils`), and a host without it keeps
   the name sysfs alone can compose. Only the two readers that display a name pay for the scan
   (`DrmCardFacts.ReadNamed`); the per-tick samplers keep the free walk, and `DrmCardFacts.Key` is untouched.

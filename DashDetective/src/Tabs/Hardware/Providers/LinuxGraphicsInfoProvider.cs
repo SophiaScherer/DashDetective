@@ -17,7 +17,8 @@ namespace DashDetective.Tabs.Hardware;
 /// alone, so this reads through <see cref="DrmCardFacts.ReadNamed"/>, which resolves the marketing model
 /// from the system's <c>pci.ids</c> table — that name is what <see cref="HardwareCatalog.LookupGpu"/>
 /// matches on, and core counts, boost clocks and bus widths come from the catalogue entry it finds. A host
-/// with no <c>pci.ids</c>, or a part the catalogue does not list, leaves those rows "—". VRAM is
+/// with no <c>pci.ids</c>, a part the catalogue does not list, or a table name covering several models
+/// leaves those rows "—". VRAM is
 /// independent of all that: amdgpu publishes it exactly, and it is formatted with the same humanizer as
 /// the Performance tab's VRAM tile.
 ///
@@ -42,7 +43,7 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
                 if (card.IsSoftware)
                     continue;
 
-                var spec = HardwareCatalog.LookupGpu(card.AdapterName);
+                var spec = NamesOneModel(card.ProductName) ? HardwareCatalog.LookupGpu(card.AdapterName) : null;
                 adapters.Add(new GraphicsAdapterInfo(
                     Name: card.AdapterName,
                     Memory: FormatVram(card.VramBytes) ?? spec?.Memory ?? "—",
@@ -59,6 +60,13 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
             return GraphicsInfo.Unknown;
         }
     }
+
+    /// <summary>
+    /// False when <c>pci.ids</c> lists several models under one device id ("Navi 32 [Radeon RX 7700 XT /
+    /// 7800 XT]"). The catalog would match whichever model it lists first and fill a 7800 XT's rows with a
+    /// 7700 XT's datasheet, so such a name gets no lookup at all. Pure; unit-tested.
+    /// </summary>
+    internal static bool NamesOneModel(string productName) => !productName.Contains('/');
 
     /// <summary>The adapter's VRAM, or <c>null</c> when the driver publishes none so the caller can fall
     /// back.</summary>

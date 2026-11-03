@@ -64,6 +64,32 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("—", adapter.Bus);
     }
 
+    /// <summary>One device id that ships as two models must not take either one's datasheet: the catalogue
+    /// lists "RX 7700 XT", and this card may be the 7800 XT.</summary>
+    [Fact]
+    public async Task GetAsync_MultiModelName_SkipsTheCatalogue() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard()
+            .WithFile("/sys/class/drm/card0/device/device", "0x747e\n")
+            .WithFile("/usr/share/hwdata/pci.ids",
+                "1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t747e  Navi 32 [Radeon RX 7700 XT / 7800 XT]\n");
+
+        var adapter = Assert.Single((await Read(proc)).Adapters);
+
+        Assert.Equal("AMD Navi 32 [Radeon RX 7700 XT / 7800 XT]", adapter.Name);
+        Assert.Equal("—", adapter.BoostClock);
+        Assert.Equal("—", adapter.Bus);
+        Assert.Equal("16 GB", adapter.Memory);
+    }
+
+    [Theory]
+    [InlineData("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", true)]
+    [InlineData("", true)]
+    [InlineData("AMD Navi 32 [Radeon RX 7700 XT / 7800 XT]", false)]
+    [InlineData("AMD Navi 23 [Radeon RX 6600/6600 XT/6600M]", false)]
+    public void NamesOneModel_FlagsATableNameListingSeveralModels(string name, bool expected) {
+        Assert.Equal(expected, LinuxGraphicsInfoProvider.NamesOneModel(name));
+    }
+
     /// <summary>VRAM comes from the driver, not the catalogue, so a named card must not lose the figure
     /// sysfs published for it.</summary>
     [Fact]

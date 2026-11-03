@@ -17,6 +17,7 @@ On Linux the kernel identifies a graphics adapter by its PCI ids and driver only
 - **The machine's reading is never replaced.** The datasheet fills only an empty row. On Windows that covers WMI fields the firmware left blank. On Linux it covers the socket, which has no rootless source, and the VM case.
 - **The table comes from the host, not the app.** No copy of `pci.ids` is shipped, so its GPL-2.0+/BSD-3 dual licensing never comes into play. The cost is that a minimal host without `hwdata` keeps the PCI-id name.
 - **The name keeps `pci.ids`' own form**, chip codename included ("GA106 [GeForce RTX 3060 …]"). The bracketed marketing name is not extracted, because AMD's brackets often list several models ("Radeon RX 6600/6600 XT/6600M").
+- **A name covering several models gets no catalog lookup.** `pci.ids` often lists every model a chip ships as ("Navi 32 [Radeon RX 7700 XT / 7800 XT]"), and the catalog's token match would fill a 7800 XT's rows with the 7700 XT's datasheet. Any `/` in the product name skips the lookup, so those rows read "—".
 - **`DrmCardFacts.Key` is untouched.** The GPU inventory keeps only adapters that both the enumeration and the sampler report, and a test pins that naming a card does not move its token.
 
 ## How to verify
