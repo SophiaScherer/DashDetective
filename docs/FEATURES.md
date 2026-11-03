@@ -341,9 +341,30 @@ and on capture loss, so a later keyboard press or UI Automation Invoke is never 
 click. Its two pointer clicks never reach the command, so a double click opens exactly once. Tooltips
 say so (*Double-click to open … in Performance*); the **accessible names do not** (*Open CPU in
 Performance*), because a keyboard or screen-reader user presses Enter, and a card's name is its heading
-and reading. The stat cards have no drag to protect (their panel sets no `DragGrip`), and the charts'
-drag lives on the widget header, which the gate does not touch. Nothing else in the app changed:
+and reading. A card's drag does not compete with it: the drag starts only once a press moves past the
+threshold, and a double click does not move. The charts' drag lives on the widget header, which the gate
+does not touch. Nothing else in the app changed:
 buttons and links such as *View in Hardware* are explicit controls and keep a single click.
+
+**The stat cards reorder among themselves, and only there** (work item 15). The card row and the charts
+below it are two separate flows: a card is dragged along its own row (or its own rows, once it wraps) and
+cannot reach the charts, and a chart cannot be dropped into the card row. Four decisions:
+
+- **The row is its own strip, saved under `dashboard.cards`**, beside the board's `dashboard`. Both are
+  `SavedOrder`s on the page, so the Settings *Layout* card's reset and `Ctrl+Shift+←/→` reach the cards
+  through the existing paths, and the drag's slide and Reduce motion come from `ReorderablePanel` as on
+  every other strip.
+- **The whole `DashboardLink` is the grip** (`DragGrip="Marked"` with `Reorder.IsGrip` on the link),
+  because a card is a button and `ReorderGrip.Item` refuses a press on one. The drag captures only past
+  the threshold, which cancels the button's own press, so a still press is the link's as before.
+- **The held card is confined to the row** (`ConfineDrag`), so it cannot be drawn over a chart it can
+  never land on.
+- **The row has no widget id, and a child with none is a fixed point** (`ChildOrder.Move`): a chart dragged
+  over it stops below it, and a keyboard move that falls through from the row's last card to the board does
+  not carry the whole row in among the charts.
+
+A card's id is its device id, except a GPU's, which goes by its index label ("GPU 0"): the device id
+carries the adapter LUID, which Windows mints again every boot.
 
 ## Universal search
 
@@ -2258,7 +2279,7 @@ Three decisions:
 
 *Shipped — branch `dragAndDropFix`, 2026-09.*
 
-**Six strips across five tabs reorder by dragging, and the affordance appears nowhere else.** The
+**Seven strips across six tabs reorder by dragging, and the affordance appears nowhere else.** The
 gesture is one implementation — `ReorderDrag` (`src/Shared/Layout`) — over any panel that implements
 `IReorderablePanel`. Two do: `WidgetBoard`, dragged by a widget's header, and `UniformFlowPanel`,
 dragged by a card or by a marked grip.
@@ -2266,6 +2287,7 @@ dragged by a card or by a marked grip.
 | What | Handle | Saved under |
 |---|---|---|
 | Dashboard / Network / Storage widgets | the header | `dashboard`, `network`, `storage` |
+| Dashboard stat cards | the card (its link, marked as the grip) | `dashboard.cards` — their own row only |
 | Storage drive cards | the card | `storage` — the same order as the panels they move among |
 | Hardware component cards | the card | `hardware` |
 | Processes summary tiles | the tile | `processes.summary` |
