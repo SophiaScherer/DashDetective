@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DashDetective.Services.SystemMetrics;
+using DashDetective.Shared.Controls;
 using System;
 using System.Linq;
 using System.Windows.Input;
@@ -17,7 +18,7 @@ namespace DashDetective.Tabs.Dashboard;
 /// The collection is the multi-instance seam: one card per detected device, so several disks (or, later,
 /// several GPUs/CPUs) each get their own card grouped with their kind.
 /// </summary>
-public partial class DashboardCard : ObservableObject {
+public partial class DashboardCard : ObservableObject, IWidgetIdentity {
     /// <summary>What a card's tooltip says when it has no note of its own.</summary>
     public const string OpenHint = "Double-click to open in Performance";
 
@@ -35,6 +36,13 @@ public partial class DashboardCard : ObservableObject {
     /// <summary>The inventory id of the device this card shows, which is how the Performance tab is asked
     /// for it (<c>PerformanceViewModel.Reveal</c>).</summary>
     public string DeviceId { get; }
+
+    /// <summary>What the card row's saved order calls this card. A GPU goes by its index label ("GPU 0")
+    /// rather than its device id, because that carries the adapter LUID, which Windows mints again every
+    /// boot — a saved position keyed by it would be lost on each restart.</summary>
+    public string WidgetId => Category == DeviceCategory.Gpu
+        ? "dashboard.card." + Label.ToLowerInvariant()
+        : "dashboard.card." + DeviceId;
 
     /// <summary>Opens this card's device on the Performance tab. The <c>PageLink</c> shape: the item holds
     /// the command and calls back into the view model that owns it.</summary>
