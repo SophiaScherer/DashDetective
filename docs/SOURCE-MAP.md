@@ -987,7 +987,7 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  BECAUSE THE KERNEL IDENTIFIES HARDWARE BUT DOES NOT NAME IT: sysfs gives
                                  ids, the spec catalog keys on model tokens, so without this the Graphics
                                  card's CUDA/boost/bus rows are blank on Linux and filled on Windows from
-                                 the identical lookup. SCANNED FOR THE IDS ASKED FOR, never loaded whole —
+                                 the identical lookup. KEEPS ONLY THE IDS ASKED FOR, never the whole table —
                                  the file is ~1.5 MB and a machine has one or two adapters. INDENT IS THE
                                  FORMAT: vendor at column 0, device one TAB in, subsystem two — and hex
                                  parsing ALLOWS LEADING WHITESPACE, so the two-tab guard is load-bearing,

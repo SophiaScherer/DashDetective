@@ -2095,6 +2095,20 @@ already arranges every child at its row's height (the tallest card's). The cards
   still grows past it with its rows and with text size, and content stays top-aligned inside the stretched
   surface, the spare space falling at the bottom.
 
+**On Linux a GPU is named by its product, and an empty row falls back to the part's datasheet.** The kernel
+gives a graphics adapter's PCI ids and nothing more, so the Graphics card used to read
+`NVIDIA nvidia (10de:2504)` and match nothing in the spec catalog. `PciIdDatabase` reads the system's own
+`pci.ids` (the table `lspci` uses) and names the card `NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]`,
+which the catalog then matches. The Processor card's base clock, L3 and socket take the catalog's rated
+value where the machine reports none, which is the ordinary case in a VM. Two decisions inside it:
+
+- **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
+  down-binned or power-limited chip would show someone else's numbers. WMI's socket designation, the
+  driver's VRAM and a live L3 read all keep their place.
+- **Nothing is bundled.** `pci.ids` is read from the host (`hwdata`/`pciutils`), and a host without it keeps
+  the name sysfs alone can compose. Only the two readers that display a name pay for the scan
+  (`DrmCardFacts.ReadNamed`); the per-tick samplers keep the free walk, and `DrmCardFacts.Key` is untouched.
+
 ## Page lifecycle
 
 *Shipped — branch `backgroundBehavior`, 2026-08.*
