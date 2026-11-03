@@ -131,24 +131,25 @@ public partial class MainWindow : Window {
 
     // The widgets the last read found, indexed as the candidates handed to the nav bar, so a picked
     // section names its widget without the view model ever holding a control.
-    private List<WidgetPanel> _sectionPanels = [];
+    private List<Control> _sectionPanels = [];
 
-    /// <summary>Reads the current page's titled widgets where they were arranged, which is the order a
-    /// user dragged them into rather than the markup's. A widget nested in another is part of its
-    /// parent's section, not one of its own.</summary>
+    /// <summary>Reads the current page's titled widgets and marked cards where they were arranged, which
+    /// is the order a user dragged them into rather than the markup's. A section nested in another is
+    /// part of its parent's, not one of its own.</summary>
     private void RefreshSections() {
         if (_viewModel is null)
             return;
 
         Control host = _viewModel.CurrentPageSelfScrolls ? SelfScrollingHost : ScrollingHost;
-        var panels = host.GetVisualDescendants().OfType<WidgetPanel>()
-            .Where(panel => !panel.GetVisualAncestors().TakeWhile(a => a != host).OfType<WidgetPanel>().Any())
+        var panels = host.GetVisualDescendants().OfType<Control>().Where(PageSections.IsSection)
+            .Where(panel => !panel.GetVisualAncestors().TakeWhile(a => a != host).OfType<Control>()
+                .Any(PageSections.IsSection))
             .ToList();
 
         var candidates = panels.Select(panel => {
             var origin = panel.TranslatePoint(default, host);
-            return new SectionCandidate(panel.Title, origin?.Y ?? double.NaN, origin?.X ?? double.NaN,
-                panel.IsEffectivelyVisible);
+            return new SectionCandidate(PageSections.TitleOf(panel), origin?.Y ?? double.NaN,
+                origin?.X ?? double.NaN, panel.IsEffectivelyVisible);
         }).ToList();
 
         _sectionPanels = panels;

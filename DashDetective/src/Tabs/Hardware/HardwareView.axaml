@@ -24,8 +24,10 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
-                <!-- No Height and no Top alignment: the panel stretches each card to its row's height. -->
-                <Border Classes="panel" MinHeight="{StaticResource HardwareCardMinHeight}"
+                <!-- No Height and no Top alignment: the panel stretches each card to its row's height.
+                     pageSection lists the card in the nav bar's "On this page" list under its automation
+                     name, and revealFlash tints it when one is picked. -->
+                <Border Classes="panel revealFlash pageSection" MinHeight="{StaticResource HardwareCardMinHeight}"
                         AutomationProperties.Name="{Binding Title}">
                     <StackPanel Spacing="12">
                         <!-- Header: tinted icon tile + title / subtitle. A Grid rather than a

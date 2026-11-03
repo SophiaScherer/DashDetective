@@ -1,3 +1,6 @@
+using Avalonia.Automation;
+using Avalonia.Controls;
+using DashDetective.Shared.Controls;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +32,19 @@ internal static class PageSections {
     /// <summary>How far apart two tops can be and still read as one row. A board aligns a row's tops
     /// exactly; the slack is for panels whose margins differ by a pixel or two.</summary>
     internal const double RowTolerance = 4;
+
+    /// <summary>The class a page puts on a card that is a section without being a <see cref="WidgetPanel"/>,
+    /// such as a Hardware card; its title is its automation name.</summary>
+    internal const string SectionClass = "pageSection";
+
+    /// <summary>Whether a control is a section: a widget, or a card marked with <see cref="SectionClass"/>.
+    /// Untitled ones still count here, so a titled widget nested in one is not listed on its own.</summary>
+    internal static bool IsSection(Control control) =>
+        control is WidgetPanel || control.Classes.Contains(SectionClass);
+
+    /// <summary>The heading a section is listed under: a widget's title, or a marked card's automation name.</summary>
+    internal static string? TitleOf(Control control) =>
+        control is WidgetPanel widget ? widget.Title : AutomationProperties.GetName(control);
 
     /// <summary>Whether a page with this many sections offers the list.</summary>
     internal static bool ShouldShow(int count) => count >= MinimumToShow;

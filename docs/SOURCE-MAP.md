@@ -1393,7 +1393,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  there is no confirmation. Notify(string) is the forwarder view
                                  code-behind calls — MainWindow's own Export among them. The page hosts
                                  are named (ScrollingHost / SelfScrollingHost) so RefreshSections can
-                                 read the current page's titled widgets for the nav bar's section list,
+                                 read the current page's titled widgets and pageSection-marked cards
+                                 for the nav bar's section list,
                                  on each page change and each open; a pick is scrolled and flashed here)
       BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
                                  from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
@@ -1518,6 +1519,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      Generic so tests use strings: NavItem's icon needs a render backend.
                                      Same idea as File Explorer's NavigationHistory, which is tab-local)
         PageSections.cs             (which widgets are the current page's SECTIONS and in what order:
+                                     a WidgetPanel, or a card carrying the pageSection class titled by
+                                     its automation name (Hardware's cards, which are not widgets);
                                      visible, titled, in reading order of where they were ARRANGED
                                      (rows within RowTolerance, then left to right), since a dragged
                                      board no longer matches its markup. Pure over SectionCandidate
@@ -2096,7 +2099,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          UniformFlowPanel with Reorder="Item", saved under
                                                          the "hardware" key. The card Border fills its
                                                          row's height and sets only a MinHeight floor
-                                                         from Dimensions.axaml — see FEATURES.md)
+                                                         from Dimensions.axaml — see FEATURES.md. It
+                                                         carries pageSection, which lists it in the nav
+                                                         bar's section list, and revealFlash for the pick)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the

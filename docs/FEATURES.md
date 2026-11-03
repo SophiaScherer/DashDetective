@@ -72,9 +72,14 @@ point drives the **same shared** `NavigationViewModel`:
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 - **Page sections** (work item 46) — **press the current page's nav item again** for an "On this page"
   list of its sections; choosing one scrolls it to the top of its scroller and flashes it. A section is a
-  visible `WidgetPanel` with a title, outermost only, listed in reading order of where it was
+  visible `WidgetPanel` with a title, or a card marked `pageSection` and titled by its automation name
+  (the Hardware cards, which are not widgets), outermost only, listed in reading order of where it was
   **arranged** — rows top to bottom, left to right within a row — because widgets are reordered by
   dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
+  - **Hardware is marked, not rebuilt.** Its cards draw their own icon-tile header, so making them
+    `WidgetPanel`s would redraw the page. The marker class is the whole change: the reader accepts it,
+    and the card also takes `revealFlash` so a pick tints it like a widget. A machine with two GPUs lists
+    Graphics twice, in page order, since the list shows titles only.
   - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
     the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
     a tab stop to every page, and have nowhere to go on a horizontal bar without moving its neighbors.
