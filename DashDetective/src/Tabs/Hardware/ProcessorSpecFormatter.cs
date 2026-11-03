@@ -58,6 +58,11 @@ internal static class ProcessorSpecFormatter {
     /// no value for the field. The shape every row's fallback ends in.</summary>
     public static string Spec(string? value) => IsBlank(value) ? None : value!;
 
+    /// <summary>The socket row: the machine's own designation where it reported one, since it names the
+    /// board's socket, and the catalog's rated socket for the part otherwise.</summary>
+    public static string Socket(string? live, string? spec) =>
+        string.IsNullOrWhiteSpace(live) ? Spec(spec) : live;
+
     /// <summary>Drops a trailing " GHz" so a catalog base clock can share the boost side's unit exactly as
     /// a numeric one does. Pure; unit-tested.</summary>
     internal static string WithoutGhz(string clock) {

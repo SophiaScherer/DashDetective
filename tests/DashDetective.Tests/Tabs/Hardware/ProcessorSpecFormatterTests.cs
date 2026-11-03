@@ -116,6 +116,25 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal(expected, ProcessorSpecFormatter.Spec(value));
     }
 
+    /// <summary>The firmware's designation names the board's own socket, so a rated one never replaces
+    /// it.</summary>
+    [Theory]
+    [InlineData("AM5")]
+    [InlineData(null)]
+    public void Socket_WithALiveDesignation_IgnoresTheCatalogSocket(string? spec) {
+        Assert.Equal("SocketAM5", ProcessorSpecFormatter.Socket("SocketAM5", spec));
+    }
+
+    [Theory]
+    [InlineData(null, "AM5", "AM5")]
+    [InlineData("", "AM5", "AM5")]
+    [InlineData("  ", "AM5", "AM5")]
+    [InlineData(null, null, "—")]
+    [InlineData("", "—", "—")]
+    public void Socket_WithNoLiveDesignation_FallsBackToTheCatalog(string? live, string? spec, string expected) {
+        Assert.Equal(expected, ProcessorSpecFormatter.Socket(live, spec));
+    }
+
     /// <summary>The catalog states clocks with their unit; the paired row states it once, on the right.
     /// Anything that is not a GHz string passes through untouched.</summary>
     [Theory]

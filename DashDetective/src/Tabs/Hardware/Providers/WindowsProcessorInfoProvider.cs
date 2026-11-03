@@ -52,12 +52,6 @@ internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
 
             var spec = HardwareCatalog.LookupCpu(name);
 
-            // WMI's designation wins where the firmware filled it in: it names the board's own socket,
-            // which the catalog's rated socket for the part can only approximate.
-            var socketName = string.IsNullOrEmpty(socket)
-                ? ProcessorSpecFormatter.Spec(spec?.Socket)
-                : socket;
-
             return new ProcessorInfo(
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 Cores: cores > 0 ? cores.ToString() : "—",
@@ -65,7 +59,7 @@ internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
                 BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost, spec?.Base),
                 CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb, spec?.CacheL3),
                 Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
-                Socket: socketName);
+                Socket: ProcessorSpecFormatter.Socket(socket, spec?.Socket));
         } catch (Exception e) {
             Log.Warn("ProcessorInfoProvider read failed", e);
             return ProcessorInfo.Unknown;
