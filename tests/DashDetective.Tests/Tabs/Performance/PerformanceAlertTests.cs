@@ -34,8 +34,8 @@ public class PerformanceAlertTests {
                 gpuAdapters: [new GpuAdapter(Amd, "AMD amdgpu (1002:73df)", false, 0)]),
             () => new FakeGpuUsageSampler().Reporting(Amd, 37), alerts: alerts);
 
-        // The constructor fires its own load and forgets it; letting that finish keeps the row set stable.
-        await Task.Delay(100);
+        // The constructor fires its own load; awaiting it keeps the row set stable.
+        await page.InitialLoad;
         await page.LoadInventoryAsync();
         return page;
     }
