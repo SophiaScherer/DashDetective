@@ -81,9 +81,12 @@ public static class ToolTipTracking {
         if (sender is not TopLevel root)
             return;
 
-        var hit = e.Source as Visual;
         var point = e.GetPosition(root);
         root.SetValue(LastPointerProperty, point);
+
+        // Hit-tested as the framework does, disabled controls included: a disabled owner can show its tip, but
+        // its moves are routed from the nearest enabled ancestor.
+        var hit = root.InputHitTest(point, enabledElementsOnly: false) as Visual ?? e.Source as Visual;
 
         if (OpenOwner(hit, ToolTip.GetIsOpen) is { } owner) {
             Track(owner, default);
