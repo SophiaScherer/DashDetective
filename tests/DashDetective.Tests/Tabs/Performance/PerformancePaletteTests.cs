@@ -5,6 +5,7 @@ using DashDetective.Services.Theming;
 using DashDetective.Tabs.Performance;
 using DashDetective.Tests.Fakes;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
@@ -16,7 +17,8 @@ namespace DashDetective.Tests.Tabs.Performance;
 /// and re-resolves when the graph colors move it.
 /// </summary>
 public class PerformancePaletteTests {
-    private static (PerformanceViewModel ViewModel, ThemeService Theme) Page() {
+    // Awaits the constructor's load, which otherwise rebuilds Resources on a pool thread mid-enumeration.
+    private static async Task<(PerformanceViewModel ViewModel, ThemeService Theme)> Page() {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
         var theme = new ThemeService();
@@ -25,6 +27,7 @@ public class PerformancePaletteTests {
             StubHardwareProviders.With(),
             () => new FakeGpuUsageSampler(),
             theme);
+        await viewModel.InitialLoad;
         return (viewModel, theme);
     }
 
@@ -34,8 +37,8 @@ public class PerformancePaletteTests {
     private static Color ColorOf(IBrush? brush) => Assert.IsAssignableFrom<ISolidColorBrush>(brush).Color;
 
     [Fact]
-    public void Rows_StartOnTheAuthoredPalette() {
-        var (viewModel, _) = Page();
+    public async Task Rows_StartOnTheAuthoredPalette() {
+        var (viewModel, _) = await Page();
 
         Assert.Equal(ChartPalette.Default.Cpu, ColorOf(Row(viewModel, ChartSeries.Cpu).ValueBrush));
         Assert.Equal(ChartPalette.Default.Memory, ColorOf(Row(viewModel, ChartSeries.Memory).ValueBrush));
@@ -43,8 +46,8 @@ public class PerformancePaletteTests {
     }
 
     [Fact]
-    public void ApplyGraphColors_RetintsEveryRow() {
-        var (viewModel, theme) = Page();
+    public async Task ApplyGraphColors_RetintsEveryRow() {
+        var (viewModel, theme) = await Page();
         var colors = GraphColors.All.First(c => c.Name == "Orange");
 
         theme.ApplyGraphColors(colors);
@@ -57,8 +60,8 @@ public class PerformancePaletteTests {
     /// <summary>The two-series row is the one the old behaviour ruined: receive and send share an axis, so
     /// one colour for both left them indistinguishable.</summary>
     [Fact]
-    public void ApplyGraphColors_LeavesTheNetworkRowsTwoSeriesOnDifferentColours() {
-        var (viewModel, theme) = Page();
+    public async Task ApplyGraphColors_LeavesTheNetworkRowsTwoSeriesOnDifferentColours() {
+        var (viewModel, theme) = await Page();
 
         foreach (var colors in GraphColors.All) {
             theme.ApplyGraphColors(colors);
@@ -69,8 +72,8 @@ public class PerformancePaletteTests {
     }
 
     [Fact]
-    public void ApplyGraphColors_Null_RestoresTheAuthoredPalette() {
-        var (viewModel, theme) = Page();
+    public async Task ApplyGraphColors_Null_RestoresTheAuthoredPalette() {
+        var (viewModel, theme) = await Page();
         theme.ApplyGraphColors(GraphColors.All.First(c => c.Name == "Green"));
 
         theme.ApplyGraphColors(null);
@@ -82,8 +85,8 @@ public class PerformancePaletteTests {
     /// <summary>A disposed page must stop hearing the service, or a re-created tab would leave the old one
     /// alive through the event.</summary>
     [Fact]
-    public void Dispose_StopsFollowingThePalette() {
-        var (viewModel, theme) = Page();
+    public async Task Dispose_StopsFollowingThePalette() {
+        var (viewModel, theme) = await Page();
         var before = Row(viewModel, ChartSeries.Cpu).ValueBrush;
 
         viewModel.Dispose();
