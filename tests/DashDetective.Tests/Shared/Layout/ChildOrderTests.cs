@@ -163,6 +163,42 @@ public class ChildOrderTests {
         Assert.Equal("b c a", Shown(order, previewing: true, "a", "b", "c"));
     }
 
+    /// <summary>The Dashboard's shape: an unnamed card row ahead of the charts. A chart dropped over it
+    /// stops just after it, rather than landing in the card row's place.</summary>
+    [Fact]
+    public void Move_OverAChildWithNoId_StopsBesideIt() {
+        var order = new ChildOrder();
+        order.Sync(["", "b", "c"]);
+        order.BeginPreview();
+
+        order.Move(child: 2, visibleTarget: 0, AllVisible);
+
+        Assert.Equal("_ c b", Shown(order, previewing: true, "_", "b", "c"));
+    }
+
+    /// <summary>The unnamed child itself never moves: a keyboard move that falls through from the card
+    /// row to the board around it must not carry the whole row into the charts.</summary>
+    [Fact]
+    public void Move_AChildWithNoId_StaysPut() {
+        var order = new ChildOrder();
+        order.Sync(["", "b", "c"]);
+        order.BeginPreview();
+
+        Assert.False(order.Move(child: 0, visibleTarget: 2, AllVisible));
+        Assert.Equal("_ b c", Shown(order, previewing: true, "_", "b", "c"));
+    }
+
+    [Fact]
+    public void Move_BetweenTwoChildrenWithNoId_StaysBetweenThem() {
+        var order = new ChildOrder();
+        order.Sync(["a", "", "c", "d", "", "f"]);
+        order.BeginPreview();
+
+        order.Move(child: 2, visibleTarget: 5, AllVisible);
+
+        Assert.Equal("a _ d c _ f", Shown(order, previewing: true, "a", "_", "c", "d", "_", "f"));
+    }
+
     // ===== Commit =====
 
     [Fact]

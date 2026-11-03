@@ -31,6 +31,11 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         AvaloniaProperty.Register<ReorderablePanel, IReadOnlyList<string>?>(
             nameof(Order), defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>Keeps a dragged item drawn inside this panel. For a strip that is a flow of its own
+    /// inside a page — the Dashboard's stat cards — so a card cannot look as if it went among the charts.</summary>
+    public static readonly StyledProperty<bool> ConfineDragProperty =
+        AvaloniaProperty.Register<ReorderablePanel, bool>(nameof(ConfineDrag));
+
     private readonly List<Control> _visible = new();
     private readonly ChildOrder _childOrder = new();
     private Rect2[] _slotRects = Array.Empty<Rect2>();
@@ -57,6 +62,11 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     public IReadOnlyList<string>? Order {
         get => GetValue(OrderProperty);
         set => SetValue(OrderProperty, value);
+    }
+
+    public bool ConfineDrag {
+        get => GetValue(ConfineDragProperty);
+        set => SetValue(ConfineDragProperty, value);
     }
 
     /// <summary>Raised with the new id order once a drag commits.</summary>
@@ -166,6 +176,8 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     }
 
     Panel IReorderablePanel.Surface => this;
+
+    bool IReorderablePanel.ConfinesDrag => ConfineDrag;
 
     IReadOnlyList<Control> IReorderablePanel.Items => _visible;
 
