@@ -18,8 +18,8 @@
         <Style Selector="controls|StatCard.disk"><Setter Property="Accent" Value="{DynamicResource ChartStorage}"/></Style>
         <Style Selector="controls|StatCard.net"><Setter Property="Accent" Value="{DynamicResource ChartNetDown}"/></Style>
 
-        <!-- A card being dragged wears the lifted look Widgets.axaml gives a strip's Border.card. The drag
-             lifts the link it picked up, so the class lands one level above the card's own surface. -->
+        <!-- Restates Widgets.axaml's Border.card.dragging: the drag lifts the link, so the class lands one
+             level above the card's surface, and widening the shared rule would also lift the Performance rail. -->
         <Style Selector="vm|DashboardLink.dragging Border.card">
             <Setter Property="Opacity" Value="0.92"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>

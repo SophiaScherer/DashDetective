@@ -37,9 +37,9 @@ public partial class DashboardCard : ObservableObject, IWidgetIdentity {
     /// for it (<c>PerformanceViewModel.Reveal</c>).</summary>
     public string DeviceId { get; }
 
-    /// <summary>What the card row's saved order calls this card. A GPU goes by its index label ("GPU 0")
-    /// rather than its device id, because that carries the adapter LUID, which Windows mints again every
-    /// boot — a saved position keyed by it would be lost on each restart.</summary>
+    /// <summary>What the card row's saved order calls this card. A GPU goes by its label ("GPU", or "GPU 0"
+    /// once there are several) rather than its device id, which carries the adapter LUID that Windows mints
+    /// again every boot. A change in GPU count renames them, and their saved slots fall back to declared.</summary>
     public string WidgetId => Category == DeviceCategory.Gpu
         ? "dashboard.card." + Label.ToLowerInvariant()
         : "dashboard.card." + DeviceId;

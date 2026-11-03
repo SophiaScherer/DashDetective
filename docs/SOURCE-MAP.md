@@ -345,7 +345,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
                                  a drag does, so both persist through one path. It also makes every
                                  item it lays out a tab stop — a card is usually a plain Border, and
-                                 Focusable in the view does not work, only this does
+                                 Focusable in the view does not work, only this does — EXCEPT a
+                                 generated item whose root is already a focusable control (a Dashboard
+                                 card's link, a Performance rail button), which would otherwise be two
+                                 stops with the first doing nothing
                                  the half of reordering both panels share: the saved order and its
                                  re-entrancy guard, the previewed order, the children on screen and
                                  where their slots were arranged. A base class rather than a helper
@@ -1550,8 +1553,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          OpenCommand, which asks the shell to reveal it in
                                                          Performance. WidgetId names it in the card row's
                                                          saved order (dashboard.cards) — by device id, except
-                                                         a GPU, by its "GPU 0" label: its device id carries a
-                                                         LUID, which Windows mints again every boot. Tip is ONE tooltip with a fallback —
+                                                         a GPU, by its "GPU" / "GPU 0" label: its device id
+                                                         carries a LUID, which Windows mints again every boot.
+                                                         A GPU count change renames them, and their saved
+                                                         slots fall back to the declared position. Tip is ONE tooltip with a fallback —
                                                          the card's no-reading note when it has one, else
                                                          the open hint — because a card has no room for a
                                                          line of its own and the note has more to say)

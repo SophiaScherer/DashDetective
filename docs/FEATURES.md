@@ -363,8 +363,10 @@ cannot reach the charts, and a chart cannot be dropped into the card row. Four d
   over it stops below it, and a keyboard move that falls through from the row's last card to the board does
   not carry the whole row in among the charts.
 
-A card's id is its device id, except a GPU's, which goes by its index label ("GPU 0"): the device id
-carries the adapter LUID, which Windows mints again every boot.
+A card's id is its device id, except a GPU's, which goes by its label — "GPU" alone, "GPU 0", "GPU 1" once
+there are several — because the device id carries the adapter LUID, which Windows mints again every boot. A
+GPU count that changes between runs renames them, so their saved slots are dropped and they return to their
+declared place among the cards; nothing else in the order moves.
 
 ## Universal search
 
@@ -831,7 +833,11 @@ cards together.
 than by each view. Most cards are a plain `Border` with no control inside, so before this a page was
 reachable only if one of its items happened to contain a button: Hardware, Storage and the Processes
 summary tiles were dead zones for Tab, and could not be reordered at all. Avalonia draws its own focus
-ring on the focused card, so the target is visible without a style of ours.
+ring on the focused card, so the target is visible without a style of ours. **The exception is a
+generated item whose template root is itself a focusable control** — a Dashboard card's link, a Performance
+rail row's button: that control is the stop, and its container is left out, or each item took two Tab
+presses, the first landing on a ring that did nothing. The keyboard move still finds the item from the
+control, since it walks out from whatever has focus.
 
 Two things about that are worth knowing:
 
