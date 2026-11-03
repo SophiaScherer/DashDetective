@@ -169,7 +169,8 @@ internal sealed record DrmCardFacts(
     ///
     /// The <i>bundled</i> vendor word wins over the table's where there is one, because <c>pci.ids</c>
     /// spells vendors out in full ("Advanced Micro Devices, Inc. [AMD/ATI]") and a card subtitle has no
-    /// room for it. Pure; unit-tested.
+    /// room for it. A product that already starts with the vendor word ("Intel Arc Graphics") is not
+    /// prefixed again. Pure; unit-tested.
     /// </summary>
     internal static string FormatProductName(uint vendorId, string tableVendor, string deviceName) {
         deviceName = MarketingName(deviceName);
@@ -180,19 +181,26 @@ internal sealed record DrmCardFacts(
         if (vendor.Length == 0)
             vendor = tableVendor;
 
-        return vendor.Length > 0 ? $"{vendor} {deviceName}" : deviceName;
+        return vendor.Length == 0 || StartsWithWord(deviceName, vendor) ? deviceName : $"{vendor} {deviceName}";
     }
+
+    /// <summary>Whether <paramref name="text"/> opens with <paramref name="word"/> as a whole word, ignoring
+    /// case — "Intel Arc" opens with "Intel", "Intellimouse" does not.</summary>
+    private static bool StartsWithWord(string text, string word) =>
+        text.StartsWith(word, StringComparison.OrdinalIgnoreCase)
+        && (text.Length == word.Length || char.IsWhiteSpace(text[word.Length]));
 
     /// <summary>
     /// The bracketed product name in a <c>pci.ids</c> device entry — "GeForce RTX 3060" from "GA106
     /// [GeForce RTX 3060]" — since the codename before it is the chip's, not anything a buyer would
-    /// recognize, and Windows names the same card without it. An entry with no bracket, or an empty one,
-    /// is returned whole. Pure; unit-tested.
+    /// recognize, and Windows names the same card without it. An entry with no bracket or an empty one is
+    /// returned whole, and so is one with text after the bracket ("MGA G200e [Pilot] ServerEngines
+    /// (SEP1)"), which is not the "codename [product]" shape. Pure; unit-tested.
     /// </summary>
     internal static string MarketingName(string deviceName) {
         var open = deviceName.IndexOf('[');
         var close = open < 0 ? -1 : deviceName.IndexOf(']', open + 1);
-        if (close < 0)
+        if (close < 0 || !deviceName.AsSpan(close + 1).IsWhiteSpace())
             return deviceName;
 
         var product = deviceName.AsSpan(open + 1, close - open - 1).Trim();

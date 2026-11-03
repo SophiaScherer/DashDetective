@@ -280,6 +280,9 @@ public class DrmCardFactsTests {
     [InlineData(0x1a2bu, "Some Vendor Inc.", "Widget 9000", "Some Vendor Inc. Widget 9000")]
     [InlineData(0x1a2bu, "", "Widget 9000", "Widget 9000")]
     [InlineData(0x10deu, "NVIDIA Corporation", "GA106 [GeForce RTX 3060]", "NVIDIA GeForce RTX 3060")]
+    [InlineData(0x8086u, "Intel Corporation", "Meteor Lake-P [Intel Arc Graphics]", "Intel Arc Graphics")]
+    [InlineData(0x8086u, "Intel Corporation", "Meteor Lake-P [INTEL Arc Graphics]", "INTEL Arc Graphics")]
+    [InlineData(0x8086u, "Intel Corporation", "Widget [Intellisense Graphics]", "Intel Intellisense Graphics")]
     public void FormatProductName_PrefersTheShortVendorWord(
         uint vendorId, string tableVendor, string deviceName, string expected) {
         Assert.Equal(expected, DrmCardFacts.FormatProductName(vendorId, tableVendor, deviceName));
@@ -302,6 +305,8 @@ public class DrmCardFactsTests {
     [InlineData("SVGA II Adapter", "SVGA II Adapter")]
     [InlineData("Widget [ ]", "Widget [ ]")]
     [InlineData("Widget [unclosed", "Widget [unclosed")]
+    [InlineData("MGA G200e [Pilot] ServerEngines (SEP1)", "MGA G200e [Pilot] ServerEngines (SEP1)")]
+    [InlineData("GA106 [GeForce RTX 3060]  ", "GeForce RTX 3060")]
     [InlineData("", "")]
     public void MarketingName_KeepsOnlyTheBracketedProduct(string deviceName, string expected) {
         Assert.Equal(expected, DrmCardFacts.MarketingName(deviceName));
