@@ -232,13 +232,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // pill is on.
         _gate = new SamplingGate(ApplySampling);
 
-        // Load static CPU hardware info off the UI thread; results are applied when ready.
-        _ = LoadCpuInfoAsync();
-        _ = LoadMemoryInfoAsync();
-        _ = LoadGpusAsync();
-        _ = LoadSystemInfoAsync();
-        _ = LoadDisksAsync();
+        // Load static hardware info off the UI thread; results are applied when ready.
+        InitialLoad = Task.WhenAll(
+            LoadCpuInfoAsync(), LoadMemoryInfoAsync(), LoadGpusAsync(), LoadSystemInfoAsync(), LoadDisksAsync());
     }
+
+    /// <summary>The loads the constructor starts, so a test can await them instead of guessing how long
+    /// they take. Each soft-fails on its own, so this never faults.</summary>
+    internal Task InitialLoad { get; }
 
     /// <summary>
     /// Forces an immediate update of every metric and re-reads the static hardware/system info,
