@@ -78,7 +78,8 @@ point drives the **same shared** `NavigationViewModel`:
   dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
   - **Hardware is marked, not rebuilt.** Its cards draw their own icon-tile header, so making them
     `WidgetPanel`s would redraw the page. The marker class is the whole change: the reader accepts it,
-    and the card also takes `revealFlash` so a pick tints it like a widget. A machine with two GPUs lists
+    and the card also takes `revealFlash` so a pick tints its surface (a widget's flash also turns its
+    border to the accent; the card's does not). A machine with two GPUs lists
     Graphics twice, in page order, since the list shows titles only.
   - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
     the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
@@ -2113,6 +2114,10 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 ## Hardware
 
 *Shipped — branch `hardwareCardHeights`, 2026-10.*
+
+**Each card is a nav bar section.** It carries `pageSection`, so the "On this page" list (see *Navigation
+bar*) lists it under its automation name, and `revealFlash`, so a pick tints it. The cards are not
+`WidgetPanel`s, and marking them is what keeps the page from being rebuilt as widgets.
 
 **Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
 already arranges every child at its row's height (the tallest card's). The cards used to opt out with

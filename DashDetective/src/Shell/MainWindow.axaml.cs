@@ -127,10 +127,10 @@ public partial class MainWindow : Window {
         Dispatcher.UIThread.Post(RefreshSections, DispatcherPriority.Loaded);
     }
 
-    // ----- Page sections (the nav bar's list of the current page's titled widgets) -----
+    // ----- Page sections (the nav bar's list of the current page's titled widgets and marked cards) -----
 
-    // The widgets the last read found, indexed as the candidates handed to the nav bar, so a picked
-    // section names its widget without the view model ever holding a control.
+    // The sections the last read found, indexed as the candidates handed to the nav bar, so a picked
+    // section names its control without the view model ever holding a control.
     private List<Control> _sectionPanels = [];
 
     /// <summary>Reads the current page's titled widgets and marked cards where they were arranged, which

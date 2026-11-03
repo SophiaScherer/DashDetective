@@ -7,9 +7,9 @@ using System.Linq;
 
 namespace DashDetective.Shell.Navigation;
 
-/// <summary>A titled widget found on the page, where it was laid out, and whether it is on screen. The
-/// view reads these off the visual tree; everything after that is <see cref="PageSections"/>'s.</summary>
-/// <param name="Title">The widget's heading, or null for a widget without one.</param>
+/// <summary>A widget or marked card found on the page, where it was laid out, and whether it is on screen.
+/// The view reads these off the visual tree; everything after that is <see cref="PageSections"/>'s.</summary>
+/// <param name="Title">Its heading, or null for one without.</param>
 /// <param name="Top">Its arranged top edge, relative to the page.</param>
 /// <param name="Left">Its arranged left edge, relative to the page.</param>
 /// <param name="IsVisible">Whether it is effectively visible.</param>

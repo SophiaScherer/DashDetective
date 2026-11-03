@@ -614,7 +614,7 @@ public partial class NavigationViewModel : ViewModelBase {
         SelectionChanged?.Invoke(item);
     }
 
-    // ----- Page sections (the current page's titled widgets, listed from its nav item) -----
+    // ----- Page sections (the current page's titled widgets and marked cards, listed from its nav item) -----
 
     /// <summary>The current page's sections, in reading order. Rebuilt by <see cref="SetSections"/>.</summary>
     public ObservableCollection<PageSectionOption> Sections { get; } = new();
