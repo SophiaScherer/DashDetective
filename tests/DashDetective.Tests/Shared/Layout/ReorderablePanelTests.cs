@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using DashDetective.Shared.Layout;
 using System;
@@ -163,6 +164,59 @@ public class ReorderablePanelTests {
         board.Measure(new Size(400, double.PositiveInfinity));
         board.Arrange(new Rect(0, 0, 400, board.DesiredSize.Height));
 
+        Assert.All(items, item => Assert.Null(item.RenderTransform));
+    }
+
+    /// <summary>Picking up a neighbour that is still sliding keeps it above the others: stopping its slide
+    /// must not drop it back under them.</summary>
+    [Fact]
+    public void Drag_ANeighborStillSliding_IsHeldAboveTheOthers() {
+        var (board, items) = Board();
+        board.Clock = () => TimeSpan.Zero;
+        DragFirstOverSecond(board, items);
+        board.Drag.Release(null);
+        Layout(board);
+
+        var grab = new Point(items[1].Bounds.Center.X, 50);
+        board.Drag.Press(new ReorderHandle(items[1], items[1], items[1]), grab);
+        board.Drag.MoveTo(grab + new Point(40, 0), null);
+        Layout(board);
+
+        Assert.Equal(10, items[1].ZIndex);
+        Assert.Null(items[1].RenderTransform);
+    }
+
+    /// <summary>A slide whose frames never came — the page was left mid-slide — is finished by the next
+    /// layout rather than left drawn off its slot.</summary>
+    [Fact]
+    public void Layout_AfterAnExpiredSlideWithNoFrames_LandsTheWidget() {
+        var (board, items) = Board();
+        var now = TimeSpan.Zero;
+        board.Clock = () => now;
+        DragFirstOverSecond(board, items);
+        board.Drag.Release(null);
+        Layout(board);
+
+        now = ReorderSlides.Duration;
+        Layout(board);
+
+        Assert.All(items, item => Assert.Null(item.RenderTransform));
+        Assert.Equal(0, items[0].ZIndex);
+    }
+
+    /// <summary>Capture-lost is a direct event on the panel holding the capture; it must reach the drag, or
+    /// a drag whose capture is taken away stays live until a later release commits it.</summary>
+    [Fact]
+    public void CaptureLost_MidDrag_CancelsTheDrag() {
+        var (board, items) = Board();
+        board.Clock = () => TimeSpan.Zero;
+        board.Drag.Attach();
+        DragFirstOverSecond(board, items);
+
+        board.RaiseEvent(new PointerCaptureLostEventArgs(board, new Pointer(1, PointerType.Mouse, true)));
+        Layout(board);
+
+        Assert.False(board.Drag.IsDragging);
         Assert.All(items, item => Assert.Null(item.RenderTransform));
     }
 }

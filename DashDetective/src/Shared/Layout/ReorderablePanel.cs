@@ -158,6 +158,10 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e) {
         if (Reorderable)
             Drag.Detach();
+
+        // No frames reach a detached panel, so a slide left running would stay drawn off its slot.
+        foreach (var child in new List<object>(_slides.Items))
+            StopSlide((Control)child);
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -242,6 +246,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     /// re-packs them, and the dropped item from where it was let go. Nothing else moves it — a resize
     /// or a cancelled drag lands at once, and Reduce motion turns all of it off.</summary>
     private void Slide(Control child, Point slot) {
+        FinishSlides(Clock());
         var settle = Drag.TakeSettle(child);
         var moved = _drawnAt.TryGetValue(child, out var was) && was != slot;
         _drawnAt[child] = slot;
@@ -272,8 +277,19 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
             return;
 
         _slides.Stop(child);
+        Land(child);
+    }
+
+    // Back in the flow: no offset, and no longer drawn above its neighbours unless it is being held.
+    private void Land(Control child) {
         child.RenderTransform = null;
-        child.ZIndex = 0;
+        if (!ReferenceEquals(child, Drag.Dragged))
+            child.ZIndex = 0;
+    }
+
+    private void FinishSlides(TimeSpan now) {
+        foreach (var child in _slides.Finish(now))
+            Land((Control)child);
     }
 
     private void Draw(Control child, TimeSpan now) {
@@ -298,13 +314,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     internal void OnFrame() {
         _frameRequested = false;
         var now = Clock();
-        foreach (var child in _slides.Finish(now)) {
-            var control = (Control)child;
-            control.RenderTransform = null;
-            if (!ReferenceEquals(control, Drag.Dragged))
-                control.ZIndex = 0;
-        }
-
+        FinishSlides(now);
         foreach (var child in _slides.Items)
             Draw((Control)child, now);
         if (_slides.Count > 0)

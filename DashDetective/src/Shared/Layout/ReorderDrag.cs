@@ -52,7 +52,9 @@ public sealed class ReorderDrag {
         _host.Surface.AddHandler(InputElement.PointerPressedEvent, OnPressed, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerMovedEvent, OnMoved, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerReleasedEvent, OnReleased, RoutingStrategies.Tunnel);
-        _host.Surface.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Tunnel);
+        // Direct, like Exited: capture-lost is raised only on the element that held the capture, so a
+        // tunnel handler never ran and a drag whose capture was taken away stayed live.
+        _host.Surface.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Direct);
 
         // Exited is a direct event, so this fires for the panel itself rather than for every child the
         // pointer crosses on the way out.
