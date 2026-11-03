@@ -2164,7 +2164,7 @@ Four decisions inside it:
 
 - **Dismissal stays the framework's.** Avalonia already closes a tip when the pointer moves off its owner, and re-checks the control under a still pointer after a layout or scroll change. An app-side dismissal guard was written once and reverted as redundant; this adds tracking only.
 - **The tip is re-placed by changing its owner's offset.** Avalonia re-reads the pointer whenever an open tip's `HorizontalOffset`/`VerticalOffset` changes, and offers no other public way to move one, so each move toggles the offset by a sub-pixel `Nudge`. The owner's own offsets are kept and restored exactly when the tip closes.
-- **A move that lands on the tip still counts.** A quick downward move can put the pointer on the tip, whose own window then takes the moves. The pointer is still over the owner beneath, so the tip is shifted by the pointer's distance from where it was anchored.
+- **A move that lands on the tip still counts.** A quick downward move can put the pointer on the tip, whose own window then takes the moves. The tip is shifted by the pointer's distance from where it was anchored; the pointer is not re-checked against the owner there, and if it has left, the framework closes the tip on the next move.
 - **Every tooltip follows, not only the widgets'.** The bug was reported on the Dashboard, but a tip pinned where the pointer entered is the same defect on any owner. A tip placed against its owner rather than the pointer (`ToolTip.Placement` other than `Pointer`) is left where it is.
 
 Reduce motion does not change it: following the pointer is a direct response to input, not an animation, and re-placing an open tip does not re-run its fade.
