@@ -14,9 +14,9 @@ namespace DashDetective.Services.Platform.Linux;
 /// are model tokens — which is why the Hardware tab's Graphics card shows "—" for CUDA cores, boost clock
 /// and bus on Linux. A real product name fills those rows with no further source.
 ///
-/// <b>Scanned for the ids asked for, never loaded whole.</b> The file is ~1.5 MB and mostly subsystem
-/// lines; a machine has one or two graphics adapters. One pass that keeps only the wanted pairs costs a
-/// fraction of what holding the whole table would, and stops as soon as every pair is found.
+/// <b>Only the ids asked for are kept.</b> The file is ~1.5 MB and mostly subsystem lines; a machine has
+/// one or two graphics adapters. The lines are read once per call, and one pass keeps only the wanted
+/// pairs, stopping as soon as every pair is found, so nothing of the table outlives the call.
 ///
 /// Stateless and never throws: on a host with no <c>pci.ids</c> — a minimal container, a distro that does
 /// not ship hwdata — <see cref="Read"/> yields <see cref="Empty"/>, every lookup misses, and each caller

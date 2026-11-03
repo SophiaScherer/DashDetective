@@ -38,6 +38,16 @@ public class LinuxGpuAdapterProviderTests {
         Assert.Equal(0xc7u, pci.Revision);
     }
 
+    /// <summary>This list labels the Dashboard and Performance GPU cards, so it reads the named walk — and the
+    /// name must not move the token, or the sampler's key stops matching and the card vanishes.</summary>
+    [Fact]
+    public async Task GetAsync_PciIdsPresent_NamesTheAdapterAndKeepsItsToken() {
+        var adapter = Assert.Single(await Read(new FakeProcFileSystem().WithNvidiaCard().WithPciIds()));
+
+        Assert.Equal("NVIDIA GA106 [GeForce RTX 3060 Lite Hash Rate]", adapter.Name);
+        Assert.Equal("0000:01:00.0", adapter.LuidToken);
+    }
+
     [Fact]
     public async Task GetAsync_ReportsEveryCardWithADistinctToken() {
         var adapters = await Read(new FakeProcFileSystem().WithAmdgpuCard().WithNvidiaCard());
