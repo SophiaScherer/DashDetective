@@ -28,9 +28,9 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
 
-        <!-- Motion. The rail is the one place in this app that animates, and only for its own two moves:
-             a collapse that snaps 236px to 64px and a bar that teleports between window edges both read as
-             glitches rather than gestures. Only a vertical rail tweens its size: RailWidth is NaN on a
+        <!-- Motion. The rail animates its own two moves, and its rows lift on hover (below). A collapse
+             that snaps 236px to 64px and a bar that teleports between window edges both read as glitches
+             rather than gestures. Only a vertical rail tweens its size: RailWidth is NaN on a
              horizontal bar, whose height follows its content, and NaN is not worth interpolating. A dock
              change cannot be tweened at all (a DockPanel offers no path between edges), so it fades
              instead: out, relayout while invisible, back in. Both live on the rail Border, which carries no

@@ -67,8 +67,8 @@ point drives the **same shared** `NavigationViewModel`:
   funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
   changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
   the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
-  dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
-  otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
+  dropped drag re-docks before `EndDrag` clears the dim. These tweens are earned by moves that would
+  otherwise read as glitches, not a licence to animate the bar's styling; the row-hover rule below still stands.
 - **Hover lift** (work item 49) — a nav row's icon and label rise 1.5px as the pointer passes, over a
   120ms `CubicEaseOut` `TransformOperationsTransition`, upward on every dock edge. Decisions inside it:
   it is a **render transform on `StackPanel.navContent` only**, so layout never changes, no neighbor
