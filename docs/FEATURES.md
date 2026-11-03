@@ -59,7 +59,7 @@ point drives the **same shared** `NavigationViewModel`:
   items, the footer and any empty space all reach it.
 - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
   in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
-- **Motion — the bar is the ONE place in this app that animates**, for its own two moves and a hover. A
+- **Motion — the bar animates its own two moves and a hover.** A
   **collapse tweens a vertical rail's width** (~150ms, `CubicEaseOut`), on `Border.rail:not(.horizontal)`
   only: a horizontal bar's height follows its content, so there is no fixed value to tween between, and
   `RailWidth` is `NaN` on that axis. A **re-dock fades** — out 120ms, change edge, back in — because
@@ -746,9 +746,12 @@ about that selector are easy to get wrong, and both were measured rather than as
   and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
   is undone from `SharedStyles.axaml`.
 
-**What it covers:** the navigation rail's width, height and opacity tweens and its rows' hover lift, the
-reveal flash's fade, and the Processes loading pulse — the app's only endlessly repeating animation,
-which drops from `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+the Processes loading pulse — the app's only endlessly repeating animation, which drops from
+`IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+- **The navigation rows' hover lift** (work item 49) is covered too: the tween and the 1.5px lift both go,
+  from a rule in `NavigationView.axaml` declared after the hover rule.
 
 **Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
 the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against
