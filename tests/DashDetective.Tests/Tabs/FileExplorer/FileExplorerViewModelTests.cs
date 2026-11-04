@@ -60,4 +60,14 @@ public sealed class FileExplorerViewModelTests : IDisposable {
 
         Assert.False(_page.HandleShortcut(ShortcutId.Back));
     }
+
+    /// <summary>A drive root loses its trailing separator ("C:"), but the Unix root is only a separator
+    /// and must keep it, or its crumb is empty.</summary>
+    [Fact]
+    public void RootLabel_TrimsADriveSeparatorButNeverLeavesTheLabelEmpty() {
+        var separator = Path.DirectorySeparatorChar.ToString();
+
+        Assert.Equal("C:", FileExplorerViewModel.RootLabel("C:" + separator));
+        Assert.Equal(separator, FileExplorerViewModel.RootLabel(separator));
+    }
 }

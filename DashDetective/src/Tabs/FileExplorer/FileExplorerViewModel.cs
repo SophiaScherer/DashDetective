@@ -682,10 +682,16 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         for (var i = 0; i < chain.Count; i++) {
             var dir = chain[i];
             var isCurrent = i == chain.Count - 1;
-            // The drive root's Name is "C:\"; trim the separator so it reads "C:".
-            var label = dir.Parent is null ? dir.Name.TrimEnd(Path.DirectorySeparatorChar) : dir.Name;
+            var label = dir.Parent is null ? RootLabel(dir.Name) : dir.Name;
             Crumbs.Add(new Crumb(label, dir.FullName, isCurrent ? "" : "›", isCurrent, OnCrumbSelected));
         }
+    }
+
+    /// <summary>A drive root's Name is "C:\", trimmed to read "C:". The Unix root is "/", which would trim
+    /// to nothing and leave a zero-width crumb, so it stays as is.</summary>
+    internal static string RootLabel(string rootName) {
+        var trimmed = rootName.TrimEnd(Path.DirectorySeparatorChar);
+        return trimmed.Length > 0 ? trimmed : rootName;
     }
 
     private void OnCrumbSelected(Crumb crumb) => SetCurrentFolder(crumb.FullPath);
