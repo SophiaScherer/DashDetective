@@ -4,8 +4,8 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Shortcuts;
 
-/// <summary>Pins that the keyboard reorder gesture resolves, and that it does not collide with the
-/// Ctrl+arrow pager it sits beside.</summary>
+/// <summary>Pins that the keyboard reorder gesture resolves, that it does not collide with the
+/// Ctrl+arrow pager it sits beside, and that it leaves a focused text box its word selection.</summary>
 public class KeyboardReorderShortcutTests {
     [Theory]
     [InlineData(Key.Right, ShortcutId.MoveItemForward)]
@@ -29,5 +29,33 @@ public class KeyboardReorderShortcutTests {
         Assert.True(bindings.TryResolve(
             Key.Right, KeyModifiers.Control, false, ShortcutScope.Network, out var id));
         Assert.Equal(ShortcutId.NextPage, id);
+    }
+
+    /// <summary>Ctrl+Shift+arrow extends a text box's selection by a word, so a field inside a widget
+    /// (the Network tab's Ping and DNS boxes) must keep it rather than moving the widget (work item 98).</summary>
+    [Theory]
+    [InlineData(Key.Left, ShortcutScope.Global)]
+    [InlineData(Key.Right, ShortcutScope.Global)]
+    [InlineData(Key.Left, ShortcutScope.Network)]
+    [InlineData(Key.Right, ShortcutScope.Network)]
+    public void CtrlShiftArrow_TextInputFocused_LeavesTheKeyToTheTextBox(Key key, ShortcutScope scope) {
+        var bindings = new ShortcutBindings();
+
+        var ids = bindings.Resolve(key, KeyModifiers.Control | KeyModifiers.Shift, true, scope);
+
+        Assert.DoesNotContain(ShortcutId.MoveItemBack, ids);
+        Assert.DoesNotContain(ShortcutId.MoveItemForward, ids);
+    }
+
+    /// <summary>The guard belongs to the action, not to the default gesture, so a rebind keeps it.</summary>
+    [Fact]
+    public void Rebind_KeepsTheMoveOutOfTextInput() {
+        var bindings = new ShortcutBindings();
+        var gesture = new KeyGesture(Key.M, KeyModifiers.Control | KeyModifiers.Alt);
+        Assert.True(bindings.TryRebind(ShortcutId.MoveItemBack, gesture, out _));
+
+        Assert.Empty(bindings.Resolve(gesture.Key, gesture.KeyModifiers, true, ShortcutScope.Global));
+        Assert.Contains(ShortcutId.MoveItemBack,
+                        bindings.Resolve(gesture.Key, gesture.KeyModifiers, false, ShortcutScope.Global));
     }
 }

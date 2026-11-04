@@ -153,13 +153,15 @@ public static class ShortcutCatalog {
 
         // ----- Layout -----
         // Ctrl+Shift rather than Alt+arrow, which Processes uses to sort and File Explorer to go up.
+        // Text-guarded because a text box selects by word on the same gesture (work item 98).
         new(ShortcutId.MoveItemBack,
             [new KeyGesture(Key.Left, KeyModifiers.Control | KeyModifiers.Shift)],
-            "Ctrl+Shift+←", "Move the focused widget or card one slot earlier", ShortcutScope.Global),
+            "Ctrl+Shift+←", "Move the focused widget or card one slot earlier", ShortcutScope.Global,
+            AllowInTextInput: false),
 
         new(ShortcutId.MoveItemForward,
             [new KeyGesture(Key.Right, KeyModifiers.Control | KeyModifiers.Shift)],
-            "Ctrl+Shift+→", "Move it one slot later", ShortcutScope.Global),
+            "Ctrl+Shift+→", "Move it one slot later", ShortcutScope.Global, AllowInTextInput: false),
     ];
 
     /// <summary>The default bindings grouped as the Help modal renders them. Generated from
