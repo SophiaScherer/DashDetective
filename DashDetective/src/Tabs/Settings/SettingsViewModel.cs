@@ -343,10 +343,13 @@ public partial class SettingsViewModel : ViewModelBase {
     }
 
     /// <summary>Puts every accessibility option back the way it ships. The segmented controls follow
-    /// through the service's Changed event, so this does not touch them itself.</summary>
+    /// through the service's Changed event, so this does not touch them itself. Raises Changed itself
+    /// because the scales and color vision reflect back without one, so a reset of only those went
+    /// unsaved (work item 107).</summary>
     [RelayCommand]
     private void ResetAccessibility() {
         _accessibility.RestoreDefaults();
+        Changed?.Invoke();
         Notify?.Invoke(Notices.AccessibilityRestored);
     }
 

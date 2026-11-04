@@ -326,6 +326,51 @@ public class SettingsViewModelTests {
         Assert.Equal(ScaleRange.DefaultPercent, viewModel.TextScalePercent);
     }
 
+    /// <summary>Work item 107: the scales are reflected without passing through a toggle's change hook,
+    /// so a reset that moved only them raised nothing and the shell never saved it.</summary>
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheTextScaleMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.TextScalePercent = 150;
+        viewModel.ApplyScales();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ScaleRange.DefaultPercent, accessibility.TextScalePercent);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheInterfaceScaleMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.UiScalePercent = 150;
+        viewModel.ApplyScales();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ScaleRange.DefaultPercent, accessibility.ScalePercent);
+        Assert.Equal(1, changes);
+    }
+
+    /// <summary>The color-vision segments are reflected through IsSelected, which raises nothing either.</summary>
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheColorVisionModeMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.ColorVisionOptions[1].SelectCommand.Execute(null);
+        Assert.Equal(ColorVisionMode.Deuteranopia, accessibility.ColorVision);
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ColorVisionMode.None, accessibility.ColorVision);
+        Assert.Equal(1, changes);
+    }
+
     /// <summary>A hand-edited settings file is normalized before the controls ever see it.</summary>
     [Fact]
     public void Ctor_SeedsTheControlsFromTheNormalizedValue() {

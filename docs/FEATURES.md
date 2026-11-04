@@ -628,7 +628,9 @@ search and revealable on its own row.
   keyboard is on. On by default because an unused gesture costs nothing.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
-  becoming a property on that service.
+  becoming a property on that service. **It raises `Changed` itself** so the shell saves the reset: the
+  scales and the color-vision segments are reflected back without passing through a change hook, so a
+  reset that moved only those was undone on the next launch (work item 107).
 
 **One transform, not a font-size sweep.** `ScaleHost` (`src/Shared/Controls`) is a
 `LayoutTransformControl` that measures its content at the reduced size and renders it enlarged, so
