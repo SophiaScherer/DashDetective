@@ -16,7 +16,7 @@ namespace DashDetective.Shared;
 /// places.
 ///
 /// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>. Fully soft-failing,
-/// like the copies it replaces: a cancelled pick and a failed write both leave the app untouched.
+/// like the copies it replaces: a cancelled pick and a failed I/O write both leave the app untouched.
 /// </summary>
 internal static class FileSave {
     /// <summary>
@@ -53,22 +53,34 @@ internal static class FileSave {
         if (file is null)
             return null; // user cancelled
 
-        try {
-            // The name is the authority on the format: the dialog does not report which filter was
-            // chosen, and a typed extension should win over the one that happened to be selected.
-            var format = DiagnosticsFormats.FromFileName(file.Name);
+        // The name is the authority on the format: the dialog does not report which filter was
+        // chosen, and a typed extension should win over the one that happened to be selected.
+        var format = DiagnosticsFormats.FromFileName(file.Name);
 
-            await using var stream = await file.OpenWriteAsync();
-            await using var writer = new StreamWriter(stream);
-            await writer.WriteAsync(content(format));
-        } catch (Exception) {
-            // Disk full, permission denied, drive removed mid-write, etc. Swallow so a failed export
-            // can't take the app down; the file simply isn't written.
+        if (!await TryWriteAsync(file.OpenWriteAsync, () => content(format)))
             return null;
-        }
 
         // The local path where there is one, so a confirmation can name somewhere the user can go look.
         // A picker on a provider that has no local file (a cloud location) still has a name.
         return file.TryGetLocalPath() ?? file.Name;
+    }
+
+    /// <summary>
+    /// Renders first, then opens the destination, so a renderer that throws cannot leave a truncated file
+    /// behind. A renderer failure is a bug and propagates; only a failed open or write returns false.
+    /// </summary>
+    internal static async Task<bool> TryWriteAsync(Func<Task<Stream>> openWrite, Func<string> render) {
+        var text = render();
+        try {
+            await using var stream = await openWrite();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(text);
+            return true;
+        } catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+            // Disk full, permission denied, drive removed mid-write: the file isn't written and the app
+            // carries on. Anything else is a bug and is left to surface.
+            Log.Warn("Export could not be written", e);
+            return false;
+        }
     }
 }

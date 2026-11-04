@@ -148,7 +148,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                 near-identical copies — toolbar Export, the two Settings buttons, the
                                 Toolkit log — which is what made adding a format a three-place edit.
                                 Content is rendered only after a destination is picked, and only in the
-                                one format chosen. RETURNS the path it wrote, or null for a cancelled pick
+                                one format chosen, and BEFORE the file is opened, so a renderer bug cannot truncate the destination
+                                (it propagates; only IOException/UnauthorizedAccessException are caught
+                                and logged). RETURNS the path it wrote, or null for a cancelled pick
                                 or a failed write, so all four callers confirm from one value rather than
                                 each deciding what counts as a success)
                                 arms: the 12-hour one must say AM/PM rather than whatever the host
