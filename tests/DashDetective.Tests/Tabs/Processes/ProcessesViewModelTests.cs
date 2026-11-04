@@ -315,6 +315,28 @@ public class ProcessesViewModelTests {
         Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
     }
 
+    /// <summary>PID 0 is the System Idle Process, a real row. Clicking it must set an anchor like any
+    /// other, rather than reading as "no anchor" and leaving the Shift-click to replace the selection.</summary>
+    [Fact]
+    public async Task SelectRow_WithShift_AfterClickingPidZero_TakesTheRange() {
+        var samplers = new MetricSamplers(
+            () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
+        var metrics = new SystemMetricsService(samplers, () => new FakeUiTimer());
+        var provider = new ControllableSnapshotProvider([
+            Proc(0, 0, "System Idle Process", ProcessCategory.App),
+            Proc(100, 0, "tool.exe", ProcessCategory.App),
+            Proc(200, 0, "zeta.exe", ProcessCategory.App),
+        ]);
+        var viewModel = new ProcessesViewModel(metrics, provider, new FakeProcessInterop());
+        await viewModel.LoadAsync();
+
+        viewModel.SelectRow(Row(viewModel, 0));
+        viewModel.SelectRow(Row(viewModel, 200), extend: false, range: true);
+
+        Assert.True(Row(viewModel, 0).IsSelected);
+        Assert.Equal(3, viewModel.SelectedPids.Count);
+    }
+
     /// <summary>A range reads the way the eye does — down the screen, straight through the group
     /// headings, not per group.</summary>
     [Fact]
