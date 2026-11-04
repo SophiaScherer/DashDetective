@@ -574,7 +574,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
         ShortcutOverrideCodec.cs
                                 (the rebinds as one opaque string for AppSettings, the WidgetOrders
                                  shape. Ids, keys and modifiers BY NAME, so inserting an enum member
-                                 cannot silently rebind someone's keyboard; an unreadable entry is
+                                 cannot silently rebind someone's keyboard — a numeric or undefined value is
+                                 refused, since Enum.TryParse would take it; an unreadable entry is
                                  skipped, leaving that shortcut on its default)
 ```
 ## `src/Services/Settings`
