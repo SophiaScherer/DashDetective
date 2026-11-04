@@ -1785,8 +1785,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          focusable, or pressing it would stand the capture
                                                          down through LostFocus and hide itself mid-click)
                                 CaptureKeyAction.cs     (CaptureKeys.Classify: what an armed box does with a
-                                                         key — wait on a modifier, cancel on Esc, capture
-                                                         anything else. Out of the control so it is
+                                                         key — wait on a modifier, cancel on Esc, ignore bare
+                                                         and Shift+Tab (focus traversal), capture anything else. Out of the control so it is
                                                          testable without a render backend)
                                 ShortcutRow.cs          (one Keyboard-card row: the action, its keys,
                                                          whether it is custom, and the note explaining a
