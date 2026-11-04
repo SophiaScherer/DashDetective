@@ -49,6 +49,20 @@ public class FileSaveTests {
             () => throw new InvalidOperationException(), () => "x"));
     }
 
+    [Fact]
+    public async Task GuardAsync_OpenThrowsNonIoError_ReturnsNull() {
+        var result = await FileSave.GuardAsync(async () => {
+            await FileSave.TryWriteAsync(() => throw new InvalidOperationException(), () => "x");
+            return "written";
+        });
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GuardAsync_Success_PassesTheResultThrough() =>
+        Assert.Equal("p", await FileSave.GuardAsync(() => Task.FromResult<string?>("p")));
+
     /// <summary>A MemoryStream the writer can dispose without losing the bytes.</summary>
     private sealed class NonClosingStream : Stream {
         public MemoryStream Inner { get; } = new();

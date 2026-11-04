@@ -30,9 +30,25 @@ internal static class FileSave {
     /// <param name="content">Renders the report in whichever format the chosen filename means.</param>
     /// <returns>Where the file was written, for a caller that confirms it; null for a cancelled pick or
     /// a failed write, which are the two things there is nothing to announce about.</returns>
-    public static async Task<string?> SaveAsync(Visual owner, string title, string suggestedName,
-                                                IReadOnlyList<DiagnosticsFormat> formats,
-                                                Func<DiagnosticsFormat, string> content) {
+    public static Task<string?> SaveAsync(Visual owner, string title, string suggestedName,
+                                          IReadOnlyList<DiagnosticsFormat> formats,
+                                          Func<DiagnosticsFormat, string> content) =>
+        GuardAsync(() => SaveCoreAsync(owner, title, suggestedName, formats, content));
+
+    /// <summary>Never throws. Deliberately broad: the picker and the open can fail in ways a platform
+    /// defines, and every caller is an <c>async void</c> handler where a throw would end the process.</summary>
+    internal static async Task<string?> GuardAsync(Func<Task<string?>> save) {
+        try {
+            return await save();
+        } catch (Exception e) {
+            Log.Error("Export failed", e);
+            return null;
+        }
+    }
+
+    private static async Task<string?> SaveCoreAsync(Visual owner, string title, string suggestedName,
+                                                     IReadOnlyList<DiagnosticsFormat> formats,
+                                                     Func<DiagnosticsFormat, string> content) {
         var storage = TopLevel.GetTopLevel(owner)?.StorageProvider;
         if (storage is null || formats.Count == 0)
             return null;

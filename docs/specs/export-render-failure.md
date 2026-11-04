@@ -18,6 +18,9 @@ The catch was also wider than its comment (disk full, permission denied) and log
 
 ## Decisions
 
+- **`SaveAsync` never throws.** `GuardAsync` wraps the whole flow (picker, open, write) in one broad,
+  logged catch, because the picker and the open fail in platform-defined ways and every caller is
+  `async void`. The filtered I/O catch inside `TryWriteAsync` remains the specific one for the write.
 - **A renderer failure does not propagate.** Every caller is an `async void` handler (or a fire-and-forget
   shortcut), so a throw would crash the app. It is logged as an error and returns null; the existing file
   is untouched because nothing was opened. Callers still cannot tell it from a cancel, which is accepted.
