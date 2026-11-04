@@ -13,6 +13,9 @@ sampler throws, so the Dashboard sat on a confident 0% for the session.
 - `ProcessorUtilityCpuSampler.Interpret` turns the two PDH statuses plus the raw value into a clamped
   reading, and throws `InvalidOperationException` on any failure.
 - `WindowsMemoryUsageSampler.EnsureRead` throws when `GlobalMemoryStatusEx` reports failure.
+- `CpuUsageSampler` keeps a seeded `SystemTimesCpuSampler` while the utility counter is in use. If the utility
+  sampler throws at runtime it logs once, disposes the counter and switches to the fallback; only if the
+  fallback also throws does the failure reach `MetricChannel`.
 
 ## Decisions
 
@@ -24,3 +27,4 @@ sampler throws, so the Dashboard sat on a confident 0% for the session.
 
 1. Run `Interpret_FailedRead_Throws` and `EnsureRead_Failure_Throws`.
 2. Make `Interpret` stop throwing and they fail.
+3. `CpuUsageSamplerTests.Sample_PrimaryThrowsAtRuntime_SwitchesToFallback` covers the runtime switch.

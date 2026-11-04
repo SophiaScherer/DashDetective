@@ -87,7 +87,7 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
     /// <summary>
     /// Returns total CPU utilisation (0–100) since the previous call. Utility can exceed 100 while the
     /// CPU boosts above its base clock; it is clamped to 100 to match Task Manager's headline figure.
-    /// Any failure yields 0.
+    /// A read failure on a ready sampler throws (<see cref="CpuUsageSampler"/> then falls back); an inert sampler yields 0.
     /// </summary>
     public double Sample() {
         if (!Ready)

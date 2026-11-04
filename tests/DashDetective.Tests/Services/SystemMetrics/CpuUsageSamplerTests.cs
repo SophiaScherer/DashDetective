@@ -97,12 +97,44 @@ public class CpuUsageSamplerTests {
         Assert.Equal(0.0, new UnsupportedCpuSampler().Sample());
     }
 
+    /// <summary>A utility counter that fails mid-session switches to the fallback instead of blanking the
+    /// readout; the failed sampler is disposed and the fallback keeps serving.</summary>
+    [Fact]
+    public void Sample_PrimaryThrowsAtRuntime_SwitchesToFallback() {
+        var primary = new ThrowingCpuSampler();
+        var sampler = new CpuUsageSampler(primary, new StubCpuSampler(37.0));
+
+        Assert.Equal(37.0, sampler.Sample());
+        Assert.Equal(37.0, sampler.Sample());
+        Assert.Equal(1, primary.Calls);
+        Assert.True(primary.Disposed);
+    }
+
+    /// <summary>With no fallback left, the failure reaches the caller so the placeholder can show.</summary>
+    [Fact]
+    public void Sample_NoFallback_ThrowPropagates() {
+        Assert.Throws<InvalidOperationException>(() => new CpuUsageSampler(new ThrowingCpuSampler(), null).Sample());
+    }
+
     /// <summary>Fake <see cref="ICpuSampler"/> — stands in for the utility counter or the fallback so the
     /// coordinator's delegation can be verified without real hardware counters.</summary>
     private sealed class StubCpuSampler(double value) : ICpuSampler, IDisposable {
         public bool Disposed { get; private set; }
 
         public double Sample() => value;
+
+        public void Dispose() => Disposed = true;
+    }
+
+    private sealed class ThrowingCpuSampler : ICpuSampler, IDisposable {
+        public int Calls { get; private set; }
+
+        public bool Disposed { get; private set; }
+
+        public double Sample() {
+            Calls++;
+            throw new InvalidOperationException("read failed");
+        }
 
         public void Dispose() => Disposed = true;
     }
