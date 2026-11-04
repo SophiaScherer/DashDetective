@@ -1,3 +1,4 @@
+using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -121,11 +122,16 @@ public sealed class RecentSearches {
     private bool RemoveMatching(SearchCategory category, string key) {
         for (var i = 0; i < Entries.Count; i++)
             if (Entries[i].Category == category &&
-                string.Equals(Entries[i].Key, key, StringComparison.OrdinalIgnoreCase)) {
+                string.Equals(Entries[i].Key, key, KeyComparison(category))) {
                 Entries.RemoveAt(i);
                 return true;
             }
 
         return false;
     }
+
+    /// <summary>How two keys of a category name the same entry: a file's key is a full path, so it follows
+    /// the filesystem's case rule; every other key is an identity compared case-insensitively.</summary>
+    internal static StringComparison KeyComparison(SearchCategory category) =>
+        category == SearchCategory.File ? PathComparison.Comparison : StringComparison.OrdinalIgnoreCase;
 }
