@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -46,10 +47,14 @@ public sealed record ToolkitAction {
     /// than from the row's label, so the log is honest about two things the label hides: the value a
     /// parameterised row's placeholder stood for, and any flags the row does not spell out.
     ///
-    /// Display only — nothing is ever executed from this string.
+    /// Display only — nothing is ever executed from this string. Tokens holding whitespace are quoted so
+    /// a paste into a terminal splits the same way the real argument list does.
     /// </summary>
     public string CommandLine =>
-        Arguments.Count == 0 ? Target : Target + " " + string.Join(' ', Arguments);
+        Arguments.Count == 0 ? Quote(Target) : Quote(Target) + " " + string.Join(' ', Arguments.Select(Quote));
+
+    private static string Quote(string token) =>
+        token.Any(char.IsWhiteSpace) ? "\"" + token.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"" : token;
 
     /// <summary>Whether this action's output is redirected into the Execution Log.</summary>
     public bool CapturesOutput => Kind == ToolkitActionKind.Capture;
