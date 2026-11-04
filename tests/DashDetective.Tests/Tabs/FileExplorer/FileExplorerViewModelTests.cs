@@ -102,14 +102,22 @@ public sealed class FileExplorerViewModelTests : IDisposable {
         Assert.Equal(drive, _page.CurrentPath);
     }
 
+    /// <summary>The folder exists relative to the working directory, which is exactly what a bypassed
+    /// check would resolve it against, so only the refusal keeps it from opening.</summary>
     [Fact]
-    public void CommitPath_RelativeName_IsRefusedWithThePathError() {
-        var before = _page.CurrentPath;
-        _page.PathText = "Users";
+    public void CommitPath_RelativeNameThatExistsInTheWorkingDirectory_IsRefusedWithThePathError() {
+        var name = "DashDetectiveRel_" + Path.GetRandomFileName();
+        var folder = Directory.CreateDirectory(Path.Combine(Environment.CurrentDirectory, name)).FullName;
+        try {
+            var before = _page.CurrentPath;
+            _page.PathText = name;
 
-        _page.CommitPathCommand.Execute(null);
+            _page.CommitPathCommand.Execute(null);
 
-        Assert.Equal(before, _page.CurrentPath);
-        Assert.Equal("Can't find \"Users\"", _page.PathError);
+            Assert.Equal(before, _page.CurrentPath);
+            Assert.Equal($"Can't find \"{name}\"", _page.PathError);
+        } finally {
+            Directory.Delete(folder);
+        }
     }
 }
