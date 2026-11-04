@@ -194,6 +194,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
         }
 
+        // A relative name would resolve against the process working directory, not anywhere the user sees.
+        var rooted = RootTypedPath(path, OperatingSystem.IsWindows());
+        if (rooted is null) {
+            PathError = $"Can't find \"{path}\"";
+            return;
+        }
+
+        path = rooted;
+
         try {
             if (Directory.Exists(path)) {
                 PathError = "";
@@ -209,6 +218,22 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             // Malformed path: bad characters, too long, or no permission to resolve it.
             PathError = $"\"{path}\" isn't a valid path";
         }
+    }
+
+    /// <summary>The typed path as an absolute one, or null when it is relative. A bare drive letter ("C:")
+    /// becomes that drive's root; "C:foo" is drive-relative, so it is refused like any relative name.</summary>
+    internal static string? RootTypedPath(string path, bool windows) {
+        if (windows && path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0])) {
+            if (path.Length == 2) {
+                return path + Path.DirectorySeparatorChar;
+            }
+
+            if (path[2] is not ('\\' or '/')) {
+                return null;
+            }
+        }
+
+        return Path.IsPathRooted(path) ? path : null;
     }
 
     /// <summary>Whether OS hidden/system entries (e.g. AppData) are shown in the list and tree.</summary>
