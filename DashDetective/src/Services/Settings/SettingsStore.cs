@@ -38,7 +38,8 @@ public sealed class SettingsStore : IDisposable {
     }
 
     /// <summary>Reads the persisted settings, or <see cref="AppSettings.Defaults"/> if the file is
-    /// missing, unreadable, corrupt, or from a newer/older schema. Never throws.</summary>
+    /// missing, unreadable, corrupt, or from a newer/older schema. A single key whose value does not fit
+    /// (an unknown enum name) falls back to its own default. Never throws.</summary>
     public AppSettings Load() {
         if (_path is null || !File.Exists(_path))
             return AppSettings.Defaults;
@@ -87,7 +88,26 @@ public sealed class SettingsStore : IDisposable {
         foreach (var (key, value) in file)
             merged[key] = value?.DeepClone();
 
-        return merged.Deserialize(SettingsJsonContext.Default.AppSettings);
+        try {
+            return merged.Deserialize(SettingsJsonContext.Default.AppSettings);
+        } catch (JsonException) {
+            // Some value does not fit its property (e.g. an enum name from another version). Drop only
+            // the keys that fail on their own so the rest of the file still loads.
+            var defaults = JsonSerializer.SerializeToNode(AppSettings.Defaults, SettingsJsonContext.Default.AppSettings)
+                as JsonObject ?? new JsonObject();
+            foreach (var (key, value) in file) {
+                var probe = (JsonObject)defaults.DeepClone();
+                probe[key] = value?.DeepClone();
+                try {
+                    probe.Deserialize(SettingsJsonContext.Default.AppSettings);
+                } catch (JsonException) {
+                    Log.Warn($"Settings key '{key}' has an unusable value; using its default");
+                    merged[key] = defaults[key]?.DeepClone();
+                }
+            }
+
+            return merged.Deserialize(SettingsJsonContext.Default.AppSettings);
+        }
     }
 
     /// <summary>Queues <paramref name="settings"/> to be written after a short debounce, coalescing a
