@@ -88,11 +88,11 @@ public static class DataRateFormatter {
     }
 
     /// <summary>NaN and infinity read as zero, as in <see cref="ByteRateFormatter"/>.</summary>
-    private static double Finite(double mbps) => double.IsFinite(mbps) ? mbps : 0;
+    internal static double Finite(double mbps) => double.IsFinite(mbps) ? mbps : 0;
 
     /// <summary>The unit for a readout, chosen from the value as it will be displayed: 999.6 Mbps rounds to
     /// 1000 in Mbps, so it reads "1.0 Gbps" instead. <see cref="UnitFor"/> keeps the raw magnitude rule.</summary>
-    private static RateUnit DisplayUnit(double mbps) {
+    internal static RateUnit DisplayUnit(double mbps) {
         var unit = UnitFor(mbps);
         // Math.Round mirrors FormatValue's whole-number rounding, which is what the reader sees at ≥ 10.
         while (unit < RateUnit.Gbps && Math.Round(Convert(mbps, unit)) >= 1000)
