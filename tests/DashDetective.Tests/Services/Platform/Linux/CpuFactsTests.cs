@@ -136,6 +136,90 @@ public class CpuFactsTests {
         Assert.Equal(12288, CpuFacts.L3CacheKilobytes(proc));
     }
 
+    /// <summary>Stages one core's L3 entry, with its package and whichever instance identifiers are given.</summary>
+    private static FakeProcFileSystem WithL3(
+        FakeProcFileSystem proc, int cpu, string package, string size, string? id, string? sharedCpus) {
+        var root = CpuRoot + "/cpu" + cpu;
+        proc.WithFile(root + "/topology/physical_package_id", package + "\n")
+            .WithFile(root + "/cache/index3/level", "3\n")
+            .WithFile(root + "/cache/index3/size", size + "\n");
+        if (id is not null)
+            proc.WithFile(root + "/cache/index3/id", id + "\n");
+        if (sharedCpus is not null)
+            proc.WithFile(root + "/cache/index3/shared_cpu_list", sharedCpus + "\n");
+        return proc;
+    }
+
+    /// <summary>The bug: a two-CCD part has two L3s, and <c>cpu0</c> sees only its own. A Ryzen 9 5900X read
+    /// 32 MB against WMI's package-wide 64 MB.</summary>
+    [Fact]
+    public void L3CacheKilobytes_TwoCcds_SumsBothInstances() {
+        var proc = new FakeProcFileSystem();
+        for (var cpu = 0; cpu < 4; cpu++)
+            WithL3(proc, cpu, "0", "32768K", id: cpu < 2 ? "0" : "1", sharedCpus: null);
+
+        Assert.Equal(65536, CpuFacts.L3CacheKilobytes(proc));
+    }
+
+    /// <summary>Every core of a monolithic part reaches the same L3, which counts once rather than once per
+    /// core.</summary>
+    [Fact]
+    public void L3CacheKilobytes_OneSharedInstance_CountsItOnce() {
+        var proc = new FakeProcFileSystem();
+        for (var cpu = 0; cpu < 4; cpu++)
+            WithL3(proc, cpu, "0", "32768K", id: "0", sharedCpus: "0-3");
+
+        Assert.Equal(32768, CpuFacts.L3CacheKilobytes(proc));
+    }
+
+    /// <summary>A kernel without the cache <c>id</c> file still names the cores sharing each instance.</summary>
+    [Fact]
+    public void L3CacheKilobytes_WithNoId_TellsInstancesApartBySharedCpus() {
+        var proc = new FakeProcFileSystem();
+        for (var cpu = 0; cpu < 4; cpu++)
+            WithL3(proc, cpu, "0", "16384K", id: null, sharedCpus: cpu < 2 ? "0-1" : "2-3");
+
+        Assert.Equal(32768, CpuFacts.L3CacheKilobytes(proc));
+    }
+
+    /// <summary>With neither identifier the instances cannot be told apart, so the cache counts once — the
+    /// old <c>cpu0</c> reading — rather than once per core.</summary>
+    [Fact]
+    public void L3CacheKilobytes_WithNoInstanceIdentifier_CountsOnce() {
+        var proc = new FakeProcFileSystem();
+        for (var cpu = 0; cpu < 4; cpu++)
+            WithL3(proc, cpu, "0", "8192K", id: null, sharedCpus: null);
+
+        Assert.Equal(8192, CpuFacts.L3CacheKilobytes(proc));
+    }
+
+    /// <summary>The figure is one package's, as WMI's first processor row is: a second socket's L3 must not
+    /// double a two-socket board's total.</summary>
+    [Fact]
+    public void L3CacheKilobytes_SecondPackage_IsLeftOut() {
+        var proc = new FakeProcFileSystem();
+        WithL3(proc, 0, "0", "16384K", id: "0", sharedCpus: "0-1");
+        WithL3(proc, 1, "0", "16384K", id: "0", sharedCpus: "0-1");
+        WithL3(proc, 2, "1", "16384K", id: "1", sharedCpus: "2-3");
+        WithL3(proc, 3, "1", "16384K", id: "1", sharedCpus: "2-3");
+
+        Assert.Equal(16384, CpuFacts.L3CacheKilobytes(proc));
+    }
+
+    /// <summary>An instance whose <c>level</c> cannot be read is not counted — it may not be an L3 — while the
+    /// readable instances beside it still are. The real seam reports a denied read as missing, as here.</summary>
+    [Fact]
+    public void L3CacheKilobytes_UnreadableLevel_SkipsOnlyThatInstance() {
+        var proc = new FakeProcFileSystem();
+        WithL3(proc, 0, "0", "32768K", id: "0", sharedCpus: null);
+        WithL3(proc, 1, "0", "32768K", id: "1", sharedCpus: null);
+        proc.WithFile(CpuRoot + "/cpu2/topology/physical_package_id", "0\n")
+            .WithFile(CpuRoot + "/cpu2/cache/index3/size", "32768K\n")
+            .WithFile(CpuRoot + "/cpu2/cache/index3/id", "2\n");
+
+        Assert.Equal(65536, CpuFacts.L3CacheKilobytes(proc));
+    }
+
     /// <summary>A VM usually describes no caches at all; 0 is what renders "—".</summary>
     [Fact]
     public void L3CacheKilobytes_WithNoCacheTree_IsZero() =>

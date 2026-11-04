@@ -891,7 +891,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  and 0 honestly; each consumer applies its own placeholder.
                                  L3CacheKilobytes is a separate static, not a field — only the Hardware
                                  card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),
-                                 never as bytes)
+                                 never as bytes. It SUMS THE DISTINCT L3 INSTANCES OF cpu0'S PACKAGE, not
+                                 cpu0's alone: each CCD of a chiplet part has its own L3, so a 5900X read
+                                 32 MB against WMI's 64 MB. Instances are told apart by cache id, else
+                                 shared_cpu_list, else counted once; other packages are left out, as WMI's
+                                 first processor row does)
           ProcPids.cs           (the live PIDs, from /proc's all-digit entries. A shared DERIVATION, not a
                                  parser: the Performance tab's process count and the Processes tab's full
                                  walk both start here, so what counts as a process is decided once. Empty

@@ -9,7 +9,7 @@ namespace DashDetective.Tabs.Hardware;
 /// <summary>
 /// Processor facts from <c>/proc/cpuinfo</c> and sysfs. Name, core and thread counts and the rated clock
 /// come from <see cref="CpuFacts"/>, shared with the Dashboard's CPU tile so the two cards cannot disagree;
-/// L3 cache comes from <c>cpu0</c>'s <c>cache/index*</c> entries. Boost clock and TDP have no source on
+/// L3 cache is the package total, summed across its CCDs. Boost clock and TDP have no source on
 /// either platform, so they come from <see cref="HardwareCatalog"/> by model name and stay "—" when it has
 /// no entry — exactly as on Windows, and formatted through the same
 /// <see cref="ProcessorSpecFormatter"/> so the rows match.
