@@ -485,10 +485,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
-    private static string FormatCpuModel(CpuStaticInfo info) {
+    internal static string FormatCpuModel(CpuStaticInfo info) {
         var name = HardwareNameFormatter.ShortenCpu(info.Name);
         return info.MaxClockMhz > 0
-            ? $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz"
+            ? string.Create(CultureInfo.InvariantCulture, $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz")
             : name;
     }
 

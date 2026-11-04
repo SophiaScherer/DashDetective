@@ -2,6 +2,7 @@ using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tests.Fakes;
+using System.Globalization;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -125,5 +126,20 @@ public class DashboardViewModelTests {
 
         Assert.Contains("Unknown", viewModel.CpuModelText);
         Assert.Contains("Unknown", viewModel.OsText);
+    }
+
+    /// <summary>The clock is formatted the way the rest of the app formats numbers, whatever the
+    /// current culture's decimal separator is.</summary>
+    [Fact]
+    public void FormatCpuModel_CommaCulture_StillUsesADecimalPoint() {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+        try {
+            var text = DashboardViewModel.FormatCpuModel(new CpuStaticInfo("Test CPU", 6, 12, 4700));
+
+            Assert.EndsWith("@ 4.70GHz", text);
+        } finally {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 }
