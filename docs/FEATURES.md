@@ -1414,7 +1414,9 @@ process — `stat`, `status`, `cmdline`, `cgroup`, `io` — of which **only `sta
 exceptional one. `ProcessGpuSampler`, `ProcessMemorySampler` and `ProcessClassifier` are reached only from
 the Windows provider, so the Linux one replaces all three rather than seaming them. Names come from
 `cmdline`'s first **NUL-separated** argument (basename, **no `.exe`** — that suffix is the Windows
-provider's), falling back to `comm`, which truncates at 15 characters. CPU% is the `utime + stime` delta
+provider's), falling back to `comm`, which truncates at 15 characters. A process that **rewrites its
+title** over its arguments (sshd's `sshd: user@pts/0`, a Chromium renderer) also falls back to `comm`,
+since its argv[0] is not a path. CPU% is the `utime + stime` delta
 over `USER_HZ` (hardcoded 100 — there is no rootless `sysconf(_SC_CLK_TCK)`), wall clock and core count.
 `LinuxProcessClassifier` replaces the window test with `/proc/[pid]/cgroup`, because **the X11 route is a
 dead end**: the target desktop is GNOME on Wayland, where no client may enumerate another's windows by

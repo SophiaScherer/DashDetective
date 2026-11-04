@@ -18,6 +18,39 @@ public class ProcPidNameTests {
     public void From_PrefersTheCommandLineBasename(string? cmdline, string comm, string expected) =>
         Assert.Equal(expected, ProcPidName.From(cmdline, comm));
 
+    /// <summary>A process that writes a title over its own arguments leaves one space-joined string padded
+    /// with NULs, not a path. Its last '/' segment is junk ("0" from sshd's "pts/0"), so the name falls back
+    /// to <c>comm</c>.</summary>
+    [Theory]
+    [InlineData("sshd: sophia@pts/0\0\0\0\0", "sshd", "sshd")]
+    [InlineData("sshd-session: sophia [priv]\0\0", "sshd-session", "sshd-session")]
+    [InlineData("postgres: checkpointer \0\0", "postgres", "postgres")]
+    [InlineData(
+        "/opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=4211"
+        + " --user-data-dir=/home/sophia/chrome-profile\0\0", "chrome", "chrome")]
+    public void From_RewrittenTitle_FallsBackToComm(string cmdline, string comm, string expected) =>
+        Assert.Equal(expected, ProcPidName.From(cmdline, comm));
+
+    /// <summary>A space in argv[0] is not on its own a title: a path can hold one, with or without arguments
+    /// after it, and a 15-character <c>comm</c> is a truncated prefix of the real name.</summary>
+    [Theory]
+    [InlineData("/opt/My App/run\0", "run", "run")]
+    [InlineData("/opt/My App/run\0--flag\0", "worker", "run")]
+    [InlineData("/opt/Some Vendor/systemd-resolved\0", "systemd-resolve", "systemd-resolved")]
+    [InlineData("/opt/My App/run\0", "", "run")]                    // no comm to check against
+    public void From_SpaceInAPath_KeepsTheBasename(string cmdline, string comm, string expected) =>
+        Assert.Equal(expected, ProcPidName.From(cmdline, comm));
+
+    /// <summary>End to end through the files: the title in <c>cmdline</c>, the kernel's name in <c>comm</c>.</summary>
+    [Fact]
+    public void Read_RewrittenTitle_FallsBackToComm() {
+        var proc = new FakeProcFileSystem()
+            .WithFile("/proc/2210/cmdline", "sshd: sophia@pts/0\0\0\0")
+            .WithFile("/proc/2210/comm", "sshd\n");
+
+        Assert.Equal("sshd", ProcPidName.Read(proc, 2210));
+    }
+
     /// <summary>Neither source names it: "" rather than a placeholder, because the two tabs' placeholders
     /// differ — Processes wants "Unknown", Network wants "PID 1234", and only the caller knows which.</summary>
     [Fact]
