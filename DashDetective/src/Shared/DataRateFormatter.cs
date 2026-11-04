@@ -63,14 +63,16 @@ public static class DataRateFormatter {
     /// <summary>Convenience: a full "value unit" string for a single rate given in Mbps (auto-scaled),
     /// e.g. "2.7 Mbps".</summary>
     public static string Format(double mbps) {
-        var unit = UnitFor(mbps);
+        mbps = Finite(mbps);
+        var unit = DisplayUnit(mbps);
         return $"{FormatValue(Convert(mbps, unit))} {Label(unit)}";
     }
 
     /// <summary>Auto-scales a single rate (in Mbps) and returns its formatted value and unit label
     /// separately, for UIs that style the number and unit independently.</summary>
     public static (string Value, string Unit) Split(double mbps) {
-        var unit = UnitFor(mbps);
+        mbps = Finite(mbps);
+        var unit = DisplayUnit(mbps);
         return (FormatValue(Convert(mbps, unit)), Label(unit));
     }
 
@@ -79,7 +81,22 @@ public static class DataRateFormatter {
     /// independently would let "45 Mbps" sit beside "800 kbps", where the smaller number is drawn taller;
     /// Task Manager never mixes units within one panel either.</summary>
     public static (string First, string Second, string Unit) SplitPair(double firstMbps, double secondMbps) {
-        var unit = UnitFor(Math.Max(firstMbps, secondMbps));
+        firstMbps = Finite(firstMbps);
+        secondMbps = Finite(secondMbps);
+        var unit = DisplayUnit(Math.Max(firstMbps, secondMbps));
         return (FormatValue(Convert(firstMbps, unit)), FormatValue(Convert(secondMbps, unit)), Label(unit));
+    }
+
+    /// <summary>NaN and infinity read as zero, as in <see cref="ByteRateFormatter"/>.</summary>
+    private static double Finite(double mbps) => double.IsFinite(mbps) ? mbps : 0;
+
+    /// <summary>The unit for a readout, chosen from the value as it will be displayed: 999.6 Mbps rounds to
+    /// 1000 in Mbps, so it reads "1.0 Gbps" instead. <see cref="UnitFor"/> keeps the raw magnitude rule.</summary>
+    private static RateUnit DisplayUnit(double mbps) {
+        var unit = UnitFor(mbps);
+        // Math.Round mirrors FormatValue's whole-number rounding, which is what the reader sees at ≥ 10.
+        while (unit < RateUnit.Gbps && Math.Round(Convert(mbps, unit)) >= 1000)
+            unit++;
+        return unit;
     }
 }
