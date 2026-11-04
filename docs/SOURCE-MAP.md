@@ -607,13 +607,21 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
         IStartupRegistration.cs (the seam + ForCurrentPlatform(); see Provider seams below)
         WindowsStartupRegistration.cs
                                 (HKCU …\Run add/remove for "Launch at startup"; Microsoft.Win32.Registry,
-                                 soft-failing. Holds UnsupportedStartupRegistration too — reports
+                                 soft-failing. IsEnabled ALSO reads Explorer\StartupApproved\Run: Task
+                                 Manager disables an app by writing THAT and leaving Run alone, so the
+                                 toggle read On for an app that would not start; turning it on deletes a
+                                 disabled flag. The registry sits behind IStartupRunStore so the logic
+                                 runs on every CI leg; only the parameterless ctor carries
+                                 [SupportedOSPlatform]. Holds UnsupportedStartupRegistration too — reports
                                  "not enabled" and ignores writes off Windows)
+        StartupApproval.cs      (pure decode of that value: first byte, low bit set = disabled; 02/06
+                                 enabled, 03/07 disabled; no value = enabled)
         LinuxStartupRegistration.cs
                                 (the XDG counterpart: ~/.config/autostart/DashDetective.desktop, honouring
                                  XDG_CONFIG_HOME when it is absolute. IsEnabled READS THE FILE, not just
                                  its existence — the spec disables an entry with Hidden=true, and some
-                                 desktop tools write that instead of deleting)
+                                 desktop tools write that instead of deleting; GNOME writes
+                                 X-GNOME-Autostart-enabled=false, which counts as disabled too)
         DesktopEntry.cs         (the .desktop body as pure statics. Exec is QUOTED and its four reserved
                                  characters escaped: unquoted, a path under /home/My User/ parses as two
                                  arguments and launches the wrong thing)
