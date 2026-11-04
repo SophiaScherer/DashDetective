@@ -2078,6 +2078,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          HardwareCard models, populates them from
                                                          HardwareInfoProvider in the ctor, and implements
                                                          IRefreshablePage; Sensors card left as "—".
+                                                         GetReportRows reports every card, so each Graphics
+                                                         adapter is exported, not just the first.
                                                          Every card drags to reorder — the grid is a
                                                          UniformFlowPanel with Reorder="Item", saved under
                                                          the "hardware" key. The card Border fills its
