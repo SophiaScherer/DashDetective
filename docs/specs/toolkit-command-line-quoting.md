@@ -10,13 +10,17 @@ split into several words when pasted into a terminal.
 
 ## What was built
 
-- Any token containing whitespace is wrapped in double quotes (embedded quotes are backslash-escaped).
+- A token containing whitespace or a quote is quoted by the CommandLineToArgvW rules (the ones .NET's
+  ArgumentList follows): embedded quotes are escaped and backslashes before a quote or the closing quote
+  are doubled.
+- The target is shown environment-expanded through `ToolkitPaths.Resolve`, as the runner runs it. A
+  documentation URL is left as written.
 
 ## Decisions
 
 - **Display only.** The runner still receives the target and the unjoined argument list, so what actually
   runs does not change.
-- **Tokens without whitespace are untouched**, so existing lines such as `ping -c 4 8.8.8.8` read as before.
+- **Tokens without whitespace or quotes are untouched**, so existing lines such as `ping -c 4 8.8.8.8` read as before.
 
 ## How to verify
 
