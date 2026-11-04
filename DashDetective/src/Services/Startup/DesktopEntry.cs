@@ -33,14 +33,16 @@ internal static class DesktopEntry {
     internal static bool IsEnabled(string content) =>
         !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase);
 
-    // Inside a quoted Exec value the spec reserves these four; each is escaped with a backslash. The
-    // backslash goes first, or it would double the ones the others just added.
+    // Inside a quoted Exec value the spec reserves four characters, each escaped with a backslash, and "%"
+    // is doubled against field codes. A backslash is four in the file: the string-level escape runs before
+    // the quoting rule. The backslash goes first, or it would double the ones the others just added.
     private static string QuoteExec(string execPath) {
         var escaped = execPath
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\\", "\\\\\\\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal)
             .Replace("`", "\\`", StringComparison.Ordinal)
-            .Replace("$", "\\$", StringComparison.Ordinal);
+            .Replace("$", "\\$", StringComparison.Ordinal)
+            .Replace("%", "%%", StringComparison.Ordinal);
 
         return $"\"{escaped}\"";
     }
