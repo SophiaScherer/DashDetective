@@ -12,12 +12,15 @@ The catch was also wider than its comment (disk full, permission denied) and log
 ## What was built
 
 - The report is rendered to a string before the destination is opened (`FileSave.TryWriteAsync`).
-- The catch admits only `IOException` and `UnauthorizedAccessException`, and logs through `Log.Warn`.
+- A renderer failure is caught (broadly, since what a renderer throws is not knowable), logged through
+  `Log.Error` and returns null without the destination having been opened.
+- The write catch admits only `IOException` and `UnauthorizedAccessException`, and logs through `Log.Warn`.
 
 ## Decisions
 
-- **A renderer failure propagates.** It is a bug, not an environmental fault, so it is no longer
-  disguised as a cancel. The destination is untouched because nothing was opened.
+- **A renderer failure does not propagate.** Every caller is an `async void` handler (or a fire-and-forget
+  shortcut), so a throw would crash the app. It is logged as an error and returns null; the existing file
+  is untouched because nothing was opened. Callers still cannot tell it from a cancel, which is accepted.
 - **A failed I/O write still returns null**, as SOURCE-MAP documents, so all four callers keep one value
   to confirm from.
 
