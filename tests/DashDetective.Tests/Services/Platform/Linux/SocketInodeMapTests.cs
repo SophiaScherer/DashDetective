@@ -67,6 +67,68 @@ public class SocketInodeMapTests {
         Assert.Equal(812, map.PidFor(21344));
     }
 
+    /// <summary>Another user's socket can never be found, because its <c>fd</c> directory is unlistable. A poll
+    /// still asking about it must not walk again — observed by staging a socket afterwards that a walk would
+    /// pick up. Before the fix, every 2.5 s poll walked every process twice for it.</summary>
+    [Fact]
+    public void Refresh_UnattributableInode_DoesNotWalkAgain() {
+        var proc = Tree();
+        var map = new SocketInodeMap(proc);
+        map.Refresh([21344, 99999]);
+
+        proc.WithLink("/proc/1500/fd/3", "socket:[77777]");
+        map.Refresh([21344, 99999]);
+
+        Assert.Equal(SocketInodeMap.NoPid, map.PidFor(77777));
+        Assert.Equal(SocketInodeMap.NoPid, map.PidFor(99999));
+    }
+
+    /// <summary>Remembering an unattributable inode must not stop a genuinely new socket from being found.</summary>
+    [Fact]
+    public void Refresh_NewInodeBesideAnUnattributableOne_StillWalks() {
+        var proc = Tree();
+        var map = new SocketInodeMap(proc);
+        map.Refresh([21344, 99999]);
+
+        proc.WithLink("/proc/1500/fd/3", "socket:[77777]");
+        map.Refresh([21344, 99999, 77777]);
+
+        Assert.Equal(1500, map.PidFor(77777));
+    }
+
+    /// <summary>The connections reader asks twice per poll, TCP then UDP. A walk the TCP call triggers must
+    /// keep the UDP call's unattributable inodes known, or every new TCP socket would cost a second walk.</summary>
+    [Fact]
+    public void Refresh_WalkTriggeredByOneCall_KeepsTheOtherCallsUnattributableInodes() {
+        var proc = Tree();
+        var map = new SocketInodeMap(proc);
+        map.Refresh([21344]);
+        map.Refresh([99999]);
+
+        // A new TCP socket walks; the UDP call that follows asks only about the known-unattributable inode.
+        proc.WithLink("/proc/1500/fd/3", "socket:[77777]");
+        map.Refresh([21344, 77777]);
+        proc.WithLink("/proc/1600/fd/3", "socket:[66666]");
+        map.Refresh([99999]);
+
+        Assert.Equal(1500, map.PidFor(77777));
+        Assert.Equal(SocketInodeMap.NoPid, map.PidFor(66666));
+    }
+
+    /// <summary>An unattributable inode is re-tested by the next walk something else forces, so a socket
+    /// that later becomes visible is attributed then rather than never.</summary>
+    [Fact]
+    public void Refresh_LaterWalk_RetestsUnattributableInodes() {
+        var proc = Tree();
+        var map = new SocketInodeMap(proc);
+        map.Refresh([21344, 99999]);
+
+        proc.WithLink("/proc/1700/fd/5", "socket:[99999]").WithLink("/proc/1500/fd/3", "socket:[77777]");
+        map.Refresh([21344, 99999, 77777]);
+
+        Assert.Equal(1700, map.PidFor(99999));
+    }
+
     /// <summary>Inode 0 is the kernel's "no inode" — a TIME_WAIT slot. Asking about it must not trigger a
     /// walk, or every poll would rebuild the map for sockets nothing can own.</summary>
     [Fact]

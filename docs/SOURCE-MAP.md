@@ -994,7 +994,12 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  only rootless attribution, since /proc/net names an inode and never a PID.
                                  STATEFUL AND CACHED on purpose: the walk is a readlink per descriptor
                                  across every process and the connections table polls at 2.5 s, so it only
-                                 walks when asked about an unseen inode. A SHARED SOCKET RESOLVES TO THE
+                                 walks when asked about an unseen inode. AN INODE A WALK COULD NOT FIND IS
+                                 REMEMBERED AS UNATTRIBUTABLE until a new inode forces the next walk:
+                                 another user's socket can never be found, and without that every poll
+                                 walked twice for it (once for TCP, once for UDP). The set is rebuilt from
+                                 inodes asked since the previous walk's call, so a walk one protocol
+                                 triggers keeps the other's. A SHARED SOCKET RESOLVES TO THE
                                  LOWEST PID, not the first one walked — /proc listing order is unspecified,
                                  and the row's identity key carries the PID, so an unstable choice would
                                  break the UI's keyed diff. Reads the inode by locating the socket:[ marker
