@@ -289,6 +289,36 @@ public class ProcessesViewModelTests {
         viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
                  .Single(row => row.Pid == pid);
 
+    /// <summary>The menu's Properties, Copy PID and Expand act on the primary row, so a right-click inside
+    /// a multi-selection must move it to the clicked row without dropping the others.</summary>
+    [Fact]
+    public async Task PrepareContextMenu_InsideAMultiSelection_MakesTheClickedRowPrimaryAndKeepsTheRest() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(300, viewModel.SelectedRow!.Pid);
+
+        viewModel.PrepareContextMenu(Row(viewModel, 100));
+
+        Assert.Equal(100, viewModel.SelectedRow!.Pid);
+        Assert.Equal(2, viewModel.SelectionCount);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    [Fact]
+    public async Task PrepareContextMenu_OutsideTheSelection_ReplacesItWithTheClickedRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.PrepareContextMenu(Row(viewModel, 400));
+
+        Assert.Equal(new[] { 400 }, viewModel.SelectedPids);
+        Assert.Equal(400, viewModel.SelectedRow!.Pid);
+    }
+
     [Fact]
     public async Task SelectRow_Plain_ReplacesTheSelection() {
         var (viewModel, _) = Selectable();
