@@ -216,6 +216,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
 
         double? worst = null;
         var device = "GPU";
+        var failed = false;
 
         try {
             foreach (var (key, sample) in _gpu.SampleAdapters())
@@ -226,12 +227,21 @@ internal sealed class ResourceAlertWatcher : IDisposable {
         } catch (Exception e) {
             // The sampler contract says it never throws, but a shut PDH query has; a dead reading must
             // not take the watcher down with it.
-            Log.Warn("Could not sample GPU utilisation for the alert watcher", e);
+            if (_gpuFailures.Failed())
+                Log.Warn("Could not sample GPU utilisation for the alert watcher", e);
             worst = null;
+            failed = true;
         }
+
+        if (!failed)
+            _gpuFailures.Recovered();
 
         RecordSustained(AlertMetric.Gpu, worst, device, _options.GpuPercent);
     }
+
+    // A sampler that keeps throwing would otherwise log every tick; once per streak is enough.
+    private readonly FailureStreak _gpuFailures = new();
+    private readonly FailureStreak _diskFailures = new();
 
     private void SampleWorstDisk() {
         if (_options.DiskActivePercent <= 0)
@@ -239,6 +249,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
 
         double? worst = null;
         var device = "Disk";
+        var failed = false;
 
         try {
             foreach (var sample in _disks.Sample())
@@ -248,9 +259,14 @@ internal sealed class ResourceAlertWatcher : IDisposable {
                 }
         } catch (Exception e) {
             // Same reason as the GPU arm above.
-            Log.Warn("Could not sample disk activity for the alert watcher", e);
+            if (_diskFailures.Failed())
+                Log.Warn("Could not sample disk activity for the alert watcher", e);
             worst = null;
+            failed = true;
         }
+
+        if (!failed)
+            _diskFailures.Recovered();
 
         RecordSustained(AlertMetric.DiskActivity, worst, device, _options.DiskActivePercent);
     }

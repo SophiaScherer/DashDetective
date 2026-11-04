@@ -657,6 +657,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  MetricChannel catch blocks route through Log.Warn, and Program.cs hooks
                                  AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException →
                                  Log.Error. No logging packages)
+        FailureStreak.cs        (true only for the first failure of an unbroken run, so a polling loop logs a
+                                 repeating failure once per streak; the alert watcher's GPU and disk reads use it)
         DiagnosticsReport.cs    (the report as DATA — sections of key/value rows — rather than as text.
                                  It used to be built by string concatenation split across the shell and
                                  the Dashboard, which is why there was only ever one format)
