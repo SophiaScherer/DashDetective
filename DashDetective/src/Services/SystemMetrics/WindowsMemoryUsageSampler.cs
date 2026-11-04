@@ -51,6 +51,13 @@ internal sealed class WindowsMemoryUsageSampler : IMemoryUsageSampler {
     /// a healthy host, where the native call always succeeds.</summary>
     internal WindowsMemoryUsageSampler(SamplerInit _) => _available = false;
 
+    /// <summary>A failed call on a working sampler throws so <c>MetricChannel</c> shows the placeholder
+    /// rather than a confident 0%.</summary>
+    internal static void EnsureRead(bool succeeded) {
+        if (!succeeded)
+            throw new InvalidOperationException("GlobalMemoryStatusEx failed.");
+    }
+
     /// <summary>
     /// Returns the current physical-memory snapshot. <c>MemoryLoad</c> is used directly for the
     /// percentage; used bytes are total − available. Memory is an absolute reading, so unlike the
@@ -64,8 +71,7 @@ internal sealed class WindowsMemoryUsageSampler : IMemoryUsageSampler {
         // Length must be set before the call so the OS knows the struct version/size.
         var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
         try {
-            if (!GlobalMemoryStatusEx(ref status))
-                return NoReading;
+            EnsureRead(GlobalMemoryStatusEx(ref status));
         } catch (Exception ex) when (NativeLoadFailure.Matches(ex)) {
             _available = false;
             NativeLoadFailure.Report(nameof(WindowsMemoryUsageSampler), ex);

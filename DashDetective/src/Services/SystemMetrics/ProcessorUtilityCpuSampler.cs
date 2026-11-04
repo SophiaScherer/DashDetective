@@ -90,14 +90,24 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
     /// Any failure yields 0.
     /// </summary>
     public double Sample() {
-        if (!Ready || PdhCollectQueryData(_query) != ErrorSuccess)
+        if (!Ready)
             return 0;
 
-        if (PdhGetFormattedCounterValue(_counter, PdhFmtDouble, IntPtr.Zero, out var value) != ErrorSuccess)
-            return 0;
+        var collect = PdhCollectQueryData(_query);
+        var value = default(FormattedValue);
+        var format = collect == ErrorSuccess
+            ? PdhGetFormattedCounterValue(_counter, PdhFmtDouble, IntPtr.Zero, out value)
+            : collect;
+        return Interpret(collect, format, value.Value);
+    }
 
-        var usage = value.Value;
-        return usage < 0 ? 0 : usage > 100 ? 100 : usage;
+    /// <summary>Turns a ready sampler's PDH results into a reading. A failed read throws, so
+    /// <c>MetricChannel</c> shows the placeholder rather than a confident 0%.</summary>
+    internal static double Interpret(uint collectStatus, uint formatStatus, double raw) {
+        if (collectStatus != ErrorSuccess || formatStatus != ErrorSuccess)
+            throw new InvalidOperationException($"PDH read failed (collect 0x{collectStatus:X}, format 0x{formatStatus:X}).");
+
+        return raw < 0 ? 0 : raw > 100 ? 100 : raw;
     }
 
     /// <summary>Closes the PDH query handle. Safe to call more than once.</summary>

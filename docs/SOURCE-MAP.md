@@ -1076,7 +1076,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  used/total + the commit pair, feeding the shared Memory metric)
         WindowsMemoryUsageSampler.cs
                                 (GlobalMemoryStatusEx. Latches inert in Sample() rather than a ctor, since
-                                 there is no query to stand up. Holds UnsupportedMemoryUsageSampler)
+                                 there is no query to stand up. A failed call on a working sampler throws, so the
+                                 placeholder can show. Holds UnsupportedMemoryUsageSampler)
         LinuxMemoryUsageSampler.cs
                                 (/proc/meminfo; used = MemTotal − MemAvailable, the closest analogue to
                                  the Windows load figure and what `free -h` calls available. Falls back to
