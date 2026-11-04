@@ -1413,7 +1413,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  ignores NotifyFocused while it is writing IsOpen false, because the popup
                                  restores focus to the box inside that write and the box's GotFocus would
                                  re-open the dropdown mid-close. Every false write goes through
-                                 CloseDropdown, which holds that guard)
+                                 CloseDropdown, which holds that guard. LostFocus to anything outside
+                                 the box AND the popup calls NotifyFocusLeft, since the popup is not
+                                 light-dismiss and Tab otherwise left it open holding the arrows)
 ```
 
 ## `src/Shell/TrayNotice`

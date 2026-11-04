@@ -411,6 +411,11 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
   that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
   from a focus handler without that guard.
+- **Focus leaving the box puts the dropdown away** (work item 100). The popup is not light-dismiss and
+  the outside-click watcher only hears presses, so tabbing out left it open over every page, with the
+  Search scope taking the bare arrow keys app-wide until Esc. When focus lands on anything but the box or
+  the popup, `NotifyFocusLeft` closes it as Esc does, keeping the term, and collapses an empty field. A
+  press on a result row moves focus into the popup, which is why the popup is excluded.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
