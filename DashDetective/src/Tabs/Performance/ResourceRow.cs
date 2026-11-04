@@ -24,13 +24,14 @@ namespace DashDetective.Tabs.Performance;
 ///
 /// The owning <see cref="PerformanceViewModel"/> updates the live members (<see cref="ValueText"/>,
 /// <see cref="Sub"/>, <see cref="Spec"/>, <see cref="Points"/>, and each tile's value) in place each
-/// sampling tick; <see cref="Name"/> / <see cref="Unit"/> / <see cref="Series"/> are fixed identity.
+/// sampling tick; <see cref="Unit"/> / <see cref="Series"/> are fixed identity (the network row alone renames with its adapter).
 /// </summary>
 public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     public ResourceRow(string name, string sub, string spec, string valueText, string unit,
                        ChartSeries series, string points, IReadOnlyList<StatTile> stats,
                        Action<ResourceRow> onSelected) {
-        Name = name;
+        _name = name;
+        _widgetId = name;
         Sub = sub;
         Spec = spec;
         ValueText = valueText;
@@ -42,10 +43,13 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
     }
 
     /// <summary>Resource name shown on the card and as the detail header (e.g. "CPU", "Disk 0 (C:)").</summary>
-    public string Name { get; }
+    [ObservableProperty] private string _name;
 
-    /// <summary>The name doubles as the id a saved rail order names this row by.</summary>
-    public string? WidgetId => Name;
+    private readonly string _widgetId;
+
+    /// <summary>The name the row was built with doubles as the id a saved rail order names it by; it stays
+    /// put when <see cref="Name"/> follows a changing network adapter.</summary>
+    public string? WidgetId => _widgetId;
 
     /// <summary>The <c>DeviceInstance.Id</c> this row was built from, which is how another page names it
     /// (see <c>PerformanceViewModel.Reveal</c>). Null for a row backing no inventory device.</summary>

@@ -193,7 +193,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
         _service = service;
 
-        // The adapter label is chosen once from the busiest active adapter.
+        // The adapter label starts as the busiest active adapter and follows the sampler from there.
         if (!string.IsNullOrWhiteSpace(service.NetworkAdapterName))
             NetworkAdapterName = service.NetworkAdapterName;
 
@@ -650,6 +650,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
     /// refresh the readouts.</summary>
     private void OnNetwork(NetworkSample sample) {
+        // The sampler can move to another adapter mid-session; the caption follows it.
+        var adapter = _service.NetworkAdapterName;
+        if (!string.IsNullOrWhiteSpace(adapter) && adapter != NetworkAdapterName)
+            NetworkAdapterName = adapter;
         _downHistory.Push(sample.DownMbps);
         _upHistory.Push(sample.UpMbps);
         UpdateNetwork(sample);

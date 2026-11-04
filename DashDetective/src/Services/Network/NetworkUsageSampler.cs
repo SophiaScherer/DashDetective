@@ -214,6 +214,19 @@ public sealed class NetworkUsageSampler {
             : current;
     }
 
+    /// <summary>The adapter with this friendly name (the one <see cref="AdapterName"/> reports), or null
+    /// when it is blank, gone or the enumeration fails. Lets a page follow the sampler's adapter.</summary>
+    internal static NetworkInterface? FindByName(string? name) {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+        try {
+            return NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(a => a.Name == name);
+        } catch (NetworkInformationException e) {
+            Log.Warn("Network adapter lookup failed", e);
+            return null;
+        }
+    }
+
     private static NetworkInterface? FindById(string? id) {
         if (id is null)
             return null;
