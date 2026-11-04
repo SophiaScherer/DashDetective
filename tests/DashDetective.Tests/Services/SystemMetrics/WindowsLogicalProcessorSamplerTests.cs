@@ -37,4 +37,16 @@ public class LogicalProcessorSamplerTests {
     public void TryParseInstance_TotalRollupsAndMalformed_AreRejected(string? instance) {
         Assert.False(WindowsLogicalProcessorSampler.TryParseInstance(instance, out _, out _));
     }
+
+    /// <summary>A second Dispose is a no-op and a Sample after Dispose is empty without touching PDH.</summary>
+    [Fact]
+    public void Dispose_Twice_IsSafeAndSampleAfterwardsIsEmpty() {
+        var sampler = new WindowsLogicalProcessorSampler(SamplerInit.Inert);
+
+        sampler.Dispose();
+        sampler.Dispose();
+
+        Assert.True(sampler.IsDisposed);
+        Assert.Empty(sampler.Sample());
+    }
 }
