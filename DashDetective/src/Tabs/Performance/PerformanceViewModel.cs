@@ -672,11 +672,13 @@ public partial class PerformanceViewModel : ViewModelBase,
             var history = _disksByNumber.TryGetValue(number, out var previous)
                 ? previous.History
                 : new MetricHistory(WindowSeconds);
-            var activeTile = new StatTile("Active", "0 %");
-            var readTile = new StatTile("Read", ByteRateFormatter.Format(0));
-            var writeTile = new StatTile("Write", ByteRateFormatter.Format(0));
-            var responseTile = new StatTile("Response", "0 ms");
-            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
+            // Seeded with the placeholder, as the GPU rows are: a sampler that never reports (inert, or none
+            // on this platform) must not leave an idle-looking 0 behind.
+            var activeTile = new StatTile("Active", Placeholders.NoReading);
+            var readTile = new StatTile("Read", Placeholders.NoReading);
+            var writeTile = new StatTile("Write", Placeholders.NoReading);
+            var responseTile = new StatTile("Response", Placeholders.NoReading);
+            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, Placeholders.NoReading, "", ChartSeries.Storage,
                                       history.Points(100),
                                       new[] { activeTile, readTile, writeTile, responseTile }, Select) {
                 DeviceId = disk.Id, Link = StorageLink(disk.DiskNumber),
@@ -1111,7 +1113,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Samples each disk and refreshes its row + tiles in place: rail value + chart + Active tile show
     /// Task Manager's "Active time" (0–100 %); Read/Write show throughput; Response shows the average transfer
-    /// time. Disks without a current reading are left unchanged.</summary>
+    /// time. Disks without a current reading are left unchanged, on the "—" they were built with.</summary>
     private void UpdateDisks() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_disksByNumber.TryGetValue(sample.DiskNumber, out var disk))
@@ -1119,6 +1121,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             disk.History.Push(sample.ActivePercent);
             var rounded = Math.Round(sample.ActivePercent);
             disk.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+            disk.Row.Unit = "%";
             disk.Row.Points = disk.History.Points(100);
             disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";

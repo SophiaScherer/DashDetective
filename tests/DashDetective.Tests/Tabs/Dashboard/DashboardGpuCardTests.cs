@@ -79,6 +79,21 @@ public class DashboardGpuCardTests {
         Assert.StartsWith(card.Note, card.Tip, System.StringComparison.Ordinal);
     }
 
+    /// <summary>The page's own sampler returning no adapters at all (inert, or not yet able to rate) leaves the
+    /// card on the placeholder it was built with, not on a confident 0. The inventory's sampler still sees the
+    /// adapter, or there would be no card to check.</summary>
+    [Fact]
+    public async Task LoadGpusAsync_PageSamplerReportsNoAdapters_ShowsThePlaceholder() {
+        var minted = 0;
+        var viewModel = await LoadedAsync(
+            () => minted++ == 0 ? new FakeGpuUsageSampler() : new FakeGpuUsageSampler().Reporting(Amd, 37),
+            Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        var card = GpuCard(viewModel);
+        Assert.Equal("—", card.Value);
+        Assert.Equal("", card.Unit);
+    }
+
     /// <summary>A card that reports carries no note — nothing to explain — so its tooltip falls back to
     /// where a click on it goes.</summary>
     [Fact]
