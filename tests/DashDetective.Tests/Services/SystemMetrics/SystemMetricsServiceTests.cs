@@ -8,7 +8,8 @@ using Xunit;
 namespace DashDetective.Tests.Services.SystemMetrics;
 
 /// <summary>Covers <see cref="SystemMetricsService"/> through the injected sampler bundle + fake timer
-/// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe and per-metric fault isolation. The
+/// factory: ref-counted start/stop, Pause/Resume, seed-on-subscribe (a sample, or a failure), Refresh with no
+/// subscribers, and per-metric fault isolation. The
 /// resource-alert behaviour this class used to own now lives in <c>ResourceAlertWatcherTests</c>.</summary>
 public class SystemMetricsServiceTests {
     // Feeds are constructed in this order, so the captured timers line up by index.
@@ -96,6 +97,55 @@ public class SystemMetricsServiceTests {
         service.RefreshAll();
 
         Assert.Equal(77, received?.DownMbps);
+    }
+
+    /// <summary>A paused page has dropped its subscription, so Refresh must renew the cache it replays
+    /// rather than skipping a feed nobody is subscribed to.</summary>
+    [Fact]
+    public void RefreshAll_WithoutSubscribers_RenewsTheCacheTheNextSubscriberIsSeededWith() {
+        var fakes = new FakeSamplers { Network = new NetworkSample(1, 0) };
+        var (service, timers) = Create(fakes);
+
+        fakes.Network = new NetworkSample(77, 0);
+        service.RefreshAll();
+        NetworkSample? seeded = null;
+        service.SubscribeNetwork(v => seeded = v, () => { });
+
+        Assert.Equal(77, seeded?.DownMbps);
+        Assert.Equal(1, timers[Network].StartCount);   // the refresh did not start it; the subscribe did
+    }
+
+    /// <summary>A failed read is replayed as a failure, not papered over with the value it failed to renew.</summary>
+    [Fact]
+    public void Subscribe_AfterAFailedRead_ReplaysTheFailure() {
+        var fakes = new FakeSamplers { Network = new NetworkSample(42, 0) };
+        var (service, _) = Create(fakes);
+        fakes.NetworkThrows = true;
+        service.RefreshAll();
+
+        NetworkSample? seeded = null;
+        var failed = false;
+        service.SubscribeNetwork(v => seeded = v, () => failed = true);
+
+        Assert.True(failed);
+        Assert.Null(seeded);
+    }
+
+    [Fact]
+    public void Subscribe_AfterARecoveredRead_SeedsTheSample() {
+        var fakes = new FakeSamplers { NetworkThrows = true };
+        var (service, _) = Create(fakes);
+        service.RefreshAll();
+        fakes.NetworkThrows = false;
+        fakes.Network = new NetworkSample(42, 0);
+        service.RefreshAll();
+
+        NetworkSample? seeded = null;
+        var failed = false;
+        service.SubscribeNetwork(v => seeded = v, () => failed = true);
+
+        Assert.False(failed);
+        Assert.Equal(42, seeded?.DownMbps);
     }
 
     [Fact]

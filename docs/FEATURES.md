@@ -2111,6 +2111,11 @@ Three rules, and they are load-bearing — a page that breaks one is a regressio
 3. **Nothing reaches the network on its own.** The Network tab's ping is opt-in and defaults to the
    machine's own gateway; its DNS lookup runs only when asked. Neither may move back into a constructor.
 
+**Refresh still works while paused**, without breaking rule 2. `SystemMetricsService.RefreshAll` samples
+every feed, even one with no subscribers, and a paused page takes that sample through
+`MetricSubscriptions.Replay`. Replay attaches and releases at once, so the page updates once and holds no
+feed open afterward. The service is paused, so the brief attach starts no timer.
+
 What stays in constructors is the **one-shot** loads, because the shell's exported report and universal
 search read them from pages the user may never open (`LoadAdaptersAsync`, the Processes list load, the
 hardware/inventory loads). Measured on the development machine: ~3 % of one core on a visible sampling tab

@@ -36,5 +36,16 @@ internal sealed class MetricSubscriptions(params Func<IDisposable>[] subscribe) 
         _tokens = null;
     }
 
+    /// <summary>Hands a detached page each feed's latest outcome once, by attaching and releasing at once, so
+    /// a Refresh while paused updates the page without leaving it subscribed. No-op while attached, since
+    /// the refresh has already reached the page.</summary>
+    public void Replay() {
+        if (_tokens is not null)
+            return;
+
+        Attach();
+        Detach();
+    }
+
     public void Dispose() => Detach();
 }

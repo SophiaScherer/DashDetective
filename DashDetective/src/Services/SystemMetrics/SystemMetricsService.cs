@@ -119,8 +119,9 @@ public sealed class SystemMetricsService : IDisposable {
             feed.Resume();
     }
 
-    /// <summary>Samples every subscribed metric once immediately and fans the results out — the toolbar
-    /// Refresh, which must update once even while paused.</summary>
+    /// <summary>Samples every metric once immediately and fans the results out — the toolbar Refresh, which
+    /// must update once even while paused. A feed with no subscribers is sampled too, renewing the cache that
+    /// a paused page replays through <see cref="MetricSubscriptions.Replay"/>.</summary>
     public void RefreshAll() {
         foreach (var feed in _feeds)
             feed.SampleNow();
@@ -143,14 +144,17 @@ public sealed class SystemMetricsService : IDisposable {
     }
 
     /// <summary>One metric: a no-history <see cref="MetricChannel{TSample}"/> plus its subscriber list.
-    /// Caches the latest sample and replays it on subscribe (so a page seeds with real data at once), and
-    /// runs the channel only while it has subscribers and isn't paused.</summary>
+    /// Caches the latest outcome and replays it on subscribe (so a page seeds with real data at once, or with
+    /// the failure when the last read failed), and runs the channel only while it has subscribers and isn't
+    /// paused.</summary>
     private sealed class MetricFeed<TSample> : MetricFeed {
         private readonly MetricChannel<TSample> _channel;
         private readonly List<Action<TSample>> _onSample = new();
         private readonly List<Action> _onFailed = new();
         private TSample _latest = default!;
         private bool _hasLatest;
+        // The last read failed, so a new subscriber is told so rather than seeded with the value it failed to renew.
+        private bool _failed;
         private bool _paused;
 
         public MetricFeed(TimeSpan interval, Func<TSample> sample, Func<IUiTimer> timerFactory) {
@@ -172,8 +176,10 @@ public sealed class SystemMetricsService : IDisposable {
             _onSample.Add(onSample);
             _onFailed.Add(onFailed);
 
-            // Seed the new subscriber immediately with the latest cached sample.
-            if (_hasLatest)
+            // Seed the new subscriber immediately with the latest cached outcome.
+            if (_failed)
+                onFailed();
+            else if (_hasLatest)
                 onSample(_latest);
 
             if (_onSample.Count == 1 && !_paused)
@@ -192,11 +198,13 @@ public sealed class SystemMetricsService : IDisposable {
         private void OnSample(TSample sample) {
             _latest = sample;
             _hasLatest = true;
+            _failed = false;
             foreach (var callback in _onSample)
                 callback(sample);
         }
 
         private void OnFailed() {
+            _failed = true;
             foreach (var callback in _onFailed)
                 callback();
         }
@@ -212,10 +220,8 @@ public sealed class SystemMetricsService : IDisposable {
                 _channel.Start();
         }
 
-        public override void SampleNow() {
-            if (_onSample.Count > 0)
-                _channel.SampleNow();
-        }
+        // Not gated on subscribers: a paused page has dropped its subscription and replays the cache instead.
+        public override void SampleNow() => _channel.SampleNow();
 
         public override void SetInterval(TimeSpan interval) => _channel.SetInterval(interval);
 

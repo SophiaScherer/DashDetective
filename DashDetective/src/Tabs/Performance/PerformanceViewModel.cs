@@ -453,6 +453,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// re-enumeration of the physical disks.</summary>
     public void Refresh() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         UpdateDisks();
         UpdateGpuAdapters();
         UpdateGpuSensors();

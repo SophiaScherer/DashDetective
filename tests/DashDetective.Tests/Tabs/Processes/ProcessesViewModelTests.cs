@@ -970,6 +970,32 @@ public class ProcessesViewModelTests {
         public bool HasExited(int pid) => !Lingering.Contains(pid);
     }
 
+    /// <summary>The toolbar Refresh updates the summary CPU and memory figures once while the Live pill is
+    /// off, and leaves the page unsubscribed, so a paused page still holds no feed open.</summary>
+    [Fact]
+    public void Refresh_WhilePaused_UpdatesTheSummaryTotalsOnce() {
+        double cpu = 10;
+        var memory = new MemorySample(20, 1UL << 30, 8UL << 30, 0, 0);
+        var metrics = TestMetrics.WithTimers(out var timers, cpu: () => cpu, memory: () => memory);
+        var page = new ProcessesViewModel(metrics, new FakeSnapshotProvider([]), new FakeProcessInterop());
+        page.SetActive(true);
+        // What the shell does for the Live pill: the service pauses, then each page.
+        metrics.Pause();
+        page.SetLive(false);
+
+        cpu = 64;
+        memory = new MemorySample(75, 6UL << 30, 8UL << 30, 0, 0);
+        page.Refresh();
+
+        Assert.Equal("64%", page.CpuUsageText);
+        Assert.Equal("75%", page.MemoryUsageText);
+
+        // Still detached: a Resume restarts only feeds that have a subscriber, and this page is not one.
+        metrics.Resume();
+        Assert.False(timers[TestMetrics.CpuTimer].IsRunning);
+        Assert.False(timers[TestMetrics.MemoryTimer].IsRunning);
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }
