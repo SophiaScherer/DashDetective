@@ -1855,7 +1855,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          VM implements ISelfScrollingPage +
                                                          IRefreshablePage; owns filter, sort + ShowHidden
                                                          state and RebuildVisibleEntries; drives live
-                                                         auto-refresh + scroll-to-top-on-navigation)
+                                                         auto-refresh + scroll-to-top-on-navigation.
+                                                         OnNodeSelected skips the open folder: the tree
+                                                         sync after a non-tree move re-enters it, and a
+                                                         second read cleared a search jump's selection.
+                                                         PendingLoads lets a test await the loads)
                                 DirectoryService.cs     (async System.IO enumeration: lazy subdirectories,
                                                          folder entries; per-entry soft-fail, Task.Run off
                                                          the UI thread; takes includeHidden to reveal
