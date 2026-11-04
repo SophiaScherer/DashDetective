@@ -11,14 +11,15 @@ example `/home/a%b/App`) broke autostart.
 ## What was built
 
 - `%` is written as `%%`.
-- A literal backslash is written as four backslashes. The spec applies the string-level escape (`\` to
+- A literal backslash is written as four backslashes, and the `"`, backtick and `$` escapes as two backslashes plus the character. The spec applies the string-level escape (`\` to
   `\`) before the quoting rule, so two backslashes in the file reach the quoting rule as one and escape
   the next character instead.
 
 ## Decisions
 
-- **Only the backslash gets the second level.** `"`, `` ` `` and `$` keep a single backslash, which
-  GLib-based launchers accept; the backslash is the case the spec states outright.
+- **Every escape is written at both levels.** `"`, backtick and `$` each take two backslashes in the file
+  (`\\"`, `\``, `\$`), like the literal backslash. GLib's key-file parser rejects an unknown
+  string-level escape such as `\"`, which would make the whole `Exec` value unreadable.
 
 ## How to verify
 

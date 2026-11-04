@@ -129,13 +129,13 @@ public class StartupRegistrationTests : IDisposable {
                         DesktopEntry.Build("/home/My User/DashDetective"),
                         StringComparison.Ordinal);
 
-    /// <summary>The characters the spec reserves inside a quoted value ("%" is doubled, and a backslash takes
+    /// <summary>The characters the spec reserves inside a quoted value ("%" is doubled, each escaping backslash is doubled and a literal one takes
     /// four in the file because the string-level escape runs first). Left raw, a "$" in a path
     /// would be expanded by the launcher into something that does not exist.</summary>
     [Theory]
-    [InlineData("/home/a$b/App", "\"/home/a\\$b/App\"")]
-    [InlineData("/home/a`b/App", "\"/home/a\\`b/App\"")]
-    [InlineData("/home/a\"b/App", "\"/home/a\\\"b/App\"")]
+    [InlineData("/home/a$b/App", "\"/home/a\\\\$b/App\"")]
+    [InlineData("/home/a`b/App", "\"/home/a\\\\`b/App\"")]
+    [InlineData("/home/a\"b/App", "\"/home/a\\\\\"b/App\"")]
     [InlineData("/home/a\\b/App", "\"/home/a\\\\\\\\b/App\"")]
     [InlineData("/home/a%b/App", "\"/home/a%%b/App\"")]
     public void DesktopEntry_EscapesTheReservedCharacters(string execPath, string expected) =>
