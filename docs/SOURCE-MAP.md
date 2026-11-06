@@ -129,7 +129,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                 Root for anything that opens or measures it)
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
-                                single unit from the shared peak via UnitFor)
+                                single unit from the shared peak via UnitFor. Format/Split/SplitPair pick the
+                                unit from the value AS DISPLAYED, so 999.6 Mbps reads 1.0 Gbps, and read
+                                NaN as zero; UnitFor stays the raw magnitude rule)
       ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
                                 Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
                                 KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
