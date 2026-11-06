@@ -1519,7 +1519,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
-                                 its MetricHistory, keyed by LUID / disk number.)
+                                 its MetricHistory, keyed by LUID / disk number. InitialLoad is the
+                                 constructor's loads as one task, as on Performance, so tests await it
+                                 instead of sleeping: off the UI thread a load's rebuild of Cards races
+                                 anything a test enumerates.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
