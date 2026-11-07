@@ -8,10 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Dashboard;
 
-/// <summary>
-/// Pins <see cref="DashboardViewModel.InitialLoad"/> as the thing tests await in place of a fixed sleep: it must
-/// not finish before the constructor's device loads have built their cards, or awaiting it races them again.
-/// </summary>
+/// <summary>Pins <see cref="DashboardViewModel.InitialLoad"/> as finishing only after the device loads have built their cards.</summary>
 public class DashboardInitialLoadTests {
     private const string Amd = "0000:03:00.0";
 

@@ -237,8 +237,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             LoadCpuInfoAsync(), LoadMemoryInfoAsync(), LoadGpusAsync(), LoadSystemInfoAsync(), LoadDisksAsync());
     }
 
-    /// <summary>The loads the constructor starts, so a test can await them instead of guessing how long
-    /// they take. Each soft-fails on its own, so this never faults.</summary>
+    /// <summary>The constructor's loads, awaitable by tests; each soft-fails, so this never faults.</summary>
     internal Task InitialLoad { get; }
 
     /// <summary>
