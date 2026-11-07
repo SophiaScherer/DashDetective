@@ -57,6 +57,7 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
     private readonly IntPtr _query;
     private readonly IntPtr _counter;
     private readonly bool _ready;
+    private bool _disposed;
 
     /// <summary>Stands up the PDH query. Annotated rather than the whole type so <see cref="Sample"/> and
     /// the pure <see cref="TryParseInstance"/> stay callable from tests on every platform — the same
@@ -93,7 +94,7 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
     /// <summary>Returns one reading per logical processor at the moment of the call, ordered by (group, core)
     /// with the <c>_Total</c> roll-ups dropped. Any failure yields an empty set.</summary>
     public IReadOnlyList<LogicalProcessorSample> Sample() {
-        if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
+        if (_disposed || !_ready || PdhCollectQueryData(_query) != ErrorSuccess)
             return Array.Empty<LogicalProcessorSample>();
 
         // First call (null buffer) reports the required buffer size via PDH_MORE_DATA.
@@ -145,8 +146,15 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
             && int.TryParse(instance.AsSpan(comma + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out core);
     }
 
-    /// <summary>Closes the PDH query handle. Safe to call more than once.</summary>
+    /// <summary>True once <see cref="Dispose"/> has run; <see cref="Sample"/> then returns empty without touching PDH.</summary>
+    internal bool IsDisposed => _disposed;
+
+    /// <summary>Closes the PDH query handle; the flag makes a second call a no-op rather than a double close.</summary>
     public void Dispose() {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
