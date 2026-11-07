@@ -248,6 +248,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     public void RefreshNow() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         UpdateUptime();
 
         _ = LoadCpuInfoAsync();

@@ -1164,6 +1164,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Toolbar Refresh: re-sample the summary totals and reload the list once, even while paused.</summary>
     public void Refresh() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         _ = LoadAsync();
     }
 

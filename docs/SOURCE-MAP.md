@@ -1334,8 +1334,12 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  Attach/Detach, so IActivatablePage can drop and re-establish them.
                                  DROPPING THEM IS WHAT STOPS THE FEED — the service ref-counts subscribers,
                                  so a deactivated page that merely ignored its callbacks would still be
-                                 paying for them. Re-attaching replays the cached latest sample, so a page
-                                 returning to screen seeds with real data instead of a blank frame)
+                                 paying for them. Re-attaching replays the cached latest sample (or the
+                                 failure, when the last read failed), so a page returning to screen seeds
+                                 with real data instead of a blank frame. Replay attaches and releases at
+                                 once: it is how a PAUSED page takes a Refresh. RefreshAll samples every
+                                 feed, subscribed or not, to renew that cache; gating it on subscribers left
+                                 a paused page's Refresh doing nothing)
 ```
 
 ## `src/Services/Network`
