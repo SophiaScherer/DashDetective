@@ -9,10 +9,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>
-/// Pins that the toolbar Refresh updates the CPU, memory and network rows once while the Live pill is off,
-/// and that the page is left unsubscribed afterward, so a paused page still holds no feed open.
-/// </summary>
+/// <summary>Pins that Refresh updates the CPU, memory and network rows once while the Live pill is off, leaving the page unsubscribed.</summary>
 public class PerformanceRefreshWhilePausedTests {
     [Fact]
     public void Refresh_WhilePaused_UpdatesTheSharedMetricsOnce() {
@@ -39,7 +36,7 @@ public class PerformanceRefreshWhilePausedTests {
         Assert.Equal(DataRateFormatter.SplitPair(50, 0).First, Row(page, ChartSeries.NetDown).ValueText);
         Assert.All(timers, t => Assert.False(t.IsRunning));
 
-        // Still detached: a Resume restarts only feeds that have a subscriber, and this page is not one.
+        // Still detached, so a Resume does not restart a feed for this page.
         metrics.Resume();
         Assert.All(timers, t => Assert.False(t.IsRunning));
     }

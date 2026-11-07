@@ -119,9 +119,7 @@ public sealed class SystemMetricsService : IDisposable {
             feed.Resume();
     }
 
-    /// <summary>Samples every metric once immediately and fans the results out — the toolbar Refresh, which
-    /// must update once even while paused. A feed with no subscribers is sampled too, renewing the cache that
-    /// a paused page replays through <see cref="MetricSubscriptions.Replay"/>.</summary>
+    /// <summary>Samples every metric once and fans out, even while paused. Unsubscribed feeds are sampled too, renewing the cache <see cref="MetricSubscriptions.Replay"/> serves.</summary>
     public void RefreshAll() {
         foreach (var feed in _feeds)
             feed.SampleNow();
@@ -144,16 +142,14 @@ public sealed class SystemMetricsService : IDisposable {
     }
 
     /// <summary>One metric: a no-history <see cref="MetricChannel{TSample}"/> plus its subscriber list.
-    /// Caches the latest outcome and replays it on subscribe (so a page seeds with real data at once, or with
-    /// the failure when the last read failed), and runs the channel only while it has subscribers and isn't
-    /// paused.</summary>
+    /// Caches the latest outcome and replays it on subscribe, and runs the channel only while it has subscribers and isn't paused.</summary>
     private sealed class MetricFeed<TSample> : MetricFeed {
         private readonly MetricChannel<TSample> _channel;
         private readonly List<Action<TSample>> _onSample = new();
         private readonly List<Action> _onFailed = new();
         private TSample _latest = default!;
         private bool _hasLatest;
-        // The last read failed, so a new subscriber is told so rather than seeded with the value it failed to renew.
+        // Tell a new subscriber the last read failed rather than seeding it with the stale value.
         private bool _failed;
         private bool _paused;
 
@@ -220,7 +216,7 @@ public sealed class SystemMetricsService : IDisposable {
                 _channel.Start();
         }
 
-        // Not gated on subscribers: a paused page has dropped its subscription and replays the cache instead.
+        // Not gated on subscribers: a paused page has dropped its subscription and replays the cache.
         public override void SampleNow() => _channel.SampleNow();
 
         public override void SetInterval(TimeSpan interval) => _channel.SetInterval(interval);

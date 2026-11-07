@@ -5,9 +5,8 @@ using Xunit;
 namespace DashDetective.Tests.Services.SystemMetrics;
 
 /// <summary>Pins <see cref="MetricSubscriptions"/>: subscriptions are established on demand rather than at
-/// construction, attach/detach are idempotent, and detaching really disposes the tokens — that disposal is
-/// what lets the ref-counted feeds stop when a page leaves the screen. Replay subscribes and releases at
-/// once, which is how a paused page takes a Refresh.</summary>
+/// construction, attach/detach are idempotent, and detaching disposes the tokens so ref-counted feeds stop.
+/// Replay subscribes and releases at once.</summary>
 public class MetricSubscriptionsTests {
     /// <summary>Stands in for a feed's subscription token, recording that it was released.</summary>
     private sealed class Token : IDisposable {
@@ -72,8 +71,7 @@ public class MetricSubscriptionsTests {
         Assert.Equal(2, created);
     }
 
-    /// <summary>A paused page takes each feed's latest outcome through the attach and is released at once,
-    /// so a Refresh leaves it holding no feed open.</summary>
+    /// <summary>A paused page takes each feed's latest outcome and is released at once, holding no feed open.</summary>
     [Fact]
     public void Replay_WhileDetached_SubscribesAndReleasesAtOnce() {
         var tokens = new[] { new Token(), new Token() };

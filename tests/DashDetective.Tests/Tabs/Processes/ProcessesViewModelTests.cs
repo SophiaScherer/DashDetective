@@ -970,8 +970,7 @@ public class ProcessesViewModelTests {
         public bool HasExited(int pid) => !Lingering.Contains(pid);
     }
 
-    /// <summary>The toolbar Refresh updates the summary CPU and memory figures once while the Live pill is
-    /// off, and leaves the page unsubscribed, so a paused page still holds no feed open.</summary>
+    /// <summary>Refresh updates the summary CPU and memory figures once while the Live pill is off, leaving the page unsubscribed.</summary>
     [Fact]
     public void Refresh_WhilePaused_UpdatesTheSummaryTotalsOnce() {
         double cpu = 10;
@@ -990,7 +989,7 @@ public class ProcessesViewModelTests {
         Assert.Equal("64%", page.CpuUsageText);
         Assert.Equal("75%", page.MemoryUsageText);
 
-        // Still detached: a Resume restarts only feeds that have a subscriber, and this page is not one.
+        // Still detached, so a Resume does not restart a feed for this page.
         metrics.Resume();
         Assert.False(timers[TestMetrics.CpuTimer].IsRunning);
         Assert.False(timers[TestMetrics.MemoryTimer].IsRunning);
