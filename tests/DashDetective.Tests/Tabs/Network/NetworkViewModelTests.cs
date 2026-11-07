@@ -126,6 +126,22 @@ public class NetworkViewModelTests {
         Assert.Equal("Start", vm.PingButtonText);
     }
 
+    /// <summary>A send in flight when Stop is pressed must not publish afterward. TEST-NET-1 never answers, so the send outlives the press.</summary>
+    [Fact]
+    public async Task StopPing_WhileASendIsInFlight_LeavesTheIdleSummary() {
+        var (vm, _) = Create();
+        await vm.PingTargetSeeded;
+        vm.PingTarget = "192.0.2.1";
+
+        vm.TogglePingCommand.Execute(null);
+        vm.TogglePingCommand.Execute(null);
+        await Task.Delay(2500);
+
+        Assert.False(vm.PingEnabled);
+        Assert.Equal("Press Start to ping", vm.PingSummary);
+        Assert.Equal("", vm.PingConsole);
+    }
+
     // ---- DNS: the latest submit wins ----
 
     private static (NetworkViewModel Vm, FakeDnsLookupProvider Dns) CreateWithPendingDns() {
