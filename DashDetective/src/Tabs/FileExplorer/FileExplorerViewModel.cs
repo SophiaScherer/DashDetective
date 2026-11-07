@@ -220,8 +220,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         }
     }
 
-    /// <summary>The typed path as an absolute one, or null when it is relative. A bare drive letter ("C:")
-    /// becomes that drive's root; "C:foo" is drive-relative, so it is refused like any relative name.</summary>
+    /// <summary>The typed path as an absolute one, or null when relative; "C:" becomes the drive's root, "C:foo" is refused.</summary>
     internal static string? RootTypedPath(string path, bool windows) {
         if (windows && path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0])) {
             if (path.Length == 2) {
