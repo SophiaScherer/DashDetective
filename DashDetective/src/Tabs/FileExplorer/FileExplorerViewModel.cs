@@ -234,6 +234,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     // Identifies the load whose busy state is live (0 = nothing in flight), so a load that has finished
     // or been superseded can neither raise nor lower the flag on a newer one's behalf.
     private int _loadSeq;
+    private readonly Func<string, bool, IShellInterop, Task<FolderRead>> _readEntries;
     private int _activeLoadId;
 
     // Ordinary folders read in a few milliseconds, so the busy state only appears once a read has
@@ -256,11 +257,12 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public FileExplorerViewModel()
         : this(IShellInterop.ForCurrentPlatform(), IFileSystemRoots.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit shell and root set. The public ctor resolves
-    /// the real ones, so the shell still builds this with <c>new()</c>.</summary>
-    internal FileExplorerViewModel(IShellInterop shell, IFileSystemRoots roots) {
+    /// <summary>Test seam: an explicit shell, root set and optional folder reader, so a test can finish loads out of order.</summary>
+    internal FileExplorerViewModel(IShellInterop shell, IFileSystemRoots roots,
+        Func<string, bool, IShellInterop, Task<FolderRead>>? readEntries = null) {
         _shell = shell;
         _roots = roots;
+        _readEntries = readEntries ?? DirectoryService.GetEntriesAsync;
 
         Filters = new ObservableCollection<FilterOption> {
             new FilterOption("All", null, OnFilterSelected),
@@ -530,15 +532,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         FolderRead read;
         try {
-            read = await DirectoryService.GetEntriesAsync(path, ShowHidden, _shell);
+            read = await _readEntries(path, ShowHidden, _shell);
         } catch {
             _readStatus = FolderReadStatus.Unreadable;
             EndLoad(id);
             return;
         }
 
-        // Ignore a stale load if the user has since selected another folder.
-        if (_pendingPath != path) {
+        // Ignore a stale load: another folder was selected, or a newer request for this one is in flight.
+        if (_pendingPath != path || id != _loadSeq) {
             EndLoad(id);
             return;
         }
