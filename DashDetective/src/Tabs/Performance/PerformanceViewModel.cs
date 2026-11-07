@@ -494,10 +494,15 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateCpuUptime();
     }
 
-    /// <summary>Sampler-failure handler for the CPU channel: shows neutral placeholders.</summary>
+    /// <summary>Sampler-failure handler for the CPU channel: shows neutral placeholders, including the counts and up time keyed off its tick.</summary>
     private void OnCpuFailed() {
         _cpuRow.ValueText = "—";
         _cpuUtilTile.Value = "—";
+        // These ride the CPU tick, so a dead feed would leave them frozen or at their initial zeros.
+        _cpuProcessesTile.Value = "—";
+        _cpuThreadsTile.Value = "—";
+        _cpuHandlesTile.Value = "—";
+        _cpuUptimeTile.Value = "—";
     }
 
     private void UpdateCpu(double value) {
