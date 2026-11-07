@@ -128,8 +128,7 @@ public class DashboardViewModelTests {
         Assert.Contains("Unknown", viewModel.OsText);
     }
 
-    /// <summary>With no system disk identified, the report's Storage row is the placeholder, not the
-    /// false "0% active  ()" it printed for the whole session.</summary>
+    /// <summary>With no system disk identified, the report's Storage row is the placeholder, not a false "0% active  ()".</summary>
     [Fact]
     public void GetReportSections_NoSystemDisk_ReportsStorageAsNoReading() {
         var viewModel = Create(StubHardwareProviders.Compose());
