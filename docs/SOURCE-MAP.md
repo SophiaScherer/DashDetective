@@ -980,7 +980,25 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  a driver that publishes no GTT is not a zero-sized pool, and it matches
                                  GpuAdapter's nullable shared total. DriverVersion is the module's own
                                  driver/module/version, "" for an in-tree driver like amdgpu — never the
-                                 kernel release; shared by the Hardware card and the GPU details)
+                                 kernel release; shared by the Hardware card and the GPU details.
+                                 ReadNamed() IS THE SECOND ENTRY POINT — same walk plus one pci.ids scan,
+                                 so AdapterName becomes the product name — the bracketed part of the entry
+                                 only (MarketingName: "GeForce RTX 3060", not "GA106 [...]"). ONLY the
+                                 two readers that DISPLAY a name call it (graphics card, adapter
+                                 enumeration); the per-tick utilisation and sensor readers keep plain
+                                 Read and pay nothing)
+          PciIdDatabase.cs      (the system pci.ids table — what lspci reads, from hwdata/pciutils. EXISTS
+                                 BECAUSE THE KERNEL IDENTIFIES HARDWARE BUT DOES NOT NAME IT: sysfs gives
+                                 ids, the spec catalog keys on model tokens, so without this the Graphics
+                                 card's CUDA/boost/bus rows are blank on Linux and filled on Windows from
+                                 the identical lookup. KEEPS ONLY THE IDS ASKED FOR, never the whole table —
+                                 the file is ~1.5 MB and a machine has one or two adapters. INDENT IS THE
+                                 FORMAT: vendor at column 0, device one TAB in, subsystem two — and hex
+                                 parsing ALLOWS LEADING WHITESPACE, so the two-tab guard is load-bearing,
+                                 not decorative. STOPS AT THE "C xx" DEVICE-CLASS SECTION or class codes
+                                 read as vendor ids. Absent file → Empty → every caller keeps its own name.
+                                 Reads via IProcFileSystem though /usr/share is not a pseudo-file: the
+                                 contract fits, and a second seam would buy only a second fake)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
@@ -2122,13 +2140,21 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          the Linux one takes DrmCardFacts.DriverVersion
                                                          for the same reason. WmiRead
                                                          holds the WMI boilerplate the Windows readers
-                                                         share. Windows* for all five; Linux* for processor,
-                                                         motherboard and storage; Unsupported* twins (at the
-                                                         bottom of their Windows file) for memory modules
-                                                         and graphics.
+                                                         share. Windows* AND Linux* for all five bar memory
+                                                         modules; Unsupported* twins (at the bottom of their
+                                                         Windows file) cover any other platform, and memory
+                                                         modules' is Linux's too, permanently.
                                                          LinuxProcessorInfoProvider — the shared CpuFacts
-                                                         plus its L3 read; SOCKET IS PERMANENTLY "—"
-                                                         (SMBIOS type 4 needs dmidecode as root).
+                                                         plus its L3 read; SOCKET HAS NO SYSFS SOURCE AT
+                                                         ALL (SMBIOS type 4 needs dmidecode as root), so
+                                                         that row is the catalog's rated socket or "—".
+                                                         Base clock and L3 take the same fallback, which is
+                                                         what fills them in a VM: no cpufreq policy and no
+                                                         cache/index* tree, but the model name is reported.
+                                                         THE LIVE READING ALWAYS WINS — the datasheet is a
+                                                         fallback, never an override, or a down-binned or
+                                                         power-limited chip would report someone else's
+                                                         numbers.
                                                          LinuxMotherboardInfoProvider — DmiIdReader +
                                                          HardwareCatalog, composing the same
                                                          "version (year)" BIOS string as the WMI arm; PCIE
@@ -2139,6 +2165,13 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          disagree about a drive while keeping their own
                                                          wording ("NVMe" here, "NVMe SSD" there);
                                                          DRIVE HEALTH IS PERMANENTLY "—" (SMART needs root).
+                                                         LinuxGraphicsInfoProvider — DrmCardFacts.ReadNamed,
+                                                         so the card carries its pci.ids product name and
+                                                         the spec catalog can match it — EXCEPT a name listing
+                                                         several models ("RX 7700 XT / 7800 XT"), which gets no
+                                                         lookup, or one model's datasheet fills another's rows;
+                                                         VRAM comes from the
+                                                         driver, the other rows from that match.
                                                          UnsupportedMemoryModulesProvider is permanent too —
                                                          per-DIMM facts are SMBIOS type 17.
                                                          ChipsetNames — the board-name token scan BOTH

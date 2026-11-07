@@ -13,11 +13,7 @@ namespace DashDetective.Tabs.Hardware;
 /// card and the Dashboard's cannot disagree about the same adapter. The Linux counterpart to
 /// <see cref="WindowsGraphicsInfoProvider"/>'s <c>Win32_VideoController</c> query.
 ///
-/// <b>Most spec rows stay "—", and that is the honest result.</b> The kernel names an adapter by its PCI
-/// ids, not its marketing model, so <see cref="HardwareCatalog.LookupGpu"/> has nothing to match on and
-/// core counts, boost clocks and bus widths have no source — the lookup is still attempted, so a richer
-/// name source would light those rows up for free. VRAM is the exception: amdgpu publishes it exactly, and
-/// it is formatted with the shared byte humanizer.
+/// The spec rows need a named adapter, so this reads <see cref="DrmCardFacts.ReadNamed"/>; without a pci.ids name the catalog lookup misses and they stay "—".
 ///
 /// Stateless and never throws: any failure yields <see cref="GraphicsInfo.Unknown"/>.
 /// </summary>
@@ -36,11 +32,11 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
         try {
             var adapters = new List<GraphicsAdapterInfo>();
 
-            foreach (var card in DrmCardFacts.Read(_proc)) {
+            foreach (var card in DrmCardFacts.ReadNamed(_proc)) {
                 if (card.IsSoftware)
                     continue;
 
-                var spec = HardwareCatalog.LookupGpu(card.AdapterName);
+                var spec = NamesOneModel(card.ProductName) ? HardwareCatalog.LookupGpu(card.AdapterName) : null;
                 adapters.Add(new GraphicsAdapterInfo(
                     Name: card.AdapterName,
                     Memory: FormatVram(card.VramBytes) ?? spec?.Memory ?? "—",
@@ -57,6 +53,9 @@ internal sealed class LinuxGraphicsInfoProvider : IGraphicsInfoProvider {
             return GraphicsInfo.Unknown;
         }
     }
+
+    /// <summary>False when pci.ids lists several models under one device id, since the catalog would fill rows from whichever it matches first.</summary>
+    internal static bool NamesOneModel(string productName) => !productName.Contains('/');
 
     /// <summary>The adapter's VRAM, or <c>null</c> when the driver publishes none so the caller can fall
     /// back.</summary>

@@ -11,8 +11,7 @@ namespace DashDetective.Tabs.Hardware;
 /// Processor facts from <c>Win32_Processor</c>. Core/thread counts are summed across sockets and the
 /// clock is the max, matching <c>CpuInfoProvider</c>; name/cache/socket come from the first package.
 /// Boost clock and TDP have no WMI source, so they come from <see cref="HardwareCatalog"/> by model name
-/// and stay "—" when it has no entry. The platform check lives in
-/// <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>.
+/// and stay "—" when it has no entry.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
@@ -55,10 +54,10 @@ internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {
                 Name: string.IsNullOrEmpty(name) ? "—" : name,
                 Cores: cores > 0 ? cores.ToString() : "—",
                 LogicalProcessors: threads.ToString(),
-                BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost),
-                CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb),
-                Tdp: spec?.Tdp ?? "—",
-                Socket: string.IsNullOrEmpty(socket) ? "—" : socket);
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(maxClockMhz, spec?.Boost, spec?.Base),
+                CacheL3: ProcessorSpecFormatter.CacheL3(l3CacheKb, spec?.CacheL3),
+                Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
+                Socket: ProcessorSpecFormatter.Socket(socket, spec?.Socket));
         } catch (Exception e) {
             Log.Warn("ProcessorInfoProvider read failed", e);
             return ProcessorInfo.Unknown;
