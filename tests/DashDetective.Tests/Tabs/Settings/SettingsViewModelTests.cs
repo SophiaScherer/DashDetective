@@ -326,8 +326,7 @@ public class SettingsViewModelTests {
         Assert.Equal(ScaleRange.DefaultPercent, viewModel.TextScalePercent);
     }
 
-    /// <summary>Work item 107: the scales are reflected without passing through a toggle's change hook,
-    /// so a reset that moved only them raised nothing and the shell never saved it.</summary>
+    /// <summary>The scales are reflected without a toggle's change hook, so a reset of only them must still raise Changed.</summary>
     [Fact]
     public void ResetAccessibility_AfterOnlyTheTextScaleMoved_ReportsAChange() {
         var (viewModel, accessibility) = CreateWithAccessibility();
