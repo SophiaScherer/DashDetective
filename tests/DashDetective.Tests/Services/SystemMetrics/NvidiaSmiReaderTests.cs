@@ -123,8 +123,7 @@ public class NvidiaSmiReaderTests {
         Assert.Null(reader.Utilisation("0000:01:00.0"));
     }
 
-    /// <summary>A run that fails after a good one must not leave the last good reading standing: it would
-    /// sit there looking live for as long as nvidia-smi stays broken.</summary>
+    /// <summary>A run that fails after a good one must not leave the last good reading looking live.</summary>
     [Theory]
     [InlineData(9, false)]
     [InlineData(0, true)]

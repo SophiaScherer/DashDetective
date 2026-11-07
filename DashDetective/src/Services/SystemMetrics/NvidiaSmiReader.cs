@@ -80,8 +80,7 @@ internal sealed class NvidiaSmiReader {
     private async System.Threading.Tasks.Task RunAsync() {
         try {
             var capture = await _launcher.CaptureAsync(Executable, Arguments, Timeout);
-            // A failed run (driver mismatch, timeout) clears the readings: the last good ones would
-            // otherwise sit there looking live while nvidia-smi is down.
+            // A failed run clears the readings, or the last good ones would look live while nvidia-smi is down.
             _readings = capture.ExitCode == 0 && !capture.TimedOut
                 ? Parse(capture.StandardOutput)
                 : new Dictionary<string, double>();
