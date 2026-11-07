@@ -1007,7 +1007,12 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  Network tab's connection owners — the CpuFacts shape applied to names, so
                                  the same process cannot read systemd-resolved on one tab and the 15-char
                                  truncated systemd-resolve on the other. cmdline holds NUL-separated args,
-                                 so argv[0] ends at the first NUL. Reports "" for a process that names
+                                 so argv[0] ends at the first NUL. A TITLE WRITTEN OVER argv FALLS BACK TO
+                                 comm: sshd's "sshd: user@pts/0" and Chromium's space-joined renderer line
+                                 have no path, and their last '/' segment reads "0" or a flag value. Judged
+                                 by shape — a space, nothing after the NULs, and a basename that is not
+                                 comm (or a 15-char comm's prefix) — because a space alone is a legal path
+                                 ("/opt/My App/run"). Reports "" for a process that names
                                  itself nowhere, because the consumers' placeholders differ — Processes
                                  wants "Unknown", Network wants "PID 1234". No .exe is appended)
           IVolumeCapacityReader.cs
