@@ -536,8 +536,7 @@ public sealed class ToolkitViewModelTests : IDisposable {
         Assert.Equal(1, announced);
     }
 
-    /// <summary>Saving an edit to a command that was just deleted would replace nothing and drop the edit
-    /// silently, so deleting the command the form has open closes the form.</summary>
+    /// <summary>Deleting the command the form has open closes the form, or saving would drop the edit silently.</summary>
     [Fact]
     public void RemoveCommand_TheCommandOpenInTheForm_ClosesTheForm() {
         var vm = Page();

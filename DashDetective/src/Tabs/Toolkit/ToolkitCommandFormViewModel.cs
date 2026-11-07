@@ -134,8 +134,7 @@ public partial class ToolkitCommandFormViewModel : ObservableObject {
         IsOpen = false;
     }
 
-    /// <summary>Closes the form if it is editing this command, which is going away; saving would otherwise
-    /// replace nothing and the edit would vanish silently.</summary>
+    /// <summary>Closes the form if it is editing this command, which is going away; saving would otherwise drop the edit silently.</summary>
     public void CancelIfEditing(ToolkitCommand command) {
         if (ReferenceEquals(_editing, command))
             Cancel();
