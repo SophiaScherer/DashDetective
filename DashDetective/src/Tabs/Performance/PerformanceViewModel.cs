@@ -220,7 +220,9 @@ public partial class PerformanceViewModel : ViewModelBase,
     // chart, so the adapter's headline surface shows its whole throughput rather than receive alone.
     private readonly MetricHistory _downHistory = new MetricHistory(WindowSeconds);
     private readonly MetricHistory _upHistory = new MetricHistory(WindowSeconds);
-    private readonly NetworkInterface? _networkInterface = NetworkUsageSampler.SelectPrimary();
+    private NetworkInterface? _networkInterface;
+    private string _networkAdapterName;
+    private readonly StatTile _netLinkTile;
 
     /// <summary>Where the rows' colours come from. This page assigns brushes in code rather than binding
     /// {DynamicResource}, so it has to be told when the accent moves the palette.</summary>
@@ -310,16 +312,17 @@ public partial class PerformanceViewModel : ViewModelBase,
             StatOrder = StatOrderFor(ChartSeries.Memory), Alert = _alerts.Memory,
         };
 
-        // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi"), and Link speed is
-        // read once at construction (it rarely changes).
+        // Named after the primary adapter and follows the sampler; link speed is re-read on a change.
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
+        _networkAdapterName = service.NetworkAdapterName;
+        _networkInterface = NetworkUsageSampler.FindByName(_networkAdapterName);
         var linkSpeed = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
         // Receive takes the download tint and send the upload tint, matching the Dashboard's throughput chart.
         _networkRow = new ResourceRow(adapterName, "", "", "0", "Mbps", ChartSeries.NetDown,
                                       _downHistory.Points(MinNetworkScaleMbps),
                                       new[] {
                                           _netReceiveTile, _netSendTile,
-                                          new StatTile("Link", linkSpeed), _netErrorsTile,
+                                          _netLinkTile = new StatTile("Link", linkSpeed), _netErrorsTile,
                                       }, Select) {
             DeviceId = DeviceIds.Network,
             StatOrder = StatOrderFor(ChartSeries.NetDown),
@@ -332,7 +335,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             Points2 = _upHistory.Points(MinNetworkScaleMbps),
             ChartSubject = "Receive and send",
             AxisYTitle = "Throughput",
-            Link = NetworkLink(adapterName),
+            Link = NetworkLink(),
         };
 
         // The CPU core charts are discovered on the first sample. Forward the CPU row's Overall/Detailed flip
@@ -777,8 +780,8 @@ public partial class PerformanceViewModel : ViewModelBase,
             ? new ResourceLink("View in Storage", () => StorageRevealRequested?.Invoke(disk))
             : null;
 
-    private ResourceLink NetworkLink(string adapterName) =>
-        new("View in Network", () => NetworkRevealRequested?.Invoke(adapterName));
+    private ResourceLink NetworkLink() =>
+        new("View in Network", () => NetworkRevealRequested?.Invoke(_networkAdapterName));
 
     private ResourceLink HardwareLink() =>
         new("View in Hardware", () => HardwareRevealRequested?.Invoke());
@@ -1131,9 +1134,24 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Network subscription callback: append both directions to their histories, then refresh.</summary>
     private void OnNetwork(NetworkSample sample) {
+        FollowNetworkAdapter();
         _downHistory.Push(sample.DownMbps);
         _upHistory.Push(sample.UpMbps);
         UpdateNetwork(sample);
+    }
+
+    /// <summary>Re-reads the adapter-bound identity (name, "View in Network" target, link speed, Errors interface) when the sampler moves.</summary>
+    private void FollowNetworkAdapter() {
+        var name = _service.NetworkAdapterName;
+        if (name == _networkAdapterName)
+            return;
+
+        _networkAdapterName = name;
+        _networkInterface = NetworkUsageSampler.FindByName(name);
+        if (!string.IsNullOrWhiteSpace(name))
+            _networkRow.Name = name;
+        _netLinkTile.Value = FormatLinkSpeed(_networkInterface?.Speed ?? 0);
+        _ = LoadNetworkInfoAsync();
     }
 
     /// <summary>Sampler-failure handler for the Network metric: shows neutral placeholders.</summary>
@@ -1174,7 +1192,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     private string ReadNetworkErrors() {
         try {
             if (_networkInterface is null)
-                return "0";
+                return "—";
             var stats = _networkInterface.GetIPStatistics();
             var errors = stats.IncomingPacketsWithErrors + stats.OutgoingPacketsWithErrors;
             return errors.ToString(CultureInfo.InvariantCulture);
@@ -1188,7 +1206,8 @@ public partial class PerformanceViewModel : ViewModelBase,
         // then bind on the UI thread. SelectPrimary never throws in practice, but guard defensively.
         var token = _gate.Token;
         try {
-            var (sub, spec) = await Task.Run(ReadNetworkInfo, token);
+            var adapterName = _networkAdapterName;
+            var (sub, spec) = await Task.Run(() => ReadNetworkInfo(adapterName), token);
             token.ThrowIfCancellationRequested();
             _networkRow.Sub = sub;
             _networkRow.Spec = spec;
@@ -1201,8 +1220,8 @@ public partial class PerformanceViewModel : ViewModelBase,
     }
 
     /// <summary>Link speed (sub) and adapter description (spec) for the primary adapter.</summary>
-    private static (string Sub, string Spec) ReadNetworkInfo() {
-        var adapter = NetworkUsageSampler.SelectPrimary();
+    private static (string Sub, string Spec) ReadNetworkInfo(string adapterName) {
+        var adapter = NetworkUsageSampler.FindByName(adapterName);
         if (adapter is null)
             return ("", "");
         return (FormatLinkSpeed(adapter.Speed), adapter.Description ?? "");
