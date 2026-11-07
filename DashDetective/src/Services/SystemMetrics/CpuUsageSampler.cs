@@ -1,3 +1,4 @@
+using DashDetective.Services.Diagnostics;
 using System;
 
 namespace DashDetective.Services.SystemMetrics;
@@ -15,7 +16,8 @@ namespace DashDetective.Services.SystemMetrics;
 /// when the Processes tab was activated — the same precedent as <c>NetworkUsageSampler</c>.
 /// </summary>
 public sealed class CpuUsageSampler : IDisposable {
-    private readonly ICpuSampler _inner;
+    private ICpuSampler _inner;
+    private ICpuSampler? _fallback;
 
     /// <summary>Picks the reader for this platform — the only place that choice is made. The Linux arm
     /// comes first so the Windows chain below sits behind an <c>IsWindows</c> guard, which is what CA1416
@@ -33,7 +35,10 @@ public sealed class CpuUsageSampler : IDisposable {
 
         // Prefer the Task-Manager-matching counter; fall back to GetSystemTimes if it isn't available.
         var utility = new ProcessorUtilityCpuSampler();
-        _inner = UtilityIfReady(utility, utility.Ready) ?? new SystemTimesCpuSampler();
+        var fallback = new SystemTimesCpuSampler();
+        _inner = UtilityIfReady(utility, utility.Ready) ?? fallback;
+        // Kept (and seeded) only while the utility counter is in use, for a runtime read failure.
+        _fallback = ReferenceEquals(_inner, fallback) ? null : fallback;
     }
 
     /// <summary>The utility counter when it stood up; otherwise disposes it and returns null so the caller
@@ -49,12 +54,30 @@ public sealed class CpuUsageSampler : IDisposable {
     /// headlessly without real hardware counters.</summary>
     internal CpuUsageSampler(ICpuSampler inner) => _inner = inner;
 
+    /// <summary>Test seam: injects a primary sampler plus the one to switch to if it throws at runtime.</summary>
+    internal CpuUsageSampler(ICpuSampler inner, ICpuSampler? fallback) {
+        _inner = inner;
+        _fallback = fallback;
+    }
+
     /// <summary>Test seam: the reader the public constructor chose, so the platform dispatch can be
     /// asserted on whichever CI leg is running.</summary>
     internal ICpuSampler Inner => _inner;
 
     /// <summary>Returns CPU utilisation (0–100) for the interval since the previous call.</summary>
-    public double Sample() => _inner.Sample();
+    public double Sample() {
+        try {
+            return _inner.Sample();
+        } catch (Exception ex) when (_fallback is not null && ex is InvalidOperationException) {
+            // MetricChannel stops polling after a throw, so one failed read would blank the readout; switch to the fallback.
+            Log.Warn("CPU utility counter read failed; switching to GetSystemTimes", ex);
+            var failed = _inner;
+            _inner = _fallback;
+            _fallback = null;
+            (failed as IDisposable)?.Dispose();
+            return _inner.Sample();
+        }
+    }
 
     /// <summary>Releases the PDH query handle when the utility counter is in use. Safe to call twice.</summary>
     public void Dispose() => (_inner as IDisposable)?.Dispose();
