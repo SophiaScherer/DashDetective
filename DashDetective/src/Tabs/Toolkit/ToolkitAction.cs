@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
 namespace DashDetective.Tabs.Toolkit;
 
@@ -46,10 +48,36 @@ public sealed record ToolkitAction {
     /// than from the row's label, so the log is honest about two things the label hides: the value a
     /// parameterised row's placeholder stood for, and any flags the row does not spell out.
     ///
-    /// Display only — nothing is ever executed from this string.
+    /// Display only; tokens holding whitespace are quoted so a paste splits like the real argument list.
     /// </summary>
-    public string CommandLine =>
-        Arguments.Count == 0 ? Target : Target + " " + string.Join(' ', Arguments);
+    public string CommandLine {
+        get {
+            var target = Kind == ToolkitActionKind.OpenUrl ? Target : ToolkitPaths.Resolve(Target);
+            return Arguments.Count == 0 ? Quote(target) : Quote(target) + " " + string.Join(' ', Arguments.Select(Quote));
+        }
+    }
+
+    // CommandLineToArgvW rules, as ArgumentList follows: backslashes only matter before a quote.
+    private static string Quote(string token) {
+        if (token.Length > 0 && !token.Any(c => char.IsWhiteSpace(c) || c == '"'))
+            return token;
+
+        var builder = new StringBuilder("\"");
+        var backslashes = 0;
+        foreach (var c in token) {
+            if (c == '\\') {
+                backslashes++;
+            } else if (c == '"') {
+                builder.Append('\\', backslashes * 2 + 1).Append('"');
+                backslashes = 0;
+            } else {
+                builder.Append('\\', backslashes).Append(c);
+                backslashes = 0;
+            }
+        }
+
+        return builder.Append('\\', backslashes * 2).Append('"').ToString();
+    }
 
     /// <summary>Whether this action's output is redirected into the Execution Log.</summary>
     public bool CapturesOutput => Kind == ToolkitActionKind.Capture;
