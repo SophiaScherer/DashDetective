@@ -71,8 +71,7 @@ public sealed class FileExplorerTreeSyncTests : IDisposable {
         Assert.Same(_page.RootNodes[1], _page.SelectedNode);
     }
 
-    // A load with rows builds FileEntry glyphs, which need a render backend these tests do not have, so
-    // it faults after its read has been counted. Only the reads matter here.
+    // FileEntry glyphs need a render backend these tests lack, so a load faults after its read is counted.
     private async Task SettleAsync() {
         try {
             await _page.PendingLoads;
