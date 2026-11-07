@@ -97,8 +97,7 @@ public class CpuUsageSamplerTests {
         Assert.Equal(0.0, new UnsupportedCpuSampler().Sample());
     }
 
-    /// <summary>A utility counter that fails mid-session switches to the fallback instead of blanking the
-    /// readout; the failed sampler is disposed and the fallback keeps serving.</summary>
+    /// <summary>A utility counter failing mid-session switches to the fallback, disposing the failed sampler.</summary>
     [Fact]
     public void Sample_PrimaryThrowsAtRuntime_SwitchesToFallback() {
         var primary = new ThrowingCpuSampler();

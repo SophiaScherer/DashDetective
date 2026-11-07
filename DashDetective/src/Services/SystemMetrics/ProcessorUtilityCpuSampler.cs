@@ -101,8 +101,7 @@ internal sealed class ProcessorUtilityCpuSampler : ICpuSampler, IDisposable {
         return Interpret(collect, format, value.Value);
     }
 
-    /// <summary>Turns a ready sampler's PDH results into a reading. A failed read throws, so
-    /// <c>MetricChannel</c> shows the placeholder rather than a confident 0%.</summary>
+    /// <summary>Turns a ready sampler's PDH results into a reading; a failed read throws so <c>MetricChannel</c> shows the placeholder.</summary>
     internal static double Interpret(uint collectStatus, uint formatStatus, double raw) {
         if (collectStatus != ErrorSuccess || formatStatus != ErrorSuccess)
             throw new InvalidOperationException($"PDH read failed (collect 0x{collectStatus:X}, format 0x{formatStatus:X}).");

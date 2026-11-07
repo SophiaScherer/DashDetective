@@ -69,8 +69,7 @@ public sealed class CpuUsageSampler : IDisposable {
         try {
             return _inner.Sample();
         } catch (Exception ex) when (_fallback is not null && ex is InvalidOperationException) {
-            // One failed counter read must not blank the CPU readout for the session (MetricChannel stops
-            // polling after a throw), so switch to the fallback; if that also throws, it propagates.
+            // MetricChannel stops polling after a throw, so one failed read would blank the readout; switch to the fallback.
             Log.Warn("CPU utility counter read failed; switching to GetSystemTimes", ex);
             var failed = _inner;
             _inner = _fallback;

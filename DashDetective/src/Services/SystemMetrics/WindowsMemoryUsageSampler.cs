@@ -51,8 +51,7 @@ internal sealed class WindowsMemoryUsageSampler : IMemoryUsageSampler {
     /// a healthy host, where the native call always succeeds.</summary>
     internal WindowsMemoryUsageSampler(SamplerInit _) => _available = false;
 
-    /// <summary>A failed call on a working sampler throws so <c>MetricChannel</c> shows the placeholder
-    /// rather than a confident 0%.</summary>
+    /// <summary>A failed call on a working sampler throws so <c>MetricChannel</c> shows the placeholder.</summary>
     internal static void EnsureRead(bool succeeded) {
         if (!succeeded)
             throw new InvalidOperationException("GlobalMemoryStatusEx failed.");

@@ -4,8 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.SystemMetrics;
 
-/// <summary>Pins that a failed native read on a working <see cref="WindowsMemoryUsageSampler"/> throws, so
-/// <c>MetricChannel</c> can show the placeholder, while the latched-inert zero contract is unchanged.</summary>
+/// <summary>Pins that a failed native read on a working <see cref="WindowsMemoryUsageSampler"/> throws, while the latched-inert zero is unchanged.</summary>
 public class WindowsMemoryUsageSamplerTests {
     [Fact]
     public void EnsureRead_Failure_Throws() {
