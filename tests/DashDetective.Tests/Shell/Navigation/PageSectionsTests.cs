@@ -7,12 +7,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
 
-/// <summary>Covers which widgets become sections in the nav bar's list and in what order. A section is a
-/// visible widget with a title, listed in reading order of where it was ARRANGED — rows top to bottom,
-/// left to right within a row — since a dragged layout no longer matches the markup. The list is offered
-/// only when there are at least two to jump between. A card that is not a widget, such as a Hardware card,
-/// is a section when it carries <see cref="PageSections.SectionClass"/>, titled by its automation name;
-/// <c>HardwareSectionTests</c> pins that the Hardware card carries it.</summary>
+/// <summary>Pins which widgets become sections and their arranged reading order; a list is offered only for two or more.</summary>
 public class PageSectionsTests {
     private static SectionCandidate At(string? title, double top, double left, bool visible = true) =>
         new(title, top, left, visible);

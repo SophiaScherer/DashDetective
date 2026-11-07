@@ -78,8 +78,7 @@ public partial class NavigationView : UserControl {
     private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
 
     // ----- Section list -----
-    // The popup opens from the current page's item, so it is re-aimed whenever the selection moves. Every
-    // item is realized (a plain StackPanel, no virtualization), so the container is always there to find.
+    // Re-aimed whenever the selection moves. Every item is realized (no virtualization), so the container is always there to find.
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
         if (e.PropertyName == nameof(NavigationViewModel.SelectedNav))
@@ -91,8 +90,7 @@ public partial class NavigationView : UserControl {
     private Control? SelectedItem() =>
         _viewModel?.SelectedNav is { } item ? NavList.ContainerFromItem(item) : null;
 
-    // Not light-dismissed, so the window stays hoverable; an outside press closes it by hand, as the
-    // Processes options popup does. Keyboard users land on the first section.
+    // Not light-dismissed, so the window stays hoverable; an outside press closes it by hand, as the Processes options popup does.
     private void OnSectionsOpened(object? sender, EventArgs e) {
         TopLevel.GetTopLevel(this)?.AddHandler(
             PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -125,8 +123,7 @@ public partial class NavigationView : UserControl {
         _viewModel.IsSectionsOpen = false;
     }
 
-    // The popup is its own visual root, so a key pressed inside it never reaches the window's shortcut
-    // chain; Esc is answered here for that one case. The chain answers it while focus is in the window.
+    // The popup is its own visual root, so keys inside it never reach the window's shortcut chain; Esc is answered here.
     private void OnSectionsKeyDown(object? sender, KeyEventArgs e) {
         if (e.Key != Key.Escape || _viewModel is null)
             return;

@@ -579,9 +579,7 @@ public partial class NavigationViewModel : ViewModelBase {
         SelectionChanged?.Invoke(SelectedNav);
     }
 
-    /// <summary>A press on a nav item: the current page's item opens its section list, any other item
-    /// navigates. Kept apart from <see cref="Navigate"/>, which shortcuts, search and cross-page jumps also
-    /// call, so none of those can open the list by landing on the page already showing.</summary>
+    /// <summary>A press: the current page's item opens its section list, any other navigates. Apart from <see cref="Navigate"/>, which shortcuts and search also call and which must never open the list.</summary>
     public void Activate(NavItem item) {
         if (item == SelectedNav) {
             if (IsSectionsOpen) {
@@ -619,24 +617,19 @@ public partial class NavigationViewModel : ViewModelBase {
     /// <summary>The current page's sections, in reading order. Rebuilt by <see cref="SetSections"/>.</summary>
     public ObservableCollection<PageSectionOption> Sections { get; } = new();
 
-    /// <summary>Whether the current page has enough sections to offer the list. Drives the caret on the
-    /// selected item and whether pressing it again opens anything.</summary>
+    /// <summary>Whether the page has enough sections to offer the list; drives the caret and whether a second press opens it.</summary>
     public bool HasSections => PageSections.ShouldShow(Sections.Count);
 
-    /// <summary>Whether the section list is open. Bound two-way to the popup, so a close the view makes
-    /// (an outside press) comes back here rather than leaving the flag stale.</summary>
+    /// <summary>Bound two-way to the popup, so an outside-press close comes back here instead of leaving the flag stale.</summary>
     [ObservableProperty] private bool _isSectionsOpen;
 
-    /// <summary>Raised as the list opens, so the shell re-reads the page: the list is built live, which
-    /// is what keeps a reorder or a widget that appeared since the last read in it.</summary>
+    /// <summary>Raised as the list opens, so the shell re-reads the page and the list reflects reorders and new widgets.</summary>
     public event Action? SectionsRefreshRequested;
 
-    /// <summary>Raised when a section is chosen, so the shell can scroll it into view. Carries the
-    /// section, never a control: the shell kept the widgets it measured.</summary>
+    /// <summary>Raised when a section is chosen. Carries the section, never a control.</summary>
     public event Action<PageSection>? SectionPicked;
 
-    /// <summary>Where the list opens: beside a vertical rail, away from the docked edge, and into the
-    /// page from a horizontal bar.</summary>
+    /// <summary>Beside a vertical rail, away from the docked edge; into the page from a horizontal bar.</summary>
     public PlacementMode SectionsPlacement => Orientation switch {
         NavOrientation.Left => PlacementMode.RightEdgeAlignedTop,
         NavOrientation.Right => PlacementMode.LeftEdgeAlignedTop,
@@ -644,8 +637,7 @@ public partial class NavigationViewModel : ViewModelBase {
         _ => PlacementMode.TopEdgeAlignedLeft,
     };
 
-    /// <summary>Replaces the section list with what the shell measured on the current page. A page with
-    /// too few sections closes the list rather than leaving an empty or one-row popup up.</summary>
+    /// <summary>Replaces the list with what the shell measured; too few sections closes it rather than leaving an empty popup.</summary>
     internal void SetSections(IReadOnlyList<SectionCandidate> candidates) {
         Sections.Clear();
         foreach (var section in PageSections.Discover(candidates))
@@ -666,9 +658,7 @@ public partial class NavigationViewModel : ViewModelBase {
         SectionPicked?.Invoke(section);
     }
 
-    /// <summary>Esc closes an open section list and is consumed. Any other shortcut also closes it but
-    /// still runs, since the popup's keys reach the window: Help or the rail collapsing must not open under
-    /// a list left standing. Enter and the arrows leave it open, being how a row is reached and picked.</summary>
+    /// <summary>Esc closes an open section list and is consumed; any other shortcut also closes it but still runs. Enter and the arrows leave it open.</summary>
     internal bool HandleSectionsShortcut(ShortcutId id) {
         if (!IsSectionsOpen)
             return false;

@@ -257,7 +257,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _accessibility.Changed += OnAccessibilityChanged;
 
         // Build the nav items pointing their press at the nav VM, then let it own selection. Activate rather
-        // than Navigate: pressing the current page's item opens its section list.
+        // than Navigate, so pressing the current page's item opens its section list.
         Nav.Initialize(new[] {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",
                         Icons.Dashboard, _dashboard, Nav.Activate),
@@ -652,8 +652,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         if (Search.IsOpen && Search.HandleShortcut(id))
             return true;
 
-        // The nav bar's section list is a light popup like the search dropdown: Esc closes it, nothing
-        // else is swallowed.
+        // The section list is a light popup like the search dropdown: Esc closes it, nothing else is swallowed.
         if (Nav.HandleSectionsShortcut(id))
             return true;
 

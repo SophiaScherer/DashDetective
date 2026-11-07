@@ -77,9 +77,7 @@
         <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
     </Style>
 
-    <!-- Revealed: the nav bar's section list landed here. RevealFlash toggles the class; this tints the
-         surface for its hold. No fade, unlike Border.revealFlash: a transition on this Background would
-         also animate every widget through a theme switch while the page behind it snaps. -->
+    <!-- Revealed from the nav bar's section list. No fade, unlike Border.revealFlash: a Background transition would also animate every widget through a theme switch. -->
     <Style Selector="controls|WidgetPanel.highlighted /template/ Border">
         <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>

@@ -257,11 +257,7 @@
             <Setter Property="Fill" Value="{DynamicResource Accent}"/>
         </Style>
 
-        <!-- Section caret: a cue on the current page's item that pressing it again lists the page's
-             sections. A glyph, not a second button, so the row stays one tab stop and one hit target. It
-             overlays the row's padding rather than joining its content, so showing it never moves a
-             neighbor: at the trailing end of an expanded vertical row, under the icon on a collapsed rail,
-             and in the trailing padding of a horizontal bar's item. -->
+        <!-- Section caret: a glyph, not a second button, so the row stays one tab stop. It overlays the row's padding so showing it never moves a neighbor. -->
         <Style Selector="Border.rail Path.sectionsCaret">
             <Setter Property="IsVisible" Value="False"/>
             <Setter Property="Fill" Value="{DynamicResource TextTertiary}"/>
@@ -470,8 +466,7 @@
                                         <Rectangle Classes="navIndicatorH" Width="18" Height="3"
                                                    RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Accent}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-                                        <!-- Not hit-testable: its negative margins reach past the row, where it
-                                             would catch a press meant for the neighbouring item. -->
+                                        <!-- Not hit-testable: its negative margins would catch a press meant for the neighboring item. -->
                                         <Path Classes="sectionsCaret" Width="8" Height="5" Stretch="Uniform"
                                               IsHitTestVisible="False" Data="{x:Static nav:Icons.CaretDown}"/>
                                         <StackPanel Classes="navContent" Orientation="Horizontal" Spacing="12">
@@ -491,10 +486,7 @@
         </DockPanel>
     </Border>
 
-        <!-- The current page's sections, opened by pressing its nav item again. The view points it at that
-             item (PlacementTarget) and the view model picks the side. Not light-dismissed, so the rest of the
-             window stays hoverable; an outside press closes it from code-behind, as the Processes options
-             popup does. IsOpen is two-way, so that close reaches the view model. -->
+        <!-- The current page's sections. Not light-dismissed so the window stays hoverable; an outside press closes it from code-behind, as the Processes options popup does. -->
         <Popup x:Name="SectionsPopup" Placement="{Binding SectionsPlacement}"
                IsLightDismissEnabled="False"
                IsOpen="{Binding IsSectionsOpen, Mode=TwoWay}">

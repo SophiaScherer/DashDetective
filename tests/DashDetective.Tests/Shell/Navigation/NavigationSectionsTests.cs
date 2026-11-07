@@ -8,11 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
 
-/// <summary>Covers the nav bar's section list on the view model: pressing the current page's item again
-/// opens it (only when the page has sections), pressing another item navigates and drops the old page's
-/// list, opening asks the shell to re-read the page, a pick closes the list and names the section, and
-/// Esc closes it without swallowing the key otherwise. <see cref="NavigationViewModel.Navigate"/> must
-/// never open it, since shortcuts and search call it too.</summary>
+/// <summary>Pins the section list's view-model behavior; <see cref="NavigationViewModel.Navigate"/> must never open it, since shortcuts and search call it too.</summary>
 public class NavigationSectionsTests {
     private sealed class Page : ViewModelBase { }
 
@@ -79,8 +75,7 @@ public class NavigationSectionsTests {
         Assert.Same(first, bar.SelectedNav);
     }
 
-    /// <summary>A page can gain sections without a page change (a form opening), so the press re-reads it
-    /// rather than trusting the count from the last page change.</summary>
+    /// <summary>A page can gain sections without a page change, so a press re-reads it.</summary>
     [Fact]
     public void Activate_PageGainedSectionsSinceLastRead_RereadsAndOpens() {
         var (bar, first, _) = Bar();

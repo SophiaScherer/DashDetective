@@ -129,13 +129,10 @@ public partial class MainWindow : Window {
 
     // ----- Page sections (the nav bar's list of the current page's titled widgets and marked cards) -----
 
-    // The sections the last read found, indexed as the candidates handed to the nav bar, so a picked
-    // section names its control without the view model ever holding a control.
+    // Indexed as the candidates handed to the nav bar, so a pick names its control without the view model holding one.
     private List<Control> _sectionPanels = [];
 
-    /// <summary>Reads the current page's titled widgets and marked cards where they were arranged, which
-    /// is the order a user dragged them into rather than the markup's. A section nested in another is
-    /// part of its parent's, not one of its own.</summary>
+    /// <summary>Reads the current page's sections in arranged order, not markup order; a section nested in another belongs to its parent.</summary>
     private void RefreshSections() {
         if (_viewModel is null)
             return;
@@ -156,10 +153,7 @@ public partial class MainWindow : Window {
         _viewModel.Nav.SetSections(candidates);
     }
 
-    /// <summary>Scrolls a picked section to the top of whichever scroller holds it — the shared page
-    /// scroller, or a self-scrolling page's own pane — and flashes it. The target rect is a viewport
-    /// tall, so the scroll lands the heading at the top rather than wherever it first comes into view;
-    /// a folded widget is only its header, so that is what shows.</summary>
+    /// <summary>Scrolls a picked section to the top of its scroller and flashes it. The target rect is a viewport tall so the heading lands at the top; a folded widget shows only its header.</summary>
     private void OnSectionPicked(PageSection section) {
         if (section.Source >= _sectionPanels.Count || _sectionPanels[section.Source] is not { } panel ||
             !panel.IsAttachedToVisualTree())

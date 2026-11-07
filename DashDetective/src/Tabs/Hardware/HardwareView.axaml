@@ -25,8 +25,7 @@
         <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:HardwareCard">
                 <!-- No Height and no Top alignment: the panel stretches each card to its row's height.
-                     pageSection lists the card in the nav bar's "On this page" list under its automation
-                     name, and revealFlash tints it when one is picked. -->
+                     pageSection lists the card in the nav bar's section list; revealFlash tints it on a pick. -->
                 <Border Classes="panel revealFlash pageSection" MinHeight="{StaticResource HardwareCardMinHeight}"
                         AutomationProperties.Name="{Binding Title}">
                     <StackPanel Spacing="12">

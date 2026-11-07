@@ -7,11 +7,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Hardware;
 
-/// <summary>
-/// The Hardware cards are the page's sections in the nav bar's "On this page" list. They are not
-/// <c>WidgetPanel</c>s, so each card carries <see cref="PageSections.SectionClass"/> and an automation name
-/// to be listed under, and <c>revealFlash</c> so a pick tints it; without the marker the page offers no list.
-/// </summary>
+/// <summary>Each Hardware card carries the section marker, an automation name and <c>revealFlash</c>; without the marker the page offers no list.</summary>
 public class HardwareSectionTests {
     [Fact]
     public void Card_CarriesTheSectionMarkerANameAndAFlash() {

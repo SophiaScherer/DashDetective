@@ -7,38 +7,26 @@ using System.Linq;
 
 namespace DashDetective.Shell.Navigation;
 
-/// <summary>A widget or marked card found on the page, where it was laid out, and whether it is on screen.
-/// The view reads these off the visual tree; everything after that is <see cref="PageSections"/>'s.</summary>
-/// <param name="Title">Its heading, or null for one without.</param>
-/// <param name="Top">Its arranged top edge, relative to the page.</param>
-/// <param name="Left">Its arranged left edge, relative to the page.</param>
-/// <param name="IsVisible">Whether it is effectively visible.</param>
+/// <summary>A widget or marked card found on the page, where it was laid out, and whether it is on screen.</summary>
 internal readonly record struct SectionCandidate(string? Title, double Top, double Left, bool IsVisible);
 
 /// <summary>One entry of the nav bar's section list.</summary>
-/// <param name="Title">The heading shown in the list.</param>
-/// <param name="Source">Its position in the candidate list it came from, which is how the view finds the
-/// widget again.</param>
+/// <param name="Source">Its position in the candidate list, which is how the view finds the widget again.</param>
 public sealed record PageSection(string Title, int Source);
 
-/// <summary>
-/// Decides which widgets on a page are sections, and in what order. Pure, so it is testable without a
-/// layout pass: the view hands in what it measured.
-/// </summary>
+/// <summary>Decides which widgets on a page are sections, and in what order. Pure, so it needs no layout pass.</summary>
 internal static class PageSections {
     /// <summary>Fewer than this and there is nothing to jump between, so the list is not offered.</summary>
     internal const int MinimumToShow = 2;
 
-    /// <summary>How far apart two tops can be and still read as one row. A board aligns a row's tops
-    /// exactly; the slack is for panels whose margins differ by a pixel or two.</summary>
+    /// <summary>How far apart two tops can be and still read as one row; panel margins can differ by a pixel or two.</summary>
     internal const double RowTolerance = 4;
 
     /// <summary>The class a page puts on a card that is a section without being a <see cref="WidgetPanel"/>,
     /// such as a Hardware card; its title is its automation name.</summary>
     internal const string SectionClass = "pageSection";
 
-    /// <summary>Whether a control is a section: a widget, or a card marked with <see cref="SectionClass"/>.
-    /// Untitled ones still count here, so a titled widget nested in one is not listed on its own.</summary>
+    /// <summary>Whether a control is a section. Untitled ones still count, so a titled widget nested in one is not listed on its own.</summary>
     internal static bool IsSection(Control control) =>
         control is WidgetPanel || control.Classes.Contains(SectionClass);
 
@@ -49,9 +37,7 @@ internal static class PageSections {
     /// <summary>Whether a page with this many sections offers the list.</summary>
     internal static bool ShouldShow(int count) => count >= MinimumToShow;
 
-    /// <summary>The visible, titled candidates in reading order: rows top to bottom, then left to right
-    /// within a row. Ordered by where they were arranged rather than declared, since widgets are
-    /// reordered by dragging.</summary>
+    /// <summary>The visible, titled candidates in arranged reading order (rows top to bottom, then left to right), since dragging reorders widgets.</summary>
     internal static IReadOnlyList<PageSection> Discover(IReadOnlyList<SectionCandidate> candidates) {
         var shown = candidates
             .Select((candidate, index) => (Candidate: candidate, Index: index))
