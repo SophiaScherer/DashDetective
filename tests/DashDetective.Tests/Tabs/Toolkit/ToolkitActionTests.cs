@@ -89,8 +89,7 @@ public class ToolkitActionTests {
         Assert.Equal(["-n", "4"], action.Arguments);
     }
 
-    /// <summary>The display line quotes a token holding whitespace, so pasting it into a terminal runs
-    /// the same argument list. The real arguments stay unjoined.</summary>
+    /// <summary>The display line quotes a token holding whitespace; the real arguments stay unjoined.</summary>
     [Fact]
     public void CommandLine_TokensWithSpaces_AreQuoted() {
         var action = ToolkitAction.Launch(@"C:\Program Files\x.exe", "a b", "plain");

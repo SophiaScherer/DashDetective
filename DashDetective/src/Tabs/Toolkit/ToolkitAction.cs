@@ -48,8 +48,7 @@ public sealed record ToolkitAction {
     /// than from the row's label, so the log is honest about two things the label hides: the value a
     /// parameterised row's placeholder stood for, and any flags the row does not spell out.
     ///
-    /// Display only — nothing is ever executed from this string. Tokens holding whitespace are quoted so
-    /// a paste into a terminal splits the same way the real argument list does.
+    /// Display only; tokens holding whitespace are quoted so a paste splits like the real argument list.
     /// </summary>
     public string CommandLine {
         get {
@@ -58,7 +57,7 @@ public sealed record ToolkitAction {
         }
     }
 
-    // CommandLineToArgvW rules (the ones ArgumentList follows): backslashes only matter before a quote.
+    // CommandLineToArgvW rules, as ArgumentList follows: backslashes only matter before a quote.
     private static string Quote(string token) {
         if (token.Length > 0 && !token.Any(c => char.IsWhiteSpace(c) || c == '"'))
             return token;
