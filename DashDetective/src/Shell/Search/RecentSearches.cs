@@ -130,8 +130,7 @@ public sealed class RecentSearches {
         return false;
     }
 
-    /// <summary>How two keys of a category name the same entry: a file's key is a full path, so it follows
-    /// the filesystem's case rule; every other key is an identity compared case-insensitively.</summary>
+    /// <summary>Whether two keys name the same entry: file keys are paths and follow the filesystem's case rule, others are case-insensitive.</summary>
     internal static StringComparison KeyComparison(SearchCategory category) =>
         category == SearchCategory.File ? PathComparison.Comparison : StringComparison.OrdinalIgnoreCase;
 }

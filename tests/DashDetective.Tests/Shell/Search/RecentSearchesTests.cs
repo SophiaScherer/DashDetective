@@ -208,8 +208,7 @@ public class RecentSearchesTests {
         Assert.Equal("", new RecentSearches().Encode());
     }
 
-    /// <summary>Two files whose paths differ only by case are one entry where the filesystem folds case
-    /// (Windows) and two where it does not, so a recent never replaces a different file.</summary>
+    /// <summary>Paths differing only by case are one entry where the filesystem folds case, else two.</summary>
     [Fact]
     public void Remember_FilePathsDifferingByCase_FollowTheFilesystem() {
         var recents = new RecentSearches();
