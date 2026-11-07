@@ -106,13 +106,7 @@
                 </Transitions>
             </Setter>
         </Style>
-        <!-- Hover lift: the icon and label rise 1.5px as the pointer passes, upward on every edge. A render
-             transform, so layout never moves and no neighbor shifts; on the content only, so the row's
-             background and indicator stay put. Time-based, so it runs at one speed at every scale; the
-             distance is in DIPs inside the scale host, so it grows with the interface size. The selected
-             row lifts too: it is still a button, and every row answering the pointer alike reads as one
-             control. Pointer only — keyboard focus already draws Fluent's ring. Reduce motion undoes both
-             the lift and the tween at the end of this file. -->
+        <!-- Hover lift: a render transform on the content only, so layout never moves; time-based so it runs at one speed at every scale. Reduce motion undoes it at the end of this file. -->
         <Style Selector="Button.nav:pointerover StackPanel.navContent">
             <Setter Property="RenderTransform" Value="translateY(-1.5px)"/>
         </Style>

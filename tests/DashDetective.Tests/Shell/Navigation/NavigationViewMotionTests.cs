@@ -10,13 +10,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shell.Navigation;
 
-/// <summary>
-/// Pins the nav rows' hover lift in NavigationView.axaml: the icon and label rise a little and only
-/// upward, as a render transform on the content (so no neighbor moves), with a short tween; and Reduce
-/// motion undoes BOTH the tween and the lift from a rule in the same file, declared after the hover rule
-/// so it wins while both match. A local style outranks an app-level one, so the undo cannot live
-/// anywhere else.
-/// </summary>
+/// <summary>Pins the nav rows' hover lift, and that Reduce motion undoes both tween and lift from a later rule in the same file.</summary>
 public class NavigationViewMotionTests {
     private const string Content = "StackPanel.navContent";
     private const string Hover = "Button.nav:pointerover " + Content;
