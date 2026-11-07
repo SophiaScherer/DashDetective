@@ -129,13 +129,13 @@ public class StartupRegistrationTests : IDisposable {
                         DesktopEntry.Build("/home/My User/DashDetective"),
                         StringComparison.Ordinal);
 
-    /// <summary>The four characters the spec reserves inside a quoted value. Left raw, a "$" in a path
-    /// would be expanded by the launcher into something that does not exist.</summary>
+    /// <summary>Reserved characters in a quoted value are escaped; left raw, a "$" in a path would be expanded by the launcher.</summary>
     [Theory]
-    [InlineData("/home/a$b/App", "\"/home/a\\$b/App\"")]
-    [InlineData("/home/a`b/App", "\"/home/a\\`b/App\"")]
-    [InlineData("/home/a\"b/App", "\"/home/a\\\"b/App\"")]
-    [InlineData("/home/a\\b/App", "\"/home/a\\\\b/App\"")]
+    [InlineData("/home/a$b/App", "\"/home/a\\\\$b/App\"")]
+    [InlineData("/home/a`b/App", "\"/home/a\\\\`b/App\"")]
+    [InlineData("/home/a\"b/App", "\"/home/a\\\\\"b/App\"")]
+    [InlineData("/home/a\\b/App", "\"/home/a\\\\\\\\b/App\"")]
+    [InlineData("/home/a%b/App", "\"/home/a%%b/App\"")]
     public void DesktopEntry_EscapesTheReservedCharacters(string execPath, string expected) =>
         Assert.Contains($"Exec={expected}", DesktopEntry.Build(execPath), StringComparison.Ordinal);
 

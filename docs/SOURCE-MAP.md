@@ -617,7 +617,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  its existence — the spec disables an entry with Hidden=true, and some
                                  desktop tools write that instead of deleting)
         DesktopEntry.cs         (the .desktop body as pure statics. Exec is QUOTED and its four reserved
-                                 characters escaped: unquoted, a path under /home/My User/ parses as two
+                                 characters escaped, "%" doubled and a backslash written four times and the other escapes doubled (the
+                                 string-level escape runs first): unquoted, a path under /home/My User/ parses as two
                                  arguments and launches the wrong thing)
 ```
 
