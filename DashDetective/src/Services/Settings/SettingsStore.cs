@@ -91,8 +91,7 @@ public sealed class SettingsStore : IDisposable {
         try {
             return merged.Deserialize(SettingsJsonContext.Default.AppSettings);
         } catch (JsonException) {
-            // Some value does not fit its property (e.g. an enum name from another version). Drop only
-            // the keys that fail on their own so the rest of the file still loads.
+            // A value may not fit its property (an enum name from another version); drop only the failing keys.
             var defaults = JsonSerializer.SerializeToNode(AppSettings.Defaults, SettingsJsonContext.Default.AppSettings)
                 as JsonObject ?? new JsonObject();
             foreach (var (key, value) in file) {

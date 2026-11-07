@@ -254,8 +254,7 @@ public sealed class SettingsStoreTests : IDisposable {
         Assert.Equal(AppSettings.Defaults, store.Load());
     }
 
-    /// <summary>A settings file from another version can name an enum member this build lacks. Only that
-    /// key falls back to its default; the rest of the file still loads.</summary>
+    /// <summary>An enum member this build lacks falls back to its default; the rest of the file loads.</summary>
     [Fact]
     public void Load_UnknownEnumName_FallsBackForThatKeyOnly() {
         File.WriteAllText(_path, """
