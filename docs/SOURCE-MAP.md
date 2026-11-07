@@ -355,7 +355,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  PIXEL SNAP: Placed snaps every slot to whole pixels before arranging, and
                                  SnappedWidth gives both panels the same width to MEASURE at. Without it a
                                  fractional slot ended a pixel past the panel and a clipping ancestor cut
-                                 the card's right border off — work item 89)
+                                 the card's right border off — work item 89.
+                                 MOTION: Placed slides a child whose slot moved ONLY while a drag
+                                 re-packs, and eases the dropped item in from ReorderDrag.TakeSettle's
+                                 let-go box. A resize, a keyboard move, a cancelled drag and Reduce motion
+                                 (the window's reduceMotion class) all land at once; MotionReduced and
+                                 Clock are the test seams)
+        ReorderSlides.cs        (the motion of a drag, Avalonia-free: each moved item eases (out-cubic,
+                                 180 ms) from where it was drawn to its new slot, as an offset the panel
+                                 applies as a RENDER transform, so layout and the frozen drop slots never
+                                 see it. A second move mid-slide carries the current offset in, so an
+                                 item re-targeted while moving continues rather than jumping)
         PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half UP
                                  so a moved span keeps its length; a span snapped under its child's
                                  MinWidth grows to it away from the panel's edge, with the minimum
