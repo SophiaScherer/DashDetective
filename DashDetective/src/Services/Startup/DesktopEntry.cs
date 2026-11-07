@@ -30,9 +30,7 @@ internal static class DesktopEntry {
     /// <summary>The key GNOME's autostart settings write to switch an entry off without deleting it.</summary>
     internal const string GnomeDisabledKey = "X-GNOME-Autostart-enabled=false";
 
-    /// <summary>Whether an existing file counts as an enabled entry. <c>Hidden=true</c> means the spec says
-    /// to ignore it, and GNOME's <c>X-GNOME-Autostart-enabled=false</c> is how its startup settings switch
-    /// one off; reporting "enabled" for either would leave the toggle disagreeing with what happens at login.</summary>
+    /// <summary>Whether an existing file is enabled; <c>Hidden=true</c> and GNOME's disabled key both mean login ignores it.</summary>
     internal static bool IsEnabled(string content) =>
         !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase)
         && !content.Contains(GnomeDisabledKey, StringComparison.OrdinalIgnoreCase);

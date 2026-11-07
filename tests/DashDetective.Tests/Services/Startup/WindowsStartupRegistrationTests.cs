@@ -4,10 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.Startup;
 
-/// <summary>
-/// Pins how <see cref="WindowsStartupRegistration"/> combines the <c>Run</c> value with Task Manager's
-/// <c>StartupApproved</c> switch, through a fake store so it runs on every CI leg.
-/// </summary>
+/// <summary>Pins how <see cref="WindowsStartupRegistration"/> combines <c>Run</c> with Task Manager's switch, through a fake store.</summary>
 public class WindowsStartupRegistrationTests {
     private static readonly byte[] Disabled = [0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     private static readonly byte[] Enabled = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];

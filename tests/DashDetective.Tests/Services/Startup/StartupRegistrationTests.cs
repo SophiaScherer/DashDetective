@@ -139,8 +139,7 @@ public class StartupRegistrationTests : IDisposable {
     public void DesktopEntry_EscapesTheReservedCharacters(string execPath, string expected) =>
         Assert.Contains($"Exec={expected}", DesktopEntry.Build(execPath), StringComparison.Ordinal);
 
-    /// <summary>GNOME's startup settings switch an entry off by editing this line rather than deleting
-    /// the file.</summary>
+    /// <summary>GNOME's startup settings switch an entry off by editing this line, not deleting the file.</summary>
     [Fact]
     public void DesktopEntry_IsEnabled_ReadsTheGnomeDisabledKey() {
         var disabled = DesktopEntry.Build("/opt/App").Replace(

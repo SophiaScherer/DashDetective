@@ -5,10 +5,7 @@ using System.Runtime.Versioning;
 
 namespace DashDetective.Services.Startup;
 
-/// <summary>
-/// The two registry values that decide whether a Windows app starts at login: the <c>Run</c> entry
-/// itself, and the Task Manager switch beside it. A seam so the combining logic runs on every CI leg.
-/// </summary>
+/// <summary>The <c>Run</c> entry and Task Manager's switch beside it; a seam so the combining logic runs on every CI leg.</summary>
 internal interface IStartupRunStore {
     string? GetRun();
     void SetRun(string command);
@@ -19,15 +16,7 @@ internal interface IStartupRunStore {
     void DeleteApproval();
 }
 
-/// <summary>
-/// Registers (or clears) the app in the per-user Windows startup list — the HKCU <c>Run</c> key, the
-/// same mechanism the Task Manager "Startup apps" tab reflects. That tab disables an entry by writing
-/// <c>StartupApproved\Run</c> and leaves <c>Run</c> alone, so both are read, and turning the toggle on
-/// clears the disabled state. Fully soft-failing, so a locked-down host degrades to "not enabled" rather
-/// than crashing. Uses the in-box <c>Microsoft.Win32.Registry</c> API (in-box on the net10.0 target, no
-/// package). The platform check lives in <see cref="IStartupRegistration.ForCurrentPlatform"/>; only the
-/// parameterless constructor, which builds the registry store, carries the OS attribute.
-/// </summary>
+/// <summary>Reads Run and Task Manager's StartupApproved switch, since disabling an app there leaves Run in place.</summary>
 internal sealed class WindowsStartupRegistration : IStartupRegistration {
     private readonly IStartupRunStore _store;
 
@@ -62,7 +51,7 @@ internal sealed class WindowsStartupRegistration : IStartupRegistration {
             if (string.IsNullOrEmpty(exe))
                 return; // no launchable path (unexpected) — leave the list untouched
             _store.SetRun($"\"{exe}\"");
-            // Without this a Task Manager "Disabled" survives the toggle and the app still would not start.
+            // Otherwise a Task Manager "Disabled" survives the toggle and the app still would not start.
             if (StartupApproval.IsDisabled(_store.GetApproval()))
                 _store.DeleteApproval();
         } else if (_store.GetRun() is not null) {
