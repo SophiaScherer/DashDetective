@@ -128,8 +128,7 @@ public class DashboardViewModelTests {
         Assert.Contains("Unknown", viewModel.OsText);
     }
 
-    /// <summary>The clock is formatted the way the rest of the app formats numbers, whatever the
-    /// current culture's decimal separator is.</summary>
+    /// <summary>The clock is formatted with the app's number format, whatever the current culture's decimal separator.</summary>
     [Fact]
     public void FormatCpuModel_CommaCulture_StillUsesADecimalPoint() {
         var previous = CultureInfo.CurrentCulture;
