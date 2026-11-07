@@ -13,7 +13,7 @@ namespace DashDetective.Services.Diagnostics;
 /// </summary>
 public static class Log {
     private static readonly object Gate = new();
-    private static readonly string? LogPath = BuildLogPath();
+    private static readonly string? LogDirectory = BuildLogDirectory();
 
     /// <summary>Records an expected, ordinary outcome worth a trace (e.g. no IPv6 route on a v4-only network).</summary>
     public static void Info(string context, Exception? error = null) => Write("INFO", context, error);
@@ -27,30 +27,39 @@ public static class Log {
 
     private static void Write(string level, string context, Exception? error) {
         try {
-            var stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            var now = DateTime.Now;
+            var stamp = now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
             var line = error is null
                 ? $"{stamp} [{level}] {context}"
                 : $"{stamp} [{level}] {context} — {error.GetType().Name}: {error.Message}";
 
             System.Diagnostics.Debug.WriteLine(line);
-            if (LogPath is not null) {
+            if (LogDirectory is not null) {
                 lock (Gate)
-                    File.AppendAllText(LogPath, line + Environment.NewLine);
+                    Append(LogDirectory, now, line);
             }
         } catch {
             // Logging must never throw into a caller's catch block.
         }
     }
 
+    /// <summary>The file a line stamped <paramref name="day"/> belongs in. Chosen per write so a session
+    /// running past midnight rolls to a new day's file.</summary>
+    internal static string FilePath(string directory, DateTime day) =>
+        Path.Combine(directory, $"dashdetective-{day:yyyyMMdd}.log");
+
+    internal static void Append(string directory, DateTime day, string line) =>
+        File.AppendAllText(FilePath(directory, day), line + Environment.NewLine);
+
     // LocalApplicationData resolves to $XDG_DATA_HOME ?? ~/.local/share on Linux — a different tree
     // from SettingsStore's $XDG_CONFIG_HOME, so the log and settings.json never collide.
-    private static string? BuildLogPath() {
+    private static string? BuildLogDirectory() {
         try {
             var dir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "DashDetective", "logs");
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"dashdetective-{DateTime.Now:yyyyMMdd}.log");
+            return dir;
         } catch {
             return null;
         }
