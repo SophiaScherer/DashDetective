@@ -1529,7 +1529,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      MinPageWidth for a vertical rail, the measured labeled width for a
                                      horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
-                                     follow theme + accent)
+                                     follow theme + accent. The rows' hover lift is a render transform on
+                                     navContent, and its reduce-motion undo sits in this file AFTER it —
+                                     a local style outranks an app-level one, and the later of two
+                                     matching rules wins)
         NavItem.cs, Icons.cs        (NavItem is a pure data model, with optional search Keywords so a
                                      renamed page keeps its old name; Icons holds the glyph geometries, all
                                      authored in an 18x18 space and STROKED — except the Caret* set, which

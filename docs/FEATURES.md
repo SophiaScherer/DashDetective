@@ -60,7 +60,7 @@ point drives the **same shared** `NavigationViewModel`:
   items, the footer and any empty space all reach it.
 - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
   in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
-- **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
+- **Motion — the bar animates its own two moves and a hover.** A
   **collapse tweens a vertical rail's width** (~150ms, `CubicEaseOut`), on `Border.rail:not(.horizontal)`
   only: a horizontal bar's height follows its content, so there is no fixed value to tween between, and
   `RailWidth` is `NaN` on that axis. A **re-dock fades** — out 120ms, change edge, back in — because
@@ -68,8 +68,22 @@ point drives the **same shared** `NavigationViewModel`:
   funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
   changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
   the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
-  dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
-  otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
+  dropped drag re-docks before `EndDrag` clears the dim. These tweens are earned by moves that would
+  otherwise read as glitches, not a licence to animate the bar's styling; the row-hover rule below still stands.
+- **Hover lift** (work item 49) — a nav row's icon and label rise 1.5px as the pointer passes, over a
+  120ms `CubicEaseOut` `TransformOperationsTransition`, upward on every dock edge. Decisions inside it:
+  it is a **render transform on `StackPanel.navContent` only**, so layout never changes, no neighbor
+  moves and the hover background and accent indicator stay where they are; the hover background itself
+  keeps no transition, per the row-hover rule. The duration is time-based, so it runs at one speed at
+  every interface and text size; the 1.5px is in DIPs inside the `ScaleHost`, so the distance grows with
+  the interface size as everything else does. **The selected row lifts too** — it is still a button, and
+  rows that answer the pointer alike read as one control. **Pointer only**: keyboard focus already draws
+  Fluent's ring, and a lift on focus would fight it. A list scrolled under a resting pointer lifts each
+  row briefly as it passes; that is the transition on the content rather than the hover-bearing element,
+  so it reads as a ripple rather than the smeared highlight the row-hover rule guards against. **Reduce
+  motion drops the tween AND the lift** (an instant 1.5px jump is still motion), from a rule in
+  `NavigationView.axaml` declared after the hover rule so it wins while both match;
+  `NavigationViewMotionTests` pins the direction, size, tween and that ordering.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
 
 The footer avatar shows the **device's own account picture** when the OS has one, read through the
@@ -737,6 +751,9 @@ about that selector are easy to get wrong, and both were measured rather than as
 drag-to-reorder slides (read in code from the window's class, since they are not a style transition), and
 the Processes loading pulse — the app's only endlessly repeating animation, which drops from
 `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+- **The navigation rows' hover lift** (work item 49) is covered too: the tween and the 1.5px lift both go,
+  from a rule in `NavigationView.axaml` declared after the hover rule.
 
 **Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
 the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against

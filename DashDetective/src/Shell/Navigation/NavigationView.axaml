@@ -99,6 +99,16 @@
             <Setter Property="Margin" Value="12,0,0,0"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="RenderTransform" Value="translateY(0px)"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <!-- Hover lift: a render transform only, so layout never moves; time-based, so it runs at one speed at every scale. -->
+        <Style Selector="Button.nav:pointerover StackPanel.navContent">
+            <Setter Property="RenderTransform" Value="translateY(-1.5px)"/>
         </Style>
         <!-- The brand area stretches so the whole strip is a drag handle; the logo and wordmark inside
              it stay left-aligned. -->
@@ -284,6 +294,13 @@
             <Setter Property="Transitions">
                 <Transitions/>
             </Setter>
+        </Style>
+        <!-- After the hover lift so it wins while both match; an instant jump is still motion. -->
+        <Style Selector=":is(Window).reduceMotion Border.rail StackPanel.navContent">
+            <Setter Property="Transitions">
+                <Transitions/>
+            </Setter>
+            <Setter Property="RenderTransform" Value="translateY(0px)"/>
         </Style>
     </UserControl.Styles>
 
