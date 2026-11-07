@@ -8,10 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>
-/// Pins that a failed CPU sampler blanks the tiles that ride the CPU tick (Processes, Threads, Handles and
-/// Up time) along with Utilization, so they do not sit at a stale count beside a dash.
-/// </summary>
+/// <summary>Pins that a failed CPU sampler blanks the tiles riding its tick along with Utilization, rather than leaving a stale count.</summary>
 public class PerformanceFailurePlaceholderTests {
     [Fact]
     public void CpuSamplerFailure_BlanksTheCountAndUptimeTiles() {

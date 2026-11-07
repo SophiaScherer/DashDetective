@@ -9,11 +9,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Dashboard;
 
-/// <summary>
-/// Pins that a failed CPU, memory or network sampler leaves the Dashboard cards showing a bare placeholder:
-/// the unit and the companion readout (memory ratio, network upload) go with the value rather than staying
-/// live beside a dash.
-/// </summary>
+/// <summary>Pins that a failed CPU, memory or network sampler blanks the unit and companion readout along with the value.</summary>
 public class DashboardFailurePlaceholderTests {
     [Fact]
     public void SamplersThatFailAfterWorking_BlankTheUnitsAndCompanionReadouts() {
