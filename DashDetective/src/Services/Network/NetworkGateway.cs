@@ -36,7 +36,7 @@ internal static class NetworkGateway {
         return null;
     }
 
-    /// <summary>The first usable IPv4 gateway, or <c>null</c>. 0.0.0.0 means "no gateway" on some adapters; IPv6 is skipped as its scope id ("fe80::1%12") fails the Toolkit's host validator.</summary>
+    /// <summary>The first IPv4 gateway, or <c>null</c>; 0.0.0.0 means "none" and IPv6 scope ids fail the Toolkit's host validator.</summary>
     internal static string? Pick(IEnumerable<IPAddress?> addresses) {
         foreach (var address in addresses)
             if (address is { AddressFamily: AddressFamily.InterNetwork } && !address.Equals(IPAddress.Any))
