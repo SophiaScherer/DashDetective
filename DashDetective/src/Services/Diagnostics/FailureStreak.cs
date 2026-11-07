@@ -1,8 +1,7 @@
 namespace DashDetective.Services.Diagnostics;
 
 /// <summary>
-/// Lets a polling loop log a repeating failure once per streak instead of once per tick. Not thread-safe;
-/// each instance belongs to one loop.
+/// Lets a polling loop log a repeating failure once per streak, not once per tick (single-threaded use).
 /// </summary>
 internal sealed class FailureStreak {
     private bool _failing;
