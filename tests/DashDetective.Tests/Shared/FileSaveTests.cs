@@ -6,10 +6,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared;
 
-/// <summary>
-/// Pins <see cref="FileSave.TryWriteAsync"/>: content is rendered before the destination is opened, so a
-/// renderer failure never truncates the chosen file and returns false; a failed I/O write returns false.
-/// </summary>
+/// <summary>Pins <see cref="FileSave.TryWriteAsync"/>: content is rendered before the destination is opened, so a failed render never truncates the file.</summary>
 public class FileSaveTests {
     [Fact]
     public async Task TryWriteAsync_RendererThrows_NeverOpensDestination() {

@@ -15,8 +15,8 @@ namespace DashDetective.Shared;
 /// Settings export buttons, the Toolkit log export), which is what made adding a format an edit in three
 /// places.
 ///
-/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>. Soft-failing,
-/// like the copies it replaces: a cancelled pick, a failed render and a failed I/O write all leave the app untouched.
+/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>. Soft-failing: a cancelled
+/// pick, a failed render or a failed write all leave the app untouched.
 /// </summary>
 internal static class FileSave {
     /// <summary>
@@ -81,18 +81,13 @@ internal static class FileSave {
         return file.TryGetLocalPath() ?? file.Name;
     }
 
-    /// <summary>
-    /// Renders first, then opens the destination, so a renderer that throws cannot leave a truncated file
-    /// behind. A failed render (any exception) or a failed I/O open or write returns false rather than
-    /// throwing, since callers are <c>async void</c> handlers where a throw would end the process.
-    /// </summary>
+    /// <summary>Renders first, then opens the destination, so a throwing renderer cannot leave a truncated file; any failure returns false.</summary>
     internal static async Task<bool> TryWriteAsync(Func<Task<Stream>> openWrite, Func<string> render) {
         string text;
         try {
             text = render();
         } catch (Exception e) {
-            // Deliberately broad: what a renderer can throw is not knowable, and the callers cannot
-            // survive an escape. The destination has not been opened, so nothing is truncated.
+            // Broad on purpose: a renderer can throw anything and callers cannot survive an escape. Nothing is truncated, as the destination is not yet open.
             Log.Error("Export could not be rendered", e);
             return false;
         }
@@ -103,8 +98,7 @@ internal static class FileSave {
             await writer.WriteAsync(text);
             return true;
         } catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
-            // Disk full, permission denied, drive removed mid-write: the file isn't written and the app
-            // carries on.
+            // Disk full, permission denied, drive removed mid-write: the app carries on.
             Log.Warn("Export could not be written", e);
             return false;
         }
