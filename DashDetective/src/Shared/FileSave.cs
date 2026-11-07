@@ -15,8 +15,7 @@ namespace DashDetective.Shared;
 /// Settings export buttons, the Toolkit log export), which is what made adding a format an edit in three
 /// places.
 ///
-/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>. Fully soft-failing,
-/// like the copies it replaces: a cancelled pick and a failed write both leave the app untouched.
+/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>.
 /// </summary>
 internal static class FileSave {
     /// <summary>
@@ -30,9 +29,24 @@ internal static class FileSave {
     /// <param name="content">Renders the report in whichever format the chosen filename means.</param>
     /// <returns>Where the file was written, for a caller that confirms it; null for a cancelled pick or
     /// a failed write, which are the two things there is nothing to announce about.</returns>
-    public static async Task<string?> SaveAsync(Visual owner, string title, string suggestedName,
-                                                IReadOnlyList<DiagnosticsFormat> formats,
-                                                Func<DiagnosticsFormat, string> content) {
+    public static Task<string?> SaveAsync(Visual owner, string title, string suggestedName,
+                                          IReadOnlyList<DiagnosticsFormat> formats,
+                                          Func<DiagnosticsFormat, string> content) =>
+        GuardAsync(() => SaveCoreAsync(owner, title, suggestedName, formats, content));
+
+    /// <summary>Never throws, because every caller is an <c>async void</c> handler where a throw would end the process.</summary>
+    internal static async Task<string?> GuardAsync(Func<Task<string?>> save) {
+        try {
+            return await save();
+        } catch (Exception e) {
+            Log.Error("Export failed", e);
+            return null;
+        }
+    }
+
+    private static async Task<string?> SaveCoreAsync(Visual owner, string title, string suggestedName,
+                                                     IReadOnlyList<DiagnosticsFormat> formats,
+                                                     Func<DiagnosticsFormat, string> content) {
         var storage = TopLevel.GetTopLevel(owner)?.StorageProvider;
         if (storage is null || formats.Count == 0)
             return null;
@@ -53,22 +67,37 @@ internal static class FileSave {
         if (file is null)
             return null; // user cancelled
 
-        try {
-            // The name is the authority on the format: the dialog does not report which filter was
-            // chosen, and a typed extension should win over the one that happened to be selected.
-            var format = DiagnosticsFormats.FromFileName(file.Name);
+        // The name decides the format: the dialog does not report which filter was chosen.
+        var format = DiagnosticsFormats.FromFileName(file.Name);
 
-            await using var stream = await file.OpenWriteAsync();
-            await using var writer = new StreamWriter(stream);
-            await writer.WriteAsync(content(format));
-        } catch (Exception) {
-            // Disk full, permission denied, drive removed mid-write, etc. Swallow so a failed export
-            // can't take the app down; the file simply isn't written.
+        if (!await TryWriteAsync(file.OpenWriteAsync, () => content(format)))
             return null;
-        }
 
         // The local path where there is one, so a confirmation can name somewhere the user can go look.
         // A picker on a provider that has no local file (a cloud location) still has a name.
         return file.TryGetLocalPath() ?? file.Name;
+    }
+
+    /// <summary>Renders first, then opens the destination, so a throwing renderer cannot leave a truncated file; any failure returns false.</summary>
+    internal static async Task<bool> TryWriteAsync(Func<Task<Stream>> openWrite, Func<string> render) {
+        string text;
+        try {
+            text = render();
+        } catch (Exception e) {
+            // Broad on purpose: a renderer can throw anything, and callers cannot survive an escape.
+            Log.Error("Export could not be rendered", e);
+            return false;
+        }
+
+        try {
+            await using var stream = await openWrite();
+            await using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(text);
+            return true;
+        } catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+            // Disk full, permission denied, drive removed mid-write: the app carries on.
+            Log.Warn("Export could not be written", e);
+            return false;
+        }
     }
 }
