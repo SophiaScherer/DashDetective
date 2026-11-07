@@ -24,8 +24,7 @@ public partial class ProcessesView : UserControl {
         HeaderColumns.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
-        // Direct: capture-lost is raised only on the element that held the capture, so a tunnel handler
-        // never ran and a drag whose capture was taken away stayed armed for the next hover.
+        // Direct, because capture-lost is raised only on the element that held the capture.
         HeaderColumns.AddHandler(PointerCaptureLostEvent, OnHeaderCaptureLost, RoutingStrategies.Direct);
 
         // Same reason: the rows carry their own tap gesture, which would otherwise eat the press.
