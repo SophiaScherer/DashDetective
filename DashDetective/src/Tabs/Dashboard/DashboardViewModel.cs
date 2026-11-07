@@ -308,7 +308,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             new ReportRow("GPU", GpuValueText == Placeholders.NoReading
                 ? $"{Placeholders.NoReading}  ({GpuModelText})"
                 : $"{GpuValueText}%  ({GpuModelText})"),
-            new ReportRow("Storage", $"{StorageValueText}% active  ({StorageSubText})"),
+            // No system disk found means no reading; "0% active  ()" would claim an idle drive all session.
+            new ReportRow("Storage", _systemDiskNumber < 0
+                ? Placeholders.NoReading
+                : $"{StorageValueText}% active  ({StorageSubText})"),
             new ReportRow("Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})"),
         ]),
     ];

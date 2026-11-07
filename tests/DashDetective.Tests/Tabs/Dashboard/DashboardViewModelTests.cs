@@ -2,6 +2,7 @@ using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tests.Fakes;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -125,5 +126,17 @@ public class DashboardViewModelTests {
 
         Assert.Contains("Unknown", viewModel.CpuModelText);
         Assert.Contains("Unknown", viewModel.OsText);
+    }
+
+    /// <summary>With no system disk identified, the report's Storage row is the placeholder, not a false "0% active  ()".</summary>
+    [Fact]
+    public void GetReportSections_NoSystemDisk_ReportsStorageAsNoReading() {
+        var viewModel = Create(StubHardwareProviders.Compose());
+
+        var storage = viewModel.GetReportSections()
+            .Single(section => section.Title == "Live metrics")
+            .Rows.Single(row => row.Key == "Storage");
+
+        Assert.Equal("—", storage.Value);
     }
 }
