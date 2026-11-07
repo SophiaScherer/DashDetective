@@ -47,8 +47,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         Clock = () => clock.Elapsed;
     }
 
-    /// <summary>Whether Reduce motion is on: the shell puts the class on the window. A seam so a test,
-    /// which has no window, can turn it on.</summary>
+    /// <summary>Whether Reduce motion is on; a seam because a test has no window to carry the class.</summary>
     internal Func<bool> MotionReduced { get; set; }
 
     /// <summary>The time slides are measured on. A seam so a test can step it.</summary>
@@ -242,9 +241,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         return Drag.DragBox();
     }
 
-    /// <summary>Eases a child that moved into its new slot instead of jumping: the others as a drag
-    /// re-packs them, and the dropped item from where it was let go. Nothing else moves it — a resize
-    /// or a cancelled drag lands at once, and Reduce motion turns all of it off.</summary>
+    /// <summary>Eases a re-packed or just-dropped child into its slot; resizes and cancelled drags land at once.</summary>
     private void Slide(Control child, Point slot) {
         FinishSlides(Clock());
         var settle = Drag.TakeSettle(child);
@@ -310,7 +307,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         top.RequestAnimationFrame(_ => OnFrame());
     }
 
-    /// <summary>Advances every slide one frame. Internal so a test can step it without a render loop.</summary>
+    /// <summary>Advances every slide one frame; internal so a test can step it.</summary>
     internal void OnFrame() {
         _frameRequested = false;
         var now = Clock();

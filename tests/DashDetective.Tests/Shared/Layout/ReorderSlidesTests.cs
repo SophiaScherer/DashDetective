@@ -4,9 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Layout;
 
-/// <summary>Covers <see cref="ReorderSlides"/>: an item starts drawn where it was, eases into its slot
-/// over <see cref="ReorderSlides.Duration"/>, and a second move mid-slide continues from where it is drawn
-/// rather than jumping.</summary>
+/// <summary>Covers <see cref="ReorderSlides"/>: an item eases into its slot, and a second move mid-slide continues from where it is drawn.</summary>
 public class ReorderSlidesTests {
     private static readonly TimeSpan Half = ReorderSlides.Duration / 2;
 
@@ -62,8 +60,7 @@ public class ReorderSlidesTests {
     public void OffsetAt_AnItemNotSliding_IsZero() =>
         Assert.Equal((0.0, 0.0), new ReorderSlides().OffsetAt(new object(), TimeSpan.Zero));
 
-    /// <summary>The hand-off: an item re-targeted mid-slide is drawn exactly where it was a moment before,
-    /// plus the distance its slot just moved.</summary>
+    /// <summary>A re-targeted item is drawn where it was a moment before, plus the distance its slot moved.</summary>
     [Fact]
     public void Start_MidSlide_ContinuesFromWhereTheItemIsDrawn() {
         var slides = new ReorderSlides();

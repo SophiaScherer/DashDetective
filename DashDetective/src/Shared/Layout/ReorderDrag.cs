@@ -52,8 +52,7 @@ public sealed class ReorderDrag {
         _host.Surface.AddHandler(InputElement.PointerPressedEvent, OnPressed, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerMovedEvent, OnMoved, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerReleasedEvent, OnReleased, RoutingStrategies.Tunnel);
-        // Direct, like Exited: capture-lost is raised only on the element that held the capture, so a
-        // tunnel handler never ran and a drag whose capture was taken away stayed live.
+        // Direct: capture-lost is raised only on the element that held the capture, so a tunnel handler never sees it.
         _host.Surface.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Direct);
 
         // Exited is a direct event, so this fires for the panel itself rather than for every child the
@@ -186,8 +185,7 @@ public sealed class ReorderDrag {
         e.Handled = true;
     }
 
-    /// <summary>Drops the item where it is previewed and hands it to the panel to ease into its slot.
-    /// <paramref name="device"/> is null only from tests.</summary>
+    /// <summary>Drops the item where it is previewed and hands it to the panel to ease into its slot.</summary>
     internal void Release(IPointer? device) {
         _host.CommitPreview();
 
@@ -200,16 +198,14 @@ public sealed class ReorderDrag {
 
     private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) => Cancel();
 
-    /// <summary>Ends a drag that was never dropped: nothing commits and nothing animates, so the item
-    /// is simply back in its slot.</summary>
+    /// <summary>Ends a drag that was never dropped: nothing commits or animates.</summary>
     internal void Cancel() {
         if (_dragging)
             End();
         _pending = false;
     }
 
-    /// <summary>The box a just-dropped item was let go at, once, for the arrange that places it, so it
-    /// can ease from there into its slot. Null for any other item, and for a drag that was cancelled.</summary>
+    /// <summary>The box a just-dropped item was let go at, taken once; null for any other item.</summary>
     internal Rect? TakeSettle(Control item) {
         if (!ReferenceEquals(item, _settling))
             return null;
