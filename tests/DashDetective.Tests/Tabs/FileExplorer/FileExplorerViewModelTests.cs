@@ -102,8 +102,7 @@ public sealed class FileExplorerViewModelTests : IDisposable {
         Assert.Equal(drive, _page.CurrentPath);
     }
 
-    /// <summary>The folder exists relative to the working directory, which is exactly what a bypassed
-    /// check would resolve it against, so only the refusal keeps it from opening.</summary>
+    /// <summary>The folder exists relative to the working directory, so only the refusal keeps it from opening.</summary>
     [Fact]
     public void CommitPath_RelativeNameThatExistsInTheWorkingDirectory_IsRefusedWithThePathError() {
         var name = "DashDetectiveRel_" + Path.GetRandomFileName();
