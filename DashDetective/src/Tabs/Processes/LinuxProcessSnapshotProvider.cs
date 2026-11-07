@@ -35,12 +35,10 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
     /// read <c>sysconf(_SC_CLK_TCK)</c>, and 100 is universal on Linux regardless of <c>CONFIG_HZ</c>.</summary>
     private const double UserHz = 100;
 
-    /// <summary>Fallback divisor when <c>/proc/stat</c> is unreadable; <c>ProcessorCount</c> follows the
-    /// affinity mask and cgroup quota, so it is not the machine's CPU count.</summary>
+    /// <summary>Fallback divisor when <c>/proc/stat</c> is unreadable; <c>ProcessorCount</c> follows affinity and cgroup quota.</summary>
     private static readonly int FallbackProcessors = Environment.ProcessorCount > 0 ? Environment.ProcessorCount : 1;
 
-    /// <summary>Online logical processors this snapshot — the divisor that puts CPU% on Task Manager's
-    /// 0–100 whole-machine scale.</summary>
+    /// <summary>Online logical processors; the divisor that puts CPU% on Task Manager's 0-100 whole-machine scale.</summary>
     private int _logicalProcessors = FallbackProcessors;
 
     private readonly IProcFileSystem _proc;
@@ -79,8 +77,7 @@ internal sealed class LinuxProcessSnapshotProvider : IProcessSnapshotProvider {
 
     public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.Run(Snapshot, token);
 
-    /// <summary>Counts the <c>cpuN</c> lines of <c>/proc/stat</c>, which lists online CPUs regardless of
-    /// the caller's affinity or cgroup quota. Falls back when none parse.</summary>
+    /// <summary>Counts the <c>cpuN</c> lines of <c>/proc/stat</c>, which lists online CPUs regardless of affinity or quota; falls back when none parse.</summary>
     internal static int OnlineCpuCount(IProcFileSystem proc, int fallback) {
         var count = 0;
         foreach (var line in proc.ReadAllLines("/proc/stat")) {

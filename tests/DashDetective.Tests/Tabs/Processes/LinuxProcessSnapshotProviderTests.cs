@@ -209,8 +209,7 @@ public class LinuxProcessSnapshotProviderTests {
     public void ComputeCpuPercent_Cases(ulong ticks, double seconds, int processors, double expected) =>
         Assert.Equal(expected, LinuxProcessSnapshotProvider.ComputeCpuPercent(ticks, seconds, processors), 6);
 
-    /// <summary>The divisor is the machine's online CPUs from <c>/proc/stat</c>, not an affinity- or
-    /// quota-limited <c>ProcessorCount</c>, so a pinned process cannot read inflated.</summary>
+    /// <summary>The divisor is the online CPU count from <c>/proc/stat</c>, not an affinity-limited <c>ProcessorCount</c>.</summary>
     [Fact]
     public void OnlineCpuCount_ReadsCpuLinesFromProcStat() {
         var proc = new FakeProcFileSystem().WithFile("/proc/stat", ProcFixtures.ProcStat);
