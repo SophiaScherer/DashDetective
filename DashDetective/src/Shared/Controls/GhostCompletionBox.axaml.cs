@@ -44,7 +44,11 @@ public partial class GhostCompletionBox : UserControl {
 
         Entry.KeyDown += OnEntryKeyDown;
         Entry.GetObservable(TextBox.TextProperty).Subscribe(new AnonymousObserver(OnEntryTextChanged));
+        // The block's brush is re-resolved on a theme switch; the suffix run must follow it.
+        Ghost.GetObservable(TextBlock.ForegroundProperty).Subscribe(new AnonymousBrushObserver(OnGhostBrushChanged));
     }
+
+    private Run? _suffixRun;
 
     public string Text {
         get => GetValue(TextProperty);
@@ -138,6 +142,7 @@ public partial class GhostCompletionBox : UserControl {
         var suffix = PrefixCompleter.Suffix(Text, Completion);
 
         Ghost.Inlines?.Clear();
+        _suffixRun = null;
         if (suffix.Length == 0)
             return;
 
@@ -146,13 +151,29 @@ public partial class GhostCompletionBox : UserControl {
         // Taken from the block rather than left to inherit: the block's brush is the one the XAML's
         // DynamicResource already resolved against the active theme, so copying it is exact and does
         // not depend on how Avalonia propagates Foreground into inlines.
-        Ghost.Inlines?.Add(new Run(suffix) { Foreground = Ghost.Foreground });
+        _suffixRun = new Run(suffix) { Foreground = Ghost.Foreground };
+        Ghost.Inlines?.Add(_suffixRun);
+    }
+
+    private void OnGhostBrushChanged(IBrush? brush) {
+        if (_suffixRun is { } run)
+            run.Foreground = brush;
     }
 
     private void SetEnterBinding() {
         Entry.KeyBindings.Clear();
         if (EnterCommand is { } command)
             Entry.KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.Enter), Command = command });
+    }
+
+    private sealed class AnonymousBrushObserver : System.IObserver<IBrush?> {
+        private readonly System.Action<IBrush?> _onNext;
+
+        public AnonymousBrushObserver(System.Action<IBrush?> onNext) => _onNext = onNext;
+
+        public void OnCompleted() { }
+        public void OnError(System.Exception error) { }
+        public void OnNext(IBrush? value) => _onNext(value);
     }
 
     /// <summary>Minimal observer so the box's own edits reach <see cref="Text"/>; Avalonia's property
