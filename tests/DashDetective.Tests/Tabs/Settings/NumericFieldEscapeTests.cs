@@ -4,10 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Settings;
 
-/// <summary>Pins how <c>NumericField</c> hears Escape. The shell's tunnelling Escape handler dismisses a
-/// banner and marks the key handled before it reaches the box, so a bubbling <c>KeyDown</c> never saw it
-/// and the half-typed number stayed. The box has no headless harness, so the registration is pinned in
-/// source.</summary>
+/// <summary>Pins that <c>NumericField</c> hears Escape on the tunnel with handled events, since the shell handles it first; pinned in source for lack of a headless harness.</summary>
 public class NumericFieldEscapeTests {
     private static string Source() =>
         File.ReadAllText(Path.Combine(PaletteFile.SourceRoot(), "src/Tabs/Settings/NumericField.axaml.cs"));
