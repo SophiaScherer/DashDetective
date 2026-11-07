@@ -115,8 +115,7 @@ public class ReorderDragTests {
         Assert.Equal("narrow wide", Shown(board));
     }
 
-    /// <summary>The Dashboard's shape: an unnamed card row owns the top, the charts sit below it. A chart
-    /// dragged up over the row stops below it instead of being dropped into its place.</summary>
+    /// <summary>A chart dragged up over an unnamed card row stops below it.</summary>
     [Fact]
     public void MoveTo_AWidgetOverAChildWithNoId_StopsBelowIt() {
         var row = new Border { MinWidth = 200, Height = 100 };
@@ -133,8 +132,7 @@ public class ReorderDragTests {
         Assert.Equal(" chart first", Shown(board));
     }
 
-    /// <summary>A double click on a Dashboard card navigates away mid-press, so the release lands on
-    /// another page. Detaching ends the press, or the first move back would pick the card up.</summary>
+    /// <summary>Detaching ends the press, or a release on another page leaves it pending.</summary>
     [Fact]
     public void Detach_WithAPressPending_DropsIt() {
         var (board, narrow) = NarrowBesideWide();
@@ -146,8 +144,7 @@ public class ReorderDragTests {
         Assert.False(board.Drag.IsDragging);
     }
 
-    /// <summary>The same press, seen from the pointer: a move with the button already up is not a drag,
-    /// whatever was left pending.</summary>
+    /// <summary>A move with the button already up is not a drag, whatever was left pending.</summary>
     [Fact]
     public void PointerMoved_WithNoButtonHeld_DropsAPendingPress() {
         var (board, narrow) = NarrowBesideWide();
@@ -164,8 +161,7 @@ public class ReorderDragTests {
         Assert.False(board.Drag.IsDragging);
     }
 
-    /// <summary>A confined strip holds its dragged item inside itself: pulled far below a one-row strip,
-    /// the card stays in the row rather than being drawn over whatever sits under it.</summary>
+    /// <summary>A confined strip keeps its dragged item inside itself.</summary>
     [Fact]
     public void DragBox_InAConfiningPanel_StaysInsideIt() {
         var (board, narrow) = NarrowBesideWide();

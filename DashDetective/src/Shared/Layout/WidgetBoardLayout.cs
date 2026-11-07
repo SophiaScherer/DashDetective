@@ -251,8 +251,7 @@ public static class WidgetBoardLayout {
                                  double grabX, double grabY) =>
         new(pointerX - grabX * width, pointerY - grabY * height, width, height);
 
-    /// <summary>A drag box kept inside a panel of this size, for a strip whose items may not leave it.
-    /// A box larger than the panel pins to its top-left rather than being squeezed.</summary>
+    /// <summary>A drag box kept inside the panel; one larger than the panel pins to its top-left.</summary>
     public static Rect2 Confine(Rect2 box, double panelWidth, double panelHeight) =>
         box with {
             Left = Math.Max(0, Math.Min(box.Left, panelWidth - box.Width)),

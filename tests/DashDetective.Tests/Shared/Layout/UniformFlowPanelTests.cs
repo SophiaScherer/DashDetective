@@ -7,9 +7,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Layout;
 
-/// <summary>Covers <see cref="UniformFlowPanel"/> as a strip of cards that are buttons, the Dashboard's
-/// shape: a grip marked on the button inside each card is a handle even though the button takes clicks of
-/// its own, and the strip reorders within itself through the drag and the keyboard alike.</summary>
+/// <summary>Covers <see cref="UniformFlowPanel"/> as a strip of button cards: a grip on the button is a handle, and the strip reorders by drag and keyboard.</summary>
 public class UniformFlowPanelTests {
     private const double Width = 1000;
 
@@ -36,8 +34,7 @@ public class UniformFlowPanelTests {
         panel.Arrange(new Rect(0, 0, Width, panel.DesiredSize.Height));
     }
 
-    /// <summary>A generated item whose template root is a button is reached through the button. Its
-    /// presenter as a tab stop too would put two stops on every card, the first doing nothing.</summary>
+    /// <summary>A button-rooted item is reached through the button, not also through its presenter.</summary>
     [Fact]
     public void Layout_AGeneratedButton_LeavesItsPresenterOutOfTheTabOrder() {
         var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Marked };
@@ -50,8 +47,7 @@ public class UniformFlowPanelTests {
         Assert.False(presenter.Focusable);
     }
 
-    /// <summary>The app's order: the generator's presenter has no child when the panel first collects it,
-    /// and gains one while it is measured. The tab stop is decided at arrange, once the child is there.</summary>
+    /// <summary>The presenter gains its child during measure, so the tab stop is decided at arrange.</summary>
     [Fact]
     public void Arrange_AButtonThePresenterGainedDuringMeasure_LeavesThePresenterOut() {
         var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Marked };
@@ -65,7 +61,7 @@ public class UniformFlowPanelTests {
         Assert.False(presenter.Focusable);
     }
 
-    /// <summary>A card that is a plain surface has nothing else to focus, so its presenter is the stop.</summary>
+    /// <summary>A plain-surface card has nothing else to focus, so its presenter is the stop.</summary>
     [Fact]
     public void Layout_AGeneratedSurface_MakesItsPresenterATabStop() {
         var panel = new UniformFlowPanel { MinItemWidth = 150, DragGrip = ReorderGrip.Item };
@@ -87,8 +83,7 @@ public class UniformFlowPanelTests {
         Assert.Same(links[1], handle.Grip);
     }
 
-    /// <summary>Why the Dashboard marks its links rather than using <see cref="ReorderGrip.Item"/>: under
-    /// Item a press on a button belongs to the button, and the whole card is one.</summary>
+    /// <summary>Under <see cref="ReorderGrip.Item"/> a press on a button belongs to the button, so the links are marked instead.</summary>
     [Fact]
     public void TryGetHandle_OnAButtonUnderItem_IsNotAHandle() {
         var (panel, links) = Strip(ReorderGrip.Item, markGrip: false);

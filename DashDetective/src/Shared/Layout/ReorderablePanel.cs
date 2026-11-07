@@ -31,8 +31,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         AvaloniaProperty.Register<ReorderablePanel, IReadOnlyList<string>?>(
             nameof(Order), defaultBindingMode: BindingMode.TwoWay);
 
-    /// <summary>Keeps a dragged item drawn inside this panel. For a strip that is a flow of its own
-    /// inside a page — the Dashboard's stat cards — so a card cannot look as if it went among the charts.</summary>
+    /// <summary>Keeps a dragged item drawn inside this panel, for a strip that is its own flow.</summary>
     public static readonly StyledProperty<bool> ConfineDragProperty =
         AvaloniaProperty.Register<ReorderablePanel, bool>(nameof(ConfineDrag));
 
@@ -214,12 +213,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         }
     }
 
-    /// <summary>Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
-    /// rather than per view because a card is usually a plain Border with no control inside: pages whose
-    /// items happened to contain a button were reachable, the rest were not reachable at all. A generated
-    /// item that IS a focusable control (a Dashboard card's link, a Performance rail row) is reachable
-    /// already, and its wrapper as a second stop would take focus and do nothing. Decided at arrange: a
-    /// presenter has no child until it is first measured, which is after measure has collected it.</summary>
+    /// <summary>Makes an item a tab stop unless its content is already focusable; decided at arrange, when the presenter has a child.</summary>
     private void MakeTabStop(Control child) {
         if (Reorderable)
             child.Focusable = !(Inner(child) is { Focusable: true } inner && !ReferenceEquals(inner, child));

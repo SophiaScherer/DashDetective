@@ -163,8 +163,7 @@ public class ChildOrderTests {
         Assert.Equal("b c a", Shown(order, previewing: true, "a", "b", "c"));
     }
 
-    /// <summary>The Dashboard's shape: an unnamed card row ahead of the charts. A chart dropped over it
-    /// stops just after it, rather than landing in the card row's place.</summary>
+    /// <summary>A chart dropped over an unnamed card row stops just after it.</summary>
     [Fact]
     public void Move_OverAChildWithNoId_StopsBesideIt() {
         var order = new ChildOrder();
@@ -176,8 +175,7 @@ public class ChildOrderTests {
         Assert.Equal("_ c b", Shown(order, previewing: true, "_", "b", "c"));
     }
 
-    /// <summary>The unnamed child itself never moves: a keyboard move that falls through from the card
-    /// row to the board around it must not carry the whole row into the charts.</summary>
+    /// <summary>The unnamed child never moves, so a keyboard move falling through from the row cannot carry it.</summary>
     [Fact]
     public void Move_AChildWithNoId_StaysPut() {
         var order = new ChildOrder();

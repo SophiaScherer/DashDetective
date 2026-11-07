@@ -4,8 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Dashboard;
 
-/// <summary>Covers <see cref="DashboardCard"/>'s identity in the card row's saved order: named by device,
-/// except a GPU, whose device id carries a LUID that changes every boot and so goes by its index label.</summary>
+/// <summary>Covers <see cref="DashboardCard"/>'s saved-order id: the device, except a GPU, which goes by label.</summary>
 public class DashboardCardTests {
     private static DashboardCard Card(DeviceCategory category, string deviceId, string label) =>
         new(category, deviceId, label, "%", _ => { });

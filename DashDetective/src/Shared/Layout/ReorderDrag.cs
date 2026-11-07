@@ -68,13 +68,12 @@ public sealed class ReorderDrag {
         _host.Surface.RemoveHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost);
         _host.Surface.RemoveHandler(InputElement.PointerExitedEvent, OnExited);
 
-        // A double click on a Dashboard card leaves the page mid-press, so its release lands elsewhere;
-        // kept pending, the first move back here would pick the card up with no button held.
+        // A release that lands on another page would leave the press pending, and the next move would pick the item up.
         Cancel();
     }
 
     /// <summary>Where the dragged item is drawn: under the pointer at the grip it was picked up by,
-    /// at the size it had then — kept inside the panel when the panel confines its drags.</summary>
+    /// at the size it had then, kept inside the panel when it confines drags.</summary>
     public Rect DragBox() {
         var box = WidgetBoardLayout.DragRect(_size.Width, _size.Height, _pointer.X, _pointer.Y,
                                              _grabX, _grabY);

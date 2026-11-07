@@ -79,8 +79,7 @@ public sealed class ChildOrder {
     }
 
     /// <summary>Moves a child to this position among the visible ones. False when it is already
-    /// there, so a wobble does not re-pack every frame. A child with no id is a fixed point: it never
-    /// moves and nothing moves past it, which is the rule <see cref="ApplySaved"/> already keeps.</summary>
+    /// there, so a wobble does not re-pack every frame. A child with no id never moves and nothing passes it.</summary>
     public bool Move(int child, int visibleTarget, Predicate<int> isVisible) {
         var from = _preview.IndexOf(child);
         if (from < 0 || IsPinned(child))
@@ -96,8 +95,7 @@ public sealed class ChildOrder {
     // Unnamed children are known only once Sync(ids) has run; before that nothing is pinned.
     private bool IsPinned(int child) => _ids is not null && child < _ids.Count && _ids[child].Length == 0;
 
-    /// <summary>The insert positions a child taken out at <paramref name="from"/> can reach without
-    /// crossing a pinned child — on the Dashboard, a chart cannot pass the stat card row.</summary>
+    /// <summary>The insert positions reachable from <paramref name="from"/> without crossing a pinned child.</summary>
     private (int Low, int High) BetweenPins(int from) {
         var low = 0;
         for (var i = from - 1; i >= 0; i--)

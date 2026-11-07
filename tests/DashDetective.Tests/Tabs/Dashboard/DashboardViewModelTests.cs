@@ -15,7 +15,7 @@ public class DashboardViewModelTests {
     private static DashboardViewModel Create(HardwareProviders providers) =>
         new(TestMetrics.Idle(), providers);
 
-    /// <summary>The card row and the charts are two flows, so each persists and resets on its own key.</summary>
+    /// <summary>The card row and the charts persist and reset on separate keys.</summary>
     [Fact]
     public void SavedOrders_KeepTheCardRowApartFromTheWidgets() {
         var viewModel = Create(StubHardwareProviders.Compose());

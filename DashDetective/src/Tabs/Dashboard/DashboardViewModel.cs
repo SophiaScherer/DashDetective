@@ -27,8 +27,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
     public SavedOrder Widgets { get; } = new("dashboard");
 
-    /// <summary>The stat card row's order. A flow of its own: the cards reorder among themselves and the
-    /// charts among themselves, never one into the other.</summary>
+    /// <summary>The stat card row's order, a flow separate from the charts'.</summary>
     public SavedOrder CardOrder { get; } = new("dashboard.cards");
 
     public IEnumerable<SavedOrder> SavedOrders => [Widgets, CardOrder];

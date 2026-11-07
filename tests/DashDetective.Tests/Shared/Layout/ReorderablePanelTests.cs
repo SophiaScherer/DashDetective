@@ -27,8 +27,7 @@ public class ReorderablePanelTests {
         Assert.Equal(new[] { "b", "a", "c" }, committed);
     }
 
-    /// <summary>The Dashboard's card row has no id. A keyboard move that falls through to the board from
-    /// the row's last card must not carry the whole row in among the charts.</summary>
+    /// <summary>A keyboard move falling through from the id-less card row must not carry the row into the charts.</summary>
     [Fact]
     public void TryMoveFocused_OnAChildWithNoId_LeavesItInPlace() {
         var (board, items) = Board();
