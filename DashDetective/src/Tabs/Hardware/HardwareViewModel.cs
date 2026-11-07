@@ -123,8 +123,7 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage, IReord
     /// </summary>
     public IReadOnlyList<(string Key, string Value)> GetReportRows() => ReportRowsOf(Cards);
 
-    /// <summary>One row per card in the order given, so a machine with several adapters reports each
-    /// Graphics card. Static because the page itself cannot be built without a render backend.</summary>
+    /// <summary>One row per card, in order, so every Graphics adapter is reported. Static because the page cannot be built without a render backend.</summary>
     internal static IReadOnlyList<(string Key, string Value)> ReportRowsOf(IEnumerable<HardwareCard> cards) =>
         cards.Select(card => (card.Title, card.Subtitle)).ToList();
 

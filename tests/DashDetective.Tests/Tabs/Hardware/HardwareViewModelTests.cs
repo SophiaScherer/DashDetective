@@ -4,10 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Hardware;
 
-/// <summary>
-/// Covers <see cref="HardwareViewModel.ReportRowsOf"/>: the exported report carries one row per card, so
-/// every Graphics adapter appears, in the order the page shows them.
-/// </summary>
+/// <summary>Pins <see cref="HardwareViewModel.ReportRowsOf"/>: the export carries one row per card, so every Graphics adapter appears in page order.</summary>
 public sealed class HardwareViewModelTests {
     // Null icons: building the real ones needs a render backend, and the rows never read them.
     private static HardwareCard Card(string id, string title, string subtitle) =>
