@@ -9,16 +9,9 @@ using System;
 
 namespace DashDetective.Shared.Controls;
 
-/// <summary>
-/// Moves an open tooltip with the cursor while the pointer stays over its owner. Attached app-wide from
-/// SharedStyles.axaml. Dismissal stays the framework's: it already closes a tip once the pointer, or a layout
-/// change under a still pointer, leaves the owner.
-/// </summary>
+/// <summary>Moves an open tooltip with the cursor while the pointer stays over its owner; dismissal stays the framework's.</summary>
 public static class ToolTipTracking {
-    /// <summary>
-    /// The smallest offset change that re-places a tip. Avalonia re-reads the pointer whenever an open tip's
-    /// offset changes, so a sub-pixel toggle moves the tip to the cursor and nowhere else.
-    /// </summary>
+    /// <summary>The smallest offset change that makes Avalonia re-read the pointer and re-place an open tip.</summary>
     internal const double Nudge = 0.01;
 
     /// <summary>Set on a <see cref="TopLevel"/> to make the tooltips inside it follow the pointer.</summary>
@@ -45,10 +38,7 @@ public static class ToolTipTracking {
 
     public static void SetFollowsPointer(TopLevel root, bool value) => root.SetValue(FollowsPointerProperty, value);
 
-    /// <summary>
-    /// The control whose tip is open under the pointer: the nearest ancestor of <paramref name="hit"/> (itself
-    /// included) that <paramref name="isOpen"/> accepts, or null when the pointer is over no open tip's owner.
-    /// </summary>
+    /// <summary>The nearest ancestor of <paramref name="hit"/> (itself included) that <paramref name="isOpen"/> accepts, or null.</summary>
     internal static Control? OpenOwner(Visual? hit, Func<Control, bool> isOpen) {
         for (var visual = hit; visual is not null; visual = visual.GetVisualParent())
             if (visual is Control control && isOpen(control))
@@ -62,10 +52,7 @@ public static class ToolTipTracking {
             ? popup.PlacementTarget
             : null;
 
-    /// <summary>
-    /// The owner's next offsets: its own plus how far the pointer is from where the tip was anchored. Equal to
-    /// the current ones only when nothing would move, so it steps a nudge aside to make Avalonia re-place it.
-    /// </summary>
+    /// <summary>The owner's next offsets; steps a nudge aside when nothing would move, so Avalonia re-places the tip.</summary>
     internal static Vector Next(Vector current, Vector baseline, Vector shift) {
         var target = baseline + shift;
         return target == current ? target + new Vector(Nudge, 0) : target;
@@ -89,8 +76,7 @@ public static class ToolTipTracking {
         if (_openTips == 0)
             return;
 
-        // Hit-tested as the framework does, disabled controls included: a disabled owner can show its tip, but
-        // its moves are routed from the nearest enabled ancestor.
+        // Hit-tested as the framework does, disabled controls included, since a disabled owner can show a tip.
         var hit = root.InputHitTest(point, enabledElementsOnly: false) as Visual ?? e.Source as Visual;
 
         if (OpenOwner(hit, ToolTip.GetIsOpen) is { } owner) {
@@ -98,16 +84,14 @@ public static class ToolTipTracking {
             return;
         }
 
-        // A quick move can land the pointer on the tip, whose own window then takes the moves. The tip keeps
-        // following, shifted by the pointer's distance from the anchor; if the pointer has in fact left the
-        // owner, the framework closes the tip on the next move.
+        // The pointer can land on the tip itself, whose window then takes the moves; keep following, and the
+        // framework closes the tip if the pointer really left.
         if (TipOwner(hit) is { } tipped && ToolTip.GetIsOpen(tipped) && TopLevel.GetTopLevel(tipped) is { } ownerRoot
             && ownerRoot != root && ownerRoot.PointToClient(root.PointToScreen(point)) is var there)
             Track(tipped, there - ownerRoot.GetValue(LastPointerProperty));
     }
 
-    /// <summary>Re-places <paramref name="owner"/>'s open tip at the pointer, offset by <paramref name="shift"/>.
-    /// Internal so a test can drive it without a pointer.</summary>
+    /// <summary>Re-places <paramref name="owner"/>'s open tip at the pointer, offset by <paramref name="shift"/>.</summary>
     internal static void Track(Control owner, Vector shift) {
         // A tip placed against its owner rather than the pointer is meant to stay put.
         if (ToolTip.GetPlacement(owner) != PlacementMode.Pointer)
@@ -129,8 +113,7 @@ public static class ToolTipTracking {
             Restore(owner);
     }
 
-    /// <summary>Hands a closed tip's owner the offsets it had before tracking began. Internal so a test can
-    /// reach it: a detached control cannot hold a tip open.</summary>
+    /// <summary>Hands a closed tip's owner back its original offsets.</summary>
     internal static void Restore(Control owner) {
         if (owner.GetValue(OffsetBeforeTrackingProperty) is not { } original)
             return;

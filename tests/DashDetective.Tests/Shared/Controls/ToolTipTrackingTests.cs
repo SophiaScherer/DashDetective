@@ -12,10 +12,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Controls;
 
-/// <summary>
-/// Covers <see cref="ToolTipTracking"/>: a tip follows the pointer only across its own owner, judged by which
-/// control owns the open tip rather than by what is on screen, and the owner's offset always comes back exactly.
-/// </summary>
+/// <summary>Pins <see cref="ToolTipTracking"/>: a tip follows the pointer only across its own owner, and the owner's offset comes back exactly.</summary>
 public class ToolTipTrackingTests {
     // card > body > label, beside a second card: the shape of two Dashboard stat cards.
     private readonly Border _card = new();
