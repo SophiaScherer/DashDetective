@@ -11,9 +11,8 @@ namespace DashDetective.Services.Platform.Linux;
 /// <b>Stateful and cached, deliberately.</b> The walk is a <c>readlink</c> per descriptor across every
 /// process — thousands of calls — and the connections table polls every 2.5 seconds. So the map is kept
 /// between calls and <see cref="Refresh"/> only walks when it is asked about an inode it has never seen;
-/// a steady-state poll costs nothing. An inode a walk could not attribute (another user's socket) is
-/// remembered, or every poll would walk twice looking for it. Held by the interop rather than a bundle member,
-/// the <c>IPhysicalDiskThroughputSampler</c> precedent for a reader that may hold state.
+/// a steady-state poll costs nothing. Held by the interop rather than by a bundle member, the
+/// <c>IPhysicalDiskThroughputSampler</c> precedent for a reader that may hold state.
 ///
 /// <b>Permission-limited by design.</b> Listing another user's <c>/proc/[pid]/fd</c> is denied, which the
 /// filesystem seam reports as an empty listing — so other users' sockets simply go unattributed, at the
@@ -32,10 +31,10 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
 
     private readonly Dictionary<long, int> _pidByInode = [];
 
-    /// <summary>Inodes the last walk could not find; re-tested only when a new inode forces a walk.</summary>
+    /// <summary>Inodes no walk could attribute (another user's sockets), remembered so every poll does not walk twice looking for them.</summary>
     private readonly HashSet<long> _unattributable = [];
 
-    /// <summary>Every inode asked about since the last walk, so a walk one call triggers keeps the other's unattributable sockets.</summary>
+    /// <summary>Every inode asked about since the last walk, so one call's walk keeps the other's unattributable sockets.</summary>
     private readonly HashSet<long> _askedSinceWalk = [];
 
     /// <summary>Rebuilds the map if any of <paramref name="inodes"/> is unknown, and at most once per call.
