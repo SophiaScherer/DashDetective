@@ -73,8 +73,7 @@ public class ShortcutOverrideCodecTests {
         Assert.Equal(Key.G, decoded[ShortcutId.Export].Key);
     }
 
-    /// <summary>Numbers parse as enum values, so "3" would load as the ordinal and "999" as an id that does
-    /// not exist. The file stores names only.</summary>
+    /// <summary>The file stores names only, so "3" must not load as an ordinal nor "999" as a nonexistent id.</summary>
     [Theory]
     [InlineData("3", "G", "Control")]
     [InlineData("999", "G", "Control")]

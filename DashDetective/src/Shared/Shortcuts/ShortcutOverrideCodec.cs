@@ -66,9 +66,7 @@ public static class ShortcutOverrideCodec {
         return overrides;
     }
 
-    /// <summary>Parses by name only. <see cref="Enum.TryParse{TEnum}(string, out TEnum)"/> also takes a
-    /// number, defined or not, which would re-point a binding by ordinal; a flags value is a comma list
-    /// and every part has to be a name.</summary>
+    /// <summary>Parses by name only: <see cref="Enum.TryParse{TEnum}(string, out TEnum)"/> also takes numbers, which would re-point a binding by ordinal.</summary>
     private static bool TryParseNames<T>(string text, out T value) where T : struct, Enum {
         value = default;
         var names = Enum.GetNames<T>();
