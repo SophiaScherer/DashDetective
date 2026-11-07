@@ -55,7 +55,7 @@ internal static class ProcPidName {
         return (nul < 0 ? cmdline : cmdline[..nul]).Trim();
     }
 
-    /// <summary>Whether argv[0] is a title the process wrote over its arguments (sshd's "sshd: user@pts/0"), whose last '/' segment is junk. A space alone is not enough, since "/opt/My App/run" is a path.</summary>
+    /// <summary>Whether argv[0] is a rewritten title (sshd's "sshd: user@pts/0") whose last '/' segment is junk, not a path containing a space.</summary>
     private static bool IsRewrittenTitle(string cmdline, string argv0, string comm) {
         if (comm.Length == 0 || !argv0.Contains(' ', StringComparison.Ordinal) || HasLaterArgument(cmdline))
             return false;
