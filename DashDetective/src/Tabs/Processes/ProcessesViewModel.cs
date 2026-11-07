@@ -228,8 +228,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// so like <see cref="_expandedPids"/> the set is what survives a poll, a re-sort and a filter.</summary>
     private readonly HashSet<int> _selectedPids = new();
 
-    /// <summary>Where a Shift-click measures its range from: the row a plain or Ctrl-click last landed
-    /// on. Null when there is nothing to measure from; PID 0 (System Idle Process) is a real anchor.</summary>
+    /// <summary>The row a Shift-click measures from; null means none, so PID 0 (System Idle Process) must stay a valid anchor.</summary>
     private int? _anchorPid;
 
     /// <summary>The primary row — the last one clicked. The selection can hold many; the things that can
