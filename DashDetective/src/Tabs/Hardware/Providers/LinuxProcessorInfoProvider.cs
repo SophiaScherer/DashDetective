@@ -14,11 +14,7 @@ namespace DashDetective.Tabs.Hardware;
 /// no entry — exactly as on Windows, and formatted through the same
 /// <see cref="ProcessorSpecFormatter"/> so the rows match.
 ///
-/// <b>The socket has no Linux source at all</b> — it lives in SMBIOS type 4, which the kernel does not
-/// surface under <c>/sys/class/dmi/id</c>; only <c>dmidecode</c> reading <c>/dev/mem</c> as root can see
-/// it. So this row is the catalog's rated socket for the identified part, or "—". The base clock and L3
-/// size take the same fallback, which is what fills them in a VM: a guest gets no <c>cpufreq</c> policy and
-/// no <c>cache/index*</c> tree, but it does report the host chip's model name.
+/// The socket has no Linux source (SMBIOS type 4 needs root), so it falls back to the catalog.
 /// </summary>
 internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
     private readonly IProcFileSystem _proc;

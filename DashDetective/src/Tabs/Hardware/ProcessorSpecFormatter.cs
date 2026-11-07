@@ -7,28 +7,17 @@ namespace DashDetective.Tabs.Hardware;
 /// Formats the Processor card's spec rows. Clocks read to one decimal of GHz — the precision a static
 /// spec sheet wants, deliberately unlike <c>CpuSpeedFormatter</c>, which keeps two for the live rail.
 /// Always InvariantCulture, matching the app's convention; a missing figure yields the neutral "—".
-///
-/// <b>Each row takes the machine's own reading first and a catalog datasheet value only as a fallback.</b>
-/// The live figure describes this chip as configured; the catalog describes the part as rated. They agree
-/// on a healthy desktop, and where they cannot — a VM with no <c>cpufreq</c> and no cache topology, a WMI
-/// field the firmware left empty — the datasheet is the honest answer for a part the machine has already
-/// identified by name, which is the same standing the TDP and boost rows have always had.
+/// Each row prefers the machine's own reading; the datasheet is a fallback for a VM with no cpufreq or cache topology.
 /// </summary>
 internal static class ProcessorSpecFormatter {
-    /// <summary>The neutral placeholder, which the catalog tables also store where a fact does not exist
-    /// for a part (an AMD card has no CUDA cores) — so it has to read as "nothing here", not as a value.</summary>
+    /// <summary>The placeholder; catalog tables also store it for a fact a part lacks, so it must read as absent.</summary>
     private const string None = "—";
 
     /// <summary>Formats a clock speed in MHz as GHz to one decimal (3200 → "3.2 GHz").</summary>
     public static string Ghz(double mhz) =>
         (mhz / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " GHz";
 
-    /// <summary>
-    /// Composes the "Base / Boost" row. The base is the machine's own reading where it has one and the
-    /// catalog's rated base otherwise; the boost has no machine source on either platform and is always the
-    /// catalog's. When both sides are known the unit is shared ("4.7 / 5.3 GHz"); otherwise the known side
-    /// carries its own unit and the missing side is "—".
-    /// </summary>
+    /// <summary>Composes "Base / Boost", preferring the machine's base over the catalog's; when both are known the unit is shared ("4.7 / 5.3 GHz").</summary>
     public static string BaseBoost(double baseMhz, string? boost, string? baseSpec = null) {
         var live = baseMhz > 0 ? Ghz(baseMhz) : "";
         var rated = IsBlank(baseSpec) ? "" : baseSpec!;
@@ -44,9 +33,7 @@ internal static class ProcessorSpecFormatter {
         return hasBase ? $"{baseClock} / {None}" : $"{None} / {boost}";
     }
 
-    /// <summary>Formats the L3 cache size, which both platforms report in KB, as whole MB — falling back to
-    /// the catalog's rated size when the machine describes no cache topology, which is the ordinary case in
-    /// a VM.</summary>
+    /// <summary>Formats the L3 size (KB) as whole MB, falling back to the catalog when the machine reports no cache topology, as in a VM.</summary>
     public static string CacheL3(long kilobytes, string? spec = null) {
         if (kilobytes > 0)
             return $"{kilobytes / 1024} MB";
@@ -54,24 +41,20 @@ internal static class ProcessorSpecFormatter {
         return IsBlank(spec) ? None : spec!;
     }
 
-    /// <summary>A catalog field, or the neutral placeholder when the catalog had no entry for the part or
-    /// no value for the field. The shape every row's fallback ends in.</summary>
+    /// <summary>A catalog field, or the placeholder when the part or field is missing.</summary>
     public static string Spec(string? value) => IsBlank(value) ? None : value!;
 
-    /// <summary>The socket row: the machine's own designation where it reported one, since it names the
-    /// board's socket, and the catalog's rated socket for the part otherwise.</summary>
+    /// <summary>The machine's own socket designation, else the catalog's rated one.</summary>
     public static string Socket(string? live, string? spec) =>
         string.IsNullOrWhiteSpace(live) ? Spec(spec) : live;
 
-    /// <summary>Drops a trailing " GHz" so a catalog base clock can share the boost side's unit exactly as
-    /// a numeric one does. Pure; unit-tested.</summary>
+    /// <summary>Drops a trailing " GHz" so a catalog base clock can share the boost side's unit.</summary>
     internal static string WithoutGhz(string clock) {
         const string unit = " GHz";
         return clock.EndsWith(unit, StringComparison.Ordinal) ? clock[..^unit.Length] : clock;
     }
 
-    /// <summary>True when a catalog field carries no usable value — absent, empty, or the placeholder the
-    /// tables store where a fact does not exist for a part.</summary>
+    /// <summary>True when a catalog field is absent, empty, or the placeholder the tables store for a fact a part lacks.</summary>
     private static bool IsBlank(string? value) =>
         string.IsNullOrEmpty(value) || string.Equals(value, None, StringComparison.Ordinal);
 }

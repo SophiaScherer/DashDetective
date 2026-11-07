@@ -500,14 +500,7 @@ internal static class ProcFixtures {
             .WithFile("/sys/class/hwmon/hwmon1/temp1_input", "27800\n");
 
     /// <summary>
-    /// An excerpt of the system <c>pci.ids</c> table, in the real file's indent-significant shape: vendors
-    /// at column 0, their devices one <b>tab</b> in, and each device's subsystem variants two tabs in.
-    /// Built from escaped lines rather than a raw literal for the same reason
-    /// <see cref="BuildAmdBlocks"/> is — the tabs are the format, and a raw literal hides them.
-    ///
-    /// Names are the real table's for these ids. Note that only the NVIDIA one carries a token the bundled
-    /// GPU catalogue keys on ("RTX 3060"): AMD's <c>73df</c> is a multi-model Navi 22 string that matches
-    /// nothing, which is the ordinary outcome and is worth having a fixture for.
+    /// A <c>pci.ids</c> excerpt built from escaped lines, since the tab indents are the format and a raw literal hides them.
     /// </summary>
     public static readonly string PciIds = string.Join('\n', new[] {
         "#\tList of PCI ID's",
@@ -532,8 +525,7 @@ internal static class ProcFixtures {
         "\t00  VGA compatible controller",
     });
 
-    /// <summary>Stages <see cref="PciIds"/> at the path Debian, Ubuntu, Fedora and Arch all populate.
-    /// A test that omits it models the minimal-container case, where every name lookup misses.</summary>
+    /// <summary>Stages <see cref="PciIds"/>; a test that omits it models a minimal container, where every lookup misses.</summary>
     public static FakeProcFileSystem WithPciIds(this FakeProcFileSystem proc) =>
         proc.WithFile("/usr/share/hwdata/pci.ids", PciIds);
 

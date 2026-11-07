@@ -140,8 +140,7 @@ public class HardwareCatalogTests {
         Assert.Null(HardwareCatalog.LookupGpu("Definitely Not A Real GPU 9999"));
     }
 
-    /// <summary>The three columns added so a machine that reports none of them still fills the row. Read
-    /// from the shipped table on purpose: the point is that the data is there, not that Match works.</summary>
+    /// <summary>The fallback columns are present in the shipped table.</summary>
     [Fact]
     public void LookupCpu_KnownModel_CarriesTheFallbackColumnsToo() {
         var spec = HardwareCatalog.LookupCpu("AMD Ryzen 5 7600X 6-Core Processor");
@@ -152,8 +151,7 @@ public class HardwareCatalogTests {
         Assert.Equal("AM5", spec.Socket);
     }
 
-    /// <summary>Every shipped entry carries all five columns. A half-filled row would render as a silent
-    /// "—" that looks exactly like a part the table has never heard of.</summary>
+    /// <summary>A half-filled row would render a silent "—" indistinguishable from an unlisted part.</summary>
     [Fact]
     public void CpuCatalog_EveryEntry_FillsEveryColumn() {
         foreach (var (key, spec) in CpuCatalog.Data) {
@@ -165,8 +163,7 @@ public class HardwareCatalogTests {
         }
     }
 
-    /// <summary>A rated base clock below its own boost, on every part. Cheap, but it is the one check that
-    /// catches the two columns being transposed on a hand-entered row.</summary>
+    /// <summary>Catches base and boost transposed on a hand-entered row.</summary>
     [Fact]
     public void CpuCatalog_EveryEntry_RatesBaseBelowBoost() {
         foreach (var (key, spec) in CpuCatalog.Data)

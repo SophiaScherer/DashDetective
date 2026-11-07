@@ -129,7 +129,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                 Root for anything that opens or measures it)
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
-                                single unit from the shared peak via UnitFor)
+                                single unit from the shared peak via UnitFor. Format/Split/SplitPair pick the
+                                unit from the value AS DISPLAYED, so 999.6 Mbps reads 1.0 Gbps, and read
+                                NaN as zero; UnitFor stays the raw magnitude rule)
       ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
                                 Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
                                 KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
@@ -292,7 +294,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  MinHeight and a MinHeight instead would make every folding card taller. The glyph is set from the
                                  pseudo-class rather than a converter, which keeps it out of Icons —
                                  touching Icons at all throws without a render backend, so a test could
-                                 not reach the rule.
+                                 not reach the rule. WidgetPanel.highlighted tints the surface while
+                                 RevealFlash holds the class — with no fade, since a Background
+                                 transition here would also animate every widget through a theme switch.
                                  which is what satisfies compiled bindings without an x:DataType)
         WindowChrome.axaml      (AppWindowDecorations: the ControlTheme for Avalonia 12's
                                  WindowDrawnDecorations, i.e. the caption buttons of a window that draws its
@@ -353,7 +357,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  PIXEL SNAP: Placed snaps every slot to whole pixels before arranging, and
                                  SnappedWidth gives both panels the same width to MEASURE at. Without it a
                                  fractional slot ended a pixel past the panel and a clipping ancestor cut
-                                 the card's right border off — work item 89)
+                                 the card's right border off — work item 89.
+                                 MOTION: Placed slides a child whose slot moved ONLY while a drag
+                                 re-packs, and eases the dropped item in from ReorderDrag.TakeSettle's
+                                 let-go box. A resize, a keyboard move, a cancelled drag and Reduce motion
+                                 (the window's reduceMotion class) all land at once; MotionReduced and
+                                 Clock are the test seams)
+        ReorderSlides.cs        (the motion of a drag, Avalonia-free: each moved item eases (out-cubic,
+                                 180 ms) from where it was drawn to its new slot, as an offset the panel
+                                 applies as a RENDER transform, so layout and the frozen drop slots never
+                                 see it. A second move mid-slide carries the current offset in, so an
+                                 item re-targeted while moving continues rather than jumping)
         PixelSnap.cs            (the snap itself, Avalonia-free: each edge to its nearest pixel, half UP
                                  so a moved span keeps its length; a span snapped under its child's
                                  MinWidth grows to it away from the panel's edge, with the minimum
@@ -460,6 +474,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                         toolkit's. A surface the toolkit did NOT move is left alone —
                                         that is what an inner list at its end looks like, and stepping it
                                         anyway would break the hand-off to the page)
+        ToolTipTracking.cs
+                                       (moves an open tooltip with the cursor while the pointer stays
+                                        over its owner, attached to every top level by the app-level
+                                        style. Avalonia places a tip at the pointer ONCE and offers no way
+                                        to move it, but re-reads the pointer whenever an open tip's offset
+                                        changes, so each move toggles the owner's offset by a sub-pixel
+                                        Nudge and restores it exactly on close. A move that lands ON the
+                                        tip arrives in the tip's own window, so the owner is found through
+                                        the tip's Popup and the tip shifted by the pointer's distance from
+                                        its anchor. It never dismisses: closing on leave, and after a
+                                        layout change under a still pointer, are the framework's)
         TitleBar.axaml(.cs), TitleBarRules.cs, WindowChrome.cs
                                        (the custom window title bar. WindowChrome.Custom is set on a
                                         Window and is the ONE place the platform is decided: it extends
@@ -1410,7 +1435,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  since an export names a path and a deep one is exactly the case worth
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
-                                 code-behind calls — MainWindow's own Export among them)
+                                 code-behind calls — MainWindow's own Export among them. The page hosts
+                                 are named (ScrollingHost / SelfScrollingHost) so RefreshSections can
+                                 read the current page's titled widgets and pageSection-marked cards
+                                 for the nav bar's section list,
+                                 on each page change and each open; a pick is scrolled and flashed here)
       BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
                                  from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
                                  shape, so it is testable without constructing the shell)
@@ -1509,7 +1538,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      MinPageWidth for a vertical rail, the measured labeled width for a
                                      horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
-                                     follow theme + accent)
+                                     follow theme + accent. The rows' hover lift is a render transform on
+                                     navContent, and its reduce-motion undo sits in this file AFTER it —
+                                     a local style outranks an app-level one, and the later of two
+                                     matching rules wins)
         NavItem.cs, Icons.cs        (NavItem is a pure data model, with optional search Keywords so a
                                      renamed page keeps its old name; Icons holds the glyph geometries, all
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
@@ -1533,6 +1565,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      Without that, two Backs would bounce between two pages. Capped at 50.
                                      Generic so tests use strings: NavItem's icon needs a render backend.
                                      Same idea as File Explorer's NavigationHistory, which is tab-local)
+        PageSections.cs             (which widgets are the current page's SECTIONS and in what order:
+                                     a WidgetPanel, or a card carrying the pageSection class titled by
+                                     its automation name (Hardware's cards, which are not widgets);
+                                     visible, titled, in reading order of where they were ARRANGED
+                                     (rows within RowTolerance, then left to right), since a dragged
+                                     board no longer matches its markup. Pure over SectionCandidate
+                                     records the shell measures, so it needs no layout pass. Fewer than
+                                     two sections and the list is not offered. PageSection.Source is the
+                                     candidate index, which is how MainWindow finds the widget again
+                                     without the view model holding a control)
+        PageSectionOption.cs        (one row of the section list: the section plus its jump command)
 ```
 
 ## `src/Tabs/Dashboard`
@@ -1540,7 +1583,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
-                                 its MetricHistory, keyed by LUID / disk number.)
+                                 its MetricHistory, keyed by LUID / disk number. InitialLoad is the
+                                 constructor's loads as one task, as on Performance, so tests await it
+                                 instead of sleeping: off the UI thread a load's rebuild of Cards races
+                                 anything a test enumerates.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
@@ -2103,7 +2149,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          UniformFlowPanel with Reorder="Item", saved under
                                                          the "hardware" key. The card Border fills its
                                                          row's height and sets only a MinHeight floor
-                                                         from Dimensions.axaml — see FEATURES.md)
+                                                         from Dimensions.axaml — see FEATURES.md. It
+                                                         carries pageSection, which lists it in the nav
+                                                         bar's section list, and revealFlash for the pick)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the

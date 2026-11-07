@@ -49,25 +49,17 @@ public class LinuxProcessorInfoProviderTests {
     public async Task GetAsync_ComposesBaseBoostFromTheRatedClock() =>
         Assert.StartsWith("3.6", (await Read(WithCpuInfo(ProcFixtures.ProcCpuInfo))).BaseBoost);
 
-    /// <summary>
-    /// Linux has no socket source at all: the designation lives in SMBIOS type 4, which the kernel does not
-    /// surface under <c>/sys/class/dmi/id</c> — only <c>dmidecode</c> reading <c>/dev/mem</c> as root can
-    /// see it. So the row is the rated socket of the part the machine named, and nothing here reads sysfs
-    /// for it.
-    /// </summary>
+    /// <summary>Linux has no socket source (SMBIOS type 4 needs root), so the row is the catalog's rated socket.</summary>
     [Fact]
     public async Task GetAsync_ReportsTheCatalogSocket_SinceSysfsHasNone() =>
         Assert.Equal("AM5", (await Read(WithCpuInfo(ProcFixtures.AmdCpuInfo))).Socket);
 
-    /// <summary>A part the catalog does not list has no second source either, so the row stays blank rather
-    /// than borrowing a similarly-named part's socket.</summary>
+    /// <summary>An unlisted part has no second source, so the row stays blank.</summary>
     [Fact]
     public async Task GetAsync_UnlistedPart_ReportsNoSocket() =>
         Assert.Equal("—", (await Read(WithCpuInfo(ProcFixtures.ProcCpuInfo))).Socket);
 
-    /// <summary>The VM case the datasheet fallback exists for: a guest describes no cache topology and gets
-    /// no <c>cpufreq</c> policy, but it does report the host chip's model name — so both rows fill from the
-    /// part rather than sitting blank beside a named processor.</summary>
+    /// <summary>A VM reports no cache topology or cpufreq but does name the chip, so both rows fill from the datasheet.</summary>
     [Fact]
     public async Task GetAsync_NoCacheTreeOrCpufreq_FillsFromTheCatalog() {
         var info = await Read(WithCpuInfo(ProcFixtures.AmdCpuInfo));

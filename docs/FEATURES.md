@@ -27,6 +27,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Hardware](#hardware)
 - [Page lifecycle](#page-lifecycle)
 - [Wheel scrolling](#wheel-scrolling)
+- [Tooltip tracking](#tooltip-tracking)
 - [Widget system](#widget-system)
 - [Multi-GPU](#multi-gpu)
 - [Repo-hygiene / portfolio pass](#repo-hygiene--portfolio-pass)
@@ -59,7 +60,7 @@ point drives the **same shared** `NavigationViewModel`:
   items, the footer and any empty space all reach it.
 - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
   in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
-- **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
+- **Motion — the bar animates its own two moves and a hover.** A
   **collapse tweens a vertical rail's width** (~150ms, `CubicEaseOut`), on `Border.rail:not(.horizontal)`
   only: a horizontal bar's height follows its content, so there is no fixed value to tween between, and
   `RailWidth` is `NaN` on that axis. A **re-dock fades** — out 120ms, change edge, back in — because
@@ -67,9 +68,58 @@ point drives the **same shared** `NavigationViewModel`:
   funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
   changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
   the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
-  dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
-  otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
+  dropped drag re-docks before `EndDrag` clears the dim. These tweens are earned by moves that would
+  otherwise read as glitches, not a licence to animate the bar's styling; the row-hover rule below still stands.
+- **Hover lift** (work item 49) — a nav row's icon and label rise 1.5px as the pointer passes, over a
+  120ms `CubicEaseOut` `TransformOperationsTransition`, upward on every dock edge. Decisions inside it:
+  it is a **render transform on `StackPanel.navContent` only**, so layout never changes, no neighbor
+  moves and the hover background and accent indicator stay where they are; the hover background itself
+  keeps no transition, per the row-hover rule. The duration is time-based, so it runs at one speed at
+  every interface and text size; the 1.5px is in DIPs inside the `ScaleHost`, so the distance grows with
+  the interface size as everything else does. **The selected row lifts too** — it is still a button, and
+  rows that answer the pointer alike read as one control. **Pointer only**: keyboard focus already draws
+  Fluent's ring, and a lift on focus would fight it. A list scrolled under a resting pointer lifts each
+  row briefly as it passes; that is the transition on the content rather than the hover-bearing element,
+  so it reads as a ripple rather than the smeared highlight the row-hover rule guards against. **Reduce
+  motion drops the tween AND the lift** (an instant 1.5px jump is still motion), from a rule in
+  `NavigationView.axaml` declared after the hover rule so it wins while both match;
+  `NavigationViewMotionTests` pins the direction, size, tween and that ordering.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
+- **Page sections** (work item 46) — **press the current page's nav item again** for an "On this page"
+  list of its sections; choosing one scrolls it to the top of its scroller and flashes it. A section is a
+  visible `WidgetPanel` with a title, or a card marked `pageSection` and titled by its automation name
+  (the Hardware cards, which are not widgets), outermost only, listed in reading order of where it was
+  **arranged** — rows top to bottom, left to right within a row — because widgets are reordered by
+  dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
+  - **Hardware is marked, not rebuilt.** Its cards draw their own icon-tile header, so making them
+    `WidgetPanel`s would redraw the page. The marker class is the whole change: the reader accepts it,
+    and the card also takes `revealFlash` so a pick tints its surface (a widget's flash also turns its
+    border to the accent; the card's does not). A machine with two GPUs lists
+    Graphics twice, in page order, since the list shows titles only.
+  - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
+    the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
+    a tab stop to every page, and have nowhere to go on a horizontal bar without moving its neighbors.
+    The caret glyph (`Icons.CaretDown`) shows on the selected item only when the page has sections, and
+    overlays the row's padding so it never moves anything: at the end of an expanded vertical row, under
+    the icon on a collapsed rail, in the trailing padding of a horizontal item. Keyboard: Tab to the
+    selected item and press Enter; the first section takes focus, Esc closes.
+  - **`Activate`, not `Navigate`, is the item's press.** `Navigate` is also what `Ctrl+1…9`, search and
+    the cross-page jumps call, and landing on the page already showing must not open a list.
+  - **Built live, on every open and every page change**, from the page's visual tree in `MainWindow`
+    (`RefreshSections`): the view model never holds a control, and a reorder or a fold since the last
+    read is always reflected. Nothing persists.
+  - **The scroll asks for a viewport-tall rect from just above the widget**, so its heading lands at the
+    top rather than wherever it first comes into view. `BringIntoView` finds the nearest scroller, so a
+    self-scrolling page's own pane scrolls instead of the shell's; a folded widget is its header, so
+    that is what shows.
+  - **The popup is the Processes options shape**: one `ScaleHost` of its own, not light-dismissed so the
+    window stays hoverable, an outside press closing it from code-behind, and `IsOpen` bound two-way.
+    Esc is the shortcut chain's while focus is in the window (`HandleSectionsShortcut`, beside the
+    search dropdown's step) and the popup's own `KeyDown` while focus is inside it, since the popup is a
+    separate visual root the window's listener never sees.
+  - **The flash is `WidgetPanel.highlighted`**, tinting the whole surface for `RevealFlash`'s hold. It
+    does not fade, unlike `Border.revealFlash`: a transition on the surface would also animate every
+    widget through a theme switch while the page behind it snaps.
 
 The footer avatar shows the **device's own account picture** when the OS has one, read through the
 `IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
@@ -637,9 +687,9 @@ merely bigger. `Sparkline` composes its own axis text with `FormattedText` and s
 subtree, so charts needed nothing either.
 
 **One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
-and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
-five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
-menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+and inherit nothing from the shell's, so there are eight: `MainWindow`, `TrayNoticeWindow`, and the
+six popups (universal search, the navigation dock flyout and section list, the File Explorer and
+Processes options menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
 the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
 resource. **The custom title bar sits outside `MainWindow`'s host on purpose**, beside caption buttons
 drawn at the OS's scale — see *Window chrome*.
@@ -732,9 +782,13 @@ about that selector are easy to get wrong, and both were measured rather than as
   and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
   is undone from `SharedStyles.axaml`.
 
-**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, the
+drag-to-reorder slides (read in code from the window's class, since they are not a style transition), and
 the Processes loading pulse — the app's only endlessly repeating animation, which drops from
 `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+- **The navigation rows' hover lift** (work item 49) is covered too: the tween and the 1.5px lift both go,
+  from a rule in `NavigationView.axaml` declared after the hover rule.
 
 **Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
 the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against
@@ -2080,6 +2134,10 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 
 *Shipped — branch `hardwareCardHeights`, 2026-10.*
 
+**Each card is a nav bar section.** It carries `pageSection`, so the "On this page" list (see *Navigation
+bar*) lists it under its automation name, and `revealFlash`, so a pick tints it. The cards are not
+`WidgetPanel`s, and marking them is what keeps the page from being rebuilt as widgets.
+
 **Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
 already arranges every child at its row's height (the tallest card's). The cards used to opt out with
 `VerticalAlignment="Top"`, so each drew at its own content height and a row's bottoms never lined up
@@ -2101,7 +2159,8 @@ gives a graphics adapter's PCI ids and nothing more, so the Graphics card used t
 `pci.ids` (the table `lspci` uses) and names the card by the bracketed product in its entry, `NVIDIA
 GeForce RTX 3060 Lite Hash Rate` rather than `GA106 [GeForce RTX 3060 Lite Hash Rate]`, which the catalog
 then matches. The chip codename is dropped because Windows names the same card without it; an entry with no
-bracket is used whole. The Processor card's base clock, L3 and socket take the catalog's rated
+bracket, or with text after it, is used whole, and a product that already names its vendor ("Intel Arc
+Graphics") is not prefixed twice. The Processor card's base clock, L3 and socket take the catalog's rated
 value where the machine reports none, which is the ordinary case in a VM. Three decisions inside it:
 
 - **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
@@ -2177,6 +2236,23 @@ Three decisions inside it:
 The setting is read per notch behind `IWheelScrollLines`, not cached: the Mouse control panel can change it
 under a running app. Linux keeps the value in each desktop environment's own store, so there is nothing
 single to read and no Linux arm — it takes `Unsupported*` and the default.
+
+## Tooltip tracking
+
+*Shipped — branch `tooltipFollowsCursor`, 2026-11.*
+
+**An open tooltip follows the cursor while the pointer stays over its owner.** Avalonia places a tip at the pointer once, when it opens, and leaves it there. On a large owner — a Dashboard stat card or chart — the tip then sat where the pointer entered while the pointer moved on, which read as a tip that would not dismiss. `ToolTipTracking`, attached to every top level by the app-level style in `SharedStyles.axaml`, re-places the open tip on each move over its owner.
+
+Four decisions inside it:
+
+- **Dismissal stays the framework's.** Avalonia already closes a tip when the pointer moves off its owner, and re-checks the control under a still pointer after a layout or scroll change. An app-side dismissal guard was written once and reverted as redundant; this adds tracking only.
+- **The tip is re-placed by changing its owner's offset.** Avalonia re-reads the pointer whenever an open tip's `HorizontalOffset`/`VerticalOffset` changes, and offers no other public way to move one, so each move toggles the offset by a sub-pixel `Nudge`. The owner's own offsets are kept and restored exactly when the tip closes.
+- **A move that lands on the tip still counts.** A quick downward move can put the pointer on the tip, whose own window then takes the moves. The tip is shifted by the pointer's distance from where it was anchored; the pointer is not re-checked against the owner there, and if it has left, the framework closes the tip on the next move.
+- **Every tooltip follows, not only the widgets'.** The bug was reported on the Dashboard, but a tip pinned where the pointer entered is the same defect on any owner. A tip placed against its owner rather than the pointer (`ToolTip.Placement` other than `Pointer`) is left where it is.
+
+Reduce motion does not change it: following the pointer is a direct response to input, not an animation, and re-placing an open tip does not re-run its fade.
+
+**Verify by owner, not by pixels.** Several owners share one tip text, so a correct hand-off between two of them looks the same as a tip that never moved. The tip is its own top-level window on Windows: enumerate the app's windows, and compare the tip window's handle (one per opening) and its text through UI Automation.
 
 ## Widget system
 
@@ -2296,7 +2372,7 @@ dragged by a card or by a marked grip.
 | Performance device rail | a grip per row | `performance.resources` |
 | Performance stat tiles | the tile | `performance.stats.{kind}` |
 
-Settings and Toolkit do not reorder, and their headers no longer claim to. Five rules, all
+Settings and Toolkit do not reorder, and their headers no longer claim to. Eight rules, all
 load-bearing:
 
 1. **The drag cursor comes from the predicate that starts the drag**, never from a style. A style
@@ -2324,6 +2400,13 @@ load-bearing:
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
    from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
+
+8. **A drag moves; it does not snap** (work item 14). The neighbours a preview re-packs slide to their
+   new slots, and the dropped item eases in from where it was let go, both over 180 ms with an ease-out
+   (`ReorderSlides`). The motion is a render transform, so layout, the frozen drop slots and the hint
+   never see it. Only a drag animates: a cancelled drag (capture lost before a release) puts everything
+   straight back, and a keyboard move, a resize or Reduce motion lands at once. A drop back onto the item's
+   own slot still eases in, since the release is accepted; "rejected" here means a drag that never dropped.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.
