@@ -110,23 +110,7 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
-    /// The rated base clock in MHz — what WMI's <c>MaxClockSpeed</c> reports on Windows, which the Dashboard
-    /// caption and the Processor card's Base row both mirror. Sources, in order, each taking the highest
-    /// across the cores so a hybrid chip reports its performance cores:
-    /// <list type="number">
-    /// <item>intel_pstate's <c>cpufreq/base_frequency</c> (kHz), published only with HWP (Skylake and
-    /// later).</item>
-    /// <item>ACPI CPPC's <c>acpi_cppc/nominal_freq</c> (MHz), which is where amd-pstate's nominal frequency
-    /// is published; 0 there means the firmware does not implement the register.</item>
-    /// <item>The clock in the model name ("… CPU @ 3.60GHz"), the rated base by definition, which also
-    /// survives the VMs where neither file exists.</item>
-    /// </list>
-    /// Otherwise 0, and the Processor card falls back to the datasheet.
-    ///
-    /// <b><c>cpuinfo_max_freq</c> is deliberately not consulted.</b> Under intel_pstate and amd-pstate it is
-    /// the maximum turbo, so it read as the base and hid the catalog's real one. <b>Nor is <c>cpu MHz</c></b>,
-    /// the core's clock at the instant of the read. Both are the near-miss this port refuses to substitute;
-    /// the live clock has its own reader in <c>LinuxProcessorFrequencySampler</c>.
+    /// The rated base in MHz: intel_pstate's base, then CPPC's nominal frequency, then the model name's clock. <c>cpuinfo_max_freq</c> (turbo) and <c>cpu MHz</c> (instantaneous) are deliberately never used.
     /// </summary>
     private static double BaseClockMhzOf(IProcFileSystem proc, string modelName) {
         var baseKhz = HighestPerCore(proc, "/cpufreq/base_frequency");
@@ -136,8 +120,7 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
         var nominalMhz = HighestPerCore(proc, "/acpi_cppc/nominal_freq");
         return nominalMhz > 0 ? nominalMhz : ModelNameMhz(modelName);
     }
-
-    /// <summary>The highest positive number one per-core file holds across the online cores, or 0 when no
+    /// <summary>The highest positive value one per-core file holds across online cores, or 0 if none is readable.</summary>
     /// core has a readable one.</summary>
     private static double HighestPerCore(IProcFileSystem proc, string file) {
         double highest = 0;

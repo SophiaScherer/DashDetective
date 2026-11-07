@@ -59,8 +59,7 @@ public class LinuxCpuInfoProviderTests {
     public async Task GetAsync_WithNoTopologyKeys_LeavesPhysicalCoresAtZero() =>
         Assert.Equal(0, (await Read(WithCpuInfo("processor\t: 0\nprocessor\t: 1\n"))).PhysicalCores);
 
-    /// <summary>The caption mirrors WMI's <c>MaxClockSpeed</c>, which is the rated base, so a Linux turbo
-    /// ceiling must not appear there either.</summary>
+    /// <summary>The caption mirrors WMI's rated base, so a turbo ceiling must not appear there.</summary>
     [Fact]
     public async Task GetAsync_TurboCeilingOnly_LeavesTheClockAtZero() {
         var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)

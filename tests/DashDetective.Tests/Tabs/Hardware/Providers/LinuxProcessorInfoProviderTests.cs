@@ -76,8 +76,7 @@ public class LinuxProcessorInfoProviderTests {
         Assert.Equal("4.7 / 5.3 GHz", info.BaseBoost);
     }
 
-    /// <summary>Under amd-pstate <c>cpuinfo_max_freq</c> is the turbo ceiling. Read as the base, it made the
-    /// row "5.3 / 5.3 GHz" and hid the datasheet's base, which is what the row now shows.</summary>
+    /// <summary>Under amd-pstate <c>cpuinfo_max_freq</c> is the turbo ceiling and must not show as the base.</summary>
     [Fact]
     public async Task GetAsync_TurboCeilingOnly_ShowsTheDatasheetBase() {
         var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
@@ -96,8 +95,7 @@ public class LinuxProcessorInfoProviderTests {
         Assert.Equal("4.5 / 5.3 GHz", (await Read(proc)).BaseBoost);
     }
 
-    /// <summary>A base file that throws costs the card its reading, not a wrong one: staged against a
-    /// fixture whose base would otherwise read, so the test fails if the read escapes the catch.</summary>
+    /// <summary>A throwing base file costs the reading, not a wrong one; staged against a fixture that would otherwise read.</summary>
     [Fact]
     public async Task GetAsync_BaseFrequencyDenied_ReportsUnknown() {
         var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
