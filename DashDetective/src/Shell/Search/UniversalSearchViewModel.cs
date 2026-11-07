@@ -277,6 +277,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
         try {
             results = await _aggregator.QueryAsync(new SearchQuery(entry.Title), token);
         } catch {
+            // A failed search leaves the recent as it was; it may well resolve next time.
             return;
         }
 
@@ -286,7 +287,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
 
         foreach (var result in results)
             if (result.Category == entry.Category &&
-                string.Equals(result.Identity, entry.Key, StringComparison.OrdinalIgnoreCase)) {
+                string.Equals(result.Identity, entry.Key, RecentSearches.KeyComparison(entry.Category))) {
                 _recents.Remember(entry);
                 result.Activate();
                 return;

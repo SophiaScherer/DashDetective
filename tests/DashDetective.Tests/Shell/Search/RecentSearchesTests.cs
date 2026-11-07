@@ -1,4 +1,5 @@
 using DashDetective.Shell.Search;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -205,5 +206,25 @@ public class RecentSearchesTests {
     [Fact]
     public void Encode_IsEmptyForAnEmptyList() {
         Assert.Equal("", new RecentSearches().Encode());
+    }
+
+    /// <summary>Paths differing only by case are one entry where the filesystem folds case, else two.</summary>
+    [Fact]
+    public void Remember_FilePathsDifferingByCase_FollowTheFilesystem() {
+        var recents = new RecentSearches();
+        recents.Remember(Result(SearchCategory.File, "Notes.txt", key: "/a/Notes.txt"));
+        recents.Remember(Result(SearchCategory.File, "notes.txt", key: "/a/notes.txt"));
+
+        Assert.Equal(OperatingSystem.IsWindows() ? 1 : 2, recents.Entries.Count);
+    }
+
+    /// <summary>Non-file identities stay case-insensitive on every host.</summary>
+    [Fact]
+    public void Remember_NonFileKeysDifferingByCase_AreOneEntry() {
+        var recents = new RecentSearches();
+        recents.Remember(Result(SearchCategory.Setting, "Theme", key: "Theme"));
+        recents.Remember(Result(SearchCategory.Setting, "Theme", key: "theme"));
+
+        Assert.Single(recents.Entries);
     }
 }
