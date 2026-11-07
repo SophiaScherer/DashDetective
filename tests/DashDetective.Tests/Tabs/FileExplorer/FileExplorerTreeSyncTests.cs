@@ -8,12 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.FileExplorer;
 
-/// <summary>
-/// Pins that keeping the tree's highlight in step with a navigation is not itself a navigation: a move
-/// that did not come from the tree selects the folder's node without reading the folder a second time,
-/// which used to discard the selection a search jump had asked for. Reads are counted through the
-/// shell fake, which every folder read asks once per row.
-/// </summary>
+/// <summary>Pins that syncing the tree's highlight to a navigation is not itself a navigation: the folder is not read a second time, which would drop a search jump's selection.</summary>
 public sealed class FileExplorerTreeSyncTests : IDisposable {
     private readonly string _root =
         Path.Combine(Path.GetTempPath(), "DashDetectiveTests_" + Path.GetRandomFileName());
