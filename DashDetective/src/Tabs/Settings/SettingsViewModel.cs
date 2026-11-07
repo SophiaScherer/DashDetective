@@ -555,6 +555,12 @@ public partial class SettingsViewModel : ViewModelBase {
 
     partial void OnLaunchAtStartupChanged(bool value) {
         _startup.SetEnabled(value);
+        // A failed write must not leave the toggle (or the saved setting) claiming otherwise.
+        var actual = _startup.IsEnabled();
+        if (actual != value) {
+            _launchAtStartup = actual;
+            OnPropertyChanged(nameof(LaunchAtStartup));
+        }
         Changed?.Invoke();
     }
 

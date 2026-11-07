@@ -65,6 +65,21 @@ public class SettingsViewModelTests {
         Assert.Equal(new[] { true }, startup.Writes);
     }
 
+    /// <summary>A write the OS rejects leaves the registration unchanged; the toggle reads the real state back and writes nothing further.</summary>
+    [Fact]
+    public void LaunchAtStartup_WriteIgnored_RevertsToRealState() {
+        var startup = new FakeStartupRegistration(enabled: false);
+        var viewModel = Create(startup);
+        var changed = 0;
+        viewModel.Changed += () => changed++;
+
+        viewModel.LaunchAtStartup = true;
+
+        Assert.False(viewModel.LaunchAtStartup);
+        Assert.Equal(new[] { true }, startup.Writes);
+        Assert.Equal(1, changed);
+    }
+
     /// <summary>The orders live on the shell, not here, so the button is a forwarder and the test is
     /// that it forwards. Resetting is idempotent, so nothing gates the command.</summary>
     [Fact]
