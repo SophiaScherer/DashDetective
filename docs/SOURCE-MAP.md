@@ -906,13 +906,16 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  lookups are OrdinalIgnoreCase. Absent key → "")
           CpuFacts.cs           (the derivation on top of ProcCpuinfoParser, shared by the Dashboard's
                                  CPU tile and the Hardware tab's Processor card so the two cannot
-                                 disagree: name, physical/logical cores, max clock. Physical cores =
+                                 disagree: name, physical/logical cores, base clock. Physical cores =
                                  distinct (physical id, core id) PAIRS — block count over-reports on a
-                                 hyperthreaded chip and core id alone merges sockets. Max clock prefers
-                                 the highest cpuinfo_max_freq across cores (not cpu0's — that is a
-                                 little core on big.LITTLE), else the model name's "@ 3.60GHz". cpu MHz
-                                 IS NEVER USED for it: it is the instantaneous clock, so a scaling
-                                 governor would report an idle 800 MHz under a "max" label. Reports ""
+                                 hyperthreaded chip and core id alone merges sockets. Base clock (what
+                                 WMI's MaxClockSpeed means on Windows) is intel_pstate's base_frequency
+                                 (kHz), else acpi_cppc/nominal_freq (MHz — amd-pstate's nominal; 0 = not
+                                 implemented), else the model name's "@ 3.60GHz", each the highest across
+                                 cores (cpu0 can be an E-core), else 0 so the Processor card takes the
+                                 datasheet. cpuinfo_max_freq IS NEVER USED: under intel_pstate/amd-pstate
+                                 it is the turbo ceiling and read "5.3 / 5.3 GHz". Nor cpu MHz, the
+                                 instantaneous clock (an idle 800 MHz under a scaling governor). Reports ""
                                  and 0 honestly; each consumer applies its own placeholder.
                                  L3CacheKilobytes is a separate static, not a field — only the Hardware
                                  card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),

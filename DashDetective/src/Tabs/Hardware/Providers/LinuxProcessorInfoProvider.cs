@@ -41,7 +41,7 @@ internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
                 Name: string.IsNullOrEmpty(facts.Name) ? "—" : facts.Name,
                 Cores: facts.PhysicalCores > 0 ? facts.PhysicalCores.ToString() : "—",
                 LogicalProcessors: facts.LogicalCores.ToString(),
-                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.MaxClockMhz, spec?.Boost, spec?.Base),
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.BaseClockMhz, spec?.Boost, spec?.Base),
                 CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc), spec?.CacheL3),
                 Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
                 Socket: ProcessorSpecFormatter.Spec(spec?.Socket));

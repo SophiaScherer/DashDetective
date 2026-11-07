@@ -2161,7 +2161,7 @@ GeForce RTX 3060 Lite Hash Rate` rather than `GA106 [GeForce RTX 3060 Lite Hash 
 then matches. The chip codename is dropped because Windows names the same card without it; an entry with no
 bracket, or with text after it, is used whole, and a product that already names its vendor ("Intel Arc
 Graphics") is not prefixed twice. The Processor card's base clock, L3 and socket take the catalog's rated
-value where the machine reports none, which is the ordinary case in a VM. Two decisions inside it:
+value where the machine reports none, which is the ordinary case in a VM. Three decisions inside it:
 
 - **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
   down-binned or power-limited chip would show someone else's numbers. WMI's socket designation, the
@@ -2171,6 +2171,13 @@ value where the machine reports none, which is the ordinary case in a VM. Two de
 - **Nothing is bundled.** `pci.ids` is read from the host (`hwdata`/`pciutils`), and a host without it keeps
   the name sysfs alone can compose. Only the two readers that display a name pay for the scan
   (`DrmCardFacts.ReadNamed`); the per-tick samplers keep the free walk, and `DrmCardFacts.Key` is untouched.
+- **Linux's base clock is the rated base, never the turbo ceiling.** `CpuFacts.BaseClockMhz` reads intel_pstate's
+  `base_frequency` (present only with HWP, Skylake and later), then ACPI CPPC's `nominal_freq` (where
+  amd-pstate publishes its nominal frequency), then the model name's "@ 3.60GHz". `cpuinfo_max_freq` is not a
+  source: under intel_pstate and amd-pstate it is the maximum turbo, so it read "5.3 / 5.3 GHz" and hid the
+  datasheet's base. With none of the three the base is unknown and the catalog's rated base shows. The same
+  figure feeds the Dashboard caption and the CPU card subtitles, which on Windows show WMI's
+  `MaxClockSpeed`, also the base.
 
 ## Page lifecycle
 
