@@ -297,7 +297,9 @@ purpose: they are entry points into Performance, where the bells are (see *Setti
 Storage: the Storage `StatCard` shows live disk
 **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
 as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
-no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
+no WMI). Each GPU and disk card is built on `Placeholders.NoReading` with no unit and keeps it until
+its sampler reports, so an inert or unsupported sampler shows "—" rather than an idle 0; the Performance
+tab's disk rows and their Active / Read / Write / Response tiles follow the same rule. Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
 in **Mbps** (dual series on one shared scale + gradient fill, keyed by a `ChartLegend`) with a live
 adapter-name caption, via `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke —
 see the sampler note in *Folder Structure*). Every chart on the page states its own scale: the three

@@ -409,8 +409,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same adapters; one still present keeps its accumulated trace.
             rebuilt.Add((
                 key,
-                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "%",
-                                  OpenInPerformance) { Sub = gpu.Sub },
+                // Built on the placeholder: a sampler with nothing to say must not leave a confident 0.
+                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "",
+                                  OpenInPerformance) { Value = Placeholders.NoReading, Sub = gpu.Sub },
                 gpu.GpuPci?.VendorId,
                 _gpuHistories.TryGetValue(key, out var previous) ? previous : new MetricHistory(WindowSeconds)));
         }
@@ -720,8 +721,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same disks; one still present keeps its accumulated trace.
             rebuilt.Add((
                 drive.DiskNumber,
+                // Built on the placeholder, as the GPU cards are; the first sample restores the unit.
                 new DashboardCard(DeviceCategory.Disk, DeviceIds.Disk(drive.DiskNumber),
-                                  drive.Name.ToUpperInvariant(), "%", OpenInPerformance) {
+                                  drive.Name.ToUpperInvariant(), "", OpenInPerformance) {
+                    Value = Placeholders.NoReading,
                     Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
                 },
                 _diskHistories.TryGetValue(drive.DiskNumber, out var previous)
@@ -770,7 +773,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
     /// Manager's disk "Active time", 0–100 %), and feeds the system drive's own reading to the report/CSV
-    /// surfaces. Disks without a current reading are left unchanged.</summary>
+    /// surfaces. Disks without a current reading are left unchanged, on the "—" they were built with.</summary>
     private void UpdateDiskThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (sample.DiskNumber == _systemDiskNumber)
@@ -781,6 +784,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
                 continue;
             history.Push(sample.ActivePercent);
             card.Value = Math.Round(sample.ActivePercent).ToString(CultureInfo.InvariantCulture);
+            card.Unit = "%";
             card.Points = history.Points(100);
         }
     }
