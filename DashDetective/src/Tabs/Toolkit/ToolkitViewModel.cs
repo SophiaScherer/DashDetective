@@ -454,6 +454,9 @@ public partial class ToolkitViewModel : ViewModelBase, ISelfScrollingPage, IShor
         if (!Custom.Remove(entry))
             return;
 
+        if (entry.Source is { } source)
+            Form.CancelIfEditing(source);
+
         RebuildGroups();
         CommandsChanged?.Invoke();
     }

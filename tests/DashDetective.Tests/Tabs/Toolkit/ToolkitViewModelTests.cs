@@ -536,6 +536,34 @@ public sealed class ToolkitViewModelTests : IDisposable {
         Assert.Equal(1, announced);
     }
 
+    /// <summary>Deleting the command the form has open closes the form, or saving would drop the edit silently.</summary>
+    [Fact]
+    public void RemoveCommand_TheCommandOpenInTheForm_ClosesTheForm() {
+        var vm = Page();
+        vm.AddCommand(Mine());
+        vm.EditCustomCommand.Execute(vm.Custom[0]);
+        Assert.True(vm.Form.IsOpen);
+
+        vm.DeleteCustomCommand.Execute(vm.Custom[0]);
+
+        Assert.False(vm.Form.IsOpen);
+        Assert.False(vm.Form.IsEditing);
+    }
+
+    [Fact]
+    public void RemoveCommand_AnotherCommand_LeavesTheOpenFormAlone() {
+        var vm = Page();
+        vm.AddCommand(Mine());
+        vm.AddCommand(new ToolkitCommand("zzz-other", "", ToolkitCommandType.Launch, "other.exe"));
+        var other = vm.Custom.Single(e => e.Command == "zzz-other");
+        vm.EditCustomCommand.Execute(vm.Custom[0]);
+
+        vm.DeleteCustomCommand.Execute(other);
+
+        Assert.True(vm.Form.IsOpen);
+        Assert.True(vm.Form.IsEditing);
+    }
+
     /// <summary>A labelled command owns two rows; deleting it must take both, not leave an orphan in the
     /// section it was filed under.</summary>
     [Fact]
