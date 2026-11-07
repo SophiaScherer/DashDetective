@@ -4,10 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Controls;
 
-/// <summary>
-/// Pins that the completion suffix follows the ghost block's brush after a theme switch. Source read,
-/// because the control cannot be built without a render backend.
-/// </summary>
+/// <summary>Pins that the completion suffix follows the ghost brush after a theme switch, by source read since the control needs a render backend.</summary>
 public class GhostCompletionBoxTests {
     private static string Source() =>
         File.ReadAllText(Path.Combine(PaletteFile.SourceRoot(), "src/Shared/Controls/GhostCompletionBox.axaml.cs"));
