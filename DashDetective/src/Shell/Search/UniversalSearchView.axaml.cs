@@ -46,10 +46,8 @@ public partial class UniversalSearchView : UserControl {
     private void OnSearchBoxLostFocus(object? sender, RoutedEventArgs e) {
         StopWatchingForOutsideClick();
 
-        // Focus that left for anything but the box or its dropdown (Tab, or another route) puts the
-        // dropdown away, or it stays up holding the arrow keys app-wide. Posted because focus moving
-        // between the box's own parts reports a loss before the gain, and closing on that would eat the
-        // click; a press on a result row moves focus into the popup, which must not close it either.
+        // Focus leaving the box and dropdown closes it, or it keeps holding the arrow keys app-wide. Posted because
+        // focus moving between the box's own parts reports a loss before the gain.
         Dispatcher.UIThread.Post(() => {
             if (SearchBox.IsKeyboardFocusWithin || ResultsPopup.Child is InputElement { IsKeyboardFocusWithin: true })
                 return;

@@ -215,9 +215,7 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
             IsExpanded = false;
     }
 
-    /// <summary>Focus has left the box and its dropdown, by Tab or any other route. Puts the dropdown away
-    /// like Esc, so the Search scope stops holding the arrow keys app-wide (work item 100), then collapses
-    /// the field if nothing is typed. Left to the view because only it can see where focus went.</summary>
+    /// <summary>Focus left the box and dropdown: closes like Esc and collapses the field if empty. The view calls it, as only it sees where focus went.</summary>
     public void NotifyFocusLeft() {
         Close();
         CollapseIfIdle();

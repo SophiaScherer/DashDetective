@@ -594,8 +594,7 @@ public class UniversalSearchViewModelTests {
         Assert.False(vm.IsOpen);
     }
 
-    /// <summary>Work item 100: tabbing out of the box left the dropdown up, holding the arrow keys
-    /// app-wide through the Search scope until Esc. Leaving puts it away but keeps the term, like Esc.</summary>
+    /// <summary>Tabbing out puts the dropdown away but keeps the term, like Esc.</summary>
     [Fact]
     public async Task NotifyFocusLeft_ClosesTheDropdownButKeepsTheTerm() {
         var (vm, timer, _) = Build();
@@ -609,8 +608,7 @@ public class UniversalSearchViewModelTests {
         Assert.True(vm.IsExpanded);
     }
 
-    /// <summary>An empty box showing the recents has nothing worth keeping on screen, so leaving it
-    /// collapses the field back to its icon.</summary>
+    /// <summary>Leaving an empty box collapses the field back to its icon.</summary>
     [Fact]
     public void NotifyFocusLeft_EmptyBoxShowingRecents_CollapsesTheField() {
         var recents = new RecentSearches();
@@ -624,8 +622,7 @@ public class UniversalSearchViewModelTests {
         Assert.False(vm.IsExpanded);
     }
 
-    /// <summary>A debounce still counting when the user leaves must not reopen the dropdown behind them,
-    /// and returning reruns the term it cut short.</summary>
+    /// <summary>A debounce still counting on leave must not reopen the dropdown; returning reruns the term.</summary>
     [Fact]
     public async Task NotifyFocusLeft_DuringTheDebounce_StaysShutAndReturningReruns() {
         var (vm, timer, provider) = Build();
