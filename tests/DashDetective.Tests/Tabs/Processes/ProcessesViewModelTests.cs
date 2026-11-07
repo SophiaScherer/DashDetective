@@ -315,8 +315,7 @@ public class ProcessesViewModelTests {
         Assert.Equal(new[] { 100 }, viewModel.SelectedPids);
     }
 
-    /// <summary>PID 0 is the System Idle Process, a real row. Clicking it must set an anchor like any
-    /// other, rather than reading as "no anchor" and leaving the Shift-click to replace the selection.</summary>
+    /// <summary>PID 0 is a real row, so clicking it sets an anchor rather than reading as "no anchor".</summary>
     [Fact]
     public async Task SelectRow_WithShift_AfterClickingPidZero_TakesTheRange() {
         var samplers = new MetricSamplers(
