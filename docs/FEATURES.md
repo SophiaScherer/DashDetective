@@ -824,6 +824,11 @@ The gesture is answered in `MainWindow` rather than the view model, because it t
 focus and only the window knows that. Focus lands on something *inside* a widget — a chevron, a button in
 its body — so the handler walks out to the nearest `ReorderablePanel` before asking it to move.
 
+**Except from a text box.** Both moves are `AllowInTextInput: false`, because `Ctrl+Shift+←/→` selects by
+word in a text field: in the Network tab's Ping or DNS box it moved the widget and persisted the order
+instead (work item 98). The guard sits on the action, so a rebind keeps it. To move a widget that holds a
+field, Tab off the field to the card or any other control in it first.
+
 **`Ctrl+Shift` rather than `Alt`+arrow**, which Processes already uses to sort and File Explorer to go up
 a folder. It is a `ShortcutCatalog` entry like every other gesture, so Help lists it and the Settings
 Keyboard card rebinds it.

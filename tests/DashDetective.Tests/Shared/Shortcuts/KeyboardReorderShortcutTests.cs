@@ -4,8 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Shortcuts;
 
-/// <summary>Pins that the keyboard reorder gesture resolves, and that it does not collide with the
-/// Ctrl+arrow pager it sits beside.</summary>
+/// <summary>Pins that the reorder gesture resolves, does not collide with the Ctrl+arrow pager, and spares a text box's word selection.</summary>
 public class KeyboardReorderShortcutTests {
     [Theory]
     [InlineData(Key.Right, ShortcutId.MoveItemForward)]
@@ -29,5 +28,32 @@ public class KeyboardReorderShortcutTests {
         Assert.True(bindings.TryResolve(
             Key.Right, KeyModifiers.Control, false, ShortcutScope.Network, out var id));
         Assert.Equal(ShortcutId.NextPage, id);
+    }
+
+    /// <summary>Ctrl+Shift+arrow selects by word in a text box, so a field inside a widget keeps it.</summary>
+    [Theory]
+    [InlineData(Key.Left, ShortcutScope.Global)]
+    [InlineData(Key.Right, ShortcutScope.Global)]
+    [InlineData(Key.Left, ShortcutScope.Network)]
+    [InlineData(Key.Right, ShortcutScope.Network)]
+    public void CtrlShiftArrow_TextInputFocused_LeavesTheKeyToTheTextBox(Key key, ShortcutScope scope) {
+        var bindings = new ShortcutBindings();
+
+        var ids = bindings.Resolve(key, KeyModifiers.Control | KeyModifiers.Shift, true, scope);
+
+        Assert.DoesNotContain(ShortcutId.MoveItemBack, ids);
+        Assert.DoesNotContain(ShortcutId.MoveItemForward, ids);
+    }
+
+    /// <summary>The guard belongs to the action, not to the default gesture, so a rebind keeps it.</summary>
+    [Fact]
+    public void Rebind_KeepsTheMoveOutOfTextInput() {
+        var bindings = new ShortcutBindings();
+        var gesture = new KeyGesture(Key.M, KeyModifiers.Control | KeyModifiers.Alt);
+        Assert.True(bindings.TryRebind(ShortcutId.MoveItemBack, gesture, out _));
+
+        Assert.Empty(bindings.Resolve(gesture.Key, gesture.KeyModifiers, true, ShortcutScope.Global));
+        Assert.Contains(ShortcutId.MoveItemBack,
+                        bindings.Resolve(gesture.Key, gesture.KeyModifiers, false, ShortcutScope.Global));
     }
 }
