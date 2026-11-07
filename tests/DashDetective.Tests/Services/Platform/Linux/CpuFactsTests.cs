@@ -150,8 +150,7 @@ public class CpuFactsTests {
         return proc;
     }
 
-    /// <summary>The bug: a two-CCD part has two L3s, and <c>cpu0</c> sees only its own. A Ryzen 9 5900X read
-    /// 32 MB against WMI's package-wide 64 MB.</summary>
+    /// <summary>A two-CCD part has two L3s, and <c>cpu0</c> sees only its own.</summary>
     [Fact]
     public void L3CacheKilobytes_TwoCcds_SumsBothInstances() {
         var proc = new FakeProcFileSystem();
@@ -161,8 +160,7 @@ public class CpuFactsTests {
         Assert.Equal(65536, CpuFacts.L3CacheKilobytes(proc));
     }
 
-    /// <summary>Every core of a monolithic part reaches the same L3, which counts once rather than once per
-    /// core.</summary>
+    /// <summary>A monolithic part's shared L3 counts once, not once per core.</summary>
     [Fact]
     public void L3CacheKilobytes_OneSharedInstance_CountsItOnce() {
         var proc = new FakeProcFileSystem();
@@ -182,8 +180,7 @@ public class CpuFactsTests {
         Assert.Equal(32768, CpuFacts.L3CacheKilobytes(proc));
     }
 
-    /// <summary>With neither identifier the instances cannot be told apart, so the cache counts once — the
-    /// old <c>cpu0</c> reading — rather than once per core.</summary>
+    /// <summary>With neither identifier the instances cannot be told apart, so the cache counts once.</summary>
     [Fact]
     public void L3CacheKilobytes_WithNoInstanceIdentifier_CountsOnce() {
         var proc = new FakeProcFileSystem();
@@ -193,8 +190,7 @@ public class CpuFactsTests {
         Assert.Equal(8192, CpuFacts.L3CacheKilobytes(proc));
     }
 
-    /// <summary>The figure is one package's, as WMI's first processor row is: a second socket's L3 must not
-    /// double a two-socket board's total.</summary>
+    /// <summary>The figure is one package's, as WMI's first row is; a second socket must not double it.</summary>
     [Fact]
     public void L3CacheKilobytes_SecondPackage_IsLeftOut() {
         var proc = new FakeProcFileSystem();
@@ -206,8 +202,7 @@ public class CpuFactsTests {
         Assert.Equal(16384, CpuFacts.L3CacheKilobytes(proc));
     }
 
-    /// <summary>An instance whose <c>level</c> cannot be read is not counted — it may not be an L3 — while the
-    /// readable instances beside it still are. The real seam reports a denied read as missing, as here.</summary>
+    /// <summary>An instance whose <c>level</c> is unreadable is not counted; its readable neighbors still are.</summary>
     [Fact]
     public void L3CacheKilobytes_UnreadableLevel_SkipsOnlyThatInstance() {
         var proc = new FakeProcFileSystem();

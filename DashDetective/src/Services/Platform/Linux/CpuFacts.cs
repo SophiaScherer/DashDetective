@@ -37,14 +37,8 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
-    /// The L3 cache size in kilobytes for <c>cpu0</c>'s package: the sum of the distinct L3 instances its
-    /// cores reach. 0 when the CPU has no L3 or sysfs does not describe its caches (the usual case in a VM).
-    /// Deliberately <b>not</b> a field of this record: only the Hardware tab's Processor card has a row for
-    /// it, and the Dashboard should not pay for a directory walk it will not render.
-    ///
-    /// <b>One core's L3 is not the package's:</b> each CCD of a chiplet part has its own, so a Ryzen 9 5900X
-    /// read 32 MB from <c>cpu0</c> against WMI's package-wide 64 MB. Other packages are left out, as on
-    /// Windows. The size is suffixed ("8192K", "16M"), never a byte count.
+    /// The package's L3 in kilobytes, summed over distinct instances because each CCD has its own; 0 when
+    /// absent. Not a record field, so the Dashboard skips the directory walk. Sizes are suffixed ("8192K", "16M").
     /// </summary>
     internal static long L3CacheKilobytes(IProcFileSystem proc) {
         var package = PackageOf(proc, "cpu0");
@@ -72,13 +66,11 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
         return total;
     }
 
-    /// <summary>A core's package, "" when topology is unreadable — which then matches every such core.</summary>
+    /// <summary>A core's package; "" when unreadable, which matches every such core.</summary>
     private static string PackageOf(IProcFileSystem proc, string cpu) =>
         proc.ReadAllText(CpuRoot + "/" + cpu + "/topology/physical_package_id")?.Trim() ?? "";
 
-    /// <summary>What identifies one L3 instance, so the cores sharing it count it once: its <c>id</c> on
-    /// newer kernels, else <c>shared_cpu_list</c>, else "" — an undescribed cache counts once, not per core.
-    /// </summary>
+    /// <summary>Identifies one L3 instance: <c>id</c>, else <c>shared_cpu_list</c>, else "" so it counts once, not per core.</summary>
     private static string L3InstanceKey(IProcFileSystem proc, string index) {
         if (proc.ReadAllText(index + "/id")?.Trim() is { Length: > 0 } id)
             return "id:" + id;
