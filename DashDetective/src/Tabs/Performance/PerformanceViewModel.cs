@@ -672,8 +672,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var history = _disksByNumber.TryGetValue(number, out var previous)
                 ? previous.History
                 : new MetricHistory(WindowSeconds);
-            // Seeded with the placeholder, as the GPU rows are: a sampler that never reports (inert, or none
-            // on this platform) must not leave an idle-looking 0 behind.
+            // Seeded with the placeholder so a sampler that never reports does not leave an idle-looking 0.
             var activeTile = new StatTile("Active", Placeholders.NoReading);
             var readTile = new StatTile("Read", Placeholders.NoReading);
             var writeTile = new StatTile("Write", Placeholders.NoReading);

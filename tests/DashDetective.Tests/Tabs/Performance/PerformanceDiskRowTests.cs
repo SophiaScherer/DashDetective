@@ -10,11 +10,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>
-/// Pins that a disk's rail row and its Active, Read, Write and Response tiles say "—" until the sampler
-/// reports, and keep saying it when it never does (an inert PDH query, or a platform with no per-disk
-/// sampler). Zeros there would read as an idle drive. A real 0 % reading still shows as one.
-/// </summary>
+/// <summary>Pins that a disk's rail row and tiles say "—" until the sampler reports, and keep saying it if it never does; a real 0 % still shows.</summary>
 public class PerformanceDiskRowTests {
     private static readonly PhysicalDiskInfo Boot = new(3, "Boot Drive", "NVMe SSD", 1_000_000_000_000, true);
 

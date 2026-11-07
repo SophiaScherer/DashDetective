@@ -79,9 +79,7 @@ public class DashboardGpuCardTests {
         Assert.StartsWith(card.Note, card.Tip, System.StringComparison.Ordinal);
     }
 
-    /// <summary>The page's own sampler returning no adapters at all (inert, or not yet able to rate) leaves the
-    /// card on the placeholder it was built with, not on a confident 0. The inventory's sampler still sees the
-    /// adapter, or there would be no card to check.</summary>
+    /// <summary>A page sampler returning no adapters leaves the card on its placeholder, not a confident 0.</summary>
     [Fact]
     public async Task LoadGpusAsync_PageSamplerReportsNoAdapters_ShowsThePlaceholder() {
         var minted = 0;

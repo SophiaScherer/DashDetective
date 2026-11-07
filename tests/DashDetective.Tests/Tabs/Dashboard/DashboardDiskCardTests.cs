@@ -9,11 +9,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Dashboard;
 
-/// <summary>
-/// Pins that a disk card says "—" until its sampler reports, and keeps saying it when the sampler never
-/// does (an inert PDH query, or a platform with no per-disk sampler). A 0 there would read as an idle
-/// drive. A real 0 % reading still shows as one.
-/// </summary>
+/// <summary>Pins that a disk card says "—" until its sampler reports, and keeps saying it if it never does; a real 0 % still shows.</summary>
 public class DashboardDiskCardTests {
     private static readonly PhysicalDiskInfo Boot = new(3, "Boot Drive", "NVMe SSD", 1_000_000_000_000, true);
 
@@ -21,7 +17,7 @@ public class DashboardDiskCardTests {
         new(Boot.DeviceId, SystemDrive.Letter, "", "NTFS", 1_000_000_000_000, 500_000_000_000),
     ];
 
-    /// <summary>Waits out the loads the constructor fires and forgets, then drives one disk load.</summary>
+    /// <summary>Waits out the constructor's fire-and-forget loads, then drives one disk load.</summary>
     private static async Task<DashboardCard> DiskCardAsync(FakeDiskThroughputSampler throughput) {
         var viewModel = new DashboardViewModel(
             TestMetrics.Idle(),
