@@ -484,7 +484,9 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   `ToggleButton.toggle` style in `SharedStyles.axaml`, pixel-matching the old mock): **Resource
   alerts** (the master switch for the Alerts card below and every alert bell), **Show in system tray**, **Launch at startup**.
   **Launch at startup** writes the HKCU `…\Run` value via `IStartupRegistration`
-  (`src/Services/Startup`, soft-failing).
+  (`src/Services/Startup`, soft-failing). It reads **disabled** when Task Manager's `StartupApproved`
+  switch (Windows) or GNOME's `X-GNOME-Autostart-enabled=false` (Linux) turned the entry off, and turning
+  the toggle on clears that state.
 - **Keyboard.** The rebinding list for every shortcut, rendered from the live bindings. Written up
   under *Keyboard shortcuts* below, since the behaviour is the shortcut layer's rather than this
   page's.
