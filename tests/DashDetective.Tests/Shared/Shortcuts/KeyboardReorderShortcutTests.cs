@@ -4,8 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Shortcuts;
 
-/// <summary>Pins that the keyboard reorder gesture resolves, that it does not collide with the
-/// Ctrl+arrow pager it sits beside, and that it leaves a focused text box its word selection.</summary>
+/// <summary>Pins that the reorder gesture resolves, does not collide with the Ctrl+arrow pager, and spares a text box's word selection.</summary>
 public class KeyboardReorderShortcutTests {
     [Theory]
     [InlineData(Key.Right, ShortcutId.MoveItemForward)]
@@ -31,8 +30,7 @@ public class KeyboardReorderShortcutTests {
         Assert.Equal(ShortcutId.NextPage, id);
     }
 
-    /// <summary>Ctrl+Shift+arrow extends a text box's selection by a word, so a field inside a widget
-    /// (the Network tab's Ping and DNS boxes) must keep it rather than moving the widget (work item 98).</summary>
+    /// <summary>Ctrl+Shift+arrow selects by word in a text box, so a field inside a widget keeps it.</summary>
     [Theory]
     [InlineData(Key.Left, ShortcutScope.Global)]
     [InlineData(Key.Right, ShortcutScope.Global)]

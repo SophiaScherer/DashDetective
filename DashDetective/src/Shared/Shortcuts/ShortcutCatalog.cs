@@ -153,7 +153,7 @@ public static class ShortcutCatalog {
 
         // ----- Layout -----
         // Ctrl+Shift rather than Alt+arrow, which Processes uses to sort and File Explorer to go up.
-        // Text-guarded because a text box selects by word on the same gesture (work item 98).
+        // Text-guarded because a text box selects by word on the same gesture.
         new(ShortcutId.MoveItemBack,
             [new KeyGesture(Key.Left, KeyModifiers.Control | KeyModifiers.Shift)],
             "Ctrl+Shift+←", "Move the focused widget or card one slot earlier", ShortcutScope.Global,
