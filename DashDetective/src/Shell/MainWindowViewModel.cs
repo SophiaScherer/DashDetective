@@ -256,8 +256,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _notices.Changed += OnNoticeChanged;
         _accessibility.Changed += OnAccessibilityChanged;
 
-        // Build the nav items pointing their press at the nav VM, then let it own selection. Activate rather
-        // than Navigate, so pressing the current page's item opens its section list.
+        // Activate rather than Navigate, so pressing the current page's item opens its section list.
         Nav.Initialize(new[] {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",
                         Icons.Dashboard, _dashboard, Nav.Activate),

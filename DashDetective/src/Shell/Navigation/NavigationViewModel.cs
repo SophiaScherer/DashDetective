@@ -579,7 +579,7 @@ public partial class NavigationViewModel : ViewModelBase {
         SelectionChanged?.Invoke(SelectedNav);
     }
 
-    /// <summary>A press: the current page's item opens its section list, any other navigates. Apart from <see cref="Navigate"/>, which shortcuts and search also call and which must never open the list.</summary>
+    /// <summary>A press on the current page's item opens its section list; unlike <see cref="Navigate"/>, which shortcuts and search call.</summary>
     public void Activate(NavItem item) {
         if (item == SelectedNav) {
             if (IsSectionsOpen) {
@@ -658,7 +658,7 @@ public partial class NavigationViewModel : ViewModelBase {
         SectionPicked?.Invoke(section);
     }
 
-    /// <summary>Esc closes an open section list and is consumed; any other shortcut also closes it but still runs. Enter and the arrows leave it open.</summary>
+    /// <summary>Esc closes an open section list and is consumed; any other shortcut closes it but still runs.</summary>
     internal bool HandleSectionsShortcut(ShortcutId id) {
         if (!IsSectionsOpen)
             return false;

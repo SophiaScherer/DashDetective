@@ -22,8 +22,7 @@ internal static class PageSections {
     /// <summary>How far apart two tops can be and still read as one row; panel margins can differ by a pixel or two.</summary>
     internal const double RowTolerance = 4;
 
-    /// <summary>The class a page puts on a card that is a section without being a <see cref="WidgetPanel"/>,
-    /// such as a Hardware card; its title is its automation name.</summary>
+    /// <summary>Marks a card that is a section without being a <see cref="WidgetPanel"/>; its title is its automation name.</summary>
     internal const string SectionClass = "pageSection";
 
     /// <summary>Whether a control is a section. Untitled ones still count, so a titled widget nested in one is not listed on its own.</summary>

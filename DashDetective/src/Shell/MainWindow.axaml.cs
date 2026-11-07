@@ -153,7 +153,7 @@ public partial class MainWindow : Window {
         _viewModel.Nav.SetSections(candidates);
     }
 
-    /// <summary>Scrolls a picked section to the top of its scroller and flashes it. The target rect is a viewport tall so the heading lands at the top; a folded widget shows only its header.</summary>
+    /// <summary>Scrolls a picked section to the top of its scroller and flashes it.</summary>
     private void OnSectionPicked(PageSection section) {
         if (section.Source >= _sectionPanels.Count || _sectionPanels[section.Source] is not { } panel ||
             !panel.IsAttachedToVisualTree())

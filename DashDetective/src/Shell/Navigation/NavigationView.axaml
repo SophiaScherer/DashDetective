@@ -257,7 +257,7 @@
             <Setter Property="Fill" Value="{DynamicResource Accent}"/>
         </Style>
 
-        <!-- Section caret: a glyph, not a second button, so the row stays one tab stop. It overlays the row's padding so showing it never moves a neighbor. -->
+        <!-- A glyph, not a second button, so the row stays one tab stop. -->
         <Style Selector="Border.rail Path.sectionsCaret">
             <Setter Property="IsVisible" Value="False"/>
             <Setter Property="Fill" Value="{DynamicResource TextTertiary}"/>
@@ -486,7 +486,7 @@
         </DockPanel>
     </Border>
 
-        <!-- The current page's sections. Not light-dismissed so the window stays hoverable; an outside press closes it from code-behind, as the Processes options popup does. -->
+        <!-- Not light-dismissed, so the window stays hoverable; an outside press closes it from code-behind. -->
         <Popup x:Name="SectionsPopup" Placement="{Binding SectionsPlacement}"
                IsLightDismissEnabled="False"
                IsOpen="{Binding IsSectionsOpen, Mode=TwoWay}">
