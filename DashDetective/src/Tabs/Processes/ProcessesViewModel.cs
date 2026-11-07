@@ -397,6 +397,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         if (!TryFindPath(_lastRoots, pid, path))
             return;
 
+        // A folded group hides its rows, so selecting into one would pick a row nobody can see.
+        var group = path[0].Aggregate.Category;
+        if (_collapsedGroups.Contains(group))
+            ToggleGroup(group);
+
         // Reveal the ancestors before filtering so the single rebuild below shows the finished state.
         for (var i = 0; i < path.Count - 1; i++)
             _expandedPids.Add(path[i].Info.Pid);
