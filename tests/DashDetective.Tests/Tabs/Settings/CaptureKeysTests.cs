@@ -32,8 +32,7 @@ public class CaptureKeysTests {
     public void Classify_AnyOtherKey_Captures(Key key) =>
         Assert.Equal(CaptureKeyAction.Capture, CaptureKeys.Classify(key));
 
-    /// <summary>Tab and Shift+Tab move focus, so a binding on either would claim them app-wide. They are
-    /// left to the focus system rather than captured; Ctrl+Tab is not focus traversal and still binds.</summary>
+    /// <summary>Tab and Shift+Tab are left to focus traversal, as a binding would claim them app-wide; Ctrl+Tab still binds.</summary>
     [Theory]
     [InlineData(KeyModifiers.None)]
     [InlineData(KeyModifiers.Shift)]

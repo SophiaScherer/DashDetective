@@ -12,8 +12,7 @@ internal enum CaptureKeyAction {
     /// <summary>Escape: stand down and leave the existing binding untouched.</summary>
     Cancel,
 
-    /// <summary>Tab or Shift+Tab: left to focus traversal, so the box is not bound to them. Moving focus
-    /// stands the capture down through LostFocus.</summary>
+    /// <summary>Tab or Shift+Tab: left to focus traversal, which stands the capture down through LostFocus.</summary>
     Ignore,
 
     /// <summary>Anything else: the new binding.</summary>
