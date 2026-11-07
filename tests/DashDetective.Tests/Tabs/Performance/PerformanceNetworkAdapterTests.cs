@@ -7,11 +7,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>
-/// Pins that the Network row follows the sampler's live adapter: its name and "View in Network" target
-/// move with it while its saved-order id stays put, and the Errors tile shows a dash when the adapter
-/// cannot be read instead of a confident zero.
-/// </summary>
+/// <summary>Pins that the Network row follows the live adapter with its saved-order id fixed, and the Errors tile dashes when unreadable.</summary>
 public class PerformanceNetworkAdapterTests {
     private static PerformanceViewModel Page(out System.Collections.Generic.List<FakeUiTimer> timers, System.Func<string> adapter) =>
         new(TestMetrics.WithTimers(out timers, network: () => new NetworkSample(1, 1), adapterName: adapter),

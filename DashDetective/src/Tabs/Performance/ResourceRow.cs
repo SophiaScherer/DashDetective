@@ -47,8 +47,7 @@ public partial class ResourceRow : ObservableObject, IWidgetIdentity {
 
     private readonly string _widgetId;
 
-    /// <summary>The name the row was built with doubles as the id a saved rail order names it by; it stays
-    /// put when <see cref="Name"/> follows a changing network adapter.</summary>
+    /// <summary>The build-time name, which is the saved rail order's id and so stays put when <see cref="Name"/> follows the adapter.</summary>
     public string? WidgetId => _widgetId;
 
     /// <summary>The <c>DeviceInstance.Id</c> this row was built from, which is how another page names it

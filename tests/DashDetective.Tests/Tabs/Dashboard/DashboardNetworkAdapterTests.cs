@@ -5,10 +5,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Dashboard;
 
-/// <summary>
-/// Pins that the Network card's adapter caption follows the sampler when it moves to another adapter,
-/// rather than keeping the name read at construction.
-/// </summary>
+/// <summary>Pins that the Network card's adapter caption follows the sampler to another adapter.</summary>
 public class DashboardNetworkAdapterTests {
     [Fact]
     public void NetworkTick_AfterTheSamplerSwitchesAdapter_ShowsTheNewAdapterName() {

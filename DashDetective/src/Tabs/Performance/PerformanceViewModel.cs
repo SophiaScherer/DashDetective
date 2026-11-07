@@ -312,8 +312,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             StatOrder = StatOrderFor(ChartSeries.Memory), Alert = _alerts.Memory,
         };
 
-        // The row is named after the real primary adapter (e.g. "Ethernet", "Wi-Fi") and follows the sampler, and Link speed is
-        // re-read when the adapter changes.
+        // Named after the primary adapter and follows the sampler; link speed is re-read on a change.
         var adapterName = string.IsNullOrWhiteSpace(service.NetworkAdapterName) ? "Ethernet" : service.NetworkAdapterName;
         _networkAdapterName = service.NetworkAdapterName;
         _networkInterface = NetworkUsageSampler.FindByName(_networkAdapterName);
@@ -1141,8 +1140,7 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateNetwork(sample);
     }
 
-    /// <summary>Re-reads the adapter identity when the sampler has moved to another adapter: the row's name,
-    /// its "View in Network" target, the link speed and the interface the Errors tile reads.</summary>
+    /// <summary>Re-reads the adapter-bound identity (name, "View in Network" target, link speed, Errors interface) when the sampler moves.</summary>
     private void FollowNetworkAdapter() {
         var name = _service.NetworkAdapterName;
         if (name == _networkAdapterName)

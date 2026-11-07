@@ -214,8 +214,7 @@ public sealed class NetworkUsageSampler {
             : current;
     }
 
-    /// <summary>The adapter with this friendly name (the one <see cref="AdapterName"/> reports), or null
-    /// when it is blank, gone or the enumeration fails. Lets a page follow the sampler's adapter.</summary>
+    /// <summary>The adapter with this friendly name, or null when blank, gone or the enumeration fails.</summary>
     internal static NetworkInterface? FindByName(string? name) {
         if (string.IsNullOrWhiteSpace(name))
             return null;
