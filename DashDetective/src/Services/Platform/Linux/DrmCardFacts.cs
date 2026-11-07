@@ -150,7 +150,7 @@ internal sealed record DrmCardFacts(
         return named;
     }
 
-    /// <summary>Composes "NVIDIA GeForce RTX 3060" from a table name, or "" when the table names only the vendor. The bundled vendor word wins, since pci.ids spells vendors out in full.</summary>
+    /// <summary>Composes "NVIDIA GeForce RTX 3060" from a table name, or "" with no device name; the bundled vendor word wins over pci.ids' long form.</summary>
     internal static string FormatProductName(uint vendorId, string tableVendor, string deviceName) {
         deviceName = MarketingName(deviceName);
         if (deviceName.Length == 0)

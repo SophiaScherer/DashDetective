@@ -5,11 +5,10 @@ using System.Globalization;
 namespace DashDetective.Services.Platform.Linux;
 
 /// <summary>
-/// Names a PCI device from the system's <c>pci.ids</c> table. The kernel gives only numeric ids, and a product name is what lets the Hardware tab's Graphics card match the spec catalogue; without a table every lookup misses.
+/// Names a PCI device from <c>pci.ids</c>, since the kernel gives only numeric ids and the Graphics card's spec lookup needs a product name.
 /// </summary>
 internal sealed class PciIdDatabase {
-    // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem. Debian and Ubuntu
-    // carry hwdata's copy and pciutils' symlink; Fedora and Arch ship the first path only.
+    // Forward-slash literals, never Path.Combine (see IProcFileSystem); distros ship the table at different paths.
     private static readonly string[] CandidatePaths = [
         "/usr/share/hwdata/pci.ids",
         "/usr/share/misc/pci.ids",
@@ -31,10 +30,10 @@ internal sealed class PciIdDatabase {
     /// <summary>The table for a host that ships no <c>pci.ids</c> — every lookup misses.</summary>
     internal static PciIdDatabase Empty { get; } = new([], []);
 
-    /// <summary>The vendor's name, e.g. "NVIDIA Corporation"; "" when the table does not carry it.</summary>
+    /// <summary>The vendor's name ("NVIDIA Corporation"), or "" when the table lacks it.</summary>
     internal string Vendor(uint vendorId) => _vendors.GetValueOrDefault(vendorId, "");
 
-    /// <summary>The device's name, e.g. "SVGA II Adapter"; "" when the table does not carry it.</summary>
+    /// <summary>The device's name ("SVGA II Adapter"), or "" when the table lacks it.</summary>
     internal string Device(uint vendorId, uint deviceId) =>
         _devices.GetValueOrDefault(Pack(vendorId, deviceId), "");
 
@@ -53,7 +52,7 @@ internal sealed class PciIdDatabase {
         return Empty;
     }
 
-    /// <summary>One pass keeping the wanted pairs. Subsystem lines are skipped (they name a board partner's build), and the scan stops at the device-class section, whose <c>C 03</c> entries would parse as vendor ids.</summary>
+    /// <summary>Stops at the device-class section, whose <c>C 03</c> entries would parse as vendor ids; subsystem lines are skipped.</summary>
     internal static PciIdDatabase Parse(
         IReadOnlyList<string> lines, IReadOnlyCollection<(uint Vendor, uint Device)> wanted) {
         var wantedVendors = new HashSet<uint>();

@@ -11,8 +11,7 @@ namespace DashDetective.Tabs.Hardware;
 /// Processor facts from <c>Win32_Processor</c>. Core/thread counts are summed across sockets and the
 /// clock is the max, matching <c>CpuInfoProvider</c>; name/cache/socket come from the first package.
 /// Boost clock and TDP have no WMI source, so they come from <see cref="HardwareCatalog"/> by model name
-/// and stay "—" when it has no entry. Base clock, L3 size and socket keep their WMI source, with the catalog as fallback for an empty field. The platform check
-/// lives in <see cref="IHardwareInfoProvider.ForCurrentPlatform"/>.
+/// and stay "—" when it has no entry.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class WindowsProcessorInfoProvider : IProcessorInfoProvider {

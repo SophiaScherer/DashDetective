@@ -9,8 +9,7 @@ public sealed record CpuSpec(string Boost, string Tdp, string Base, string Cache
 /// <summary>
 /// Bundled CPU spec table, keyed by a distinctive <b>normalized</b> model token (see
 /// <see cref="HardwareCatalog.Normalize"/>) — e.g. "7600X" matches WMI's
-/// "AMD Ryzen 5 7600X 6-Core Processor". Add a part by adding one line; an empty table leaves the
-/// fields as "—". Intel base is the P-core base and TDP the Processor Base Power; L3 is the whole package's.
+/// "AMD Ryzen 5 7600X 6-Core Processor". Intel base is the P-core base and L3 is the whole package's.
 /// </summary>
 internal static class CpuCatalog {
     public static readonly IReadOnlyDictionary<string, CpuSpec> Data =

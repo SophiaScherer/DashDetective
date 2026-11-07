@@ -7,7 +7,7 @@ namespace DashDetective.Tabs.Hardware;
 /// Formats the Processor card's spec rows. Clocks read to one decimal of GHz — the precision a static
 /// spec sheet wants, deliberately unlike <c>CpuSpeedFormatter</c>, which keeps two for the live rail.
 /// Always InvariantCulture, matching the app's convention; a missing figure yields the neutral "—".
-/// Each row takes the machine's own reading first and the catalog datasheet only as a fallback, e.g. in a VM with no cpufreq or cache topology.
+/// Each row prefers the machine's own reading; the datasheet is a fallback for a VM with no cpufreq or cache topology.
 /// </summary>
 internal static class ProcessorSpecFormatter {
     /// <summary>The placeholder; catalog tables also store it for a fact a part lacks, so it must read as absent.</summary>

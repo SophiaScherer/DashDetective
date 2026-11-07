@@ -14,7 +14,7 @@ namespace DashDetective.Tabs.Hardware;
 /// no entry — exactly as on Windows, and formatted through the same
 /// <see cref="ProcessorSpecFormatter"/> so the rows match.
 ///
-/// The socket has no Linux source (SMBIOS type 4 needs root), so socket, base clock and L3 fall back to the catalog; that is what fills them in a VM.
+/// The socket has no Linux source (SMBIOS type 4 needs root), so it falls back to the catalog.
 /// </summary>
 internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
     private readonly IProcFileSystem _proc;
