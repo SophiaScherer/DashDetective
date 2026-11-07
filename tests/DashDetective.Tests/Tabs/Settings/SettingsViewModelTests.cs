@@ -65,8 +65,7 @@ public class SettingsViewModelTests {
         Assert.Equal(new[] { true }, startup.Writes);
     }
 
-    /// <summary>A write the OS ignores or rejects leaves the registration unchanged; the toggle reads
-    /// the real state back instead of staying on, and the revert writes nothing further.</summary>
+    /// <summary>A write the OS rejects leaves the registration unchanged; the toggle reads the real state back and writes nothing further.</summary>
     [Fact]
     public void LaunchAtStartup_WriteIgnored_RevertsToRealState() {
         var startup = new FakeStartupRegistration(enabled: false);
