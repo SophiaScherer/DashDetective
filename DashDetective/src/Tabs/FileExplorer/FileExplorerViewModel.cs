@@ -687,8 +687,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         }
     }
 
-    /// <summary>A drive root's Name is "C:\", trimmed to read "C:". The Unix root is "/", which would trim
-    /// to nothing and leave a zero-width crumb, so it stays as is.</summary>
+    /// <summary>A drive root's "C:\" is trimmed to "C:"; the Unix root "/" would trim to nothing, so it stays.</summary>
     internal static string RootLabel(string rootName) {
         var trimmed = rootName.TrimEnd(Path.DirectorySeparatorChar);
         return trimmed.Length > 0 ? trimmed : rootName;
