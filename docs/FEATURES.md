@@ -1168,8 +1168,10 @@ callback (the NavItem pattern), with the VM enforcing single selection.
 
 Notable choices / deferred bits: this tab introduces the app's **first hierarchical control**
 (`TreeView`) — an intentional, signed-off architecture addition. Tree roots are **drives**, not a
-synthetic "This PC" node. Navigating via the list/breadcrumb does **not** sync the tree selection
-(deferred by choice). Filter chips reuse the shared **segmented control** (`Border.seg`), not the
+synthetic "This PC" node. Navigating via Back, Up, the list or the breadcrumb selects the folder's
+tree node when its branch is loaded (`SyncTreeSelection`), and clears the old highlight otherwise.
+That selection re-enters `OnNodeSelected`, which therefore **skips the folder already open**: reading
+it again dropped the file a search jump had selected. Filter chips reuse the shared **segmented control** (`Border.seg`), not the
 comp's softer chip; the details **preview** is a solid themed swatch, not the comp's literal
 diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
 and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a

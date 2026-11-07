@@ -7,13 +7,15 @@ namespace DashDetective.Tests.Fakes;
 /// <summary>
 /// Hand-rolled <see cref="IShellInterop"/> for headless tests: records every type-name lookup, so how
 /// often the shell is actually asked can be pinned. Answers from the extension, as the real shells do.
+/// Thread-safe, since two folder reads can ask at once off the UI thread.
 /// </summary>
 internal sealed class FakeShellInterop : IShellInterop {
     /// <summary>Every path handed to <see cref="GetTypeName"/>, in order.</summary>
     public List<string> TypeNameCalls { get; } = [];
 
     public string GetTypeName(string path, bool isDirectory) {
-        TypeNameCalls.Add(path);
+        lock (TypeNameCalls)
+            TypeNameCalls.Add(path);
         if (isDirectory)
             return "File folder";
 
