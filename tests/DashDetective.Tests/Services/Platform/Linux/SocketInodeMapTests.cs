@@ -67,9 +67,7 @@ public class SocketInodeMapTests {
         Assert.Equal(812, map.PidFor(21344));
     }
 
-    /// <summary>Another user's socket can never be found, because its <c>fd</c> directory is unlistable. A poll
-    /// still asking about it must not walk again — observed by staging a socket afterwards that a walk would
-    /// pick up. Before the fix, every 2.5 s poll walked every process twice for it.</summary>
+    /// <summary>Another user's socket is unfindable (its <c>fd</c> directory is unlistable), so a poll asking about it must not re-walk.</summary>
     [Fact]
     public void Refresh_UnattributableInode_DoesNotWalkAgain() {
         var proc = Tree();
@@ -96,8 +94,7 @@ public class SocketInodeMapTests {
         Assert.Equal(1500, map.PidFor(77777));
     }
 
-    /// <summary>The connections reader asks twice per poll, TCP then UDP. A walk the TCP call triggers must
-    /// keep the UDP call's unattributable inodes known, or every new TCP socket would cost a second walk.</summary>
+    /// <summary>A walk the TCP call triggers must keep the UDP call's unattributable inodes known, or each costs a second walk.</summary>
     [Fact]
     public void Refresh_WalkTriggeredByOneCall_KeepsTheOtherCallsUnattributableInodes() {
         var proc = Tree();
@@ -115,8 +112,7 @@ public class SocketInodeMapTests {
         Assert.Equal(SocketInodeMap.NoPid, map.PidFor(66666));
     }
 
-    /// <summary>An unattributable inode is re-tested by the next walk something else forces, so a socket
-    /// that later becomes visible is attributed then rather than never.</summary>
+    /// <summary>The next forced walk re-tests an unattributable inode, so a socket that becomes visible is attributed.</summary>
     [Fact]
     public void Refresh_LaterWalk_RetestsUnattributableInodes() {
         var proc = Tree();

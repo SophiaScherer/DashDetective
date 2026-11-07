@@ -11,10 +11,9 @@ namespace DashDetective.Services.Platform.Linux;
 /// <b>Stateful and cached, deliberately.</b> The walk is a <c>readlink</c> per descriptor across every
 /// process — thousands of calls — and the connections table polls every 2.5 seconds. So the map is kept
 /// between calls and <see cref="Refresh"/> only walks when it is asked about an inode it has never seen;
-/// a steady-state poll costs nothing. That includes an inode a walk could not attribute (another user's
-/// socket): it is remembered as unattributable, or every poll would walk twice looking for it. Held by
-/// the interop rather than by a bundle member, the <c>IPhysicalDiskThroughputSampler</c> precedent for a
-/// reader that may hold state.
+/// a steady-state poll costs nothing. An inode a walk could not attribute (another user's socket) is
+/// remembered, or every poll would walk twice looking for it. Held by the interop rather than a bundle member,
+/// the <c>IPhysicalDiskThroughputSampler</c> precedent for a reader that may hold state.
 ///
 /// <b>Permission-limited by design.</b> Listing another user's <c>/proc/[pid]/fd</c> is denied, which the
 /// filesystem seam reports as an empty listing — so other users' sockets simply go unattributed, at the
@@ -33,13 +32,10 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
 
     private readonly Dictionary<long, int> _pidByInode = [];
 
-    /// <summary>Inodes the last walk was asked about and could not find. Not walked for again until a new
-    /// inode forces a walk, which re-tests them.</summary>
+    /// <summary>Inodes the last walk could not find; re-tested only when a new inode forces a walk.</summary>
     private readonly HashSet<long> _unattributable = [];
 
-    /// <summary>Every inode asked about since the last walk, including in that walk's own call — so the TCP
-    /// and UDP calls of one poll both keep their unattributable sockets through a walk the other triggered.
-    /// </summary>
+    /// <summary>Every inode asked about since the last walk, so a walk one call triggers keeps the other's unattributable sockets.</summary>
     private readonly HashSet<long> _askedSinceWalk = [];
 
     /// <summary>Rebuilds the map if any of <paramref name="inodes"/> is unknown, and at most once per call.
@@ -51,7 +47,7 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
 
         Walk();
 
-        // Rebuilt from what was asked since the previous walk, so a closed socket drops out of this set too.
+        // Rebuilt from what was asked since the last walk, so a closed socket drops out.
         _unattributable.Clear();
         foreach (var inode in _askedSinceWalk) {
             if (!_pidByInode.ContainsKey(inode))
@@ -118,8 +114,7 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
             : null;
     }
 
-    /// <summary>Whether anything asked about is new: neither mapped nor already known to be unattributable.
-    /// Inode 0 is the kernel's "no inode" and is never worth a walk.</summary>
+    /// <summary>Whether anything asked about is new, neither mapped nor unattributable; inode 0 is "no inode".</summary>
     private bool NeedsWalk(IReadOnlyCollection<long> inodes) {
         foreach (var inode in inodes) {
             if (inode != 0 && !_pidByInode.ContainsKey(inode) && !_unattributable.Contains(inode))

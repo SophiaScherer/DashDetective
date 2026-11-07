@@ -87,9 +87,7 @@ public class LinuxConnectionsInteropTests {
     public void GetTcp_UnattributableSocket_ReportsNoPid() =>
         Assert.Equal(SocketInodeMap.NoPid, Interop().GetTcp().Single(r => r.LocalPort == 22).Pid);
 
-    /// <summary>A steady-state poll does not re-walk for sockets it already failed to attribute. The fixture
-    /// leaves the SSH listener's inode unowned; staging an owner for it after the first poll shows whether the
-    /// second poll walked.</summary>
+    /// <summary>A steady-state poll does not re-walk for sockets it already failed to attribute.</summary>
     [Fact]
     public void SecondPoll_WithOnlyUnattributableSocketsNew_DoesNotWalk() {
         var proc = Proc();
