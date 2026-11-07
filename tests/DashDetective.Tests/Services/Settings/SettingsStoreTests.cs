@@ -253,4 +253,17 @@ public sealed class SettingsStoreTests : IDisposable {
 
         Assert.Equal(AppSettings.Defaults, store.Load());
     }
+
+    /// <summary>An enum member this build lacks falls back to its default; the rest of the file loads.</summary>
+    [Fact]
+    public void Load_UnknownEnumName_FallsBackForThatKeyOnly() {
+        File.WriteAllText(_path, """
+            { "SchemaVersion": 1, "ColorVision": "NoSuchMode", "ShowInTray": false }
+            """);
+
+        var loaded = new SettingsStore(_path).Load();
+
+        Assert.False(loaded.ShowInTray);
+        Assert.Equal(AppSettings.Defaults.ColorVision, loaded.ColorVision);
+    }
 }
