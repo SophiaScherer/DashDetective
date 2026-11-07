@@ -54,7 +54,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
     private ResourceAlertOptions _options = ResourceAlertOptions.Defaults;
     private ResourceAlert? _current;
     private bool _live = true;
-    private int _spaceRead;   // generation of the newest free-space read, so an older one can be told apart
+    private int _spaceRead;   // generation of the newest free-space read
     private bool _disposed;
 
     public ResourceAlertWatcher(SystemMetricsService metrics)
@@ -292,8 +292,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
             return;
         }
 
-        // The enumeration is slow; the bell, master switch or Live pill may have moved while it ran. A
-        // stale verdict would re-raise a banner nothing is left to clear (the timer is already stopped).
+        // The settings may have changed during the slow read; a stale verdict would re-raise a banner nothing clears.
         if (read != _spaceRead || !Enabled || !_live || _options.LowDiskFreePercent != threshold)
             return;
 
