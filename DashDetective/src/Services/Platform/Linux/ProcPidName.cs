@@ -55,12 +55,7 @@ internal static class ProcPidName {
         return (nul < 0 ? cmdline : cmdline[..nul]).Trim();
     }
 
-    /// <summary>
-    /// Whether argv[0] is a title the process wrote over its own arguments (sshd's "sshd: user@pts/0",
-    /// Chromium's space-joined renderer line). Such a title has spaces and nothing after its NULs, and its
-    /// last '/' segment is not the program's name. A space alone is not enough: "/opt/My App/run" is a path.
-    /// With no comm there is nothing to check against or fall back on, so argv[0] is taken as written.
-    /// </summary>
+    /// <summary>Whether argv[0] is a title the process wrote over its arguments (sshd's "sshd: user@pts/0"), whose last '/' segment is junk. A space alone is not enough, since "/opt/My App/run" is a path.</summary>
     private static bool IsRewrittenTitle(string cmdline, string argv0, string comm) {
         if (comm.Length == 0 || !argv0.Contains(' ', StringComparison.Ordinal) || HasLaterArgument(cmdline))
             return false;
@@ -70,8 +65,7 @@ internal static class ProcPidName {
         return !(name == comm || (comm.Length == CommLength && name.StartsWith(comm, StringComparison.Ordinal)));
     }
 
-    /// <summary>Whether a non-empty argument follows argv[0] — the kernel's own NUL-separated layout, which
-    /// a title written over the argument area replaces with NUL padding.</summary>
+    /// <summary>Whether a non-empty argument follows argv[0]; a title written over the argument area leaves NUL padding instead.</summary>
     private static bool HasLaterArgument(string cmdline) {
         var nul = cmdline.IndexOf('\0');
         return nul >= 0 && cmdline.AsSpan(nul).TrimStart('\0').Trim().Length > 0;

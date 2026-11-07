@@ -18,9 +18,7 @@ public class ProcPidNameTests {
     public void From_PrefersTheCommandLineBasename(string? cmdline, string comm, string expected) =>
         Assert.Equal(expected, ProcPidName.From(cmdline, comm));
 
-    /// <summary>A process that writes a title over its own arguments leaves one space-joined string padded
-    /// with NULs, not a path. Its last '/' segment is junk ("0" from sshd's "pts/0"), so the name falls back
-    /// to <c>comm</c>.</summary>
+    /// <summary>A rewritten title is not a path, and its last '/' segment is junk ("0" from "pts/0"), so the name falls back to <c>comm</c>.</summary>
     [Theory]
     [InlineData("sshd: sophia@pts/0\0\0\0\0", "sshd", "sshd")]
     [InlineData("sshd-session: sophia [priv]\0\0", "sshd-session", "sshd-session")]
@@ -31,8 +29,7 @@ public class ProcPidNameTests {
     public void From_RewrittenTitle_FallsBackToComm(string cmdline, string comm, string expected) =>
         Assert.Equal(expected, ProcPidName.From(cmdline, comm));
 
-    /// <summary>A space in argv[0] is not on its own a title: a path can hold one, with or without arguments
-    /// after it, and a 15-character <c>comm</c> is a truncated prefix of the real name.</summary>
+    /// <summary>A space in argv[0] is not on its own a title; a path can hold one, and a 15-character <c>comm</c> is a truncated prefix.</summary>
     [Theory]
     [InlineData("/opt/My App/run\0", "run", "run")]
     [InlineData("/opt/My App/run\0--flag\0", "worker", "run")]
