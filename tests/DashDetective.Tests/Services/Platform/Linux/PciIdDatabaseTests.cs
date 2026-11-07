@@ -5,11 +5,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.Platform.Linux;
 
-/// <summary>
-/// Covers <see cref="PciIdDatabase"/>: the indent-significant parse of the system <c>pci.ids</c> table,
-/// the two boundaries a naive reader crosses (subsystem lines and the trailing device-class section), the
-/// candidate-path search, and the degradation on a host that ships no table at all.
-/// </summary>
+/// <summary>Pins <see cref="PciIdDatabase"/>'s indent-significant parse, its two scan boundaries, and the no-table degradation.</summary>
 public class PciIdDatabaseTests {
     private static readonly (uint Vendor, uint Device) Nvidia = (0x10deu, 0x2504u);
     private static readonly (uint Vendor, uint Device) Vmware = (0x15adu, 0x0405u);
@@ -33,8 +29,7 @@ public class PciIdDatabaseTests {
         Assert.Equal("SVGA II Adapter", db.Device(0x15adu, 0x0405u));
     }
 
-    /// <summary>A device the table lists under a <i>different</i> vendor must not answer for this one — the
-    /// pair is the key, not the device id, and 16-bit device ids collide across vendors constantly.</summary>
+    /// <summary>The (vendor, device) pair is the key; 16-bit device ids collide across vendors.</summary>
     [Fact]
     public void Read_DoesNotMatchADeviceIdUnderTheWrongVendor() {
         Assert.Equal("", Read((0x10deu, 0x0405u)).Device(0x10deu, 0x0405u));
@@ -49,22 +44,13 @@ public class PciIdDatabaseTests {
         Assert.Equal("", db.Vendor(0x1234u));
     }
 
-    /// <summary>
-    /// The device-class section trails every vendor and its entries are two hex digits deep
-    /// (<c>C 03</c> → <c>00  VGA compatible controller</c>). A parse that does not stop there reads the
-    /// class code as a vendor id, and every display adapter starts resolving to "VGA compatible
-    /// controller".
-    /// </summary>
+    /// <summary>The trailing device-class section (<c>C 03</c>) must stop the scan, or class codes parse as vendor ids.</summary>
     [Fact]
     public void Read_StopsAtTheDeviceClassSection() {
         Assert.Equal("", Read((0x03u, 0x00u)).Device(0x03u, 0x00u));
     }
 
-    /// <summary>
-    /// A subsystem line names a board partner's build of the same chip, so it must not overwrite the
-    /// device. The guard is load-bearing rather than decorative: hex parsing allows leading whitespace, so
-    /// a reader that strips only one tab parses the subvendor id as a device id perfectly happily.
-    /// </summary>
+    /// <summary>Subsystem lines must not overwrite the device; hex parsing tolerates leading whitespace, so stripping one tab would read the subvendor id as a device id.</summary>
     [Fact]
     public void Parse_SubsystemLine_NeverBecomesTheDeviceName() {
         var lines = new[] {
@@ -78,8 +64,7 @@ public class PciIdDatabaseTests {
             PciIdDatabase.Parse(lines, [Vmware]).Device(0x15adu, 0x0405u));
     }
 
-    /// <summary>A vendor line that does not parse must close the open vendor, or the following devices are
-    /// filed under whichever vendor happened to precede it.</summary>
+    /// <summary>A vendor line that does not parse must close the open vendor, or later devices are filed under the previous one.</summary>
     [Fact]
     public void Parse_MalformedVendorLine_OrphansTheDevicesBeneathIt() {
         var lines = new[] {
@@ -106,8 +91,7 @@ public class PciIdDatabaseTests {
             PciIdDatabase.Parse(lines, [Vmware]).Device(0x15adu, 0x0405u));
     }
 
-    /// <summary>Debian carries the table under <c>misc</c> as well as <c>hwdata</c>; a host with only the
-    /// second path must still resolve.</summary>
+    /// <summary>Debian also carries the table under <c>misc</c>; a host with only that path must still resolve.</summary>
     [Fact]
     public void Read_FindsTheTableAtAFallbackPath() {
         var proc = new FakeProcFileSystem().WithFile("/usr/share/misc/pci.ids", ProcFixtures.PciIds);
@@ -115,8 +99,7 @@ public class PciIdDatabaseTests {
         Assert.Equal("SVGA II Adapter", PciIdDatabase.Read(proc, [Vmware]).Device(0x15adu, 0x0405u));
     }
 
-    /// <summary>A minimal container ships no <c>pci.ids</c>. Every lookup misses and each caller keeps the
-    /// name it composed for itself — the degradation, not a fault.</summary>
+    /// <summary>A minimal container ships no <c>pci.ids</c>; every lookup misses and callers keep their own name.</summary>
     [Fact]
     public void Read_NoTableOnTheHost_MissesEverything() {
         var db = PciIdDatabase.Read(new FakeProcFileSystem(), [Vmware]);
@@ -125,8 +108,7 @@ public class PciIdDatabaseTests {
         Assert.Equal("", db.Vendor(0x15adu));
     }
 
-    /// <summary>Nothing wanted means nothing to read — the file is ~1.5 MB and a caller with no cards must
-    /// not pay for it.</summary>
+    /// <summary>Nothing wanted means nothing read; the file is ~1.5 MB.</summary>
     [Fact]
     public void Read_NothingWanted_DoesNotTouchTheFile() {
         var proc = new FakeProcFileSystem().WithPciIds();
@@ -182,8 +164,7 @@ public class PciIdDatabaseTests {
         Assert.Equal("", PciIdDatabase.Empty.Device(0x10deu, 0x2504u));
     }
 
-    /// <summary>Guards the shape the parser relies on: <see cref="IReadOnlyCollection{T}"/>, so a caller
-    /// can pass the list it already built without copying it into an array.</summary>
+    /// <summary>The parser takes <see cref="IReadOnlyCollection{T}"/> so callers can pass the list they already built.</summary>
     [Fact]
     public void Read_AcceptsAnyCollectionOfPairs() {
         var wanted = new List<(uint Vendor, uint Device)> { Vmware };

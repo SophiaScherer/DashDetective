@@ -186,8 +186,7 @@ public class DrmCardFactsTests {
         Assert.Equal("AMD amdgpu (1002:73df)", Assert.Single(DrmCardFacts.Read(Amd())).AdapterName);
     }
 
-    /// <summary>The point of the whole naming path: sysfs can only say "VMware vmwgfx (15ad:0405)", and
-    /// that string matches nothing in the spec catalogue. The system table turns it into a product.</summary>
+    /// <summary>The table turns sysfs's "VMware vmwgfx (15ad:0405)" into a product name the catalog can match.</summary>
     [Fact]
     public void ReadNamed_ResolvesTheMarketingName() {
         var proc = new FakeProcFileSystem()
@@ -210,8 +209,7 @@ public class DrmCardFactsTests {
             cards.Select(c => c.AdapterName));
     }
 
-    /// <summary>A host with no <c>pci.ids</c> — a minimal container, a distro without hwdata — must read
-    /// exactly as it did before the table existed, not blank.</summary>
+    /// <summary>A host with no <c>pci.ids</c> reads as it did before the table existed, not blank.</summary>
     [Fact]
     public void ReadNamed_NoTable_FallsBackToTheSysfsIdentity() {
         var card = Assert.Single(DrmCardFacts.ReadNamed(Amd()));
@@ -220,8 +218,7 @@ public class DrmCardFactsTests {
         Assert.Equal("AMD amdgpu (1002:73df)", card.AdapterName);
     }
 
-    /// <summary>A card the table does not list falls back the same way, even though the table itself was
-    /// found and its vendor named.</summary>
+    /// <summary>A card the table does not list falls back the same way.</summary>
     [Fact]
     public void ReadNamed_UnlistedDevice_FallsBackToTheSysfsIdentity() {
         var proc = new FakeProcFileSystem()
@@ -233,8 +230,7 @@ public class DrmCardFactsTests {
         Assert.Equal("VMware vmwgfx (15ad:9999)", Assert.Single(DrmCardFacts.ReadNamed(proc)).AdapterName);
     }
 
-    /// <summary>A table that throws on read costs the name, not the card: staged against a working sysfs
-    /// fixture and table, so the test fails if the denial empties the list.</summary>
+    /// <summary>A table that throws costs the name, not the card.</summary>
     [Fact]
     public void ReadNamed_TableDenied_KeepsTheCardOnItsSysfsName() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard().WithPciIds()
@@ -245,7 +241,7 @@ public class DrmCardFactsTests {
         Assert.Equal("AMD amdgpu (1002:73df)", card.AdapterName);
     }
 
-    /// <summary>An unreadable device id parses to 0, which must not be looked up as device 0000.</summary>
+    /// <summary>An unreadable device id parses to 0 and must not be looked up as device 0000.</summary>
     [Fact]
     public void ReadNamed_UnreadableDeviceId_IsNotNamedFromTheTable() {
         var proc = new FakeProcFileSystem()
@@ -256,8 +252,7 @@ public class DrmCardFactsTests {
         Assert.Equal("", Assert.Single(DrmCardFacts.ReadNamed(proc)).ProductName);
     }
 
-    /// <summary><see cref="DrmCardFacts.Key"/> is what the enumeration and the sampler join on; if naming
-    /// ever touched it the inventory would build no GPU card at all, silently.</summary>
+    /// <summary>Naming must not touch <see cref="DrmCardFacts.Key"/>, or the inventory builds no GPU card.</summary>
     [Fact]
     public void ReadNamed_LeavesTheJoinKeyUntouched() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard().WithPciIds();
@@ -272,9 +267,7 @@ public class DrmCardFactsTests {
         Assert.Empty(DrmCardFacts.ReadNamed(new FakeProcFileSystem().WithPciIds()));
     }
 
-    /// <summary>The table spells vendors out in full; a card subtitle has no room for "Advanced Micro
-    /// Devices, Inc. [AMD/ATI]", so the bundled word wins where there is one. Where there is not, the
-    /// table's own is better than nothing.</summary>
+    /// <summary>The bundled vendor word wins over the table's long form; the table's is used only when there is none.</summary>
     [Theory]
     [InlineData(0x1002u, "Advanced Micro Devices, Inc. [AMD/ATI]", "Navi 22", "AMD Navi 22")]
     [InlineData(0x1a2bu, "Some Vendor Inc.", "Widget 9000", "Some Vendor Inc. Widget 9000")]
@@ -288,16 +281,13 @@ public class DrmCardFactsTests {
         Assert.Equal(expected, DrmCardFacts.FormatProductName(vendorId, tableVendor, deviceName));
     }
 
-    /// <summary>A named vendor with an unnamed device has told us nothing the ids did not already say, so
-    /// the caller must keep its own composition rather than show a bare vendor.</summary>
+    /// <summary>A named vendor with an unnamed device keeps the caller's own composition.</summary>
     [Fact]
     public void FormatProductName_NoDeviceName_IsEmpty() {
         Assert.Equal("", DrmCardFacts.FormatProductName(0x10deu, "NVIDIA Corporation", ""));
     }
 
-    /// <summary>The codename is the chip's, not the product's: Windows names the same card "GeForce RTX
-    /// 3060", so the bracket is what the card shows. A multi-model bracket is kept whole, slashes and all,
-    /// because that is what keeps it out of the catalog.</summary>
+    /// <summary>The bracket is the product name (Windows drops the codename too); a multi-model bracket is kept whole so the catalog misses it.</summary>
     [Theory]
     [InlineData("GA106 [GeForce RTX 3060 Lite Hash Rate]", "GeForce RTX 3060 Lite Hash Rate")]
     [InlineData("Navi 32 [Radeon RX 7700 XT / 7800 XT]", "Radeon RX 7700 XT / 7800 XT")]

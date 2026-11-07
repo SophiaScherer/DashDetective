@@ -21,10 +21,7 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("16 GB", adapter.Memory);
     }
 
-    /// <summary>With no <c>pci.ids</c> on the host the kernel's PCI-id name is all there is, the spec
-    /// catalogue has nothing to match, and these rows have no source. "—" is the honest answer, and the
-    /// point of checking it is that the card still renders rather than being dropped for being mostly
-    /// empty.</summary>
+    /// <summary>With no <c>pci.ids</c> the spec rows are "—", but the card still renders.</summary>
     [Fact]
     public async Task GetAsync_NoPciIds_LeavesTheCatalogueRowsBlank() {
         var adapter = Assert.Single((await Read(new FakeProcFileSystem().WithAmdgpuCard())).Adapters);
@@ -34,11 +31,7 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("—", adapter.Bus);
     }
 
-    /// <summary>
-    /// The end of the chain this card exists for: <c>pci.ids</c> names the adapter, the name carries a
-    /// model token, and the bundled catalogue fills the three rows sysfs has no source for. Nothing else
-    /// changed to make that happen — the lookup was always attempted, it simply had nothing to match on.
-    /// </summary>
+    /// <summary>A <c>pci.ids</c> name carrying a model token fills the spec rows from the catalogue.</summary>
     [Fact]
     public async Task GetAsync_PciIdsNamesTheCard_FillsTheCatalogueRows() {
         var adapter = Assert.Single(
@@ -52,8 +45,7 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("PCIe 4.0 x16", adapter.Bus);
     }
 
-    /// <summary>A named card the catalogue does not list keeps its blanks. The name is a real improvement
-    /// on its own; it is not a promise that the spec rows follow.</summary>
+    /// <summary>A named card the catalogue does not list keeps its blank spec rows.</summary>
     [Fact]
     public async Task GetAsync_NamedButUnlistedCard_KeepsTheCatalogueRowsBlank() {
         var adapter = Assert.Single(
@@ -64,8 +56,7 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal("—", adapter.Bus);
     }
 
-    /// <summary>One device id that ships as two models must not take either one's datasheet: the catalogue
-    /// lists "RX 7700 XT", and this card may be the 7800 XT.</summary>
+    /// <summary>A device id that ships as two models takes neither one's datasheet.</summary>
     [Fact]
     public async Task GetAsync_MultiModelName_SkipsTheCatalogue() {
         var proc = new FakeProcFileSystem().WithAmdgpuCard()
@@ -90,8 +81,7 @@ public class LinuxGraphicsInfoProviderTests {
         Assert.Equal(expected, LinuxGraphicsInfoProvider.NamesOneModel(name));
     }
 
-    /// <summary>VRAM comes from the driver, not the catalogue, so a named card must not lose the figure
-    /// sysfs published for it.</summary>
+    /// <summary>VRAM comes from the driver, so a named card keeps the figure sysfs published.</summary>
     [Fact]
     public async Task GetAsync_PciIdsPresent_KeepsTheDriverReportedVram() {
         var adapter = Assert.Single(

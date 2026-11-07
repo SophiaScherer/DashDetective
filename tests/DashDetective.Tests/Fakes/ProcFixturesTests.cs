@@ -94,9 +94,7 @@ public class ProcFixturesTests {
         Assert.Equal("acpitz\n", fs.ReadAllText("/sys/class/hwmon/hwmon1/name"));
     }
 
-    /// <summary><c>pci.ids</c> is indent-significant and the indents are <b>tabs</b>: a vendor at column 0,
-    /// its devices one tab in, their subsystem variants two. If the escaping ever collapsed to spaces the
-    /// parser would read every line as a vendor and the fixture would still look fine by eye.</summary>
+    /// <summary><c>pci.ids</c> indents are tabs; spaces would make the parser read every line as a vendor.</summary>
     [Fact]
     public void PciIds_KeepsTheTabIndentsThatCarryTheFormat() {
         var lines = new FakeProcFileSystem().WithPciIds().ReadAllLines("/usr/share/hwdata/pci.ids");
@@ -106,8 +104,7 @@ public class ProcFixturesTests {
         Assert.Contains("\t\t1458 4067  RTX 3060 GAMING OC 12G", lines);
     }
 
-    /// <summary>The class section has to be present, or the parser's stop condition is never exercised by
-    /// anything but a hand-written literal.</summary>
+    /// <summary>The class section must be present, or the parser's stop condition goes unexercised.</summary>
     [Fact]
     public void PciIds_EndsWithTheDeviceClassSection() {
         var lines = new FakeProcFileSystem().WithPciIds().ReadAllLines("/usr/share/hwdata/pci.ids");

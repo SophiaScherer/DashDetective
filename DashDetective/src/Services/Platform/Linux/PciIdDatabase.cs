@@ -5,22 +5,7 @@ using System.Globalization;
 namespace DashDetective.Services.Platform.Linux;
 
 /// <summary>
-/// Names a PCI device from the system's own <c>pci.ids</c> table — the database <c>lspci</c> reads, shipped
-/// by the <c>hwdata</c> or <c>pciutils</c> package on every mainstream distribution.
-///
-/// <b>Why this exists.</b> The kernel identifies an adapter by its numeric PCI ids, never by its marketing
-/// model, so <see cref="DrmCardFacts"/> can only compose "VMware vmwgfx (15ad:0405)" from what sysfs gives
-/// it. That string names the right hardware but matches nothing in the bundled spec catalogue, whose keys
-/// are model tokens — which is why the Hardware tab's Graphics card shows "—" for CUDA cores, boost clock
-/// and bus on Linux. A real product name fills those rows with no further source.
-///
-/// <b>Only the ids asked for are kept.</b> The file is ~1.5 MB and mostly subsystem lines; a machine has
-/// one or two graphics adapters. The lines are read once per call, and one pass keeps only the wanted
-/// pairs, stopping as soon as every pair is found, so nothing of the table outlives the call.
-///
-/// Stateless and never throws: on a host with no <c>pci.ids</c> — a minimal container, a distro that does
-/// not ship hwdata — <see cref="Read"/> yields <see cref="Empty"/>, every lookup misses, and each caller
-/// keeps the name it composed for itself.
+/// Names a PCI device from the system's <c>pci.ids</c> table. The kernel gives only numeric ids, and a product name is what lets the Hardware tab's Graphics card match the spec catalogue; without a table every lookup misses.
 /// </summary>
 internal sealed class PciIdDatabase {
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem. Debian and Ubuntu
@@ -32,8 +17,7 @@ internal sealed class PciIdDatabase {
         "/var/lib/pciutils/pci.ids",
     ];
 
-    /// <summary>Stands for "no vendor is open" while scanning. No PCI vendor id can reach it: the field is
-    /// 16 bits wide.</summary>
+    /// <summary>"No vendor is open"; no 16-bit PCI vendor id can reach it.</summary>
     private const uint NoVendor = uint.MaxValue;
 
     private readonly Dictionary<uint, string> _vendors;
@@ -54,8 +38,7 @@ internal sealed class PciIdDatabase {
     internal string Device(uint vendorId, uint deviceId) =>
         _devices.GetValueOrDefault(Pack(vendorId, deviceId), "");
 
-    /// <summary>Reads the first table the host has, keeping only the wanted (vendor, device) pairs. An
-    /// empty request, and a host with no table, both yield <see cref="Empty"/>.</summary>
+    /// <summary>Reads the first table the host has, keeping only the wanted pairs; no request or no table yields <see cref="Empty"/>.</summary>
     internal static PciIdDatabase Read(
         IProcFileSystem proc, IReadOnlyCollection<(uint Vendor, uint Device)> wanted) {
         if (wanted.Count == 0)
@@ -70,16 +53,7 @@ internal sealed class PciIdDatabase {
         return Empty;
     }
 
-    /// <summary>
-    /// One pass over the table. The format is indent-significant: a vendor sits at column 0
-    /// (<c>15ad  VMware</c>), its devices one tab in (<c>\t0405  SVGA II Adapter</c>), and a device's
-    /// subsystem variants two tabs in. Subsystem lines describe a board partner's build of the same chip,
-    /// so they are skipped — a card must not be named after whoever assembled it.
-    ///
-    /// <b>The scan stops at the device-class section</b> that follows the last vendor. Its entries look
-    /// like <c>C 03  Display controller</c>, and reading those two hex digits as a vendor id is how a
-    /// parser starts attributing display-class names to real hardware. Pure; unit-tested.
-    /// </summary>
+    /// <summary>One pass keeping the wanted pairs. Subsystem lines are skipped (they name a board partner's build), and the scan stops at the device-class section, whose <c>C 03</c> entries would parse as vendor ids.</summary>
     internal static PciIdDatabase Parse(
         IReadOnlyList<string> lines, IReadOnlyCollection<(uint Vendor, uint Device)> wanted) {
         var wantedVendors = new HashSet<uint>();
@@ -129,9 +103,7 @@ internal sealed class PciIdDatabase {
         return new PciIdDatabase(vendors, devices);
     }
 
-    /// <summary>Splits one "<c>id  name</c>" entry at the given indent, or <c>null</c> when the line does
-    /// not hold one. The id is bare hex here — unlike the sysfs id files, which carry an <c>0x</c> prefix.
-    /// Pure; unit-tested.</summary>
+    /// <summary>Splits one "<c>id  name</c>" entry at the given indent, or <c>null</c>; the id is bare hex, unlike sysfs's <c>0x</c>-prefixed ones.</summary>
     internal static (uint Id, string Name)? ParseEntry(string line, int indent) {
         if (line.Length <= indent)
             return null;
@@ -148,7 +120,6 @@ internal sealed class PciIdDatabase {
         return name.Length == 0 ? null : (id, name);
     }
 
-    /// <summary>One key for a (vendor, device) pair. Shifted by a full 32 bits rather than 16 so a
-    /// malformed id wider than the PCI field cannot collide with a real pair.</summary>
+    /// <summary>Shifted by 32 bits rather than 16 so a malformed id wider than the PCI field cannot collide with a real pair.</summary>
     private static ulong Pack(uint vendorId, uint deviceId) => ((ulong)vendorId << 32) | deviceId;
 }

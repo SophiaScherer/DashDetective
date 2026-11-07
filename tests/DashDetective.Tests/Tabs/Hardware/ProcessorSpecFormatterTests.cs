@@ -57,8 +57,7 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal("—", ProcessorSpecFormatter.CacheL3(kilobytes));
     }
 
-    /// <summary>The machine's own reading always wins; the datasheet is a fallback, never an override. A
-    /// chip that has been down-binned or is running under a power limit must report what it reports.</summary>
+    /// <summary>The machine's reading wins over the datasheet, e.g. a down-binned or power-limited chip.</summary>
     [Theory]
     [InlineData("4.7 GHz")]
     [InlineData(null)]
@@ -66,8 +65,7 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal("4.2 / 5.3 GHz", ProcessorSpecFormatter.BaseBoost(4200, "5.3 GHz", baseSpec));
     }
 
-    /// <summary>The VM case this fallback exists for: a guest gets no <c>cpufreq</c> policy, so the base
-    /// clock has no live source at all and the identified part's datasheet is the honest answer.</summary>
+    /// <summary>A VM guest has no cpufreq policy, so the datasheet supplies the base clock.</summary>
     [Theory]
     [InlineData("5.3 GHz", "4.7 / 5.3 GHz")]
     [InlineData(null, "4.7 GHz / —")]
@@ -81,8 +79,7 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal("—", ProcessorSpecFormatter.BaseBoost(0, null, null));
     }
 
-    /// <summary>The catalog tables store the placeholder where a fact does not exist for a part, so a
-    /// field carrying it has to read as absent rather than as a value.</summary>
+    /// <summary>The catalog's placeholder must read as absent, not as a value.</summary>
     [Fact]
     public void BaseBoost_CatalogPlaceholders_ReadAsAbsent() {
         Assert.Equal("—", ProcessorSpecFormatter.BaseBoost(0, "—", "—"));
@@ -116,8 +113,7 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal(expected, ProcessorSpecFormatter.Spec(value));
     }
 
-    /// <summary>The firmware's designation names the board's own socket, so a rated one never replaces
-    /// it.</summary>
+    /// <summary>The firmware's socket designation is never replaced by a rated one.</summary>
     [Theory]
     [InlineData("AM5")]
     [InlineData(null)]
@@ -135,8 +131,7 @@ public class ProcessorSpecFormatterTests {
         Assert.Equal(expected, ProcessorSpecFormatter.Socket(live, spec));
     }
 
-    /// <summary>The catalog states clocks with their unit; the paired row states it once, on the right.
-    /// Anything that is not a GHz string passes through untouched.</summary>
+    /// <summary>The paired row states the unit once, on the right; non-GHz strings pass through.</summary>
     [Theory]
     [InlineData("4.7 GHz", "4.7")]
     [InlineData("4.7", "4.7")]

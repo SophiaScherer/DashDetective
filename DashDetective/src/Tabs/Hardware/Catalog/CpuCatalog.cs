@@ -3,24 +3,14 @@ using System.Collections.Generic;
 
 namespace DashDetective.Tabs.Hardware.Catalog;
 
-/// <summary>
-/// Rated CPU specs. <see cref="Boost"/> and <see cref="Tdp"/> have no source on either platform. The other
-/// three <b>do</b>, and are carried here as a fallback rather than a replacement: a machine that reports
-/// its own base clock, L3 size or socket keeps that reading, and the datasheet fills in only where the
-/// machine says nothing — a VM with no <c>cpufreq</c> and no cache topology, or a firmware that left the
-/// WMI field empty.
-/// </summary>
+/// <summary>Rated CPU specs; base, L3 and socket are only a fallback for what the machine does not report.</summary>
 public sealed record CpuSpec(string Boost, string Tdp, string Base, string CacheL3, string Socket);
 
 /// <summary>
 /// Bundled CPU spec table, keyed by a distinctive <b>normalized</b> model token (see
 /// <see cref="HardwareCatalog.Normalize"/>) — e.g. "7600X" matches WMI's
-/// "AMD Ryzen 5 7600X 6-Core Processor". Add a part by adding one line; an empty table simply leaves the
-/// fields as "—".
-///
-/// Figures are the vendor's published desktop-part datasheet: AMD's base and boost are the all-core and
-/// max single-core clocks, Intel's base is the <b>P-core</b> base and its TDP the Processor Base Power.
-/// L3 is the whole package's, so a two-CCD Ryzen carries twice a one-CCD part's.
+/// "AMD Ryzen 5 7600X 6-Core Processor". Add a part by adding one line; an empty table leaves the
+/// fields as "—". Intel base is the P-core base and TDP the Processor Base Power; L3 is the whole package's.
 /// </summary>
 internal static class CpuCatalog {
     public static readonly IReadOnlyDictionary<string, CpuSpec> Data =
