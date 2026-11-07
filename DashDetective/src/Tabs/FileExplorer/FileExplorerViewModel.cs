@@ -257,9 +257,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
     public FileExplorerViewModel()
         : this(IShellInterop.ForCurrentPlatform(), IFileSystemRoots.ForCurrentPlatform()) { }
 
-    /// <summary>Test seam: the same page over an explicit shell and root set, and optionally a folder
-    /// reader so a test can finish loads out of order. The public ctor resolves the real ones, so the
-    /// shell still builds this with <c>new()</c>.</summary>
+    /// <summary>Test seam: an explicit shell, root set and optional folder reader, so a test can finish loads out of order.</summary>
     internal FileExplorerViewModel(IShellInterop shell, IFileSystemRoots roots,
         Func<string, bool, IShellInterop, Task<FolderRead>>? readEntries = null) {
         _shell = shell;
@@ -541,8 +539,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             return;
         }
 
-        // Ignore a stale load: another folder was selected, or a newer request for this one (a Show
-        // hidden toggle) is in flight and must be the one that lands.
+        // Ignore a stale load: another folder was selected, or a newer request for this one is in flight.
         if (_pendingPath != path || id != _loadSeq) {
             EndLoad(id);
             return;

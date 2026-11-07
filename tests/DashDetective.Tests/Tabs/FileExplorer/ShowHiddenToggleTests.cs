@@ -8,10 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.FileExplorer;
 
-/// <summary>
-/// Pins that the newest folder read wins when Show hidden is toggled faster than the reads finish: an
-/// older read that lands last must not leave hidden files showing while the box is unchecked.
-/// </summary>
+/// <summary>Pins that the newest folder read wins when Show hidden is toggled faster than reads finish.</summary>
 public sealed class ShowHiddenToggleTests : IDisposable {
     private readonly string _root =
         Path.Combine(Path.GetTempPath(), "DashDetectiveTests_" + Path.GetRandomFileName());
@@ -39,8 +36,7 @@ public sealed class ShowHiddenToggleTests : IDisposable {
         return result.Task;
     }
 
-    // Rows cannot be built without a render backend (their glyphs parse geometry), so the two reads are
-    // told apart by the folder message their status produces.
+    // Rows need a render backend, so the two reads are told apart by their status's folder message.
     private static FolderRead Empty(FolderReadStatus status) => new(Array.Empty<FileItem>(), status);
 
     [Fact]
