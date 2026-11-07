@@ -33,8 +33,7 @@ internal static class DesktopEntry {
     internal static bool IsEnabled(string content) =>
         !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase);
 
-    // Each escaping backslash is doubled in the file (a literal one takes four) because the string-level escape runs first. "%" is doubled
-    // against field codes; the backslash goes first so it does not double the others' escapes.
+    // The backslash is replaced first so it does not re-escape the escapes added after it.
     private static string QuoteExec(string execPath) {
         var escaped = execPath
             .Replace("\\", "\\\\\\\\", StringComparison.Ordinal)
