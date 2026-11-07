@@ -118,7 +118,7 @@ public partial class NumericField : UserControl {
         }
     }
 
-    // Escape abandons the edit. Tunnelled with handledEventsToo because the shell's Escape handler marks the key handled first; restores the pre-edit value, since Capture stores every digit typed.
+    // Tunnelled with handledEventsToo because the shell's Escape handler marks the key handled first.
     private void OnEscape(object? sender, KeyEventArgs e) {
         if (e.Key != Key.Escape)
             return;
