@@ -79,8 +79,7 @@ public class ToolkitCommandCodecTests {
         Assert.Empty(ToolkitCommandCodec.Decode(encoded));
     }
 
-    /// <summary>A numeric type is not a name the codec wrote, so the record goes even when the number
-    /// happens to match a member (<c>Enum.TryParse</c> would accept it).</summary>
+    /// <summary>A numeric type is not a name the codec wrote, so the record goes even when the number matches a member.</summary>
     [Theory]
     [InlineData("1")]
     [InlineData("99")]
