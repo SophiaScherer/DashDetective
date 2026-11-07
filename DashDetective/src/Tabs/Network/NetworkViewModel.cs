@@ -258,8 +258,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>DNS footer line (timing + record type, or a failure note).</summary>
     [ObservableProperty] private string _dnsFooter = DnsIdleFooter;
 
-    /// <summary>The host of the last submitted lookup (null until one is), so Refresh re-resolves what the
-    /// user asked for — not text typed since — and never reaches out to a host they never requested.</summary>
+    /// <summary>The host of the last submitted lookup (null until one is), so Refresh never re-resolves text typed since.</summary>
     private string? _dnsLastHost;
 
     /// <summary>Bumped by every lookup; a result lands only while its number is still the latest.</summary>
