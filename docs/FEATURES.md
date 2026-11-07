@@ -85,6 +85,41 @@ point drives the **same shared** `NavigationViewModel`:
   `NavigationView.axaml` declared after the hover rule so it wins while both match;
   `NavigationViewMotionTests` pins the direction, size, tween and that ordering.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
+- **Page sections** (work item 46) — **press the current page's nav item again** for an "On this page"
+  list of its sections; choosing one scrolls it to the top of its scroller and flashes it. A section is a
+  visible `WidgetPanel` with a title, or a card marked `pageSection` and titled by its automation name
+  (the Hardware cards, which are not widgets), outermost only, listed in reading order of where it was
+  **arranged** — rows top to bottom, left to right within a row — because widgets are reordered by
+  dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
+  - **Hardware is marked, not rebuilt.** Its cards draw their own icon-tile header, so making them
+    `WidgetPanel`s would redraw the page. The marker class is the whole change: the reader accepts it,
+    and the card also takes `revealFlash` so a pick tints its surface (a widget's flash also turns its
+    border to the accent; the card's does not). A machine with two GPUs lists
+    Graphics twice, in page order, since the list shows titles only.
+  - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
+    the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
+    a tab stop to every page, and have nowhere to go on a horizontal bar without moving its neighbors.
+    The caret glyph (`Icons.CaretDown`) shows on the selected item only when the page has sections, and
+    overlays the row's padding so it never moves anything: at the end of an expanded vertical row, under
+    the icon on a collapsed rail, in the trailing padding of a horizontal item. Keyboard: Tab to the
+    selected item and press Enter; the first section takes focus, Esc closes.
+  - **`Activate`, not `Navigate`, is the item's press.** `Navigate` is also what `Ctrl+1…9`, search and
+    the cross-page jumps call, and landing on the page already showing must not open a list.
+  - **Built live, on every open and every page change**, from the page's visual tree in `MainWindow`
+    (`RefreshSections`): the view model never holds a control, and a reorder or a fold since the last
+    read is always reflected. Nothing persists.
+  - **The scroll asks for a viewport-tall rect from just above the widget**, so its heading lands at the
+    top rather than wherever it first comes into view. `BringIntoView` finds the nearest scroller, so a
+    self-scrolling page's own pane scrolls instead of the shell's; a folded widget is its header, so
+    that is what shows.
+  - **The popup is the Processes options shape**: one `ScaleHost` of its own, not light-dismissed so the
+    window stays hoverable, an outside press closing it from code-behind, and `IsOpen` bound two-way.
+    Esc is the shortcut chain's while focus is in the window (`HandleSectionsShortcut`, beside the
+    search dropdown's step) and the popup's own `KeyDown` while focus is inside it, since the popup is a
+    separate visual root the window's listener never sees.
+  - **The flash is `WidgetPanel.highlighted`**, tinting the whole surface for `RevealFlash`'s hold. It
+    does not fade, unlike `Border.revealFlash`: a transition on the surface would also animate every
+    widget through a theme switch while the page behind it snaps.
 
 The footer avatar shows the **device's own account picture** when the OS has one, read through the
 `IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
@@ -652,9 +687,9 @@ merely bigger. `Sparkline` composes its own axis text with `FormattedText` and s
 subtree, so charts needed nothing either.
 
 **One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
-and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
-five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
-menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+and inherit nothing from the shell's, so there are eight: `MainWindow`, `TrayNoticeWindow`, and the
+six popups (universal search, the navigation dock flyout and section list, the File Explorer and
+Processes options menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
 the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
 resource. **The custom title bar sits outside `MainWindow`'s host on purpose**, beside caption buttons
 drawn at the OS's scale — see *Window chrome*.
@@ -2098,6 +2133,10 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 ## Hardware
 
 *Shipped — branch `hardwareCardHeights`, 2026-10.*
+
+**Each card is a nav bar section.** It carries `pageSection`, so the "On this page" list (see *Navigation
+bar*) lists it under its automation name, and `revealFlash`, so a pick tints it. The cards are not
+`WidgetPanel`s, and marking them is what keeps the page from being rebuilt as widgets.
 
 **Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
 already arranges every child at its row's height (the tallest card's). The cards used to opt out with
