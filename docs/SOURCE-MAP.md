@@ -462,6 +462,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                         toolkit's. A surface the toolkit did NOT move is left alone —
                                         that is what an inner list at its end looks like, and stepping it
                                         anyway would break the hand-off to the page)
+        ToolTipTracking.cs
+                                       (moves an open tooltip with the cursor while the pointer stays
+                                        over its owner, attached to every top level by the app-level
+                                        style. Avalonia places a tip at the pointer ONCE and offers no way
+                                        to move it, but re-reads the pointer whenever an open tip's offset
+                                        changes, so each move toggles the owner's offset by a sub-pixel
+                                        Nudge and restores it exactly on close. A move that lands ON the
+                                        tip arrives in the tip's own window, so the owner is found through
+                                        the tip's Popup and the tip shifted by the pointer's distance from
+                                        its anchor. It never dismisses: closing on leave, and after a
+                                        layout change under a still pointer, are the framework's)
         TitleBar.axaml(.cs), TitleBarRules.cs, WindowChrome.cs
                                        (the custom window title bar. WindowChrome.Custom is set on a
                                         Window and is the ONE place the platform is decided: it extends

@@ -27,6 +27,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Hardware](#hardware)
 - [Page lifecycle](#page-lifecycle)
 - [Wheel scrolling](#wheel-scrolling)
+- [Tooltip tracking](#tooltip-tracking)
 - [Widget system](#widget-system)
 - [Multi-GPU](#multi-gpu)
 - [Repo-hygiene / portfolio pass](#repo-hygiene--portfolio-pass)
@@ -2171,6 +2172,23 @@ Three decisions inside it:
 The setting is read per notch behind `IWheelScrollLines`, not cached: the Mouse control panel can change it
 under a running app. Linux keeps the value in each desktop environment's own store, so there is nothing
 single to read and no Linux arm — it takes `Unsupported*` and the default.
+
+## Tooltip tracking
+
+*Shipped — branch `tooltipFollowsCursor`, 2026-11.*
+
+**An open tooltip follows the cursor while the pointer stays over its owner.** Avalonia places a tip at the pointer once, when it opens, and leaves it there. On a large owner — a Dashboard stat card or chart — the tip then sat where the pointer entered while the pointer moved on, which read as a tip that would not dismiss. `ToolTipTracking`, attached to every top level by the app-level style in `SharedStyles.axaml`, re-places the open tip on each move over its owner.
+
+Four decisions inside it:
+
+- **Dismissal stays the framework's.** Avalonia already closes a tip when the pointer moves off its owner, and re-checks the control under a still pointer after a layout or scroll change. An app-side dismissal guard was written once and reverted as redundant; this adds tracking only.
+- **The tip is re-placed by changing its owner's offset.** Avalonia re-reads the pointer whenever an open tip's `HorizontalOffset`/`VerticalOffset` changes, and offers no other public way to move one, so each move toggles the offset by a sub-pixel `Nudge`. The owner's own offsets are kept and restored exactly when the tip closes.
+- **A move that lands on the tip still counts.** A quick downward move can put the pointer on the tip, whose own window then takes the moves. The tip is shifted by the pointer's distance from where it was anchored; the pointer is not re-checked against the owner there, and if it has left, the framework closes the tip on the next move.
+- **Every tooltip follows, not only the widgets'.** The bug was reported on the Dashboard, but a tip pinned where the pointer entered is the same defect on any owner. A tip placed against its owner rather than the pointer (`ToolTip.Placement` other than `Pointer`) is left where it is.
+
+Reduce motion does not change it: following the pointer is a direct response to input, not an animation, and re-placing an open tip does not re-run its fade.
+
+**Verify by owner, not by pixels.** Several owners share one tip text, so a correct hand-off between two of them looks the same as a tip that never moved. The tip is its own top-level window on Windows: enumerate the app's windows, and compare the tip window's handle (one per opening) and its text through UI Automation.
 
 ## Widget system
 
