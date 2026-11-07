@@ -38,8 +38,7 @@ public sealed class SettingsStore : IDisposable {
     }
 
     /// <summary>Reads the persisted settings, or <see cref="AppSettings.Defaults"/> if the file is
-    /// missing, unreadable, corrupt, or from a newer/older schema. A single key whose value does not fit
-    /// (an unknown enum name) falls back to its own default. Never throws.</summary>
+    /// unusable. Never throws.</summary>
     public AppSettings Load() {
         if (_path is null || !File.Exists(_path))
             return AppSettings.Defaults;
