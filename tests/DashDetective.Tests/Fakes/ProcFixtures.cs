@@ -500,8 +500,7 @@ internal static class ProcFixtures {
             .WithFile("/sys/class/hwmon/hwmon1/temp1_input", "27800\n");
 
     /// <summary>
-    /// An excerpt of <c>pci.ids</c> built from escaped lines, since the tab indents are the format and a raw
-    /// literal hides them. Only the NVIDIA entry carries a catalogue token; AMD's <c>73df</c> deliberately matches nothing.
+    /// A <c>pci.ids</c> excerpt built from escaped lines, since the tab indents are the format and a raw literal hides them.
     /// </summary>
     public static readonly string PciIds = string.Join('\n', new[] {
         "#\tList of PCI ID's",
