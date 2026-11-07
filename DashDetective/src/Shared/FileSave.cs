@@ -15,8 +15,7 @@ namespace DashDetective.Shared;
 /// Settings export buttons, the Toolkit log export), which is what made adding a format an edit in three
 /// places.
 ///
-/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>. Soft-failing: a cancelled
-/// pick, a failed render or a failed write all leave the app untouched.
+/// Lives in the view layer because a save dialog needs the window's <c>TopLevel</c>.
 /// </summary>
 internal static class FileSave {
     /// <summary>
@@ -35,8 +34,7 @@ internal static class FileSave {
                                           Func<DiagnosticsFormat, string> content) =>
         GuardAsync(() => SaveCoreAsync(owner, title, suggestedName, formats, content));
 
-    /// <summary>Never throws. Deliberately broad: the picker and the open can fail in ways a platform
-    /// defines, and every caller is an <c>async void</c> handler where a throw would end the process.</summary>
+    /// <summary>Never throws, because every caller is an <c>async void</c> handler where a throw would end the process.</summary>
     internal static async Task<string?> GuardAsync(Func<Task<string?>> save) {
         try {
             return await save();
@@ -69,8 +67,7 @@ internal static class FileSave {
         if (file is null)
             return null; // user cancelled
 
-        // The name is the authority on the format: the dialog does not report which filter was
-        // chosen, and a typed extension should win over the one that happened to be selected.
+        // The name decides the format: the dialog does not report which filter was chosen.
         var format = DiagnosticsFormats.FromFileName(file.Name);
 
         if (!await TryWriteAsync(file.OpenWriteAsync, () => content(format)))
@@ -87,7 +84,7 @@ internal static class FileSave {
         try {
             text = render();
         } catch (Exception e) {
-            // Broad on purpose: a renderer can throw anything and callers cannot survive an escape. Nothing is truncated, as the destination is not yet open.
+            // Broad on purpose: a renderer can throw anything, and callers cannot survive an escape.
             Log.Error("Export could not be rendered", e);
             return false;
         }
