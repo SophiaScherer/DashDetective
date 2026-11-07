@@ -3,8 +3,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Services.SystemMetrics;
 
-/// <summary>Pins the dispose contract of <see cref="WindowsPhysicalDiskThroughputSampler"/>: safe to dispose
-/// more than once, and empty (not a collect on a closed query) after disposal.</summary>
+/// <summary>Pins the dispose contract: disposing twice is safe, and Sample after disposal is empty rather than a collect on a closed query.</summary>
 public class WindowsPhysicalDiskThroughputSamplerTests {
     [Fact]
     public void Dispose_Twice_IsSafeAndSampleAfterwardsIsEmpty() {

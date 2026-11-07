@@ -149,8 +149,7 @@ internal sealed class WindowsLogicalProcessorSampler : ILogicalProcessorSampler 
     /// <summary>True once <see cref="Dispose"/> has run; <see cref="Sample"/> then returns empty without touching PDH.</summary>
     internal bool IsDisposed => _disposed;
 
-    /// <summary>Closes the PDH query handle and leaves the sampler inert. Safe to call more than once — the
-    /// flag also stops a second close on the same handle.</summary>
+    /// <summary>Closes the PDH query handle; the flag makes a second call a no-op rather than a double close.</summary>
     public void Dispose() {
         if (_disposed)
             return;
