@@ -27,7 +27,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
     public SavedOrder Widgets { get; } = new("dashboard");
 
-    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
+    /// <summary>The stat card row's order, a flow separate from the charts'.</summary>
+    public SavedOrder CardOrder { get; } = new("dashboard.cards");
+
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets, CardOrder];
 
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;

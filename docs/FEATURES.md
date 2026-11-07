@@ -341,9 +341,32 @@ and on capture loss, so a later keyboard press or UI Automation Invoke is never 
 click. Its two pointer clicks never reach the command, so a double click opens exactly once. Tooltips
 say so (*Double-click to open … in Performance*); the **accessible names do not** (*Open CPU in
 Performance*), because a keyboard or screen-reader user presses Enter, and a card's name is its heading
-and reading. The stat cards have no drag to protect (their panel sets no `DragGrip`), and the charts'
-drag lives on the widget header, which the gate does not touch. Nothing else in the app changed:
+and reading. A card's drag does not compete with it: the drag starts only once a press moves past the
+threshold, and a double click does not move. The charts' drag lives on the widget header, which the gate
+does not touch. Nothing else in the app changed:
 buttons and links such as *View in Hardware* are explicit controls and keep a single click.
+
+**The stat cards reorder among themselves, and only there** (work item 15). The card row and the charts
+below it are two separate flows: a card is dragged along its own row (or its own rows, once it wraps) and
+cannot reach the charts, and a chart cannot be dropped into the card row. Four decisions:
+
+- **The row is its own strip, saved under `dashboard.cards`**, beside the board's `dashboard`. Both are
+  `SavedOrder`s on the page, so the Settings *Layout* card's reset and `Ctrl+Shift+←/→` reach the cards
+  through the existing paths, and the drag's slide and Reduce motion come from `ReorderablePanel` as on
+  every other strip.
+- **The whole `DashboardLink` is the grip** (`DragGrip="Marked"` with `Reorder.IsGrip` on the link),
+  because a card is a button and `ReorderGrip.Item` refuses a press on one. The drag captures only past
+  the threshold, which cancels the button's own press, so a still press is the link's as before.
+- **The held card is confined to the row** (`ConfineDrag`), so it cannot be drawn over a chart it can
+  never land on.
+- **The row has no widget id, and a child with none is a fixed point** (`ChildOrder.Move`): a chart dragged
+  over it stops below it, and a keyboard move that falls through from the row's last card to the board does
+  not carry the whole row in among the charts.
+
+A card's id is its device id, except a GPU's, which goes by its label — "GPU" alone, "GPU 0", "GPU 1" once
+there are several — because the device id carries the adapter LUID, which Windows mints again every boot. A
+GPU count that changes between runs renames them, so their saved slots are dropped and they return to their
+declared place among the cards; nothing else in the order moves.
 
 ## Universal search
 
@@ -732,7 +755,8 @@ about that selector are easy to get wrong, and both were measured rather than as
   and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
   is undone from `SharedStyles.axaml`.
 
-**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, the
+drag-to-reorder slides (read in code from the window's class, since they are not a style transition), and
 the Processes loading pulse — the app's only endlessly repeating animation, which drops from
 `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
 
@@ -809,7 +833,11 @@ cards together.
 than by each view. Most cards are a plain `Border` with no control inside, so before this a page was
 reachable only if one of its items happened to contain a button: Hardware, Storage and the Processes
 summary tiles were dead zones for Tab, and could not be reordered at all. Avalonia draws its own focus
-ring on the focused card, so the target is visible without a style of ours.
+ring on the focused card, so the target is visible without a style of ours. **The exception is a
+generated item whose template root is itself a focusable control** — a Dashboard card's link, a Performance
+rail row's button: that control is the stop, and its container is left out, or each item took two Tab
+presses, the first landing on a ring that did nothing. The keyboard move still finds the item from the
+control, since it walks out from whatever has focus.
 
 Two things about that are worth knowing:
 
@@ -2257,7 +2285,7 @@ Three decisions:
 
 *Shipped — branch `dragAndDropFix`, 2026-09.*
 
-**Six strips across five tabs reorder by dragging, and the affordance appears nowhere else.** The
+**Seven strips across six tabs reorder by dragging, and the affordance appears nowhere else.** The
 gesture is one implementation — `ReorderDrag` (`src/Shared/Layout`) — over any panel that implements
 `IReorderablePanel`. Two do: `WidgetBoard`, dragged by a widget's header, and `UniformFlowPanel`,
 dragged by a card or by a marked grip.
@@ -2265,13 +2293,14 @@ dragged by a card or by a marked grip.
 | What | Handle | Saved under |
 |---|---|---|
 | Dashboard / Network / Storage widgets | the header | `dashboard`, `network`, `storage` |
+| Dashboard stat cards | the card (its link, marked as the grip) | `dashboard.cards` — their own row only |
 | Storage drive cards | the card | `storage` — the same order as the panels they move among |
 | Hardware component cards | the card | `hardware` |
 | Processes summary tiles | the tile | `processes.summary` |
 | Performance device rail | a grip per row | `performance.resources` |
 | Performance stat tiles | the tile | `performance.stats.{kind}` |
 
-Settings and Toolkit do not reorder, and their headers no longer claim to. Five rules, all
+Settings and Toolkit do not reorder, and their headers no longer claim to. Eight rules, all
 load-bearing:
 
 1. **The drag cursor comes from the predicate that starts the drag**, never from a style. A style
@@ -2299,6 +2328,13 @@ load-bearing:
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
    from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
+
+8. **A drag moves; it does not snap** (work item 14). The neighbours a preview re-packs slide to their
+   new slots, and the dropped item eases in from where it was let go, both over 180 ms with an ease-out
+   (`ReorderSlides`). The motion is a render transform, so layout, the frozen drop slots and the hint
+   never see it. Only a drag animates: a cancelled drag (capture lost before a release) puts everything
+   straight back, and a keyboard move, a resize or Reduce motion lands at once. A drop back onto the item's
+   own slot still eases in, since the release is accepted; "rejected" here means a drag that never dropped.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.

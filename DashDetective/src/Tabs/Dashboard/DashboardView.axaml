@@ -18,6 +18,13 @@
         <Style Selector="controls|StatCard.disk"><Setter Property="Accent" Value="{DynamicResource ChartStorage}"/></Style>
         <Style Selector="controls|StatCard.net"><Setter Property="Accent" Value="{DynamicResource ChartNetDown}"/></Style>
 
+        <!-- Restates Widgets.axaml's Border.card.dragging one level up; widening the shared rule would lift the Performance rail too. -->
+        <Style Selector="vm|DashboardLink.dragging Border.card">
+            <Setter Property="Opacity" Value="0.92"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+            <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
+        </Style>
+
         <!-- A chart body that opens its device in Performance. Button.bare carries the hand cursor; this
              adds the hover tint, since a chart has no card surface of its own to pick one up from. -->
         <Style Selector="Button.openChart">
@@ -41,19 +48,21 @@
         <!-- ===== Stat cards: one per detected device, grouped by kind (CPUs → Memory → GPUs → Disks
              → Network). As many per row as fit at 150px each — the width at which the label, value
              and sparkline stay legible — wrapping to further rows below that. No column cap, so on a
-             wide window every device sits on one line instead of stranding the last card alone. -->
+             wide window every device sits on one line instead of stranding the last card alone.
+             The row has no id, so it is a flow of its own and a chart cannot be dropped into it. -->
         <ItemsControl ItemsSource="{Binding Cards}" layout:WidgetBoard.Stretch="True">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"/>
+                    <layout:UniformFlowPanel MinItemWidth="150" ColumnSpacing="12" RowSpacing="12"
+                                             DragGrip="Marked" ConfineDrag="True"
+                                             Order="{Binding CardOrder.Order, Mode=TwoWay}"/>
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:DashboardCard">
-                    <!-- The card opens its own device in Performance on a double click, never a single
-                         one (DashboardLink). Still a button, so it takes focus and answers Enter/Space;
-                         the cards' panel sets no DragGrip, so nothing here competes for the press. -->
+                    <!-- Opens its device in Performance on a double click (DashboardLink); the whole link is the drag grip, and a press that does not move stays a click. -->
                     <vm:DashboardLink Classes="bare" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Tip}"
+                            layout:Reorder.IsGrip="True"
                             AutomationProperties.Name="{Binding AccessibleName}"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                         <controls:StatCard Selectable="True"

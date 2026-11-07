@@ -251,6 +251,13 @@ public static class WidgetBoardLayout {
                                  double grabX, double grabY) =>
         new(pointerX - grabX * width, pointerY - grabY * height, width, height);
 
+    /// <summary>A drag box kept inside the panel; one larger than the panel pins to its top-left.</summary>
+    public static Rect2 Confine(Rect2 box, double panelWidth, double panelHeight) =>
+        box with {
+            Left = Math.Max(0, Math.Min(box.Left, panelWidth - box.Width)),
+            Top = Math.Max(0, Math.Min(box.Top, panelHeight - box.Height)),
+        };
+
     private static double Cap(WidgetSlot slot) =>
         slot.Stretch ? double.PositiveInfinity : Math.Max(slot.MinWidth, slot.MaxWidth);
 }
