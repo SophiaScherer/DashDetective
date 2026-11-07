@@ -289,8 +289,7 @@ public class ProcessesViewModelTests {
         viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
                  .Single(row => row.Pid == pid);
 
-    /// <summary>The menu's Properties, Copy PID and Expand act on the primary row, so a right-click inside
-    /// a multi-selection must move it to the clicked row without dropping the others.</summary>
+    /// <summary>A right-click inside a multi-selection moves the primary row without dropping the others.</summary>
     [Fact]
     public async Task PrepareContextMenu_InsideAMultiSelection_MakesTheClickedRowPrimaryAndKeepsTheRest() {
         var (viewModel, _) = Selectable();

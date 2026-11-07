@@ -242,9 +242,7 @@ public partial class ProcessesView : UserControl {
 
         var point = e.GetCurrentPoint(ProcessListScroll);
 
-        // A right-click opens the shared row menu, whose items act on the page's selection and primary
-        // row, so the row under the pointer has to be both. Done on the press, which tunnels, so it
-        // lands before the flyout opens.
+        // The row menu acts on the selection and primary row, so the clicked row must be both; on the tunneling press, before the flyout opens.
         if (point.Properties.IsRightButtonPressed) {
             vm.PrepareContextMenu(row);
             return;

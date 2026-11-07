@@ -901,9 +901,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Whether a row is the entire selection — the case where a plain click on it deselects.</summary>
     public bool IsOnlySelection(ProcessRow row) => _selectedPids.Count == 1 && _selectedPids.Contains(row.Pid);
 
-    /// <summary>Points the row menu at a right-clicked row. Outside the selection it replaces it; inside a
-    /// multi-selection the selection stays and the row becomes the primary one, because Properties, Copy
-    /// PID and Expand act on the primary row, not on the one the menu was opened over.</summary>
+    /// <summary>Points the row menu at a right-clicked row: outside the selection it replaces it, inside one it only becomes primary.</summary>
     public void PrepareContextMenu(ProcessRow row) {
         if (!row.IsSelected) {
             SelectRow(row);
