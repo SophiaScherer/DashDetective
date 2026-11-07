@@ -126,9 +126,7 @@ public class NetworkViewModelTests {
         Assert.Equal("Start", vm.PingButtonText);
     }
 
-    /// <summary>A send still in flight when Stop is pressed must not publish its stats afterward: the panel
-    /// reads "Press Start to ping" and stays that way. TEST-NET-1 never answers, so the send outlives the
-    /// press by the monitor's 1.5 s timeout.</summary>
+    /// <summary>A send in flight when Stop is pressed must not publish afterward. TEST-NET-1 never answers, so the send outlives the press.</summary>
     [Fact]
     public async Task StopPing_WhileASendIsInFlight_LeavesTheIdleSummary() {
         var (vm, _) = Create();
