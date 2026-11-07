@@ -228,9 +228,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// so like <see cref="_expandedPids"/> the set is what survives a poll, a re-sort and a filter.</summary>
     private readonly HashSet<int> _selectedPids = new();
 
-    /// <summary>Where a Shift-click measures its range from: the row a plain or Ctrl-click last landed
-    /// on. Zero when there is nothing to measure from.</summary>
-    private int _anchorPid;
+    /// <summary>The row a Shift-click measures from; null means none, so PID 0 (System Idle Process) must stay a valid anchor.</summary>
+    private int? _anchorPid;
 
     /// <summary>The primary row — the last one clicked. The selection can hold many; the things that can
     /// only act on one (Properties' shell dialog) act on this.</summary>
@@ -584,8 +583,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             live.Add(info.Pid);
 
         _selectedPids.IntersectWith(live);
-        if (!_selectedPids.Contains(_anchorPid))
-            _anchorPid = 0;
+        if (_anchorPid is not { } anchor || !_selectedPids.Contains(anchor))
+            _anchorPid = null;
     }
 
     private static void CollectExpandable(IReadOnlyList<ProcessNode> nodes, HashSet<int> into) {
@@ -831,8 +830,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// everything between the anchor and this row.
     /// </summary>
     public void SelectRow(ProcessRow row, bool extend, bool range) {
-        if (range && _anchorPid != 0) {
-            SelectRange(_anchorPid, row.Pid);
+        if (range && _anchorPid is { } anchor) {
+            SelectRange(anchor, row.Pid);
         } else if (extend) {
             if (!_selectedPids.Remove(row.Pid))
                 _selectedPids.Add(row.Pid);
@@ -892,7 +891,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             return;
 
         _selectedPids.Clear();
-        _anchorPid = 0;
+        _anchorPid = null;
         SelectedRow = null;
         ApplySelection();
         ActionMessage = "";
