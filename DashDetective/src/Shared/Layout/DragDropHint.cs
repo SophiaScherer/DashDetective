@@ -72,9 +72,7 @@ public sealed class DragDropHint {
         Show(mapped);
     }
 
-    /// <summary>Maps a box and its rounding into the overlay. The whole box goes through the transform,
-    /// because the overlay sits outside the <c>ScaleHost</c> and a box moved by its origin alone keeps
-    /// its unscaled size.</summary>
+    /// <summary>Maps a box and its rounding into the overlay, which sits outside the <c>ScaleHost</c>, so the whole box is transformed.</summary>
     internal static (Rect Box, CornerRadius Radius) Map(Rect box, Matrix toOverlay, double radius) {
         var scale = Math.Sqrt(toOverlay.M11 * toOverlay.M11 + toOverlay.M12 * toOverlay.M12);
         return (box.TransformToAABB(toOverlay), new CornerRadius(radius * scale));

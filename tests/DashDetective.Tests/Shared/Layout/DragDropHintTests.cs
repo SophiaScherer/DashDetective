@@ -4,9 +4,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Layout;
 
-/// <summary>Covers <see cref="DragDropHint.Map"/>: a box given inside the scale host lands in the overlay
-/// at its scaled position and size, with its rounding scaled to match, and passes through unchanged at
-/// 100 %.</summary>
+/// <summary>Covers <see cref="DragDropHint.Map"/>: a box inside the scale host lands in the overlay scaled, and is unchanged at 100 %.</summary>
 public class DragDropHintTests {
     [Fact]
     public void Map_InterfaceSizeOneHundredFifty_ScalesSizeAsWellAsOrigin() {
