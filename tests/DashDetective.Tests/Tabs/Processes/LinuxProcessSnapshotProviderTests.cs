@@ -209,6 +209,19 @@ public class LinuxProcessSnapshotProviderTests {
     public void ComputeCpuPercent_Cases(ulong ticks, double seconds, int processors, double expected) =>
         Assert.Equal(expected, LinuxProcessSnapshotProvider.ComputeCpuPercent(ticks, seconds, processors), 6);
 
+    /// <summary>The divisor is the online CPU count from <c>/proc/stat</c>, not an affinity-limited <c>ProcessorCount</c>.</summary>
+    [Fact]
+    public void OnlineCpuCount_ReadsCpuLinesFromProcStat() {
+        var proc = new FakeProcFileSystem().WithFile("/proc/stat", ProcFixtures.ProcStat);
+
+        Assert.Equal(4, LinuxProcessSnapshotProvider.OnlineCpuCount(proc, fallback: 1));
+    }
+
+    [Fact]
+    public void OnlineCpuCount_UnreadableProcStat_UsesFallback() {
+        Assert.Equal(2, LinuxProcessSnapshotProvider.OnlineCpuCount(new FakeProcFileSystem(), fallback: 2));
+    }
+
     /// <summary>The derivation itself now lives in <c>ProcPidName</c>, shared with the Network tab; what is
     /// this tab's own is the placeholder for a process that names itself nowhere.</summary>
     [Theory]
