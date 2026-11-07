@@ -37,8 +37,7 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
-    /// The package's L3 in kilobytes, summed over distinct instances because each CCD has its own; 0 when
-    /// absent. Not a record field, so the Dashboard skips the directory walk. Sizes are suffixed ("8192K", "16M").
+    /// The package's L3 in kilobytes, summed over distinct instances because each CCD has its own; 0 when absent.
     /// </summary>
     internal static long L3CacheKilobytes(IProcFileSystem proc) {
         var package = PackageOf(proc, "cpu0");
