@@ -186,6 +186,122 @@ public class DrmCardFactsTests {
         Assert.Equal("AMD amdgpu (1002:73df)", Assert.Single(DrmCardFacts.Read(Amd())).AdapterName);
     }
 
+    /// <summary>The table turns sysfs's "VMware vmwgfx (15ad:0405)" into a product name the catalog can match.</summary>
+    [Fact]
+    public void ReadNamed_ResolvesTheMarketingName() {
+        var proc = new FakeProcFileSystem()
+            .WithFile("/sys/class/drm/card0/device/vendor", "0x15ad\n")
+            .WithFile("/sys/class/drm/card0/device/device", "0x0405\n")
+            .WithLink("/sys/class/drm/card0/device/driver", "/sys/bus/pci/drivers/vmwgfx")
+            .WithPciIds();
+
+        Assert.Equal("VMware SVGA II Adapter", Assert.Single(DrmCardFacts.ReadNamed(proc)).AdapterName);
+    }
+
+    [Fact]
+    public void ReadNamed_NamesEveryCard() {
+        var cards = DrmCardFacts.ReadNamed(
+            new FakeProcFileSystem().WithAmdgpuCard().WithNvidiaCard().WithPciIds());
+
+        Assert.Equal(
+            ["AMD Radeon RX 6700/6700 XT/6750 XT / 6800M/6850M XT",
+             "NVIDIA GeForce RTX 3060 Lite Hash Rate"],
+            cards.Select(c => c.AdapterName));
+    }
+
+    /// <summary>A host with no <c>pci.ids</c> reads as it did before the table existed, not blank.</summary>
+    [Fact]
+    public void ReadNamed_NoTable_FallsBackToTheSysfsIdentity() {
+        var card = Assert.Single(DrmCardFacts.ReadNamed(Amd()));
+
+        Assert.Equal("", card.ProductName);
+        Assert.Equal("AMD amdgpu (1002:73df)", card.AdapterName);
+    }
+
+    /// <summary>A card the table does not list falls back the same way.</summary>
+    [Fact]
+    public void ReadNamed_UnlistedDevice_FallsBackToTheSysfsIdentity() {
+        var proc = new FakeProcFileSystem()
+            .WithFile("/sys/class/drm/card0/device/vendor", "0x15ad\n")
+            .WithFile("/sys/class/drm/card0/device/device", "0x9999\n")
+            .WithLink("/sys/class/drm/card0/device/driver", "/sys/bus/pci/drivers/vmwgfx")
+            .WithPciIds();
+
+        Assert.Equal("VMware vmwgfx (15ad:9999)", Assert.Single(DrmCardFacts.ReadNamed(proc)).AdapterName);
+    }
+
+    /// <summary>A table that throws costs the name, not the card.</summary>
+    [Fact]
+    public void ReadNamed_TableDenied_KeepsTheCardOnItsSysfsName() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().WithPciIds()
+            .ThrowOn("/usr/share").ThrowOn("/var/lib/pciutils");
+
+        var card = Assert.Single(DrmCardFacts.ReadNamed(proc));
+
+        Assert.Equal("AMD amdgpu (1002:73df)", card.AdapterName);
+    }
+
+    /// <summary>An unreadable device id parses to 0 and must not be looked up as device 0000.</summary>
+    [Fact]
+    public void ReadNamed_UnreadableDeviceId_IsNotNamedFromTheTable() {
+        var proc = new FakeProcFileSystem()
+            .WithFile("/sys/class/drm/card0/device/vendor", "0x15ad\n")
+            .WithLink("/sys/class/drm/card0/device/driver", "/sys/bus/pci/drivers/vmwgfx")
+            .WithFile("/usr/share/hwdata/pci.ids", "15ad  VMware\n\t0000  Not this card\n");
+
+        Assert.Equal("", Assert.Single(DrmCardFacts.ReadNamed(proc)).ProductName);
+    }
+
+    /// <summary>Naming must not touch <see cref="DrmCardFacts.Key"/>, or the inventory builds no GPU card.</summary>
+    [Fact]
+    public void ReadNamed_LeavesTheJoinKeyUntouched() {
+        var proc = new FakeProcFileSystem().WithAmdgpuCard().WithPciIds();
+
+        Assert.Equal(
+            DrmCardFacts.Read(proc).Select(c => c.Key),
+            DrmCardFacts.ReadNamed(proc).Select(c => c.Key));
+    }
+
+    [Fact]
+    public void ReadNamed_EmptySysfs_YieldsNoCards() {
+        Assert.Empty(DrmCardFacts.ReadNamed(new FakeProcFileSystem().WithPciIds()));
+    }
+
+    /// <summary>The bundled vendor word wins over the table's long form; the table's is used only when there is none.</summary>
+    [Theory]
+    [InlineData(0x1002u, "Advanced Micro Devices, Inc. [AMD/ATI]", "Navi 22", "AMD Navi 22")]
+    [InlineData(0x1a2bu, "Some Vendor Inc.", "Widget 9000", "Some Vendor Inc. Widget 9000")]
+    [InlineData(0x1a2bu, "", "Widget 9000", "Widget 9000")]
+    [InlineData(0x10deu, "NVIDIA Corporation", "GA106 [GeForce RTX 3060]", "NVIDIA GeForce RTX 3060")]
+    [InlineData(0x8086u, "Intel Corporation", "Meteor Lake-P [Intel Arc Graphics]", "Intel Arc Graphics")]
+    [InlineData(0x8086u, "Intel Corporation", "Meteor Lake-P [INTEL Arc Graphics]", "INTEL Arc Graphics")]
+    [InlineData(0x8086u, "Intel Corporation", "Widget [Intellisense Graphics]", "Intel Intellisense Graphics")]
+    public void FormatProductName_PrefersTheShortVendorWord(
+        uint vendorId, string tableVendor, string deviceName, string expected) {
+        Assert.Equal(expected, DrmCardFacts.FormatProductName(vendorId, tableVendor, deviceName));
+    }
+
+    /// <summary>A named vendor with an unnamed device keeps the caller's own composition.</summary>
+    [Fact]
+    public void FormatProductName_NoDeviceName_IsEmpty() {
+        Assert.Equal("", DrmCardFacts.FormatProductName(0x10deu, "NVIDIA Corporation", ""));
+    }
+
+    /// <summary>The bracket is the product name (Windows drops the codename too); a multi-model bracket is kept whole so the catalog misses it.</summary>
+    [Theory]
+    [InlineData("GA106 [GeForce RTX 3060 Lite Hash Rate]", "GeForce RTX 3060 Lite Hash Rate")]
+    [InlineData("Navi 32 [Radeon RX 7700 XT / 7800 XT]", "Radeon RX 7700 XT / 7800 XT")]
+    [InlineData("Alder Lake-S GT1 [UHD Graphics 730]", "UHD Graphics 730")]
+    [InlineData("SVGA II Adapter", "SVGA II Adapter")]
+    [InlineData("Widget [ ]", "Widget [ ]")]
+    [InlineData("Widget [unclosed", "Widget [unclosed")]
+    [InlineData("MGA G200e [Pilot] ServerEngines (SEP1)", "MGA G200e [Pilot] ServerEngines (SEP1)")]
+    [InlineData("GA106 [GeForce RTX 3060]  ", "GeForce RTX 3060")]
+    [InlineData("", "")]
+    public void MarketingName_KeepsOnlyTheBracketedProduct(string deviceName, string expected) {
+        Assert.Equal(expected, DrmCardFacts.MarketingName(deviceName));
+    }
+
     [Fact]
     public void Read_EmptySysfs_YieldsNoCards() {
         Assert.Empty(DrmCardFacts.Read(new FakeProcFileSystem()));

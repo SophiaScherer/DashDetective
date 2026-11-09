@@ -129,7 +129,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                 Root for anything that opens or measures it)
       DataRateFormatter.cs     (network rates by magnitude (kbps/Mbps/Gbps, decimal base to match
                                 Task Manager). Callers showing related values on one axis pick a
-                                single unit from the shared peak via UnitFor)
+                                single unit from the shared peak via UnitFor. Format/Split/SplitPair pick the
+                                unit from the value AS DISPLAYED, so 999.6 Mbps reads 1.0 Gbps, and read
+                                NaN as zero; UnitFor stays the raw magnitude rule)
       ByteRateFormatter.cs     (disk rates by magnitude (KB/s, MB/s, GB/s, binary base to match Task
                                 Manager). The unit is picked from the value AS DISPLAYED, so 1023.6
                                 KB/s reads "1.0 MB/s", never "1024 KB/s". The Processes Disk column
@@ -292,7 +294,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  MinHeight and a MinHeight instead would make every folding card taller. The glyph is set from the
                                  pseudo-class rather than a converter, which keeps it out of Icons —
                                  touching Icons at all throws without a render backend, so a test could
-                                 not reach the rule.
+                                 not reach the rule. WidgetPanel.highlighted tints the surface while
+                                 RevealFlash holds the class — with no fade, since a Background
+                                 transition here would also animate every widget through a theme switch.
                                  which is what satisfies compiled bindings without an x:DataType)
         WindowChrome.axaml      (AppWindowDecorations: the ControlTheme for Avalonia 12's
                                  WindowDrawnDecorations, i.e. the caption buttons of a window that draws its
@@ -482,6 +486,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                         toolkit's. A surface the toolkit did NOT move is left alone —
                                         that is what an inner list at its end looks like, and stepping it
                                         anyway would break the hand-off to the page)
+        ToolTipTracking.cs
+                                       (moves an open tooltip with the cursor while the pointer stays
+                                        over its owner, attached to every top level by the app-level
+                                        style. Avalonia places a tip at the pointer ONCE and offers no way
+                                        to move it, but re-reads the pointer whenever an open tip's offset
+                                        changes, so each move toggles the owner's offset by a sub-pixel
+                                        Nudge and restores it exactly on close. A move that lands ON the
+                                        tip arrives in the tip's own window, so the owner is found through
+                                        the tip's Popup and the tip shifted by the pointer's distance from
+                                        its anchor. It never dismisses: closing on leave, and after a
+                                        layout change under a still pointer, are the framework's)
         TitleBar.axaml(.cs), TitleBarRules.cs, WindowChrome.cs
                                        (the custom window title bar. WindowChrome.Custom is set on a
                                         Window and is the ONE place the platform is decided: it extends
@@ -903,13 +918,16 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  lookups are OrdinalIgnoreCase. Absent key → "")
           CpuFacts.cs           (the derivation on top of ProcCpuinfoParser, shared by the Dashboard's
                                  CPU tile and the Hardware tab's Processor card so the two cannot
-                                 disagree: name, physical/logical cores, max clock. Physical cores =
+                                 disagree: name, physical/logical cores, base clock. Physical cores =
                                  distinct (physical id, core id) PAIRS — block count over-reports on a
-                                 hyperthreaded chip and core id alone merges sockets. Max clock prefers
-                                 the highest cpuinfo_max_freq across cores (not cpu0's — that is a
-                                 little core on big.LITTLE), else the model name's "@ 3.60GHz". cpu MHz
-                                 IS NEVER USED for it: it is the instantaneous clock, so a scaling
-                                 governor would report an idle 800 MHz under a "max" label. Reports ""
+                                 hyperthreaded chip and core id alone merges sockets. Base clock (what
+                                 WMI's MaxClockSpeed means on Windows) is intel_pstate's base_frequency
+                                 (kHz), else acpi_cppc/nominal_freq (MHz — amd-pstate's nominal; 0 = not
+                                 implemented), else the model name's "@ 3.60GHz", each the highest across
+                                 cores (cpu0 can be an E-core), else 0 so the Processor card takes the
+                                 datasheet. cpuinfo_max_freq IS NEVER USED: under intel_pstate/amd-pstate
+                                 it is the turbo ceiling and read "5.3 / 5.3 GHz". Nor cpu MHz, the
+                                 instantaneous clock (an idle 800 MHz under a scaling governor). Reports ""
                                  and 0 honestly; each consumer applies its own placeholder.
                                  L3CacheKilobytes is a separate static, not a field — only the Hardware
                                  card has a row for it. Sysfs writes that size SUFFIXED ("8192K", "16M"),
@@ -1000,7 +1018,25 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  a driver that publishes no GTT is not a zero-sized pool, and it matches
                                  GpuAdapter's nullable shared total. DriverVersion is the module's own
                                  driver/module/version, "" for an in-tree driver like amdgpu — never the
-                                 kernel release; shared by the Hardware card and the GPU details)
+                                 kernel release; shared by the Hardware card and the GPU details.
+                                 ReadNamed() IS THE SECOND ENTRY POINT — same walk plus one pci.ids scan,
+                                 so AdapterName becomes the product name — the bracketed part of the entry
+                                 only (MarketingName: "GeForce RTX 3060", not "GA106 [...]"). ONLY the
+                                 two readers that DISPLAY a name call it (graphics card, adapter
+                                 enumeration); the per-tick utilisation and sensor readers keep plain
+                                 Read and pay nothing)
+          PciIdDatabase.cs      (the system pci.ids table — what lspci reads, from hwdata/pciutils. EXISTS
+                                 BECAUSE THE KERNEL IDENTIFIES HARDWARE BUT DOES NOT NAME IT: sysfs gives
+                                 ids, the spec catalog keys on model tokens, so without this the Graphics
+                                 card's CUDA/boost/bus rows are blank on Linux and filled on Windows from
+                                 the identical lookup. KEEPS ONLY THE IDS ASKED FOR, never the whole table —
+                                 the file is ~1.5 MB and a machine has one or two adapters. INDENT IS THE
+                                 FORMAT: vendor at column 0, device one TAB in, subsystem two — and hex
+                                 parsing ALLOWS LEADING WHITESPACE, so the two-tab guard is load-bearing,
+                                 not decorative. STOPS AT THE "C xx" DEVICE-CLASS SECTION or class codes
+                                 read as vendor ids. Absent file → Empty → every caller keeps its own name.
+                                 Reads via IProcFileSystem though /usr/share is not a pseudo-file: the
+                                 contract fits, and a second seam would buy only a second fake)
           ProcNetParser.cs      (/proc/net/{tcp,tcp6,udp,udp6} format knowledge, used by
                                  LinuxConnectionsInterop. ONE parser for all four files: they share the ten
                                  leading columns (sl, local, remote, st, queues, timer, retrnsmt, uid,
@@ -1411,7 +1447,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  since an export names a path and a deep one is exactly the case worth
                                  reading. Esc dismisses the confirmation first and the warning only if
                                  there is no confirmation. Notify(string) is the forwarder view
-                                 code-behind calls — MainWindow's own Export among them)
+                                 code-behind calls — MainWindow's own Export among them. The page hosts
+                                 are named (ScrollingHost / SelfScrollingHost) so RefreshSections can
+                                 read the current page's titled widgets and pageSection-marked cards
+                                 for the nav bar's section list,
+                                 on each page change and each open; a pick is scrolled and flashed here)
       BackHint.cs               (the toolbar Back button's tooltip: "Back to <page> (<key>)", the key read
                                  from the live ShortcutBindings so a rebind shows. Pure, the RefreshHint
                                  shape, so it is testable without constructing the shell)
@@ -1510,7 +1550,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      MinPageWidth for a vertical rail, the measured labeled width for a
                                      horizontal bar. Selection/layout visuals
                                      are styled in NavigationView.axaml via DynamicResource so they
-                                     follow theme + accent)
+                                     follow theme + accent. The rows' hover lift is a render transform on
+                                     navContent, and its reduce-motion undo sits in this file AFTER it —
+                                     a local style outranks an app-level one, and the later of two
+                                     matching rules wins)
         NavItem.cs, Icons.cs        (NavItem is a pure data model, with optional search Keywords so a
                                      renamed page keeps its old name; Icons holds the glyph geometries, all
                                      authored in an 18x18 space and STROKED — except the Caret* set, which
@@ -1534,6 +1577,17 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                      Without that, two Backs would bounce between two pages. Capped at 50.
                                      Generic so tests use strings: NavItem's icon needs a render backend.
                                      Same idea as File Explorer's NavigationHistory, which is tab-local)
+        PageSections.cs             (which widgets are the current page's SECTIONS and in what order:
+                                     a WidgetPanel, or a card carrying the pageSection class titled by
+                                     its automation name (Hardware's cards, which are not widgets);
+                                     visible, titled, in reading order of where they were ARRANGED
+                                     (rows within RowTolerance, then left to right), since a dragged
+                                     board no longer matches its markup. Pure over SectionCandidate
+                                     records the shell measures, so it needs no layout pass. Fewer than
+                                     two sections and the list is not offered. PageSection.Source is the
+                                     candidate index, which is how MainWindow finds the widget again
+                                     without the view model holding a control)
+        PageSectionOption.cs        (one row of the section list: the section plus its jump command)
 ```
 
 ## `src/Tabs/Dashboard`
@@ -1541,7 +1595,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
 ```
       /Dashboard                DashboardView.axaml(.cs) + DashboardViewModel.cs
                                 (Refresh rebuilds the GPU and disk cards, and each surviving one keeps
-                                 its MetricHistory, keyed by LUID / disk number.)
+                                 its MetricHistory, keyed by LUID / disk number. InitialLoad is the
+                                 constructor's loads as one task, as on Performance, so tests await it
+                                 instead of sleeping: off the UI thread a load's rebuild of Cards races
+                                 anything a test enumerates.)
                                 ICpuInfoProvider.cs + WindowsCpuInfoProvider.cs
                                                         (CPU info via WMI, async. Reached through the shared
                                                          HardwareProviders bundle, NOT statically)
@@ -2109,7 +2166,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          UniformFlowPanel with Reorder="Item", saved under
                                                          the "hardware" key. The card Border fills its
                                                          row's height and sets only a MinHeight floor
-                                                         from Dimensions.axaml — see FEATURES.md)
+                                                         from Dimensions.axaml — see FEATURES.md. It
+                                                         carries pageSection, which lists it in the nav
+                                                         bar's section list, and revealFlash for the pick)
                                 IHardwareInfoProvider.cs (seam + ForCurrentPlatform(); ONE interface over the
                                                          whole surface — the public shape is already a
                                                          single method returning one aggregate. Holds the
@@ -2144,13 +2203,21 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          the Linux one takes DrmCardFacts.DriverVersion
                                                          for the same reason. WmiRead
                                                          holds the WMI boilerplate the Windows readers
-                                                         share. Windows* for all five; Linux* for processor,
-                                                         motherboard and storage; Unsupported* twins (at the
-                                                         bottom of their Windows file) for memory modules
-                                                         and graphics.
+                                                         share. Windows* AND Linux* for all five bar memory
+                                                         modules; Unsupported* twins (at the bottom of their
+                                                         Windows file) cover any other platform, and memory
+                                                         modules' is Linux's too, permanently.
                                                          LinuxProcessorInfoProvider — the shared CpuFacts
-                                                         plus its L3 read; SOCKET IS PERMANENTLY "—"
-                                                         (SMBIOS type 4 needs dmidecode as root).
+                                                         plus its L3 read; SOCKET HAS NO SYSFS SOURCE AT
+                                                         ALL (SMBIOS type 4 needs dmidecode as root), so
+                                                         that row is the catalog's rated socket or "—".
+                                                         Base clock and L3 take the same fallback, which is
+                                                         what fills them in a VM: no cpufreq policy and no
+                                                         cache/index* tree, but the model name is reported.
+                                                         THE LIVE READING ALWAYS WINS — the datasheet is a
+                                                         fallback, never an override, or a down-binned or
+                                                         power-limited chip would report someone else's
+                                                         numbers.
                                                          LinuxMotherboardInfoProvider — DmiIdReader +
                                                          HardwareCatalog, composing the same
                                                          "version (year)" BIOS string as the WMI arm; PCIE
@@ -2161,6 +2228,13 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                                          disagree about a drive while keeping their own
                                                          wording ("NVMe" here, "NVMe SSD" there);
                                                          DRIVE HEALTH IS PERMANENTLY "—" (SMART needs root).
+                                                         LinuxGraphicsInfoProvider — DrmCardFacts.ReadNamed,
+                                                         so the card carries its pci.ids product name and
+                                                         the spec catalog can match it — EXCEPT a name listing
+                                                         several models ("RX 7700 XT / 7800 XT"), which gets no
+                                                         lookup, or one model's datasheet fills another's rows;
+                                                         VRAM comes from the
+                                                         driver, the other rows from that match.
                                                          UnsupportedMemoryModulesProvider is permanent too —
                                                          per-DIMM facts are SMBIOS type 17.
                                                          ChipsetNames — the board-name token scan BOTH

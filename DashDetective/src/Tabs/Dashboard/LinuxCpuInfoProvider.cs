@@ -37,7 +37,7 @@ internal sealed class LinuxCpuInfoProvider : ICpuInfoProvider {
                 string.IsNullOrWhiteSpace(facts.Name) ? Placeholders.UnknownProcessor : facts.Name,
                 facts.PhysicalCores,
                 facts.LogicalCores,
-                facts.MaxClockMhz);
+                facts.BaseClockMhz);
         } catch (Exception e) {
             Log.Warn("CpuInfoProvider read failed", e);
             return CpuStaticInfo.Unknown;

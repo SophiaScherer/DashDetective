@@ -24,13 +24,14 @@ public partial class ProcessesView : UserControl {
         HeaderColumns.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerMovedEvent, OnHeaderMoved, RoutingStrategies.Tunnel);
         HeaderColumns.AddHandler(PointerReleasedEvent, OnHeaderReleased, RoutingStrategies.Tunnel);
-        HeaderColumns.AddHandler(PointerCaptureLostEvent, OnHeaderCaptureLost, RoutingStrategies.Tunnel);
+        // Direct, because capture-lost is raised only on the element that held the capture.
+        HeaderColumns.AddHandler(PointerCaptureLostEvent, OnHeaderCaptureLost, RoutingStrategies.Direct);
 
         // Same reason: the rows carry their own tap gesture, which would otherwise eat the press.
         ProcessListScroll.AddHandler(PointerPressedEvent, OnListPressed, RoutingStrategies.Tunnel);
         ProcessListScroll.AddHandler(PointerMovedEvent, OnListMoved, RoutingStrategies.Tunnel);
         ProcessListScroll.AddHandler(PointerReleasedEvent, OnListReleased, RoutingStrategies.Tunnel);
-        ProcessListScroll.AddHandler(PointerCaptureLostEvent, OnListCaptureLost, RoutingStrategies.Tunnel);
+        ProcessListScroll.AddHandler(PointerCaptureLostEvent, OnListCaptureLost, RoutingStrategies.Direct);
 
         OptionsPopup.Opened += OnOptionsPopupOpened;
         OptionsPopup.Closed += OnOptionsPopupClosed;
@@ -103,8 +104,8 @@ public partial class ProcessesView : UserControl {
         _viewModel?.CommitColumnOrder();
     }
 
-    // Fires for the header button losing its capture to the drag as well, so it only ends the drag
-    // when the capture that went is the one the drag itself took.
+    // Raised when the header loses the capture the drag took; a capture moving back onto the header
+    // itself is not an end.
     private void OnHeaderCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
         if (_dragging && !ReferenceEquals(e.Pointer.Captured, HeaderColumns)) {
             _dragging = false;
@@ -296,8 +297,8 @@ public partial class ProcessesView : UserControl {
         _rangePending = false;
     }
 
-    // Also fires for the row losing its capture to the drag, so it only ends the drag when the capture
-    // that went is the one the drag itself took.
+    // Raised when the list loses the capture the range drag took; a capture moving back onto the list
+    // itself is not an end.
     private void OnListCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
         if (_rangeDragging && !ReferenceEquals(e.Pointer.Captured, ProcessListScroll)) {
             _rangeDragging = false;

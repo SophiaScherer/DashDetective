@@ -256,26 +256,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         _notices.Changed += OnNoticeChanged;
         _accessibility.Changed += OnAccessibilityChanged;
 
-        // Build the nav items pointing their select callback at the nav VM, then let it own selection.
+        // Activate rather than Navigate, so pressing the current page's item opens its section list.
         Nav.Initialize(new[] {
             new NavItem("Dashboard", "Dashboard", "Real-time system overview",
-                        Icons.Dashboard, _dashboard, Nav.Navigate),
+                        Icons.Dashboard, _dashboard, Nav.Activate),
             new NavItem("File Explorer", "File Explorer", "Browse files and folders",
-                        Icons.FileExplorer, _fileExplorer, Nav.Navigate),
+                        Icons.FileExplorer, _fileExplorer, Nav.Activate),
             new NavItem("Processes", "Processes", "Live processes & resource usage",
-                        Icons.Processes, _processes, Nav.Navigate),
+                        Icons.Processes, _processes, Nav.Activate),
             new NavItem("Performance", "Performance", "Live resource utilization",
-                        Icons.Performance, _performance, Nav.Navigate),
+                        Icons.Performance, _performance, Nav.Activate),
             new NavItem("Network", "Network", "Adapters, connections & diagnostics",
-                        Icons.Network, _network, Nav.Navigate),
+                        Icons.Network, _network, Nav.Activate),
             new NavItem("Storage", "Storage", "Drives, partitions & health",
-                        Icons.Storage, _storage, Nav.Navigate),
+                        Icons.Storage, _storage, Nav.Activate),
             new NavItem("Hardware", "Hardware", "Installed components & specs",
-                        Icons.Hardware, _hardware, Nav.Navigate),
+                        Icons.Hardware, _hardware, Nav.Activate),
             new NavItem("Utilities", "Utilities", "Common commands & diagnostics",
-                        Icons.Toolkit, _toolkit, Nav.Navigate, ["Toolkit", "Tools", "Commands"]),
+                        Icons.Toolkit, _toolkit, Nav.Activate, ["Toolkit", "Tools", "Commands"]),
             new NavItem("Settings", "Settings", "Application preferences",
-                        Icons.Settings, _settings, Nav.Navigate),
+                        Icons.Settings, _settings, Nav.Activate),
         });
         _currentPage = Nav.SelectedNav.Page;
         _pageHistory.Visit(Nav.SelectedNav);
@@ -649,6 +649,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable {
         // results and Esc puts it away, but unlike Help it doesn't swallow the rest — Ctrl+1 still
         // switches tabs from a half-typed search.
         if (Search.IsOpen && Search.HandleShortcut(id))
+            return true;
+
+        // The section list is a light popup like the search dropdown: Esc closes it, nothing else is swallowed.
+        if (Nav.HandleSectionsShortcut(id))
             return true;
 
         if (CurrentPage is IShortcutTarget target && target.HandleShortcut(id))

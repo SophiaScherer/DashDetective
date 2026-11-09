@@ -301,6 +301,10 @@ Linux needs none of it: the kernel publishes the same readings as pseudo-files. 
 NVIDIA utilisation, which needs an `nvidia-smi` process launch and is therefore the app's only opt-in
 reading — off by default, rate-limited, and never on the sampling path.
 
+The kernel identifies hardware but does not name it, so a Linux GPU's product name comes from the system's
+own `pci.ids` (the table `lspci` reads, from `hwdata`/`pciutils`) through `PciIdDatabase`. Nothing is
+bundled: a host without the table keeps the identity sysfs alone can compose.
+
 ## Testing
 
 xUnit, in `tests/DashDetective.Tests`, on the same neutral TFM. Test files mirror the source path.

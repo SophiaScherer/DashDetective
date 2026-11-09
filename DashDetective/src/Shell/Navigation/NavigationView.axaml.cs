@@ -3,11 +3,16 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using DashDetective.Shared;
 using DashDetective.Shared.Layout;
 using System;
+using System.ComponentModel;
+using System.Linq;
 
 namespace DashDetective.Shell.Navigation;
 
@@ -39,19 +44,27 @@ public partial class NavigationView : UserControl {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         ItemScroll.LayoutUpdated += OnItemScrollLayoutUpdated;
+        SectionsPopup.Opened += OnSectionsOpened;
+        SectionsPopup.Closed += OnSectionsClosed;
+        SectionsPopup.AddHandler(KeyDownEvent, OnSectionsKeyDown, RoutingStrategies.Tunnel);
     }
 
     // Bridge the view model's UI-only PositionPicked signal to dismissing the dock menu: selecting a
     // dock position (or the current one) closes it, matching normal menu behaviour. Click-off dismissal
     // is already handled by the flyout's light-dismiss.
     private void OnDataContextChanged(object? sender, EventArgs e) {
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.PositionPicked -= CloseDockMenu;
+            _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
 
         _viewModel = DataContext as NavigationViewModel;
 
-        if (_viewModel is not null)
+        if (_viewModel is not null) {
             _viewModel.PositionPicked += CloseDockMenu;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            Dispatcher.UIThread.Post(AimSectionsPopup, DispatcherPriority.Loaded);
+        }
     }
 
     private void CloseDockMenu() => RailBorder.ContextFlyout?.Hide();
@@ -63,6 +76,61 @@ public partial class NavigationView : UserControl {
     private void OnRailPointerEntered(object? sender, PointerEventArgs e) => _viewModel?.PointerEnteredBar();
 
     private void OnRailPointerExited(object? sender, PointerEventArgs e) => _viewModel?.PointerExitedBar();
+
+    // ----- Section list -----
+    // Re-aimed whenever the selection moves. Every item is realized (no virtualization), so the container is always there to find.
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(NavigationViewModel.SelectedNav))
+            AimSectionsPopup();
+    }
+
+    private void AimSectionsPopup() => SectionsPopup.PlacementTarget = SelectedItem();
+
+    private Control? SelectedItem() =>
+        _viewModel?.SelectedNav is { } item ? NavList.ContainerFromItem(item) : null;
+
+    // Not light-dismissed, so the window stays hoverable; an outside press closes it by hand, as the Processes options popup does.
+    private void OnSectionsOpened(object? sender, EventArgs e) {
+        TopLevel.GetTopLevel(this)?.AddHandler(
+            PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+
+        Dispatcher.UIThread.Post(() => {
+            if (SectionsPopup.Child is Visual root)
+                root.GetVisualDescendants().OfType<Button>().FirstOrDefault()?.Focus(NavigationMethod.Tab);
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void OnSectionsClosed(object? sender, EventArgs e) {
+        TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnWindowPointerPressed);
+
+        // Focus that was in the popup has nowhere to be; hand it back to the item that opened it.
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual;
+        if (focused is null || (SectionsPopup.Child is Visual root && root.IsVisualAncestorOf(focused)))
+            (SelectedItem()?.GetVisualDescendants().OfType<Button>().FirstOrDefault())?.Focus();
+    }
+
+    private void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e) {
+        if (e.Source is not Visual source || _viewModel is null)
+            return;
+
+        // The current item toggles the list itself; closing here first would let its press reopen it.
+        if (SelectedItem() is { } item && (item == source || item.IsVisualAncestorOf(source)))
+            return;
+        if (SectionsPopup.Child is Visual child && child.IsVisualAncestorOf(source))
+            return;
+
+        _viewModel.IsSectionsOpen = false;
+    }
+
+    // The popup is its own visual root, so keys inside it never reach the window's shortcut chain; Esc is answered here.
+    private void OnSectionsKeyDown(object? sender, KeyEventArgs e) {
+        if (e.Key != Key.Escape || _viewModel is null)
+            return;
+
+        _viewModel.IsSectionsOpen = false;
+        e.Handled = true;
+    }
 
     // A horizontal bar sizes to its content, so the drop preview learns its height from the layout.
     private void OnRailSizeChanged(object? sender, SizeChangedEventArgs e) =>

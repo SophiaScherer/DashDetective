@@ -168,4 +168,12 @@ public class ChartAxisTests {
     public void GridLine_PlotThinnerThanOnePixel_StaysPositive() {
         Assert.Equal(0.5, ChartAxis.GridLine(0.4, 0, 0.8));
     }
+
+    [Fact]
+    public void RateLabels_CeilingThatRoundsToAThousand_ReadsInTheNextUnit() =>
+        Assert.Equal(new[] { "1.0 Gbps", "0.5", "0" }, ChartAxis.RateLabels(999.6, 2));
+
+    [Fact]
+    public void RateLabels_NaNCeiling_ReadsAsZero() =>
+        Assert.DoesNotContain(ChartAxis.RateLabels(double.NaN, 2), label => label.Contains("NaN"));
 }

@@ -14,9 +14,7 @@ namespace DashDetective.Tabs.Hardware;
 /// no entry — exactly as on Windows, and formatted through the same
 /// <see cref="ProcessorSpecFormatter"/> so the rows match.
 ///
-/// <b>Socket designation is permanently "—" on Linux.</b> It lives in SMBIOS type 4, which the kernel does
-/// not surface under <c>/sys/class/dmi/id</c>; only <c>dmidecode</c> reading <c>/dev/mem</c> as root can
-/// see it.
+/// The socket has no Linux source (SMBIOS type 4 needs root), so it falls back to the catalog.
 /// </summary>
 internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
     private readonly IProcFileSystem _proc;
@@ -43,10 +41,10 @@ internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
                 Name: string.IsNullOrEmpty(facts.Name) ? "—" : facts.Name,
                 Cores: facts.PhysicalCores > 0 ? facts.PhysicalCores.ToString() : "—",
                 LogicalProcessors: facts.LogicalCores.ToString(),
-                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.MaxClockMhz, spec?.Boost),
-                CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc)),
-                Tdp: spec?.Tdp ?? "—",
-                Socket: "—");
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.BaseClockMhz, spec?.Boost, spec?.Base),
+                CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc), spec?.CacheL3),
+                Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
+                Socket: ProcessorSpecFormatter.Spec(spec?.Socket));
         } catch (Exception e) {
             Log.Warn("ProcessorInfoProvider read failed", e);
             return ProcessorInfo.Unknown;

@@ -48,7 +48,7 @@ public class DashboardGpuCardTests {
                 return minted;
             });
 
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadGpusAsync();
         return (viewModel, pageSampler!);
     }

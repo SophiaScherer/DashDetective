@@ -9,10 +9,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Shared.Layout;
 
-/// <summary>Covers <see cref="ReorderablePanel"/> on a real headless <see cref="WidgetBoard"/>: the keyboard
-/// path moves by one index and never asks a drop target anything, and a drag's motion — neighbours slide
-/// as it re-packs, the dropped item eases in — runs only for a drag, never for a cancelled one, a keyboard
-/// move or with Reduce motion on.</summary>
+/// <summary>Covers <see cref="ReorderablePanel"/> on a headless <see cref="WidgetBoard"/>: keyboard moves go by one index, and slide motion runs only for a completed drag without Reduce motion.</summary>
 public class ReorderablePanelTests {
     private const double Width = 1000;
 
@@ -66,8 +63,7 @@ public class ReorderablePanelTests {
         board.Arrange(new Rect(0, 0, Width, board.DesiredSize.Height));
     }
 
-    /// <summary>Picks up the first widget and holds it over the second's slot, which shifts the second
-    /// into the first's place.</summary>
+    /// <summary>Holds the first widget over the second's slot, shifting the second into the first's place.</summary>
     private static void DragFirstOverSecond(WidgetBoard board, List<Border> items) {
         var grab = new Point(items[0].Bounds.Center.X, 50);
         board.Drag.Press(new ReorderHandle(items[0], items[0], items[0]), grab);
@@ -135,7 +131,7 @@ public class ReorderablePanelTests {
         Assert.Equal(0, items[0].ZIndex);
     }
 
-    /// <summary>A drag that is never dropped puts everything straight back, so nothing is left sliding.</summary>
+    /// <summary>A drag that is never dropped leaves nothing sliding.</summary>
     [Fact]
     public void Cancel_PutsEveryWidgetBackWithoutMotion() {
         var (board, items) = Board();
@@ -184,8 +180,7 @@ public class ReorderablePanelTests {
         Assert.All(items, item => Assert.Null(item.RenderTransform));
     }
 
-    /// <summary>Picking up a neighbour that is still sliding keeps it above the others: stopping its slide
-    /// must not drop it back under them.</summary>
+    /// <summary>A picked-up neighbour that was still sliding stays above the others.</summary>
     [Fact]
     public void Drag_ANeighborStillSliding_IsHeldAboveTheOthers() {
         var (board, items) = Board();
@@ -203,8 +198,7 @@ public class ReorderablePanelTests {
         Assert.Null(items[1].RenderTransform);
     }
 
-    /// <summary>A slide whose frames never came — the page was left mid-slide — is finished by the next
-    /// layout rather than left drawn off its slot.</summary>
+    /// <summary>A slide whose frames never came is finished by the next layout, not left off its slot.</summary>
     [Fact]
     public void Layout_AfterAnExpiredSlideWithNoFrames_LandsTheWidget() {
         var (board, items) = Board();
@@ -221,8 +215,7 @@ public class ReorderablePanelTests {
         Assert.Equal(0, items[0].ZIndex);
     }
 
-    /// <summary>Capture-lost is a direct event on the panel holding the capture; it must reach the drag, or
-    /// a drag whose capture is taken away stays live until a later release commits it.</summary>
+    /// <summary>Capture-lost is direct on the capturing panel and must reach the drag, or it stays live.</summary>
     [Fact]
     public void CaptureLost_MidDrag_CancelsTheDrag() {
         var (board, items) = Board();
