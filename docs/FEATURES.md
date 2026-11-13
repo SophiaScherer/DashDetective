@@ -1900,6 +1900,9 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
      A single click and a search result only select it. The Execution Log's `$` line prints the
      resolved target and arguments, so a row whose label disagrees with what it runs is visible the
      moment it fires.
+- **Deleting the command open in the edit form closes the form.** Saving would otherwise find no row to
+  replace (`UpdateCommand` returns quietly) and the edit would vanish. `RemoveCommand` calls
+  `Form.CancelIfEditing`; deleting a different row leaves the form open.
 
   Accepted, documented residual risk: `settings.json` can now put a mislabelled runnable row on the page if
   it is tampered with. That is not an escalation — anything able to write `%AppData%\DashDetective` can
