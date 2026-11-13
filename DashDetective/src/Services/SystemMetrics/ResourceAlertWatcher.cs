@@ -54,6 +54,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
     private ResourceAlertOptions _options = ResourceAlertOptions.Defaults;
     private ResourceAlert? _current;
     private bool _live = true;
+    private int _spaceRead;   // generation of the newest free-space read
     private bool _disposed;
 
     public ResourceAlertWatcher(SystemMetricsService metrics)
@@ -262,6 +263,7 @@ internal sealed class ResourceAlertWatcher : IDisposable {
         if (threshold <= 0)
             return;
 
+        var read = ++_spaceRead;
         double? worst = null;
         var device = "Disk";
 
@@ -289,6 +291,10 @@ internal sealed class ResourceAlertWatcher : IDisposable {
             Log.Warn("Could not read volume free space for the alert watcher", e);
             return;
         }
+
+        // The settings may have changed during the slow read; a stale verdict would re-raise a banner nothing clears.
+        if (read != _spaceRead || !Enabled || !_live || _options.LowDiskFreePercent != threshold)
+            return;
 
         var state = _states[AlertMetric.DiskSpace];
         state.Breaching = worst is { } headroom && headroom <= threshold;

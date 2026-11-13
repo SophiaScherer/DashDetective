@@ -1390,7 +1390,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  SECONDS converted against the live interval, not a sample count, which
                                  used to mean 5 s at the 0.5 s cadence and 50 s at the 5 s one. Free space
                                  skips UNLETTERED volumes: Recovery/EFI sit near-full by design, so
-                                 watching them is a banner that never goes away)
+                                 watching them is a banner that never goes away. A free-space read is
+                                 DISCARDED if it was superseded or the bell, master switch, Live pill or
+                                 threshold moved during its await — a stale verdict re-raised a banner
+                                 whose timer was already stopped)
                                  per-metric 1 Hz channel fans each sample out to subscribers (ref-counted — a
                                  channel runs only while it has one), Pause/Resume for the Live pill,
                                  RefreshAll for Refresh, per-metric fault isolation. Dashboard / Performance /
