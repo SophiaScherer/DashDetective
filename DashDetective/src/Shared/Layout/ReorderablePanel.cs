@@ -31,6 +31,10 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         AvaloniaProperty.Register<ReorderablePanel, IReadOnlyList<string>?>(
             nameof(Order), defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>Keeps a dragged item drawn inside this panel, for a strip that is its own flow.</summary>
+    public static readonly StyledProperty<bool> ConfineDragProperty =
+        AvaloniaProperty.Register<ReorderablePanel, bool>(nameof(ConfineDrag));
+
     private readonly List<Control> _visible = new();
     private readonly ChildOrder _childOrder = new();
     private Rect2[] _slotRects = Array.Empty<Rect2>();
@@ -56,6 +60,11 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
     public IReadOnlyList<string>? Order {
         get => GetValue(OrderProperty);
         set => SetValue(OrderProperty, value);
+    }
+
+    public bool ConfineDrag {
+        get => GetValue(ConfineDragProperty);
+        set => SetValue(ConfineDragProperty, value);
     }
 
     /// <summary>Raised with the new id order once a drag commits.</summary>
@@ -166,6 +175,8 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
 
     Panel IReorderablePanel.Surface => this;
 
+    bool IReorderablePanel.ConfinesDrag => ConfineDrag;
+
     IReadOnlyList<Control> IReorderablePanel.Items => _visible;
 
     ReadOnlySpan<Rect2> IReorderablePanel.SlotRects => _slotRects.AsSpan(0, _visible.Count);
@@ -199,13 +210,12 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
                 StopSlide(child);
             }
         }
+    }
 
-        // Every reorderable item is a tab stop, so the keyboard can reach one to move it. Done here
-        // rather than per view because a card is usually a plain Border with no control inside: pages
-        // whose items happened to contain a button were reachable, the rest were not reachable at all.
+    /// <summary>Makes an item a tab stop unless its content is already focusable; decided at arrange, when the presenter has a child.</summary>
+    private void MakeTabStop(Control child) {
         if (Reorderable)
-            foreach (var child in _visible)
-                child.Focusable = true;
+            child.Focusable = !(Inner(child) is { Focusable: true } inner && !ReferenceEquals(inner, child));
     }
 
     /// <summary>Device pixels per layout unit, as the framework's own rounding counts them; 0 where
@@ -228,6 +238,7 @@ public abstract class ReorderablePanel : Panel, IReorderablePanel {
         var (y, height) = PixelSnap.Span(slot.Y, slot.Height, Math.Max(child.MinHeight, inner.MinHeight),
                                          panel.Height, scale);
         slot = new Rect(x, y, width, height);
+        MakeTabStop(child);
 
         _slotRects[index] = new Rect2(slot.X, slot.Y, slot.Width, slot.Height);
         if (!ReferenceEquals(child, Drag.Dragged)) {

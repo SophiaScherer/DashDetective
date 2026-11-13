@@ -24,6 +24,23 @@ public class ReorderablePanelTests {
         Assert.Equal(new[] { "b", "a", "c" }, committed);
     }
 
+    /// <summary>A keyboard move falling through from the id-less card row must not carry the row into the charts.</summary>
+    [Fact]
+    public void TryMoveFocused_OnAChildWithNoId_LeavesItInPlace() {
+        var (board, items) = Board();
+        var row = new Border { MinWidth = 100, Height = 100 };
+        WidgetBoard.SetStretch(row, true);
+        board.Children.Insert(0, row);
+        Layout(board);
+        var moved = false;
+        board.OrderChanged += _ => moved = true;
+
+        Assert.False(board.TryMoveFocused(row, 1));
+        Assert.False(moved);
+        Assert.Same(row, ((IReorderablePanel)board).Items[0]);
+        Assert.Same(items[0], ((IReorderablePanel)board).Items[1]);
+    }
+
     /// <summary>Three equal widgets in one row, on a clock the test steps.</summary>
     private static (WidgetBoard Board, List<Border> Items) Board() {
         var board = new WidgetBoard { ColumnSpacing = 16 };

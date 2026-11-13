@@ -333,7 +333,12 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  target goes through DropTarget, snapshotted as the drag begins; reading
                                  the panel's live slots instead is the flicker loop. Press/MoveTo are
                                  the pointer handlers' bodies, internal so ReorderDragTests can drive a
-                                 real board through re-layouts and catch a revert to live slots)
+                                 real board through re-layouts and catch a revert to live slots.
+                                 A PENDING press is dropped on Detach and on a move with no button held:
+                                 a double click on a Dashboard card leaves the page mid-press, and the
+                                 first move back would otherwise pick the card up. A panel that sets
+                                 ConfineDrag has its held item clamped inside itself (WidgetBoardLayout.
+                                 Confine) — the Dashboard card row)
         DropTarget.cs           (which slot a drag takes, against the slots FROZEN when it began, with
                                  hysteresis: the target changes only once the dragged box's center is
                                  Hysteresis (0.2) of the smaller slot past the boundary. The live layout
@@ -344,7 +349,10 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
         ReorderablePanel.cs     (KEYBOARD REORDERING: TryMoveFocused runs the same Begin/Preview/Commit
                                  a drag does, so both persist through one path. It also makes every
                                  item it lays out a tab stop — a card is usually a plain Border, and
-                                 Focusable in the view does not work, only this does
+                                 Focusable in the view does not work, only this does — EXCEPT a
+                                 generated item whose root is already a focusable control (a Dashboard
+                                 card's link, a Performance rail button), which would otherwise be two
+                                 stops with the first doing nothing
                                  the half of reordering both panels share: the saved order and its
                                  re-entrancy guard, the previewed order, the children on screen and
                                  where their slots were arranged. A base class rather than a helper
@@ -405,7 +413,11 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  whenever the child count is unchanged, which is every reset.
                                  Sync(ids) — what ReorderablePanel calls — ALSO REBUILDS WHEN THE SAME
                                  COUNT CARRIES DIFFERENT IDS: one GPU's tiles swapped for another's of equal
-                                 length kept the old permutation and applied it to the wrong tiles)
+                                 length kept the old permutation and applied it to the wrong tiles.
+                                 A CHILD WITH NO ID IS A FIXED POINT in Move: it never moves and nothing
+                                 crosses it, as ApplySaved already ranked it. That is what keeps a
+                                 Dashboard chart out of the card row's place, and a keyboard move that
+                                 falls through from the row's last card from moving the row itself)
         Reorder.cs              (the attached IsGrip mark for the one element inside an item a drag may
                                  start from; OwnsItsOwnGesture, the one list of controls that take clicks
                                  of their own, which a drag and a widget header's double-tap both refuse;
@@ -1596,7 +1608,12 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                 DashboardCard.cs        (one stat card's live state, plus the identity that
                                                          makes it a link: DeviceId (the inventory id) and
                                                          OpenCommand, which asks the shell to reveal it in
-                                                         Performance. Tip is ONE tooltip with a fallback —
+                                                         Performance. WidgetId names it in the card row's
+                                                         saved order (dashboard.cards) — by device id, except
+                                                         a GPU, by its "GPU" / "GPU 0" label: its device id
+                                                         carries a LUID, which Windows mints again every boot.
+                                                         A GPU count change renames them, and their saved
+                                                         slots fall back to the declared position. Tip is ONE tooltip with a fallback —
                                                          the card's no-reading note when it has one, else
                                                          the open hint — because a card has no room for a
                                                          line of its own and the note has more to say)
