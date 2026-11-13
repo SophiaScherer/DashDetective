@@ -1609,6 +1609,7 @@ behind it that must not be quietly undone:
   tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
+  `Reveal` (a universal-search jump) unfolds the target's group first, so the row it selects is visible.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
   running". `HasLoaded` is set on success AND on failure, never on cancellation: a page that failed has
   an answer, whereas a cancelled read means the user left and nothing was learned. The summary reads

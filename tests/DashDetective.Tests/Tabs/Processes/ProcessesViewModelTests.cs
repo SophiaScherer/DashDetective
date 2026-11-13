@@ -289,6 +289,21 @@ public class ProcessesViewModelTests {
         viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
                  .Single(row => row.Pid == pid);
 
+    /// <summary>A search jump into a folded group must open it, or the selected row stays hidden.</summary>
+    [Fact]
+    public async Task Reveal_ProcessInAFoldedGroup_UnfoldsItAndSelectsTheRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.ToggleGroup(ProcessCategory.App);
+        viewModel.ToggleGroup(ProcessCategory.Background);
+
+        viewModel.Reveal(100);
+
+        Assert.False(viewModel.AppsCollapsed);
+        Assert.True(viewModel.BackgroundCollapsed);
+        Assert.True(Row(viewModel, 100).IsSelected);
+    }
+
     [Fact]
     public async Task SelectRow_Plain_ReplacesTheSelection() {
         var (viewModel, _) = Selectable();
