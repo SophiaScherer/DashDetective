@@ -286,8 +286,15 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         // Load drives off the UI thread; the continuation resumes here (UI thread) to fill
         // the bound collection. Mirrors the Dashboard providers' fire-and-forget load.
-        _ = LoadRootsAsync();
+        Track(LoadRootsAsync());
     }
+
+    /// <summary>Every root and folder load still in flight, so a test can await the page going quiet
+    /// instead of guessing how long a read takes.</summary>
+    internal Task PendingLoads { get; private set; } = Task.CompletedTask;
+
+    private void Track(Task load) =>
+        PendingLoads = PendingLoads.IsCompleted ? load : Task.WhenAll(PendingLoads, load);
 
     // Reconciled rather than rebuilt so a Refresh keeps every expanded branch and the selection: the
     // roots are re-read on each one, and clearing would collapse the tree under the user. Keyed by path,
@@ -316,14 +323,14 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         foreach (var node in RootNodes)
             _ = node.SyncChildrenAsync();
         if (!string.IsNullOrEmpty(CurrentPath))
-            _ = LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: true);
+            Track(LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: true));
     }
 
     /// <summary>Toolbar Refresh for the File Explorer: re-read the roots and the current folder. The
     /// roots are re-read even with a folder open, because removable media appears and disappears while
     /// the app runs — a stick plugged in after launch would otherwise need a restart to show up.</summary>
     public void Refresh() {
-        _ = LoadRootsAsync();
+        Track(LoadRootsAsync());
         if (!string.IsNullOrEmpty(CurrentPath))
             SetCurrentFolder(CurrentPath);
     }
@@ -336,7 +343,11 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
             prev.IsSelected = false;
 
         SelectedNode = node;
-        SetCurrentFolder(node.FullPath);
+
+        // SyncTreeSelection lands here after the folder is already open; reading it again would drop the
+        // selection a search jump asked for.
+        if (!string.Equals(node.FullPath, CurrentPath, PathComparison.Comparison))
+            SetCurrentFolder(node.FullPath);
     }
 
     /// <summary>Selects a file-list row (drives the details pane in Phase 4).</summary>
@@ -409,7 +420,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
         _watcher.Watch(path);
         // Only a move to a different folder clears the list: the rows already shown belong to the
         // folder the breadcrumb has just stopped naming, and they are clickable.
-        _ = LoadEntriesAsync(path, clearFirst: isNavigation, showBusy: true);
+        Track(LoadEntriesAsync(path, clearFirst: isNavigation, showBusy: true));
 
         if (isNavigation) {
             SyncTreeSelection(path);
@@ -489,7 +500,7 @@ public partial class FileExplorerViewModel : ViewModelBase, ISelfScrollingPage, 
 
         _reselectPath = SelectedEntry?.FullPath;
         // Nobody asked for this one, so it stays silent — same folder, same rows, nothing stale.
-        _ = LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: false);
+        Track(LoadEntriesAsync(CurrentPath, clearFirst: false, showBusy: false));
 
         if (FindNode(RootNodes, CurrentPath) is { } node)
             _ = node.SyncChildrenAsync();
