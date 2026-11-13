@@ -87,6 +87,21 @@ public class LinuxConnectionsInteropTests {
     public void GetTcp_UnattributableSocket_ReportsNoPid() =>
         Assert.Equal(SocketInodeMap.NoPid, Interop().GetTcp().Single(r => r.LocalPort == 22).Pid);
 
+    /// <summary>A steady-state poll does not re-walk for sockets it already failed to attribute.</summary>
+    [Fact]
+    public void SecondPoll_WithOnlyUnattributableSocketsNew_DoesNotWalk() {
+        var proc = Proc();
+        var interop = new LinuxConnectionsInterop(proc);
+        interop.GetTcp();
+        interop.GetUdp();
+
+        proc.WithLink("/proc/1500/fd/3", "socket:[19788]");
+        var rows = interop.GetTcp();
+        interop.GetUdp();
+
+        Assert.Equal(SocketInodeMap.NoPid, rows.Single(r => r.LocalPort == 22).Pid);
+    }
+
     /// <summary>
     /// UDP keeps the Windows row shape: no remote endpoint and no state, which is what the table renders as
     /// "—". The fixture's third row is a CONNECTED UDP socket with a real peer and a real state, so this is
