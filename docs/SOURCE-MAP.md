@@ -398,7 +398,9 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
         DragDropHint.cs         (the accent band a drag draws where the thing will land, in the window's
                                  OverlayLayer. Shared by the nav bar's drag-to-dock and the board's
                                  drag-to-reorder; the board cannot host it as a child, which would
-                                 re-enter its own layout)
+                                 re-enter its own layout. ShowFrom maps the whole box and its rounding,
+                                 not just the origin: the overlay sits outside the ScaleHost, so a box
+                                 moved by its origin alone kept its 100 % size)
         WidgetOrders.cs         (per-page order codec; the resolver that survives a widget being added,
                                  removed or renamed now lives in OrderResolver.cs, which this delegates
                                  to — the Processes columns want the same semantics)
