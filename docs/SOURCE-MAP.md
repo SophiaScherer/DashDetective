@@ -1221,7 +1221,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
                                  path entirely: at most one run per 15 s of WALL CLOCK (not per N ticks —
                                  the tick interval is a user setting), never overlapping, never blocking,
                                  gated behind an off-by-default setting, and retired for the session on the
-                                 first failure. NORMALISES THE BUS ID: nvidia-smi writes an EIGHT-digit PCI
+                                 first failure. A run that EXITS NON-ZERO or TIMES OUT clears the readings
+                                 (the last good ones would sit frozen, looking live). NORMALISES THE BUS ID: nvidia-smi writes an EIGHT-digit PCI
                                  domain and uppercase hex where sysfs writes four and lowercase, so a raw
                                  join matches nothing and every reading silently fails to find its card.
                                  Runs over the Toolkit's IProcessLauncher seam, so tests spawn nothing)

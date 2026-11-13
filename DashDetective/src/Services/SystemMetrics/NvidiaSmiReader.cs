@@ -33,6 +33,7 @@ internal sealed class NvidiaSmiReader {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     private readonly IProcessLauncher _launcher;
+    private readonly TimeSpan _refreshEvery;
     private readonly Stopwatch _sinceRefresh = new();
     private readonly object _gate = new();
 
@@ -46,8 +47,11 @@ internal sealed class NvidiaSmiReader {
     public NvidiaSmiReader() : this(new SystemProcessLauncher()) { }
 
     /// <summary>Test seam: injects the launcher so the parse and the cadence can be exercised without any
-    /// process existing.</summary>
-    internal NvidiaSmiReader(IProcessLauncher launcher) => _launcher = launcher;
+    /// process existing, and optionally the refresh window so a second run needs no 15 s wait.</summary>
+    internal NvidiaSmiReader(IProcessLauncher launcher, TimeSpan? refreshEvery = null) {
+        _launcher = launcher;
+        _refreshEvery = refreshEvery ?? TimeSpan.FromSeconds(RefreshSeconds);
+    }
 
     /// <summary>The last completed run's utilisation for a card, or <c>null</c> when it reported none —
     /// including before the first run finishes.</summary>
@@ -64,7 +68,7 @@ internal sealed class NvidiaSmiReader {
         lock (_gate) {
             if (_retired || _running)
                 return;
-            if (_sinceRefresh.IsRunning && _sinceRefresh.Elapsed.TotalSeconds < RefreshSeconds)
+            if (_sinceRefresh.IsRunning && _sinceRefresh.Elapsed < _refreshEvery)
                 return;
 
             _running = true;
@@ -76,8 +80,10 @@ internal sealed class NvidiaSmiReader {
     private async System.Threading.Tasks.Task RunAsync() {
         try {
             var capture = await _launcher.CaptureAsync(Executable, Arguments, Timeout);
-            if (capture.ExitCode == 0 && !capture.TimedOut)
-                _readings = Parse(capture.StandardOutput);
+            // A failed run clears the readings, or the last good ones would look live while nvidia-smi is down.
+            _readings = capture.ExitCode == 0 && !capture.TimedOut
+                ? Parse(capture.StandardOutput)
+                : new Dictionary<string, double>();
         } catch (Exception e) {
             // A missing binary surfaces as a throw, not an exit code. One report, then never again.
             Log.Warn("nvidia-smi is unavailable; NVIDIA GPU utilisation will stay blank", e);

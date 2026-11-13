@@ -123,6 +123,28 @@ public class NvidiaSmiReaderTests {
         Assert.Null(reader.Utilisation("0000:01:00.0"));
     }
 
+    /// <summary>A run that fails after a good one must not leave the last good reading looking live.</summary>
+    [Theory]
+    [InlineData(9, false)]
+    [InlineData(0, true)]
+    public async Task RefreshIfDue_AFailedRunAfterASuccessfulOne_ClearsTheReadings(int exitCode, bool timedOut) {
+        var launcher = new FakeProcessLauncher {
+            NextCapture = new ProcessCapture(0, "00000000:01:00.0, 42\n", "", false),
+        };
+        var reader = new NvidiaSmiReader(launcher, TimeSpan.Zero);
+        reader.RefreshIfDue();
+        await WaitFor(() => reader.Utilisation("0000:01:00.0") == 42);
+        Assert.Equal(42, reader.Utilisation("0000:01:00.0"));
+
+        launcher.NextCapture = new ProcessCapture(exitCode, "00000000:01:00.0, 77\n", "", timedOut);
+        await WaitFor(() => {
+            reader.RefreshIfDue();
+            return launcher.Calls.Count >= 2 && reader.Utilisation("0000:01:00.0") is null;
+        });
+
+        Assert.Null(reader.Utilisation("0000:01:00.0"));
+    }
+
     [Fact]
     public void Utilisation_BeforeAnyRun_IsNull() {
         Assert.Null(new NvidiaSmiReader(new FakeProcessLauncher()).Utilisation("0000:01:00.0"));
@@ -132,6 +154,11 @@ public class NvidiaSmiReaderTests {
     /// awaiting a handle the production path never exposes.</summary>
     private static async Task WaitForCalls(FakeProcessLauncher launcher, int count) {
         for (var i = 0; i < 200 && launcher.Calls.Count < count; i++)
+            await Task.Delay(5);
+    }
+
+    private static async Task WaitFor(Func<bool> condition) {
+        for (var i = 0; i < 200 && !condition(); i++)
             await Task.Delay(5);
     }
 }
