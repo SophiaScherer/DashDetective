@@ -1336,6 +1336,9 @@ tab-local except the shared refresh seam:
   silently, so a stale universal-search hit is not a dead button. The error row uses a `Margin`, **not**
   the grid's `RowSpacing` — Avalonia applies row spacing even to a zero-height row, which would cost the
   bar 4 px permanently.
+- **A typed path is absolute or refused.** `Path.GetFullPath` resolves a relative name (and `"C:"`, which is
+  drive-relative) against the process working directory, so `RootTypedPath` runs first: a bare drive letter
+  becomes that drive's root, `C:foo` and any other relative name get the "Can't find" error.
 
 **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
 **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
