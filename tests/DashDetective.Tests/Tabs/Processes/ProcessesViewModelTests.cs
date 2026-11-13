@@ -970,6 +970,31 @@ public class ProcessesViewModelTests {
         public bool HasExited(int pid) => !Lingering.Contains(pid);
     }
 
+    /// <summary>Refresh updates the summary CPU and memory figures once while the Live pill is off, leaving the page unsubscribed.</summary>
+    [Fact]
+    public void Refresh_WhilePaused_UpdatesTheSummaryTotalsOnce() {
+        double cpu = 10;
+        var memory = new MemorySample(20, 1UL << 30, 8UL << 30, 0, 0);
+        var metrics = TestMetrics.WithTimers(out var timers, cpu: () => cpu, memory: () => memory);
+        var page = new ProcessesViewModel(metrics, new FakeSnapshotProvider([]), new FakeProcessInterop());
+        page.SetActive(true);
+        // What the shell does for the Live pill: the service pauses, then each page.
+        metrics.Pause();
+        page.SetLive(false);
+
+        cpu = 64;
+        memory = new MemorySample(75, 6UL << 30, 8UL << 30, 0, 0);
+        page.Refresh();
+
+        Assert.Equal("64%", page.CpuUsageText);
+        Assert.Equal("75%", page.MemoryUsageText);
+
+        // Still detached, so a Resume does not restart a feed for this page.
+        metrics.Resume();
+        Assert.False(timers[TestMetrics.CpuTimer].IsRunning);
+        Assert.False(timers[TestMetrics.MemoryTimer].IsRunning);
+    }
+
     private sealed class FakeSnapshotProvider(IReadOnlyList<ProcessInfo> processes) : IProcessSnapshotProvider {
         public Task<IReadOnlyList<ProcessInfo>> GetAsync(CancellationToken token = default) => Task.FromResult(processes);
     }
