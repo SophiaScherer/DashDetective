@@ -88,4 +88,43 @@ public class ToolkitActionTests {
 
         Assert.Equal(["-n", "4"], action.Arguments);
     }
+
+    /// <summary>The display line quotes a token holding whitespace; the real arguments stay unjoined.</summary>
+    [Fact]
+    public void CommandLine_TokensWithSpaces_AreQuoted() {
+        var action = ToolkitAction.Launch(@"C:\Program Files\x.exe", "a b", "plain");
+
+        Assert.Equal("\"C:\\Program Files\\x.exe\" \"a b\" plain", action.CommandLine);
+        Assert.Equal(["a b", "plain"], action.Arguments);
+    }
+
+    /// <summary>Backslashes before the closing quote are doubled so the quote is not escaped.</summary>
+    [Fact]
+    public void CommandLine_TrailingBackslashInQuotedToken_IsDoubled() {
+        var action = ToolkitAction.Launch("tool", @"C:\a b\");
+
+        Assert.Equal("tool \"C:\\a b\\\\\"", action.CommandLine);
+    }
+
+    /// <summary>An embedded quote is escaped, and the token is quoted even without whitespace.</summary>
+    [Fact]
+    public void CommandLine_EmbeddedQuote_IsEscapedAndQuoted() {
+        var action = ToolkitAction.Launch("tool", "a\"b");
+
+        Assert.Equal("tool \"a\\\"b\"", action.CommandLine);
+    }
+
+    /// <summary>The target is shown as the runner resolves it, environment variables expanded.</summary>
+    [Fact]
+    public void CommandLine_Target_IsShownExpanded() {
+        var action = ToolkitAction.Launch(OperatingSystem.IsWindows() ? "%DD_TEST_DIR%/x" : "$DD_TEST_DIR/x");
+
+        Environment.SetEnvironmentVariable("DD_TEST_DIR", "C:\\Tools");
+        try {
+            Assert.Equal(ToolkitPaths.Resolve(action.Target), action.CommandLine);
+            Assert.DoesNotContain("DD_TEST_DIR", action.CommandLine, StringComparison.Ordinal);
+        } finally {
+            Environment.SetEnvironmentVariable("DD_TEST_DIR", null);
+        }
+    }
 }
