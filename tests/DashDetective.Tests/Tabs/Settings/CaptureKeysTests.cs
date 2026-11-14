@@ -32,6 +32,17 @@ public class CaptureKeysTests {
     public void Classify_AnyOtherKey_Captures(Key key) =>
         Assert.Equal(CaptureKeyAction.Capture, CaptureKeys.Classify(key));
 
+    /// <summary>Tab and Shift+Tab are left to focus traversal, as a binding would claim them app-wide; Ctrl+Tab still binds.</summary>
+    [Theory]
+    [InlineData(KeyModifiers.None)]
+    [InlineData(KeyModifiers.Shift)]
+    public void Classify_BareOrShiftedTab_IsIgnored(KeyModifiers modifiers) =>
+        Assert.Equal(CaptureKeyAction.Ignore, CaptureKeys.Classify(Key.Tab, modifiers));
+
+    [Fact]
+    public void Classify_ControlTab_Captures() =>
+        Assert.Equal(CaptureKeyAction.Capture, CaptureKeys.Classify(Key.Tab, KeyModifiers.Control));
+
     /// <summary>The control itself has no view model to test, so its markup is pinned instead: a Cancel
     /// button that starts hidden and cannot take focus, which would stand the capture down mid-click.</summary>
     [Fact]

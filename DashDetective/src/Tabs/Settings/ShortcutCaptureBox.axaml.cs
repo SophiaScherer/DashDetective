@@ -96,9 +96,13 @@ public partial class ShortcutCaptureBox : UserControl {
         if (!IsCapturing)
             return;
 
+        var action = CaptureKeys.Classify(e.Key, e.KeyModifiers);
+        if (action == CaptureKeyAction.Ignore)
+            return;
+
         e.Handled = true;
 
-        switch (CaptureKeys.Classify(e.Key)) {
+        switch (action) {
             case CaptureKeyAction.Wait:
                 return;
             case CaptureKeyAction.Cancel:
