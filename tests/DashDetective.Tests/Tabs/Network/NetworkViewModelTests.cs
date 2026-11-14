@@ -71,6 +71,31 @@ public class NetworkViewModelTests {
         Assert.Equal(new[] { vm.DnsHost }, dns.Requests);
     }
 
+    /// <summary>Refresh repeats the lookup the user submitted, not whatever has since been typed in the box.</summary>
+    [Fact]
+    public void Refresh_AfterEditingTheBox_ReResolvesTheSubmittedHost() {
+        var (vm, dns) = Create();
+        vm.DnsHost = "a.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "b.test";
+
+        vm.Refresh();
+
+        Assert.Equal(["a.test", "a.test"], dns.Requests);
+    }
+
+    [Fact]
+    public void Refresh_AfterClearingTheBox_ReResolvesTheSubmittedHost() {
+        var (vm, dns) = Create();
+        vm.DnsHost = "a.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "";
+
+        vm.Refresh();
+
+        Assert.Equal(["a.test", "a.test"], dns.Requests);
+    }
+
     [Fact]
     public void Refresh_BeforeAnyLookup_StillResolvesNothing() {
         var (vm, dns) = Create();
@@ -251,14 +276,13 @@ public class NetworkViewModelTests {
         var (vm, dns) = CreateWithPendingDns();
         vm.DnsHost = "older.test";
         vm.LookupDnsCommand.Execute(null);
-        vm.DnsHost = "newer.test";
         vm.Refresh();
 
         dns.Complete("older.test");
         Assert.Equal("Resolving older.test…", vm.DnsFooter);
 
-        dns.Complete("newer.test");
-        Assert.Equal("Resolved newer.test", vm.DnsFooter);
+        dns.Complete("older.test");
+        Assert.Equal("Resolved older.test", vm.DnsFooter);
     }
 
     // ---- Soft-fail ----

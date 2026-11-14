@@ -258,9 +258,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// <summary>DNS footer line (timing + record type, or a failure note).</summary>
     [ObservableProperty] private string _dnsFooter = DnsIdleFooter;
 
-    /// <summary>Whether a lookup has been run this session, so Refresh re-resolves what the user asked
-    /// for rather than reaching out to a host they never requested.</summary>
-    private bool _dnsResolved;
+    /// <summary>The host of the last submitted lookup (null until one is), so Refresh never re-resolves text typed since.</summary>
+    private string? _dnsLastHost;
 
     /// <summary>Bumped by every Start and Stop; a send's reply is published only while its number is the latest.</summary>
     private int _pingSession;
@@ -599,10 +598,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Reads the DNS lookup off the UI thread and publishes the console + footer text. The
     /// provider never throws, but the fire-and-forget is guarded like the Dashboard's info loads.</summary>
-    private async Task LoadDnsAsync() {
-        _dnsResolved = true;
+    private async Task LoadDnsAsync(string host) {
+        _dnsLastHost = host;
         var generation = ++_dnsGeneration;
-        var host = DnsHost.Trim();
         try {
             var result = await _providers.Dns.GetAsync(host);
             // Awaited on the UI thread, so the continuation resumes there — safe to bind.
@@ -632,7 +630,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
             DnsFooter = $"Resolving {host}…";
         }
 
-        _ = LoadDnsAsync();
+        _ = LoadDnsAsync(host);
     }
 
     /// <summary>Asks the outside service for the public IPv4 and IPv6. Never throws; a family that fails
@@ -756,8 +754,8 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _ = LoadConnectionsAsync();
         if (PingEnabled)
             _ = RunPingAsync();
-        if (_dnsResolved)
-            _ = LoadDnsAsync();
+        if (_dnsLastHost is { } lastHost)
+            _ = LoadDnsAsync(lastHost);
         if (PublicLookedUp)
             _ = LoadPublicAddressesAsync();
     }
