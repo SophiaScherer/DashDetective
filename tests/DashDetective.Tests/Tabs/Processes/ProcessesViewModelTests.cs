@@ -289,6 +289,35 @@ public class ProcessesViewModelTests {
         viewModel.Apps.Concat(viewModel.Background).Concat(viewModel.WindowsProcesses)
                  .Single(row => row.Pid == pid);
 
+    /// <summary>A right-click inside a multi-selection moves the primary row without dropping the others.</summary>
+    [Fact]
+    public async Task PrepareContextMenu_InsideAMultiSelection_MakesTheClickedRowPrimaryAndKeepsTheRest() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+        Assert.Equal(300, viewModel.SelectedRow!.Pid);
+
+        viewModel.PrepareContextMenu(Row(viewModel, 100));
+
+        Assert.Equal(100, viewModel.SelectedRow!.Pid);
+        Assert.Equal(2, viewModel.SelectionCount);
+        Assert.True(Row(viewModel, 300).IsSelected);
+    }
+
+    [Fact]
+    public async Task PrepareContextMenu_OutsideTheSelection_ReplacesItWithTheClickedRow() {
+        var (viewModel, _) = Selectable();
+        await viewModel.LoadAsync();
+        viewModel.SelectRow(Row(viewModel, 100));
+        viewModel.SelectRow(Row(viewModel, 300), extend: true, range: false);
+
+        viewModel.PrepareContextMenu(Row(viewModel, 400));
+
+        Assert.Equal(new[] { 400 }, viewModel.SelectedPids);
+        Assert.Equal(400, viewModel.SelectedRow!.Pid);
+    }
+
     /// <summary>A search jump into a folded group must open it, or the selected row stays hidden.</summary>
     [Fact]
     public async Task Reveal_ProcessInAFoldedGroup_UnfoldsItAndSelectsTheRow() {

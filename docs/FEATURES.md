@@ -1601,8 +1601,9 @@ behind it that must not be quietly undone:
   next to a selection count. Rows also carry a context menu (End task / Properties / Expand-collapse /
   Copy PID) **declared once and shared**, never per row — a per-row `MenuFlyout` would build a few
   thousand controls for a list this long. Nothing in it binds to a row: the right-click puts the row
-  into the selection first, **on the tunneling press**, so it lands before the flyout opens.
-  `ContextRequested` was tried for that and silently never fired.
+  into the selection first (`PrepareContextMenu`: outside it replaces the selection, inside a multi-selection
+  the row becomes the primary one and the rest stay), **on the tunneling press**, so it lands before the
+  flyout opens. `ContextRequested` was tried for that and silently never fired.
 - **A plain click on the row that is the whole selection deselects it** (`ProcessRowClick`). It is
   decided on the tunneling press (click count 1, no modifier, left button) and carried out by the row's
   tap, since by the tap a double-click's first click has already changed the state; a drag cancels the

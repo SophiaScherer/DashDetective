@@ -243,13 +243,9 @@ public partial class ProcessesView : UserControl {
 
         var point = e.GetCurrentPoint(ProcessListScroll);
 
-        // A right-click opens the shared row menu, whose items act on the page's selection — so the row
-        // under the pointer has to be in it. Right-clicking inside an existing multi-selection leaves
-        // that selection alone; anywhere else replaces it with the row clicked. Done on the press, which
-        // tunnels, so it lands before the flyout opens.
+        // The row menu acts on the selection and primary row, so the clicked row must be both; on the tunneling press, before the flyout opens.
         if (point.Properties.IsRightButtonPressed) {
-            if (!row.IsSelected)
-                vm.SelectRow(row);
+            vm.PrepareContextMenu(row);
             return;
         }
 
