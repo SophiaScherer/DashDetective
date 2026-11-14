@@ -32,6 +32,9 @@ public interface IReorderablePanel {
     /// <summary>The children on screen, in the order currently shown.</summary>
     IReadOnlyList<Control> Items { get; }
 
+    /// <summary>Whether a dragged item is held inside the panel rather than following the pointer out.</summary>
+    bool ConfinesDrag { get; }
+
     /// <summary>What this press may drag, if anything.</summary>
     bool TryGetHandle(Visual source, out ReorderHandle handle);
 

@@ -65,6 +65,21 @@ public class SettingsViewModelTests {
         Assert.Equal(new[] { true }, startup.Writes);
     }
 
+    /// <summary>A write the OS rejects leaves the registration unchanged; the toggle reads the real state back and writes nothing further.</summary>
+    [Fact]
+    public void LaunchAtStartup_WriteIgnored_RevertsToRealState() {
+        var startup = new FakeStartupRegistration(enabled: false);
+        var viewModel = Create(startup);
+        var changed = 0;
+        viewModel.Changed += () => changed++;
+
+        viewModel.LaunchAtStartup = true;
+
+        Assert.False(viewModel.LaunchAtStartup);
+        Assert.Equal(new[] { true }, startup.Writes);
+        Assert.Equal(1, changed);
+    }
+
     /// <summary>The orders live on the shell, not here, so the button is a forwarder and the test is
     /// that it forwards. Resetting is idempotent, so nothing gates the command.</summary>
     [Fact]
@@ -324,6 +339,50 @@ public class SettingsViewModelTests {
 
         Assert.Equal(ScaleRange.DefaultPercent, viewModel.UiScalePercent);
         Assert.Equal(ScaleRange.DefaultPercent, viewModel.TextScalePercent);
+    }
+
+    /// <summary>The scales are reflected without a toggle's change hook, so a reset of only them must still raise Changed.</summary>
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheTextScaleMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.TextScalePercent = 150;
+        viewModel.ApplyScales();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ScaleRange.DefaultPercent, accessibility.TextScalePercent);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheInterfaceScaleMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.UiScalePercent = 150;
+        viewModel.ApplyScales();
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ScaleRange.DefaultPercent, accessibility.ScalePercent);
+        Assert.Equal(1, changes);
+    }
+
+    /// <summary>The color-vision segments are reflected through IsSelected, which raises nothing either.</summary>
+    [Fact]
+    public void ResetAccessibility_AfterOnlyTheColorVisionModeMoved_ReportsAChange() {
+        var (viewModel, accessibility) = CreateWithAccessibility();
+        viewModel.ColorVisionOptions[1].SelectCommand.Execute(null);
+        Assert.Equal(ColorVisionMode.Deuteranopia, accessibility.ColorVision);
+        var changes = 0;
+        viewModel.Changed += () => changes++;
+
+        viewModel.ResetAccessibilityCommand.Execute(null);
+
+        Assert.Equal(ColorVisionMode.None, accessibility.ColorVision);
+        Assert.Equal(1, changes);
     }
 
     /// <summary>A hand-edited settings file is normalized before the controls ever see it.</summary>

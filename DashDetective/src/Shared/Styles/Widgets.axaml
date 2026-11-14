@@ -77,6 +77,12 @@
         <Setter Property="BoxShadow" Value="{StaticResource ShadowDrag}"/>
     </Style>
 
+    <!-- Revealed from the nav bar's section list. No fade, unlike Border.revealFlash: a Background transition would also animate every widget through a theme switch. -->
+    <Style Selector="controls|WidgetPanel.highlighted /template/ Border">
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
     <!-- The same, for a plain surface dragged out of a strip: those are cards rather than widgets,
          so they have no template to reach into. -->
     <Style Selector="Border.panel.dragging, Border.card.dragging">

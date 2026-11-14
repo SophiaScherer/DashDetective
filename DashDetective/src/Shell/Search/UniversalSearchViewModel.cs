@@ -210,9 +210,15 @@ public sealed partial class UniversalSearchViewModel : ViewModelBase, IShortcutT
     }
 
     /// <summary>Puts the field away, unless the user has typed something worth keeping on screen.</summary>
-    public void CollapseIfIdle() {
+    private void CollapseIfIdle() {
         if (!IsOpen && Text.Length == 0)
             IsExpanded = false;
+    }
+
+    /// <summary>Focus left the box and dropdown: closes like Esc and collapses the field if empty. The view calls it, as only it sees where focus went.</summary>
+    public void NotifyFocusLeft() {
+        Close();
+        CollapseIfIdle();
     }
 
     /// <summary>The box took focus by some other route — the user clicked into it. Opens the same

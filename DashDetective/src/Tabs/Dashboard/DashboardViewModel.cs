@@ -27,7 +27,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
     public SavedOrder Widgets { get; } = new("dashboard");
 
-    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
+    /// <summary>The stat card row's order, a flow separate from the charts'.</summary>
+    public SavedOrder CardOrder { get; } = new("dashboard.cards");
+
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets, CardOrder];
 
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
@@ -232,13 +235,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // pill is on.
         _gate = new SamplingGate(ApplySampling);
 
-        // Load static CPU hardware info off the UI thread; results are applied when ready.
-        _ = LoadCpuInfoAsync();
-        _ = LoadMemoryInfoAsync();
-        _ = LoadGpusAsync();
-        _ = LoadSystemInfoAsync();
-        _ = LoadDisksAsync();
+        // Load static hardware info off the UI thread; results are applied when ready.
+        InitialLoad = Task.WhenAll(
+            LoadCpuInfoAsync(), LoadMemoryInfoAsync(), LoadGpusAsync(), LoadSystemInfoAsync(), LoadDisksAsync());
     }
+
+    /// <summary>The loads the constructor starts, so a test can await them instead of guessing how long
+    /// they take. Each soft-fails on its own, so this never faults.</summary>
+    internal Task InitialLoad { get; }
 
     /// <summary>
     /// Forces an immediate update of every metric and re-reads the static hardware/system info,
@@ -247,6 +251,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     public void RefreshNow() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         UpdateUptime();
 
         _ = LoadCpuInfoAsync();
@@ -408,8 +413,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same adapters; one still present keeps its accumulated trace.
             rebuilt.Add((
                 key,
-                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "%",
-                                  OpenInPerformance) { Sub = gpu.Sub },
+                // Built on the placeholder: a sampler with nothing to say must not leave a confident 0.
+                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "",
+                                  OpenInPerformance) { Value = Placeholders.NoReading, Sub = gpu.Sub },
                 gpu.GpuPci?.VendorId,
                 _gpuHistories.TryGetValue(key, out var previous) ? previous : new MetricHistory(WindowSeconds)));
         }
@@ -719,8 +725,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same disks; one still present keeps its accumulated trace.
             rebuilt.Add((
                 drive.DiskNumber,
+                // Built on the placeholder, as the GPU cards are; the first sample restores the unit.
                 new DashboardCard(DeviceCategory.Disk, DeviceIds.Disk(drive.DiskNumber),
-                                  drive.Name.ToUpperInvariant(), "%", OpenInPerformance) {
+                                  drive.Name.ToUpperInvariant(), "", OpenInPerformance) {
+                    Value = Placeholders.NoReading,
                     Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
                 },
                 _diskHistories.TryGetValue(drive.DiskNumber, out var previous)
@@ -769,7 +777,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
     /// Manager's disk "Active time", 0–100 %), and feeds the system drive's own reading to the report/CSV
-    /// surfaces. Disks without a current reading are left unchanged.</summary>
+    /// surfaces. Disks without a current reading are left unchanged, on the "—" they were built with.</summary>
     private void UpdateDiskThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (sample.DiskNumber == _systemDiskNumber)
@@ -780,6 +788,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
                 continue;
             history.Push(sample.ActivePercent);
             card.Value = Math.Round(sample.ActivePercent).ToString(CultureInfo.InvariantCulture);
+            card.Unit = "%";
             card.Points = history.Points(100);
         }
     }

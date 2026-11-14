@@ -36,5 +36,14 @@ internal sealed class MetricSubscriptions(params Func<IDisposable>[] subscribe) 
         _tokens = null;
     }
 
+    /// <summary>Hands a detached page each feed's latest outcome by attaching and releasing at once; no-op while attached.</summary>
+    public void Replay() {
+        if (_tokens is not null)
+            return;
+
+        Attach();
+        Detach();
+    }
+
     public void Dispose() => Detach();
 }

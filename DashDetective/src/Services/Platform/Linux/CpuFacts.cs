@@ -14,7 +14,7 @@ namespace DashDetective.Services.Platform.Linux;
 /// stand-in. Each consumer applies its own placeholder, because they differ ("Unknown processor" on the
 /// Dashboard, "—" on the Hardware card) and because a substitution made here would be invisible to both.
 /// </summary>
-internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores, double MaxClockMhz) {
+internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores, double BaseClockMhz) {
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string CpuInfoPath = "/proc/cpuinfo";
     private const string CpuRoot = "/sys/devices/system/cpu";
@@ -33,32 +33,48 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
 
         var name = ProcCpuinfoParser.Value(blocks[0], "model name");
 
-        return new CpuFacts(name, PhysicalCoresOf(blocks), blocks.Count, MaxClockMhzOf(proc, name));
+        return new CpuFacts(name, PhysicalCoresOf(blocks), blocks.Count, BaseClockMhzOf(proc, name));
     }
 
     /// <summary>
-    /// The L3 cache size in kilobytes, from <c>cpu0</c>'s <c>cache/index*</c> entries; 0 when the CPU has
-    /// no L3 or sysfs does not describe its caches (the usual case in a VM). Deliberately <b>not</b> a
-    /// field of this record: only the Hardware tab's Processor card has a row for it, and the Dashboard
-    /// should not pay for a directory walk it will not render.
-    ///
-    /// The kernel writes the size with a unit suffix ("8192K", "16M"), never as a byte count — reading it
-    /// as a bare number would be off by three orders of magnitude.
+    /// The package's L3 in kilobytes, summed over distinct instances because each CCD has its own; 0 when absent.
     /// </summary>
     internal static long L3CacheKilobytes(IProcFileSystem proc) {
-        const string cacheRoot = CpuRoot + "/cpu0/cache";
+        var package = PackageOf(proc, "cpu0");
+        var instances = new Dictionary<string, long>(StringComparer.Ordinal);
 
-        foreach (var entry in proc.ListDirectory(cacheRoot)) {
-            var level = proc.ReadAllText(cacheRoot + "/" + entry + "/level")?.Trim();
-            if (level != "3")
+        foreach (var cpu in proc.ListDirectory(CpuRoot)) {
+            if (!IsCpuDirectory(cpu) || PackageOf(proc, cpu) != package)
                 continue;
 
-            var size = proc.ReadAllText(cacheRoot + "/" + entry + "/size")?.Trim();
-            if (size is not null)
-                return ParseCacheKilobytes(size);
+            var cacheRoot = CpuRoot + "/" + cpu + "/cache";
+            foreach (var entry in proc.ListDirectory(cacheRoot)) {
+                var index = cacheRoot + "/" + entry;
+                if (proc.ReadAllText(index + "/level")?.Trim() != "3"
+                    || proc.ReadAllText(index + "/size")?.Trim() is not { } size)
+                    continue;
+
+                instances.TryAdd(L3InstanceKey(proc, index), ParseCacheKilobytes(size));
+            }
         }
 
-        return 0;
+        long total = 0;
+        foreach (var kilobytes in instances.Values)
+            total += kilobytes;
+
+        return total;
+    }
+
+    /// <summary>A core's package; "" when unreadable, which matches every such core.</summary>
+    private static string PackageOf(IProcFileSystem proc, string cpu) =>
+        proc.ReadAllText(CpuRoot + "/" + cpu + "/topology/physical_package_id")?.Trim() ?? "";
+
+    /// <summary>Identifies one L3 instance: <c>id</c>, else <c>shared_cpu_list</c>, else "" so it counts once, not per core.</summary>
+    private static string L3InstanceKey(IProcFileSystem proc, string index) {
+        if (proc.ReadAllText(index + "/id")?.Trim() is { Length: > 0 } id)
+            return "id:" + id;
+
+        return proc.ReadAllText(index + "/shared_cpu_list")?.Trim() is { Length: > 0 } cpus ? "cpus:" + cpus : "";
     }
 
     /// <summary>Converts a sysfs cache size ("8192K", "16M") to kilobytes; 0 when unparseable.</summary>
@@ -110,31 +126,33 @@ internal sealed record CpuFacts(string Name, int PhysicalCores, int LogicalCores
     }
 
     /// <summary>
-    /// The rated maximum clock in MHz. Prefers <c>cpufreq</c>'s <c>cpuinfo_max_freq</c> (kHz), taking the
-    /// highest across the online cores so a heterogeneous chip reports its fast cores rather than whichever
-    /// one happens to be <c>cpu0</c>. Falls back to the clock in the model name
-    /// ("… CPU @ 3.60GHz"), which is the rated base clock and survives the VMs where <c>cpufreq</c> is
-    /// absent entirely.
-    ///
-    /// <b><c>cpu MHz</c> is deliberately not consulted.</b> It is the core's clock at the instant of the
-    /// read, so under a scaling governor it reports an idle 800 MHz under a "max" label — the near-miss
-    /// this port refuses to substitute. The live clock has its own reader in
-    /// <c>LinuxProcessorFrequencySampler</c>.
+    /// The rated base in MHz: intel_pstate's base, then CPPC's nominal frequency, then the model name's clock. <c>cpuinfo_max_freq</c> (turbo) and <c>cpu MHz</c> (instantaneous) are deliberately never used.
     /// </summary>
-    private static double MaxClockMhzOf(IProcFileSystem proc, string modelName) {
-        double kHz = 0;
+    private static double BaseClockMhzOf(IProcFileSystem proc, string modelName) {
+        var baseKhz = HighestPerCore(proc, "/cpufreq/base_frequency");
+        if (baseKhz > 0)
+            return baseKhz / 1000.0;
+
+        var nominalMhz = HighestPerCore(proc, "/acpi_cppc/nominal_freq");
+        return nominalMhz > 0 ? nominalMhz : ModelNameMhz(modelName);
+    }
+    /// <summary>The highest positive value one per-core file holds across online cores, or 0 if none is readable.</summary>
+    /// core has a readable one.</summary>
+    private static double HighestPerCore(IProcFileSystem proc, string file) {
+        double highest = 0;
         foreach (var entry in proc.ListDirectory(CpuRoot)) {
             if (!IsCpuDirectory(entry))
                 continue;
 
-            var text = proc.ReadAllText(CpuRoot + "/" + entry + "/cpufreq/cpuinfo_max_freq");
+            var text = proc.ReadAllText(CpuRoot + "/" + entry + file);
             if (text is not null
                 && double.TryParse(
-                    text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
-                kHz = Math.Max(kHz, value);
+                    text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+                && double.IsFinite(value))
+                highest = Math.Max(highest, value);
         }
 
-        return kHz > 0 ? kHz / 1000.0 : ModelNameMhz(modelName);
+        return highest;
     }
 
     /// <summary>Whether a <c>/sys/devices/system/cpu</c> entry is a per-core directory (<c>cpu0</c>,

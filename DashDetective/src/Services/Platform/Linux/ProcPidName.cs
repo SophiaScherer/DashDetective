@@ -20,6 +20,9 @@ internal static class ProcPidName {
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string ProcRoot = "/proc/";
 
+    /// <summary>The kernel's limit on <c>comm</c>: TASK_COMM_LEN less its terminator.</summary>
+    private const int CommLength = 15;
+
     /// <summary>The name for a PID, reading both sources itself. For callers that have not already parsed
     /// <c>stat</c> — the ones that want a name and nothing else.</summary>
     internal static string Read(IProcFileSystem proc, int pid) {
@@ -28,10 +31,14 @@ internal static class ProcPidName {
     }
 
     /// <summary>The name from sources the caller already holds. <c>cmdline</c> is preferred because
-    /// <c>comm</c> truncates at 15 characters.</summary>
+    /// <c>comm</c> truncates at 15 characters — unless argv[0] is a rewritten title, which is not a
+    /// path.</summary>
     internal static string From(string? cmdline, string comm) {
-        var name = Basename(FirstArgument(cmdline));
-        return name.Length > 0 ? name : comm;
+        var argv0 = FirstArgument(cmdline);
+        if (argv0.Length == 0 || IsRewrittenTitle(cmdline!, argv0, comm))
+            return comm;
+
+        return Basename(argv0);
     }
 
     /// <summary>Whether the process has a user-space command line at all. Empty means a kernel thread or a
@@ -46,6 +53,22 @@ internal static class ProcPidName {
 
         var nul = cmdline.IndexOf('\0');
         return (nul < 0 ? cmdline : cmdline[..nul]).Trim();
+    }
+
+    /// <summary>Whether argv[0] is a rewritten title (sshd's "sshd: user@pts/0") whose last '/' segment is junk, not a path containing a space.</summary>
+    private static bool IsRewrittenTitle(string cmdline, string argv0, string comm) {
+        if (comm.Length == 0 || !argv0.Contains(' ', StringComparison.Ordinal) || HasLaterArgument(cmdline))
+            return false;
+
+        // comm is cut at 15 characters, so a 15-character comm only has to be a prefix of the name.
+        var name = Basename(argv0);
+        return !(name == comm || (comm.Length == CommLength && name.StartsWith(comm, StringComparison.Ordinal)));
+    }
+
+    /// <summary>Whether a non-empty argument follows argv[0]; a title written over the argument area leaves NUL padding instead.</summary>
+    private static bool HasLaterArgument(string cmdline) {
+        var nul = cmdline.IndexOf('\0');
+        return nul >= 0 && cmdline.AsSpan(nul).TrimStart('\0').Trim().Length > 0;
     }
 
     private static string Basename(string path) {

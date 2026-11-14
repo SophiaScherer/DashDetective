@@ -27,6 +27,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) first for how the pieces fit together, a
 - [Hardware](#hardware)
 - [Page lifecycle](#page-lifecycle)
 - [Wheel scrolling](#wheel-scrolling)
+- [Tooltip tracking](#tooltip-tracking)
 - [Widget system](#widget-system)
 - [Multi-GPU](#multi-gpu)
 - [Repo-hygiene / portfolio pass](#repo-hygiene--portfolio-pass)
@@ -59,7 +60,7 @@ point drives the **same shared** `NavigationViewModel`:
   items, the footer and any empty space all reach it.
 - **Re-dock by drag** — press and drag the **brand area** to the nearest window edge. The bar **dims
   in place** for the gesture while an accent drop band and a cursor chip preview the target edge.
-- **Motion — the bar is the ONE place in this app that animates**, and only for its own two moves. A
+- **Motion — the bar animates its own two moves and a hover.** A
   **collapse tweens a vertical rail's width** (~150ms, `CubicEaseOut`), on `Border.rail:not(.horizontal)`
   only: a horizontal bar's height follows its content, so there is no fixed value to tween between, and
   `RailWidth` is `NaN` on that axis. A **re-dock fades** — out 120ms, change edge, back in — because
@@ -67,9 +68,58 @@ point drives the **same shared** `NavigationViewModel`:
   funnels through `BeginRelocate`, so none can skip it, and the move takes **two timer beats**: the first
   changes the edge while still faded out and with size transitions suspended by the `.relocating` class,
   the second fades back in. `.relocating` is declared **after** the drag dim so it wins the overlap — a
-  dropped drag re-docks before `EndDrag` clears the dim. This is a deliberate exception to the app's
-  otherwise instant styling, not a licence to animate elsewhere; the row-hover rule below still stands.
+  dropped drag re-docks before `EndDrag` clears the dim. These tweens are earned by moves that would
+  otherwise read as glitches, not a licence to animate the bar's styling; the row-hover rule below still stands.
+- **Hover lift** (work item 49) — a nav row's icon and label rise 1.5px as the pointer passes, over a
+  120ms `CubicEaseOut` `TransformOperationsTransition`, upward on every dock edge. Decisions inside it:
+  it is a **render transform on `StackPanel.navContent` only**, so layout never changes, no neighbor
+  moves and the hover background and accent indicator stay where they are; the hover background itself
+  keeps no transition, per the row-hover rule. The duration is time-based, so it runs at one speed at
+  every interface and text size; the 1.5px is in DIPs inside the `ScaleHost`, so the distance grows with
+  the interface size as everything else does. **The selected row lifts too** — it is still a button, and
+  rows that answer the pointer alike read as one control. **Pointer only**: keyboard focus already draws
+  Fluent's ring, and a lift on focus would fight it. A list scrolled under a resting pointer lifts each
+  row briefly as it passes; that is the transition on the content rather than the hover-bearing element,
+  so it reads as a ripple rather than the smeared highlight the row-hover rule guards against. **Reduce
+  motion drops the tween AND the lift** (an instant 1.5px jump is still motion), from a rule in
+  `NavigationView.axaml` declared after the hover rule so it wins while both match;
+  `NavigationViewMotionTests` pins the direction, size, tween and that ordering.
 - **Settings → Appearance → Navigation** — Position + Collapse, both segmented controls.
+- **Page sections** (work item 46) — **press the current page's nav item again** for an "On this page"
+  list of its sections; choosing one scrolls it to the top of its scroller and flashes it. A section is a
+  visible `WidgetPanel` with a title, or a card marked `pageSection` and titled by its automation name
+  (the Hardware cards, which are not widgets), outermost only, listed in reading order of where it was
+  **arranged** — rows top to bottom, left to right within a row — because widgets are reordered by
+  dragging and the markup order is stale. Pages with fewer than two have no list. Decisions inside it:
+  - **Hardware is marked, not rebuilt.** Its cards draw their own icon-tile header, so making them
+    `WidgetPanel`s would redraw the page. The marker class is the whole change: the reader accepts it,
+    and the card also takes `revealFlash` so a pick tints its surface (a widget's flash also turns its
+    border to the accent; the card's does not). A machine with two GPUs lists
+    Graphics twice, in page order, since the list shows titles only.
+  - **The item itself is the trigger, with a caret as the cue**, not a second button. A caret button at
+    the end of the row was the first idea, but it would nest inside or overlay the item's own button, add
+    a tab stop to every page, and have nowhere to go on a horizontal bar without moving its neighbors.
+    The caret glyph (`Icons.CaretDown`) shows on the selected item only when the page has sections, and
+    overlays the row's padding so it never moves anything: at the end of an expanded vertical row, under
+    the icon on a collapsed rail, in the trailing padding of a horizontal item. Keyboard: Tab to the
+    selected item and press Enter; the first section takes focus, Esc closes.
+  - **`Activate`, not `Navigate`, is the item's press.** `Navigate` is also what `Ctrl+1…9`, search and
+    the cross-page jumps call, and landing on the page already showing must not open a list.
+  - **Built live, on every open and every page change**, from the page's visual tree in `MainWindow`
+    (`RefreshSections`): the view model never holds a control, and a reorder or a fold since the last
+    read is always reflected. Nothing persists.
+  - **The scroll asks for a viewport-tall rect from just above the widget**, so its heading lands at the
+    top rather than wherever it first comes into view. `BringIntoView` finds the nearest scroller, so a
+    self-scrolling page's own pane scrolls instead of the shell's; a folded widget is its header, so
+    that is what shows.
+  - **The popup is the Processes options shape**: one `ScaleHost` of its own, not light-dismissed so the
+    window stays hoverable, an outside press closing it from code-behind, and `IsOpen` bound two-way.
+    Esc is the shortcut chain's while focus is in the window (`HandleSectionsShortcut`, beside the
+    search dropdown's step) and the popup's own `KeyDown` while focus is inside it, since the popup is a
+    separate visual root the window's listener never sees.
+  - **The flash is `WidgetPanel.highlighted`**, tinting the whole surface for `RevealFlash`'s hold. It
+    does not fade, unlike `Border.revealFlash`: a transition on the surface would also animate every
+    widget through a theme switch while the page behind it snaps.
 
 The footer avatar shows the **device's own account picture** when the OS has one, read through the
 `IUserPictureProvider` seam (`src/Services/Identity`) — the `AccountPicture\Users\{SID}` registry index
@@ -297,7 +347,9 @@ purpose: they are entry points into Performance, where the bells are (see *Setti
 Storage: the Storage `StatCard` shows live disk
 **Active time %** (headline value + sparkline, both from PDH `\PhysicalDisk(_Total)\% Idle Time`
 as `100 − idle`), with a system-drive capacity caption (`used / total` via `System.IO.DriveInfo`,
-no WMI). Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
+no WMI). Each GPU and disk card is built on `Placeholders.NoReading` with no unit and keeps it until
+its sampler reports, so an inert or unsupported sampler shows "—" rather than an idle 0; the Performance
+tab's disk rows and their Active / Read / Write / Response tiles follow the same rule. Network: the Network `StatCard` and the "Network Throughput" panel show live download/upload
 in **Mbps** (dual series on one shared scale + gradient fill, keyed by a `ChartLegend`) with a live
 adapter-name caption, via `NetworkUsageSampler` (managed `System.Net.NetworkInformation`, no P/Invoke —
 see the sampler note in *Folder Structure*). Every chart on the page states its own scale: the three
@@ -341,9 +393,32 @@ and on capture loss, so a later keyboard press or UI Automation Invoke is never 
 click. Its two pointer clicks never reach the command, so a double click opens exactly once. Tooltips
 say so (*Double-click to open … in Performance*); the **accessible names do not** (*Open CPU in
 Performance*), because a keyboard or screen-reader user presses Enter, and a card's name is its heading
-and reading. The stat cards have no drag to protect (their panel sets no `DragGrip`), and the charts'
-drag lives on the widget header, which the gate does not touch. Nothing else in the app changed:
+and reading. A card's drag does not compete with it: the drag starts only once a press moves past the
+threshold, and a double click does not move. The charts' drag lives on the widget header, which the gate
+does not touch. Nothing else in the app changed:
 buttons and links such as *View in Hardware* are explicit controls and keep a single click.
+
+**The stat cards reorder among themselves, and only there** (work item 15). The card row and the charts
+below it are two separate flows: a card is dragged along its own row (or its own rows, once it wraps) and
+cannot reach the charts, and a chart cannot be dropped into the card row. Four decisions:
+
+- **The row is its own strip, saved under `dashboard.cards`**, beside the board's `dashboard`. Both are
+  `SavedOrder`s on the page, so the Settings *Layout* card's reset and `Ctrl+Shift+←/→` reach the cards
+  through the existing paths, and the drag's slide and Reduce motion come from `ReorderablePanel` as on
+  every other strip.
+- **The whole `DashboardLink` is the grip** (`DragGrip="Marked"` with `Reorder.IsGrip` on the link),
+  because a card is a button and `ReorderGrip.Item` refuses a press on one. The drag captures only past
+  the threshold, which cancels the button's own press, so a still press is the link's as before.
+- **The held card is confined to the row** (`ConfineDrag`), so it cannot be drawn over a chart it can
+  never land on.
+- **The row has no widget id, and a child with none is a fixed point** (`ChildOrder.Move`): a chart dragged
+  over it stops below it, and a keyboard move that falls through from the row's last card to the board does
+  not carry the whole row in among the charts.
+
+A card's id is its device id, except a GPU's, which goes by its label — "GPU" alone, "GPU 0", "GPU 1" once
+there are several — because the device id carries the adapter LUID, which Windows mints again every boot. A
+GPU count that changes between runs renames them, so their saved slots are dropped and they return to their
+declared place among the cards; nothing else in the order moves.
 
 ## Universal search
 
@@ -411,6 +486,11 @@ seven categories at once and navigates to whatever is picked, revealing it in pl
   the box's `GotFocus` re-opened the dropdown re-entrantly. `NotifyFocused` therefore ignores focus
   that arrives while `IsOpen` is being written false. Do not make the binding OneWay again or re-open
   from a focus handler without that guard.
+- **Focus leaving the box puts the dropdown away** (work item 100). The popup is not light-dismiss and
+  the outside-click watcher only hears presses, so tabbing out left it open over every page, with the
+  Search scope taking the bare arrow keys app-wide until Esc. When focus lands on anything but the box or
+  the popup, `NotifyFocusLeft` closes it as Esc does, keeping the term, and collapses an empty field. A
+  press on a result row moves focus into the popup, which is why the popup is excluded.
 - **Recents.** The last eight things opened, persisted through `AppSettings.RecentSearches` as one
   opaque string. Opening one re-runs the search and matches by identity, so an entry naming a deleted
   file or an exited process drops itself rather than promising something that no longer works.
@@ -628,7 +708,9 @@ search and revealable on its own row.
   keyboard is on. On by default because an unused gesture costs nothing.
 - **Restore defaults**, ungated like the Layout card's reset, confirmed through `NoticeService`. It
   resets the whole `AccessibilityService`, so a later option is covered by it for free simply by
-  becoming a property on that service.
+  becoming a property on that service. **It raises `Changed` itself** so the shell saves the reset: the
+  scales and the color-vision segments are reflected back without passing through a change hook, so a
+  reset that moved only those was undone on the next launch (work item 107).
 
 **One transform, not a font-size sweep.** `ScaleHost` (`src/Shared/Controls`) is a
 `LayoutTransformControl` that measures its content at the reduced size and renders it enlarged, so
@@ -637,9 +719,9 @@ merely bigger. `Sparkline` composes its own axis text with `FormattedText` and s
 subtree, so charts needed nothing either.
 
 **One `ScaleHost` per visual root.** A popup, a flyout and a second window are each their own tree
-and inherit nothing from the shell's, so there are seven: `MainWindow`, `TrayNoticeWindow`, and the
-five popups (universal search, the navigation dock flyout, the File Explorer and Processes options
-menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
+and inherit nothing from the shell's, so there are eight: `MainWindow`, `TrayNoticeWindow`, and the
+six popups (universal search, the navigation dock flyout and section list, the File Explorer and
+Processes options menus, the Storage drive picker). **The two Fluent templates the app cannot wrap** — the tooltip and
 the context-menu presenter — follow the scale by type size instead, through the `PopupFontSize`
 resource. **The custom title bar sits outside `MainWindow`'s host on purpose**, beside caption buttons
 drawn at the OS's scale — see *Window chrome*.
@@ -732,9 +814,13 @@ about that selector are easy to get wrong, and both were measured rather than as
   and the loading pulse's in `ProcessesView.axaml`. Only the reveal flash, whose transition is app-level,
   is undone from `SharedStyles.axaml`.
 
-**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, and
+**What it covers:** the navigation rail's width, height and opacity tweens, the reveal flash's fade, the
+drag-to-reorder slides (read in code from the window's class, since they are not a style transition), and
 the Processes loading pulse — the app's only endlessly repeating animation, which drops from
 `IterationCount="INFINITE"` to a single pass that leaves the placeholder at its dim end.
+
+- **The navigation rows' hover lift** (work item 49) is covered too: the tween and the 1.5px lift both go,
+  from a rule in `NavigationView.axaml` declared after the hover rule.
 
 **Verified by timing rather than by eye.** Collapsing the navigation bar and sampling the rail's width as
 the click returns gives **205px mid-flight, 70px settled** with motion on — caught mid-tween — against
@@ -809,7 +895,11 @@ cards together.
 than by each view. Most cards are a plain `Border` with no control inside, so before this a page was
 reachable only if one of its items happened to contain a button: Hardware, Storage and the Processes
 summary tiles were dead zones for Tab, and could not be reordered at all. Avalonia draws its own focus
-ring on the focused card, so the target is visible without a style of ours.
+ring on the focused card, so the target is visible without a style of ours. **The exception is a
+generated item whose template root is itself a focusable control** — a Dashboard card's link, a Performance
+rail row's button: that control is the stop, and its container is left out, or each item took two Tab
+presses, the first landing on a ring that did nothing. The keyboard move still finds the item from the
+control, since it walks out from whatever has focus.
 
 Two things about that are worth knowing:
 
@@ -823,6 +913,11 @@ Two things about that are worth knowing:
 The gesture is answered in `MainWindow` rather than the view model, because it turns on which control has
 focus and only the window knows that. Focus lands on something *inside* a widget — a chevron, a button in
 its body — so the handler walks out to the nearest `ReorderablePanel` before asking it to move.
+
+**Except from a text box.** Both moves are `AllowInTextInput: false`, because `Ctrl+Shift+←/→` selects by
+word in a text field: in the Network tab's Ping or DNS box it moved the widget and persisted the order
+instead (work item 98). The guard sits on the action, so a rebind keeps it. To move a widget that holds a
+field, Tab off the field to the card or any other control in it first.
 
 **`Ctrl+Shift` rather than `Alt`+arrow**, which Processes already uses to sort and File Explorer to go up
 a folder. It is a `ShortcutCatalog` entry like every other gesture, so Help lists it and the Settings
@@ -1168,8 +1263,10 @@ callback (the NavItem pattern), with the VM enforcing single selection.
 
 Notable choices / deferred bits: this tab introduces the app's **first hierarchical control**
 (`TreeView`) — an intentional, signed-off architecture addition. Tree roots are **drives**, not a
-synthetic "This PC" node. Navigating via the list/breadcrumb does **not** sync the tree selection
-(deferred by choice). Filter chips reuse the shared **segmented control** (`Border.seg`), not the
+synthetic "This PC" node. Navigating via Back, Up, the list or the breadcrumb selects the folder's
+tree node when its branch is loaded (`SyncTreeSelection`), and clears the old highlight otherwise.
+That selection re-enters `OnNodeSelected`, which therefore **skips the folder already open**: reading
+it again dropped the file a search jump had selected. Filter chips reuse the shared **segmented control** (`Border.seg`), not the
 comp's softer chip; the details **preview** is a solid themed swatch, not the comp's literal
 diagonal hatch. `TreeView` selection/hover colours are overridden to `AccentSoft`/`HoverOverlay`,
 and the Fluent default hover is suppressed (it otherwise greys the whole ancestor chain, since a
@@ -1239,6 +1336,9 @@ tab-local except the shared refresh seam:
   silently, so a stale universal-search hit is not a dead button. The error row uses a `Margin`, **not**
   the grid's `RowSpacing` — Avalonia applies row spacing even to a zero-height row, which would cost the
   bar 4 px permanently.
+- **A typed path is absolute or refused.** `Path.GetFullPath` resolves a relative name (and `"C:"`, which is
+  drive-relative) against the process working directory, so `RootTypedPath` runs first: a bare drive letter
+  becomes that drive's root, `C:foo` and any other relative name get the "Can't find" error.
 
 **Layout & scrolling (design rework).** The three panes are now **independently scrollable** and
 **user-resizable**. Independent scrolling required a shell change: the page-host `ScrollViewer` in
@@ -1414,7 +1514,9 @@ process — `stat`, `status`, `cmdline`, `cgroup`, `io` — of which **only `sta
 exceptional one. `ProcessGpuSampler`, `ProcessMemorySampler` and `ProcessClassifier` are reached only from
 the Windows provider, so the Linux one replaces all three rather than seaming them. Names come from
 `cmdline`'s first **NUL-separated** argument (basename, **no `.exe`** — that suffix is the Windows
-provider's), falling back to `comm`, which truncates at 15 characters. CPU% is the `utime + stime` delta
+provider's), falling back to `comm`, which truncates at 15 characters. A process that **rewrites its
+title** over its arguments (sshd's `sshd: user@pts/0`, a Chromium renderer) also falls back to `comm`,
+since its argv[0] is not a path. CPU% is the `utime + stime` delta
 over `USER_HZ` (hardcoded 100 — there is no rootless `sysconf(_SC_CLK_TCK)`), wall clock and core count.
 `LinuxProcessClassifier` replaces the window test with `/proc/[pid]/cgroup`, because **the X11 route is a
 dead end**: the target desktop is GNOME on Wayland, where no client may enumerate another's windows by
@@ -1508,6 +1610,7 @@ behind it that must not be quietly undone:
   tap, so it never clears. A row inside a multi-selection still collapses to itself.
 - **Group sections fold**, and double-clicking a row does what its chevron does. Folding hides the list
   and nothing else — the count, the filter and the selection keep meaning the same thing.
+  `Reveal` (a universal-search jump) unfolds the target's group first, so the row it selects is visible.
 - **Placeholder rows until the first enumeration lands**, because an empty list reads as "no processes
   running". `HasLoaded` is set on success AND on failure, never on cancellation: a page that failed has
   an answer, whereas a cancelled read means the user left and nothing was learned. The summary reads
@@ -1798,6 +1901,9 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
      A single click and a search result only select it. The Execution Log's `$` line prints the
      resolved target and arguments, so a row whose label disagrees with what it runs is visible the
      moment it fires.
+- **Deleting the command open in the edit form closes the form.** Saving would otherwise find no row to
+  replace (`UpdateCommand` returns quietly) and the edit would vanish. `RemoveCommand` calls
+  `Form.CancelIfEditing`; deleting a different row leaves the form open.
 
   Accepted, documented residual risk: `settings.json` can now put a mislabelled runnable row on the page if
   it is tampered with. That is not an escalation — anything able to write `%AppData%\DashDetective` can
@@ -2081,6 +2187,10 @@ Ctrl+digit tab jumps run **Ctrl+1 … Ctrl+9**.
 
 *Shipped — branch `hardwareCardHeights`, 2026-10.*
 
+**Each card is a nav bar section.** It carries `pageSection`, so the "On this page" list (see *Navigation
+bar*) lists it under its automation name, and `revealFlash`, so a pick tints it. The cards are not
+`WidgetPanel`s, and marking them is what keeps the page from being rebuilt as widgets.
+
 **Cards in a row share one height, and no card owns a height.** The page is a `UniformFlowPanel`, which
 already arranges every child at its row's height (the tallest card's). The cards used to opt out with
 `VerticalAlignment="Top"`, so each drew at its own content height and a row's bottoms never lined up
@@ -2095,6 +2205,32 @@ already arranges every child at its row's height (the tallest card's). The cards
   row (Sensors, or Storage Devices once the grid wraps) from looking stubby. It is a `MinHeight`, so a card
   still grows past it with its rows and with text size, and content stays top-aligned inside the stretched
   surface, the spare space falling at the bottom.
+
+**On Linux a GPU is named by its product, and an empty row falls back to the part's datasheet.** The kernel
+gives a graphics adapter's PCI ids and nothing more, so the Graphics card used to read
+`NVIDIA nvidia (10de:2504)` and match nothing in the spec catalog. `PciIdDatabase` reads the system's own
+`pci.ids` (the table `lspci` uses) and names the card by the bracketed product in its entry, `NVIDIA
+GeForce RTX 3060 Lite Hash Rate` rather than `GA106 [GeForce RTX 3060 Lite Hash Rate]`, which the catalog
+then matches. The chip codename is dropped because Windows names the same card without it; an entry with no
+bracket, or with text after it, is used whole, and a product that already names its vendor ("Intel Arc
+Graphics") is not prefixed twice. The Processor card's base clock, L3 and socket take the catalog's rated
+value where the machine reports none, which is the ordinary case in a VM. Three decisions inside it:
+
+- **The machine's reading always wins.** The datasheet fills only an empty row, never a reported one, or a
+  down-binned or power-limited chip would show someone else's numbers. WMI's socket designation, the
+  driver's VRAM and a live L3 read all keep their place. The same honesty applies to the name: where
+  `pci.ids` lists several models under one device id ("Radeon RX 7700 XT / 7800 XT") the catalog is not
+  consulted at all, since its token match would pick one of them.
+- **Nothing is bundled.** `pci.ids` is read from the host (`hwdata`/`pciutils`), and a host without it keeps
+  the name sysfs alone can compose. Only the two readers that display a name pay for the scan
+  (`DrmCardFacts.ReadNamed`); the per-tick samplers keep the free walk, and `DrmCardFacts.Key` is untouched.
+- **Linux's base clock is the rated base, never the turbo ceiling.** `CpuFacts.BaseClockMhz` reads intel_pstate's
+  `base_frequency` (present only with HWP, Skylake and later), then ACPI CPPC's `nominal_freq` (where
+  amd-pstate publishes its nominal frequency), then the model name's "@ 3.60GHz". `cpuinfo_max_freq` is not a
+  source: under intel_pstate and amd-pstate it is the maximum turbo, so it read "5.3 / 5.3 GHz" and hid the
+  datasheet's base. With none of the three the base is unknown and the catalog's rated base shows. The same
+  figure feeds the Dashboard caption and the CPU card subtitles, which on Windows show WMI's
+  `MaxClockSpeed`, also the base.
 
 ## Page lifecycle
 
@@ -2111,6 +2247,11 @@ Three rules, and they are load-bearing — a page that breaks one is a regressio
    The service's own alert watcher follows the same rule, behind `AlertsEnabled`.
 3. **Nothing reaches the network on its own.** The Network tab's ping is opt-in and defaults to the
    machine's own gateway; its DNS lookup runs only when asked. Neither may move back into a constructor.
+
+**Refresh still works while paused**, without breaking rule 2. `SystemMetricsService.RefreshAll` samples
+every feed, even one with no subscribers, and a paused page takes that sample through
+`MetricSubscriptions.Replay`. Replay attaches and releases at once, so the page updates once and holds no
+feed open afterward. The service is paused, so the brief attach starts no timer.
 
 What stays in constructors is the **one-shot** loads, because the shell's exported report and universal
 search read them from pages the user may never open (`LoadAdaptersAsync`, the Processes list load, the
@@ -2153,6 +2294,23 @@ Three decisions inside it:
 The setting is read per notch behind `IWheelScrollLines`, not cached: the Mouse control panel can change it
 under a running app. Linux keeps the value in each desktop environment's own store, so there is nothing
 single to read and no Linux arm — it takes `Unsupported*` and the default.
+
+## Tooltip tracking
+
+*Shipped — branch `tooltipFollowsCursor`, 2026-11.*
+
+**An open tooltip follows the cursor while the pointer stays over its owner.** Avalonia places a tip at the pointer once, when it opens, and leaves it there. On a large owner — a Dashboard stat card or chart — the tip then sat where the pointer entered while the pointer moved on, which read as a tip that would not dismiss. `ToolTipTracking`, attached to every top level by the app-level style in `SharedStyles.axaml`, re-places the open tip on each move over its owner.
+
+Four decisions inside it:
+
+- **Dismissal stays the framework's.** Avalonia already closes a tip when the pointer moves off its owner, and re-checks the control under a still pointer after a layout or scroll change. An app-side dismissal guard was written once and reverted as redundant; this adds tracking only.
+- **The tip is re-placed by changing its owner's offset.** Avalonia re-reads the pointer whenever an open tip's `HorizontalOffset`/`VerticalOffset` changes, and offers no other public way to move one, so each move toggles the offset by a sub-pixel `Nudge`. The owner's own offsets are kept and restored exactly when the tip closes.
+- **A move that lands on the tip still counts.** A quick downward move can put the pointer on the tip, whose own window then takes the moves. The tip is shifted by the pointer's distance from where it was anchored; the pointer is not re-checked against the owner there, and if it has left, the framework closes the tip on the next move.
+- **Every tooltip follows, not only the widgets'.** The bug was reported on the Dashboard, but a tip pinned where the pointer entered is the same defect on any owner. A tip placed against its owner rather than the pointer (`ToolTip.Placement` other than `Pointer`) is left where it is.
+
+Reduce motion does not change it: following the pointer is a direct response to input, not an animation, and re-placing an open tip does not re-run its fade.
+
+**Verify by owner, not by pixels.** Several owners share one tip text, so a correct hand-off between two of them looks the same as a tip that never moved. The tip is its own top-level window on Windows: enumerate the app's windows, and compare the tip window's handle (one per opening) and its text through UI Automation.
 
 ## Widget system
 
@@ -2258,7 +2416,7 @@ Three decisions:
 
 *Shipped — branch `dragAndDropFix`, 2026-09.*
 
-**Six strips across five tabs reorder by dragging, and the affordance appears nowhere else.** The
+**Seven strips across six tabs reorder by dragging, and the affordance appears nowhere else.** The
 gesture is one implementation — `ReorderDrag` (`src/Shared/Layout`) — over any panel that implements
 `IReorderablePanel`. Two do: `WidgetBoard`, dragged by a widget's header, and `UniformFlowPanel`,
 dragged by a card or by a marked grip.
@@ -2266,13 +2424,14 @@ dragged by a card or by a marked grip.
 | What | Handle | Saved under |
 |---|---|---|
 | Dashboard / Network / Storage widgets | the header | `dashboard`, `network`, `storage` |
+| Dashboard stat cards | the card (its link, marked as the grip) | `dashboard.cards` — their own row only |
 | Storage drive cards | the card | `storage` — the same order as the panels they move among |
 | Hardware component cards | the card | `hardware` |
 | Processes summary tiles | the tile | `processes.summary` |
 | Performance device rail | a grip per row | `performance.resources` |
 | Performance stat tiles | the tile | `performance.stats.{kind}` |
 
-Settings and Toolkit do not reorder, and their headers no longer claim to. Five rules, all
+Settings and Toolkit do not reorder, and their headers no longer claim to. Eight rules, all
 load-bearing:
 
 1. **The drag cursor comes from the predicate that starts the drag**, never from a style. A style
@@ -2300,6 +2459,13 @@ load-bearing:
    was grabbed, and could not express dragging straight down at all: x never changes, so the item
    landed one slot short — in two columns, the slot up and to the right. Which slot it covers is read
    from the slots as they were when the drag began, with hysteresis — see *Widget system* above.
+
+8. **A drag moves; it does not snap** (work item 14). The neighbours a preview re-packs slide to their
+   new slots, and the dropped item eases in from where it was let go, both over 180 ms with an ease-out
+   (`ReorderSlides`). The motion is a render transform, so layout, the frozen drop slots and the hint
+   never see it. Only a drag animates: a cancelled drag (capture lost before a release) puts everything
+   straight back, and a keyboard move, a resize or Reduce motion lands at once. A drop back onto the item's
+   own slot still eases in, since the release is accepted; "rejected" here means a drag that never dropped.
 
 A header `ToggleButton` or `Button` is refused as a drag handle by `TryGetHandle`'s blocked-control walk,
 which is what lets the fold chevron share a header with the drag.

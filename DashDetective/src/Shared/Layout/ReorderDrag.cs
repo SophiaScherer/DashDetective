@@ -32,6 +32,8 @@ public sealed class ReorderDrag {
     private Control? _lifted;
     private DragDropHint? _hint;
     private InputElement? _gripUnderPointer;
+    private Control? _settling;         // the item just dropped, until the panel's next arrange takes it
+    private Rect _settleFrom;           // where it was drawn as it was let go
 
     public ReorderDrag(IReorderablePanel host) => _host = host;
 
@@ -50,7 +52,8 @@ public sealed class ReorderDrag {
         _host.Surface.AddHandler(InputElement.PointerPressedEvent, OnPressed, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerMovedEvent, OnMoved, RoutingStrategies.Tunnel);
         _host.Surface.AddHandler(InputElement.PointerReleasedEvent, OnReleased, RoutingStrategies.Tunnel);
-        _host.Surface.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Tunnel);
+        // Direct: capture-lost is raised only on the element that held the capture, so a tunnel handler never sees it.
+        _host.Surface.AddHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost, RoutingStrategies.Direct);
 
         // Exited is a direct event, so this fires for the panel itself rather than for every child the
         // pointer crosses on the way out.
@@ -63,13 +66,18 @@ public sealed class ReorderDrag {
         _host.Surface.RemoveHandler(InputElement.PointerReleasedEvent, OnReleased);
         _host.Surface.RemoveHandler(InputElement.PointerCaptureLostEvent, OnCaptureLost);
         _host.Surface.RemoveHandler(InputElement.PointerExitedEvent, OnExited);
+
+        // A release that lands on another page would leave the press pending, and the next move would pick the item up.
+        Cancel();
     }
 
     /// <summary>Where the dragged item is drawn: under the pointer at the grip it was picked up by,
-    /// at the size it had then.</summary>
+    /// at the size it had then, kept inside the panel when it confines drags.</summary>
     public Rect DragBox() {
         var box = WidgetBoardLayout.DragRect(_size.Width, _size.Height, _pointer.X, _pointer.Y,
                                              _grabX, _grabY);
+        if (_host.ConfinesDrag)
+            box = WidgetBoardLayout.Confine(box, _host.Surface.Bounds.Width, _host.Surface.Bounds.Height);
         return new Rect(box.Left, box.Top, box.Width, box.Height);
     }
 
@@ -89,6 +97,7 @@ public sealed class ReorderDrag {
     /// drive a drag without a pointer device.</summary>
     internal void Press(ReorderHandle handle, Point press) {
         (_item, _lifted, _) = handle;
+        _settling = null;
         _press = press;
         _size = handle.Item.Bounds.Size;
         _grabX = Fraction(_press.X - handle.Item.Bounds.X, _size.Width);
@@ -102,6 +111,10 @@ public sealed class ReorderDrag {
         extent > 0 ? Math.Clamp(offset / extent, 0, 1) : 0;
 
     private void OnMoved(object? sender, PointerEventArgs e) {
+        // A press whose release never reached this panel is over, whatever is still pending.
+        if (_pending && !_dragging && !e.GetCurrentPoint(_host.Surface).Properties.IsLeftButtonPressed)
+            Cancel();
+
         if (!_pending || _item is null) {
             ShowGripCursor(e.Source as Visual);
             return;
@@ -175,18 +188,39 @@ public sealed class ReorderDrag {
             return;
         }
 
-        _host.CommitPreview();
-        e.Pointer.Capture(null);
+        Release(e.Pointer);
 
         // This release ends a drag, not a click, so it must not also press whatever is under it.
         e.Handled = true;
+    }
+
+    /// <summary>Drops the item where it is previewed and hands it to the panel to ease into its slot.</summary>
+    internal void Release(IPointer? device) {
+        _host.CommitPreview();
+
+        // Before the capture goes: releasing it raises CaptureLost, which ends the drag from there.
+        _settling = _item;
+        _settleFrom = DragBox();
+        device?.Capture(null);
         End();
     }
 
-    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) {
+    private void OnCaptureLost(object? sender, PointerCaptureLostEventArgs e) => Cancel();
+
+    /// <summary>Ends a drag that was never dropped: nothing commits or animates.</summary>
+    internal void Cancel() {
         if (_dragging)
             End();
         _pending = false;
+    }
+
+    /// <summary>The box a just-dropped item was let go at, taken once; null for any other item.</summary>
+    internal Rect? TakeSettle(Control item) {
+        if (!ReferenceEquals(item, _settling))
+            return null;
+
+        _settling = null;
+        return _settleFrom;
     }
 
     private void OnExited(object? sender, PointerEventArgs e) {

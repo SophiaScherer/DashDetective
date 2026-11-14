@@ -342,11 +342,11 @@ public partial class SettingsViewModel : ViewModelBase {
         Notify?.Invoke(Notices.ShortcutsRestored);
     }
 
-    /// <summary>Puts every accessibility option back the way it ships. The segmented controls follow
-    /// through the service's Changed event, so this does not touch them itself.</summary>
+    /// <summary>Puts every accessibility option back the way it ships. Raises Changed itself, since the scales and color vision reflect back without one.</summary>
     [RelayCommand]
     private void ResetAccessibility() {
         _accessibility.RestoreDefaults();
+        Changed?.Invoke();
         Notify?.Invoke(Notices.AccessibilityRestored);
     }
 
@@ -555,6 +555,12 @@ public partial class SettingsViewModel : ViewModelBase {
 
     partial void OnLaunchAtStartupChanged(bool value) {
         _startup.SetEnabled(value);
+        // A failed write must not leave the toggle (or the saved setting) claiming otherwise.
+        var actual = _startup.IsEnabled();
+        if (actual != value) {
+            _launchAtStartup = actual;
+            OnPropertyChanged(nameof(LaunchAtStartup));
+        }
         Changed?.Invoke();
     }
 

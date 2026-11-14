@@ -1,6 +1,8 @@
+using DashDetective.Services.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 
 namespace DashDetective.Services.Platform.Linux;
 
@@ -36,7 +38,8 @@ internal sealed record DrmCardFacts(
     ulong VramBytes,
     string HwmonPath,
     ulong? GttBytes = null,
-    string DriverVersion = "") {
+    string DriverVersion = "",
+    string ProductName = "") {
 
     // Concatenated forward-slash literals, never Path.Combine — see IProcFileSystem.
     private const string DrmRoot = "/sys/class/drm";
@@ -77,8 +80,13 @@ internal sealed record DrmCardFacts(
     /// <see cref="SoftwareDrivers"/>.</summary>
     internal bool IsSoftware => Array.IndexOf(SoftwareDrivers, Driver) >= 0;
 
-    /// <summary>This card's display name, e.g. "AMD amdgpu (1002:73df)".</summary>
-    internal string AdapterName => FormatAdapterName(VendorId, DeviceId, Driver);
+    /// <summary>The product name when <see cref="ReadNamed"/> resolved one, else the identity sysfs can compose.</summary>
+    internal string AdapterName =>
+        ProductName.Length > 0 ? ProductName : FormatAdapterName(VendorId, DeviceId, Driver);
+
+    // An unreadable vendor or device file parses to 0, and looking that up would name the card after
+    // whatever the table happens to list under 0000.
+    private static bool IsIdentified(DrmCardFacts card) => card.VendorId != 0 && card.DeviceId != 0;
 
     /// <summary>Reads and derives every card. Never throws: an unreadable source yields an empty
     /// list.</summary>
@@ -102,6 +110,73 @@ internal sealed record DrmCardFacts(
             result.Add(card);
 
         return result;
+    }
+
+    /// <summary>Like <see cref="Read"/> but with marketing names from <c>pci.ids</c>; a ~1.5 MB scan, so only readers that display a name call it.</summary>
+    internal static IReadOnlyList<DrmCardFacts> ReadNamed(IProcFileSystem proc) {
+        var cards = Read(proc);
+        if (cards.Count == 0)
+            return cards;
+
+        var wanted = new List<(uint Vendor, uint Device)>(cards.Count);
+        foreach (var card in cards)
+            if (IsIdentified(card))
+                wanted.Add((card.VendorId, card.DeviceId));
+        if (wanted.Count == 0)
+            return cards;
+
+        PciIdDatabase names;
+        try {
+            names = PciIdDatabase.Read(proc, wanted);
+        } catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+            // The name only decorates the list, so a table that cannot be read must not cost the cards.
+            Log.Warn("pci.ids could not be read; GPUs keep their sysfs names", e);
+            return cards;
+        }
+
+        var named = new List<DrmCardFacts>(cards.Count);
+        foreach (var card in cards) {
+            if (!IsIdentified(card)) {
+                named.Add(card);
+                continue;
+            }
+
+            named.Add(card with {
+                ProductName = FormatProductName(
+                    card.VendorId, names.Vendor(card.VendorId), names.Device(card.VendorId, card.DeviceId)),
+            });
+        }
+
+        return named;
+    }
+
+    /// <summary>Composes "NVIDIA GeForce RTX 3060" from a table name, or "" with no device name; the bundled vendor word wins over pci.ids' long form.</summary>
+    internal static string FormatProductName(uint vendorId, string tableVendor, string deviceName) {
+        deviceName = MarketingName(deviceName);
+        if (deviceName.Length == 0)
+            return "";
+
+        var vendor = VendorName(vendorId);
+        if (vendor.Length == 0)
+            vendor = tableVendor;
+
+        return vendor.Length == 0 || StartsWithWord(deviceName, vendor) ? deviceName : $"{vendor} {deviceName}";
+    }
+
+    /// <summary>Whether <paramref name="text"/> opens with <paramref name="word"/> as a whole word ("Intel Arc" yes, "Intellimouse" no).</summary>
+    private static bool StartsWithWord(string text, string word) =>
+        text.StartsWith(word, StringComparison.OrdinalIgnoreCase)
+        && (text.Length == word.Length || char.IsWhiteSpace(text[word.Length]));
+
+    /// <summary>The bracketed product name ("GeForce RTX 3060" from "GA106 [GeForce RTX 3060]"); an entry without exactly that shape is returned whole.</summary>
+    internal static string MarketingName(string deviceName) {
+        var open = deviceName.IndexOf('[');
+        var close = open < 0 ? -1 : deviceName.IndexOf(']', open + 1);
+        if (close < 0 || !deviceName.AsSpan(close + 1).IsWhiteSpace())
+            return deviceName;
+
+        var product = deviceName.AsSpan(open + 1, close - open - 1).Trim();
+        return product.Length > 0 ? product.ToString() : deviceName;
     }
 
     /// <summary>

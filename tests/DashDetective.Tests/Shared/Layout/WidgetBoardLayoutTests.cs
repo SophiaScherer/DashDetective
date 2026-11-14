@@ -386,6 +386,28 @@ public class WidgetBoardLayoutTests {
         Assert.Equal(500 - 0.9 * 340, narrow.Left, 6);
     }
 
+    [Theory]
+    [InlineData(-40, -5, 0, 0)]        // dragged off the top-left
+    [InlineData(900, 200, 700, 20)]    // dragged down and off the right
+    [InlineData(250, 10, 250, 10)]     // already inside
+    public void Confine_KeepsTheBoxInsideThePanel(double left, double top,
+                                                  double expectedLeft, double expectedTop) {
+        var box = WidgetBoardLayout.Confine(new Rect2(left, top, 300, 100), 1000, 120);
+
+        Assert.Equal(expectedLeft, box.Left, 6);
+        Assert.Equal(expectedTop, box.Top, 6);
+        Assert.Equal(300, box.Width);
+        Assert.Equal(100, box.Height);
+    }
+
+    [Fact]
+    public void Confine_ABoxBiggerThanThePanel_PinsToItsCorner() {
+        var box = WidgetBoardLayout.Confine(new Rect2(50, 50, 300, 100), 200, 80);
+
+        Assert.Equal(0, box.Left);
+        Assert.Equal(0, box.Top);
+    }
+
     /// <summary>Whether the row has more content width than its caps can between them absorb, which
     /// is the point at which the caps give way rather than banking the rest as whitespace.</summary>
     private static bool ExceedsEveryCap(ReadOnlySpan<WidgetSlot> row, double width) {
