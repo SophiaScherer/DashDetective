@@ -27,11 +27,13 @@ internal static class DesktopEntry {
 
         """;
 
-    /// <summary>Whether an existing file counts as an enabled entry. A <c>Hidden=true</c> line means the
-    /// spec says to ignore it, so reporting "enabled" for one would leave the toggle disagreeing with
-    /// what actually happens at login.</summary>
+    /// <summary>The key GNOME's autostart settings write to switch an entry off without deleting it.</summary>
+    internal const string GnomeDisabledKey = "X-GNOME-Autostart-enabled=false";
+
+    /// <summary>Whether an existing file is enabled; <c>Hidden=true</c> and GNOME's disabled key both mean login ignores it.</summary>
     internal static bool IsEnabled(string content) =>
-        !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase);
+        !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase)
+        && !content.Contains(GnomeDisabledKey, StringComparison.OrdinalIgnoreCase);
 
     // Inside a quoted Exec value the spec reserves these four; each is escaped with a backslash. The
     // backslash goes first, or it would double the ones the others just added.
