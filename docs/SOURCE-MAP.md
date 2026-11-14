@@ -1434,7 +1434,8 @@ stamps it into the exe. Its source, the mark and the wordmark as SVG, is `docs/b
 ```
       /Network
         NetworkGateway.cs       (the machine's own IPv4 default gateway, over NetworkUsageSampler
-                                 .SelectPrimary. Shared because two features want it: the Toolkit's
+                                 .SelectPrimary; Pick skips 0.0.0.0, which some adapters report for
+                                 "no gateway". Shared because two features want it: the Toolkit's
                                  parameterised ping/tracert boxes and the Network tab's ping panel.
                                  REPORTS null RATHER THAN A FALLBACK HOST — the two callers answer "no
                                  gateway" differently, and the lookup must not decide for them: the
