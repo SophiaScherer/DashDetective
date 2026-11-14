@@ -50,9 +50,9 @@ public static class ShortcutOverrideCodec {
                 continue;
 
             // A hand-edited file, or one written by a version that knew a different set of actions.
-            if (!Enum.TryParse<ShortcutId>(fields[0], out var id) ||
-                !Enum.TryParse<Key>(fields[1], out var key) ||
-                !Enum.TryParse<KeyModifiers>(fields[2], out var modifiers))
+            if (!TryParseNames<ShortcutId>(fields[0], out var id) ||
+                !TryParseNames<Key>(fields[1], out var key) ||
+                !TryParseNames<KeyModifiers>(fields[2], out var modifiers))
                 continue;
 
             // A modifier-only binding would fire the moment Ctrl was touched. The capture control refuses
@@ -64,5 +64,16 @@ public static class ShortcutOverrideCodec {
         }
 
         return overrides;
+    }
+
+    /// <summary>Parses by name only: <see cref="Enum.TryParse{TEnum}(string, out TEnum)"/> also takes numbers, which would re-point a binding by ordinal.</summary>
+    private static bool TryParseNames<T>(string text, out T value) where T : struct, Enum {
+        value = default;
+        var names = Enum.GetNames<T>();
+        foreach (var part in text.Split(','))
+            if (Array.IndexOf(names, part.Trim()) < 0)
+                return false;
+
+        return Enum.TryParse(text, out value);
     }
 }
