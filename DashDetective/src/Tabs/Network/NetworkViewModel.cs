@@ -262,6 +262,9 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
     /// for rather than reaching out to a host they never requested.</summary>
     private bool _dnsResolved;
 
+    /// <summary>Bumped by every Start and Stop; a send's reply is published only while its number is the latest.</summary>
+    private int _pingSession;
+
     /// <summary>Bumped by every lookup; a result lands only while its number is still the latest.</summary>
     private int _dnsGeneration;
 
@@ -579,8 +582,13 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         if (run is null)
             return;
 
+        var session = _pingSession;
         try {
             await _pingMonitor.SendAsync();
+            // A Stop or restart ended this session; a late reply must not bring the stats back.
+            if (session != _pingSession)
+                return;
+
             // SendAsync was awaited on the UI thread, so the continuation resumes there — safe to bind.
             PingConsole = _pingMonitor.ConsoleText;
             PingSummary = _pingMonitor.SummaryText;
@@ -719,6 +727,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
         _pingMonitor.SetTarget(PingTarget);
         // Reflect the trim back into the field.
         PingTarget = _pingMonitor.Target;
+        _pingSession++;
         PingConsole = "";
         PingSummary = "";
         PingEnabled = true;
@@ -732,6 +741,7 @@ public partial class NetworkViewModel : ViewModelBase, IRefreshablePage, ILiveSa
 
     /// <summary>Stops the monitor, leaving the last replies on screen with an idle summary.</summary>
     private void StopPing() {
+        _pingSession++;
         PingEnabled = false;
         _pingTimer.Stop();
         PingSummary = PingIdleSummary;
