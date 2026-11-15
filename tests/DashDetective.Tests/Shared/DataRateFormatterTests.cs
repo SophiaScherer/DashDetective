@@ -87,4 +87,25 @@ public class DataRateFormatterTests {
     public void SplitPair_PromotesBothOnceEitherReachesGbps() {
         Assert.Equal(("1.2", "0.0", "Gbps"), DataRateFormatter.SplitPair(1200, 0));
     }
+
+    [Theory]
+    [InlineData(999.6, "1.0 Gbps")]
+    [InlineData(0.9996, "1.0 Mbps")]
+    [InlineData(999.4, "999 Mbps")]
+    [InlineData(0.9994, "999 kbps")]
+    [InlineData(double.NaN, "0.0 kbps")]
+    [InlineData(double.PositiveInfinity, "0.0 kbps")]
+    public void Format_PicksUnitFromTheRoundedValue(double mbps, string expected) {
+        Assert.Equal(expected, DataRateFormatter.Format(mbps));
+    }
+
+    [Fact]
+    public void Split_RoundsUpAcrossTheUnitStep() {
+        Assert.Equal(("1.0", "Gbps"), DataRateFormatter.Split(999.6));
+    }
+
+    [Fact]
+    public void SplitPair_LargerSideRoundingUpMovesBothToTheNextUnit() {
+        Assert.Equal(("1.0", "0.5", "Gbps"), DataRateFormatter.SplitPair(999.6, 500));
+    }
 }

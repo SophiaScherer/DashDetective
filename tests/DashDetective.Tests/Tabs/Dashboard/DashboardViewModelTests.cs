@@ -3,6 +3,7 @@ using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tests.Fakes;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -14,6 +15,14 @@ namespace DashDetective.Tests.Tabs.Dashboard;
 public class DashboardViewModelTests {
     private static DashboardViewModel Create(HardwareProviders providers) =>
         new(TestMetrics.Idle(), providers);
+
+    /// <summary>The card row and the charts persist and reset on separate keys.</summary>
+    [Fact]
+    public void SavedOrders_KeepTheCardRowApartFromTheWidgets() {
+        var viewModel = Create(StubHardwareProviders.Compose());
+
+        Assert.Equal(["dashboard", "dashboard.cards"], viewModel.SavedOrders.Select(order => order.Key));
+    }
 
     // ---- Soft-fail: a failed READ, as distinct from a successful read of an unknown machine ----
     //

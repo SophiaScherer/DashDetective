@@ -2,6 +2,7 @@ using DashDetective.Shared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DashDetective.Tabs.Hardware;
@@ -120,14 +121,11 @@ public partial class HardwareViewModel : ViewModelBase, IRefreshablePage, IReord
     /// from the values already loaded into the cards. Read-only; the report builder in the shell owns
     /// formatting, so this exposes the data without reaching into the card internals.
     /// </summary>
-    public IReadOnlyList<(string Key, string Value)> GetReportRows() => new[] {
-        (_processor.Title, _processor.Subtitle),
-        (_graphics.Title, _graphics.Subtitle),
-        (_motherboard.Title, _motherboard.Subtitle),
-        (_memory.Title, _memory.Subtitle),
-        (_storage.Title, _storage.Subtitle),
-        (_sensors.Title, _sensors.Subtitle),
-    };
+    public IReadOnlyList<(string Key, string Value)> GetReportRows() => ReportRowsOf(Cards);
+
+    /// <summary>One row per card, in order, so every Graphics adapter is reported. Static because the page cannot be built without a render backend.</summary>
+    internal static IReadOnlyList<(string Key, string Value)> ReportRowsOf(IEnumerable<HardwareCard> cards) =>
+        cards.Select(card => (card.Title, card.Subtitle)).ToList();
 
     private async Task LoadAsync() {
         // GetAsync never throws (each section falls back to its .Unknown record), but guard the whole

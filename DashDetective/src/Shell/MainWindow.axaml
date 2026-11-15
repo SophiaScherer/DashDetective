@@ -227,9 +227,9 @@
                          scrolling page shares this one, so code-behind resets it on each page change. -->
                     <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                                   IsVisible="{Binding !CurrentPageSelfScrolls}">
-                        <ContentControl Margin="{StaticResource PageInset}" Content="{Binding ScrollingPage}"/>
+                        <ContentControl x:Name="ScrollingHost" Margin="{StaticResource PageInset}" Content="{Binding ScrollingPage}"/>
                     </ScrollViewer>
-                    <ContentControl Margin="{StaticResource PageInset}"
+                    <ContentControl x:Name="SelfScrollingHost" Margin="{StaticResource PageInset}"
                                     Content="{Binding SelfScrollingPage}"
                                     IsVisible="{Binding CurrentPageSelfScrolls}"/>
                 </Panel>
