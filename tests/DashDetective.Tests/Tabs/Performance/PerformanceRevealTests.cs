@@ -140,4 +140,17 @@ public class PerformanceRevealTests {
         Assert.All(page.Resources, row => Assert.False(string.IsNullOrEmpty(row.DeviceId)));
         Assert.Equal(page.Resources.Count, page.Resources.Select(row => row.DeviceId).Distinct().Count());
     }
+
+    [Fact]
+    public async Task Reveal_PendingRowThenManualSelect_KeepsTheManualSelection() {
+        var page = Page();
+        page.Reveal(DeviceIds.Disk(SecondDisk));
+
+        Assert.Equal(ChartSeries.Cpu, page.SelectedResource.Series);
+        page.Resources.First(row => row.Series == ChartSeries.Memory).SelectCommand.Execute(null);
+        await page.InitialLoad;
+        await page.LoadInventoryAsync();
+
+        Assert.Equal(ChartSeries.Memory, page.SelectedResource.Series);
+    }
 }
