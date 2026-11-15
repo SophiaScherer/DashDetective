@@ -137,6 +137,18 @@ public class DashboardViewModelTests {
         Assert.Contains("Unknown", viewModel.OsText);
     }
 
+    /// <summary>With no system disk identified, the report's Storage row is the placeholder, not a false "0% active  ()".</summary>
+    [Fact]
+    public void GetReportSections_NoSystemDisk_ReportsStorageAsNoReading() {
+        var viewModel = Create(StubHardwareProviders.Compose());
+
+        var storage = viewModel.GetReportSections()
+            .Single(section => section.Title == "Live metrics")
+            .Rows.Single(row => row.Key == "Storage");
+
+        Assert.Equal("—", storage.Value);
+    }
+
     /// <summary>The clock is formatted with the app's number format, whatever the current culture's decimal separator.</summary>
     [Fact]
     public void FormatCpuModel_CommaCulture_StillUsesADecimalPoint() {
