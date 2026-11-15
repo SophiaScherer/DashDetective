@@ -48,7 +48,7 @@ public class DashboardGpuCardTests {
                 return minted;
             });
 
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadGpusAsync();
         return (viewModel, pageSampler!);
     }
@@ -77,6 +77,19 @@ public class DashboardGpuCardTests {
         // …and the card can say why, since it has no room for a line of its own.
         Assert.Equal("Turn on \"NVIDIA GPU utilization\" in Settings to read this card.", card.Note);
         Assert.StartsWith(card.Note, card.Tip, System.StringComparison.Ordinal);
+    }
+
+    /// <summary>A page sampler returning no adapters leaves the card on its placeholder, not a confident 0.</summary>
+    [Fact]
+    public async Task LoadGpusAsync_PageSamplerReportsNoAdapters_ShowsThePlaceholder() {
+        var minted = 0;
+        var viewModel = await LoadedAsync(
+            () => minted++ == 0 ? new FakeGpuUsageSampler() : new FakeGpuUsageSampler().Reporting(Amd, 37),
+            Adapter(Amd, "AMD amdgpu (1002:73df)"));
+
+        var card = GpuCard(viewModel);
+        Assert.Equal("—", card.Value);
+        Assert.Equal("", card.Unit);
     }
 
     /// <summary>A card that reports carries no note — nothing to explain — so its tooltip falls back to

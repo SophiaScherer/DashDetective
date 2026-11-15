@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DashDetective.Services.Diagnostics;
 using DashDetective.Services.Notifications;
@@ -8,10 +9,13 @@ using DashDetective.Shared;
 using DashDetective.Shared.Controls;
 using DashDetective.Shared.Layout;
 using DashDetective.Shared.Shortcuts;
+using DashDetective.Shell.Navigation;
 using DashDetective.Shell.Shortcuts;
 using DashDetective.Shell.TrayNotice;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DashDetective.Shell;
@@ -79,6 +83,8 @@ public partial class MainWindow : Window {
         if (_viewModel is not null) {
             _viewModel.ExportRequested -= OnExportRequested;
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _viewModel.Nav.SectionsRefreshRequested -= RefreshSections;
+            _viewModel.Nav.SectionPicked -= OnSectionPicked;
         }
 
         _viewModel = DataContext as MainWindowViewModel;
@@ -86,7 +92,10 @@ public partial class MainWindow : Window {
         if (_viewModel is not null) {
             _viewModel.ExportRequested += OnExportRequested;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _viewModel.Nav.SectionsRefreshRequested += RefreshSections;
+            _viewModel.Nav.SectionPicked += OnSectionPicked;
             ReportCaptionHeight();
+            Dispatcher.UIThread.Post(RefreshSections, DispatcherPriority.Loaded);
         }
     }
 
@@ -109,8 +118,53 @@ public partial class MainWindow : Window {
     /// <summary>Every scrolling page shares one scroller, so a new page would open at the last one's
     /// offset. Synchronous, so it lands before a search reveal's posted scroll.</summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e) {
-        if (e.PropertyName == nameof(MainWindowViewModel.CurrentPage))
-            PageScroll.ScrollToHome();
+        if (e.PropertyName != nameof(MainWindowViewModel.CurrentPage))
+            return;
+
+        PageScroll.ScrollToHome();
+
+        // The new page's widgets do not exist until its first layout pass.
+        Dispatcher.UIThread.Post(RefreshSections, DispatcherPriority.Loaded);
+    }
+
+    // ----- Page sections (the nav bar's list of the current page's titled widgets and marked cards) -----
+
+    // Indexed as the candidates handed to the nav bar, so a pick names its control without the view model holding one.
+    private List<Control> _sectionPanels = [];
+
+    /// <summary>Reads the current page's sections in arranged order, not markup order; a section nested in another belongs to its parent.</summary>
+    private void RefreshSections() {
+        if (_viewModel is null)
+            return;
+
+        Control host = _viewModel.CurrentPageSelfScrolls ? SelfScrollingHost : ScrollingHost;
+        var panels = host.GetVisualDescendants().OfType<Control>().Where(PageSections.IsSection)
+            .Where(panel => !panel.GetVisualAncestors().TakeWhile(a => a != host).OfType<Control>()
+                .Any(PageSections.IsSection))
+            .ToList();
+
+        var candidates = panels.Select(panel => {
+            var origin = panel.TranslatePoint(default, host);
+            return new SectionCandidate(PageSections.TitleOf(panel), origin?.Y ?? double.NaN,
+                origin?.X ?? double.NaN, panel.IsEffectivelyVisible);
+        }).ToList();
+
+        _sectionPanels = panels;
+        _viewModel.Nav.SetSections(candidates);
+    }
+
+    /// <summary>Scrolls a picked section to the top of its scroller and flashes it.</summary>
+    private void OnSectionPicked(PageSection section) {
+        if (section.Source >= _sectionPanels.Count || _sectionPanels[section.Source] is not { } panel ||
+            !panel.IsAttachedToVisualTree())
+            return;
+
+        var gap = this.TryFindResource("SpacePage", out var space) && space is double d ? d : 16;
+        var viewport = panel.FindAncestorOfType<ScrollViewer>()?.Viewport.Height ?? 0;
+        var height = Math.Max(panel.Bounds.Height, viewport);
+
+        panel.BringIntoView(new Rect(0, -gap, panel.Bounds.Width, height));
+        RevealFlash.Flash(panel);
     }
 
     /// <summary>

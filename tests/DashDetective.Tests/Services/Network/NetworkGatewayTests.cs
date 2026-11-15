@@ -1,4 +1,5 @@
 using DashDetective.Services.Network;
+using System.Net;
 using Xunit;
 
 namespace DashDetective.Tests.Services.Network;
@@ -18,4 +19,22 @@ public class NetworkGatewayTests {
         Assert.NotEqual("", gateway);
         Assert.Equal(4, gateway.Split('.').Length);
     }
+
+    private static IPAddress Ip(string text) => IPAddress.Parse(text);
+
+    [Fact]
+    public void Pick_OnlyTheUnspecifiedAddress_ReturnsNull() =>
+        Assert.Null(NetworkGateway.Pick([Ip("0.0.0.0")]));
+
+    [Fact]
+    public void Pick_SkipsTheUnspecifiedAddress_ForTheNextIPv4() =>
+        Assert.Equal("192.168.1.1", NetworkGateway.Pick([Ip("0.0.0.0"), Ip("192.168.1.1")]));
+
+    [Fact]
+    public void Pick_SkipsIPv6Addresses_IncludingTheUnspecifiedOne() =>
+        Assert.Equal("10.0.0.1", NetworkGateway.Pick([IPAddress.IPv6Any, Ip("fe80::1"), Ip("10.0.0.1")]));
+
+    [Fact]
+    public void Pick_NoAddresses_ReturnsNull() =>
+        Assert.Null(NetworkGateway.Pick([]));
 }

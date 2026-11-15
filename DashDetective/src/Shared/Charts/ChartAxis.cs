@@ -83,7 +83,8 @@ public static class ChartAxis {
     /// <summary>Throughput labels for a chart ruled into <paramref name="divisions"/> bands, top to bottom,
     /// so every label lands on a grid line. Same shared-unit rule as the three-label form.</summary>
     public static IReadOnlyList<string> RateLabels(double axisMaxMbps, int divisions) {
-        var unit = DataRateFormatter.UnitFor(axisMaxMbps);
+        axisMaxMbps = DataRateFormatter.Finite(axisMaxMbps);
+        var unit = DataRateFormatter.DisplayUnit(axisMaxMbps);
         return Labels(divisions, DataRateFormatter.Label(unit),
             band => DataRateFormatter.FormatValue(
                 DataRateFormatter.Convert(axisMaxMbps * band / divisions, unit)));

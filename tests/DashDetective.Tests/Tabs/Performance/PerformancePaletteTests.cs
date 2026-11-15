@@ -16,6 +16,8 @@ namespace DashDetective.Tests.Tabs.Performance;
 /// and re-resolves when the graph colors move it.
 /// </summary>
 public class PerformancePaletteTests {
+    // Waits out the constructor's load, which otherwise rebuilds Resources on a pool thread mid-enumeration.
+    // Blocking, not awaited: the rows' brushes belong to this thread, and an await could resume elsewhere.
     private static (PerformanceViewModel ViewModel, ThemeService Theme) Page() {
         var samplers = new MetricSamplers(
             () => 0, () => new MemorySample(0, 0, 0, 0, 0), () => new NetworkSample(0, 0), () => "TestNIC");
@@ -25,6 +27,7 @@ public class PerformancePaletteTests {
             StubHardwareProviders.With(),
             () => new FakeGpuUsageSampler(),
             theme);
+        viewModel.InitialLoad.Wait();
         return (viewModel, theme);
     }
 

@@ -73,6 +73,18 @@ public class ShortcutOverrideCodecTests {
         Assert.Equal(Key.G, decoded[ShortcutId.Export].Key);
     }
 
+    /// <summary>The file stores names only, so "3" must not load as an ordinal nor "999" as a nonexistent id.</summary>
+    [Theory]
+    [InlineData("3", "G", "Control")]
+    [InlineData("999", "G", "Control")]
+    [InlineData("Export", "44", "Control")]
+    [InlineData("Export", "999999", "Control")]
+    [InlineData("Export", "G", "2")]
+    [InlineData("Export", "G", "999")]
+    [InlineData("Export", "G", "Control, 8")]
+    public void Decode_SkipsNumericOrUndefinedEnumValues(string id, string key, string modifiers) =>
+        Assert.Empty(ShortcutOverrideCodec.Decode($"{id}{Field}{key}{Field}{modifiers}"));
+
     [Fact]
     public void Decode_SkipsAnUnknownKeyOrModifier() {
         Assert.Empty(ShortcutOverrideCodec.Decode($"Export{Field}NoSuchKey{Field}Control"));

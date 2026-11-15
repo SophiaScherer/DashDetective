@@ -79,16 +79,39 @@ public sealed class ChildOrder {
     }
 
     /// <summary>Moves a child to this position among the visible ones. False when it is already
-    /// there, so a wobble does not re-pack every frame.</summary>
+    /// there, so a wobble does not re-pack every frame. A child with no id never moves and nothing passes it.</summary>
     public bool Move(int child, int visibleTarget, Predicate<int> isVisible) {
         var from = _preview.IndexOf(child);
-        if (from < 0)
+        if (from < 0 || IsPinned(child))
             return false;
 
         _preview.RemoveAt(from);
-        var to = PositionOf(visibleTarget, isVisible);
+        var (low, high) = BetweenPins(from);
+        var to = Math.Clamp(PositionOf(visibleTarget, isVisible), low, high);
         _preview.Insert(to, child);
         return to != from;
+    }
+
+    // Unnamed children are known only once Sync(ids) has run; before that nothing is pinned.
+    private bool IsPinned(int child) => _ids is not null && child < _ids.Count && _ids[child].Length == 0;
+
+    /// <summary>The insert positions reachable from <paramref name="from"/> without crossing a pinned child.</summary>
+    private (int Low, int High) BetweenPins(int from) {
+        var low = 0;
+        for (var i = from - 1; i >= 0; i--)
+            if (IsPinned(_preview[i])) {
+                low = i + 1;
+                break;
+            }
+
+        var high = _preview.Count;
+        for (var i = from; i < _preview.Count; i++)
+            if (IsPinned(_preview[i])) {
+                high = i;
+                break;
+            }
+
+        return (low, high);
     }
 
     /// <summary>Keeps the previewed order and reports the ids in it. A child with no id contributes
