@@ -518,6 +518,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuValueText = "—";
         CpuPercentText = "—";
         _cpuCard.Value = "—";
+        _cpuCard.Unit = "";
     }
 
     private void UpdateCpu(double value) {
@@ -528,6 +529,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuPoints = _cpuHistory.Points(100);
         CpuChartStatus = ChartStatus.For(_cpuHistory);
         _cpuCard.Value = CpuValueText;
+        _cpuCard.Unit = "%";
         _cpuCard.Points = CpuPoints;
     }
 
@@ -626,7 +628,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnMemoryFailed() {
         MemoryValueText = "—";
         MemorySubText = "";
+        MemoryUtilizationText = "";
         _memoryCard.Value = "—";
+        _memoryCard.Unit = "";
         _memoryCard.Sub = "";
     }
 
@@ -645,6 +649,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         MemoryPoints = _memoryHistory.Points(100);
         MemoryChartStatus = ChartStatus.For(_memoryHistory);
         _memoryCard.Value = MemoryValueText;
+        _memoryCard.Unit = "GB";
         _memoryCard.Sub = MemorySubText;
         _memoryCard.Points = MemoryPoints;
     }
@@ -653,7 +658,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnNetworkFailed() {
         NetworkDownText = "—";
         NetworkUpText = "—";
+        NetworkSubText = "";
         _networkCard.Value = "—";
+        _networkCard.Unit = "";
+        _networkCard.Sub = "";
     }
 
     /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
