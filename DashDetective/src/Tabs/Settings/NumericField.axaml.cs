@@ -75,6 +75,7 @@ public partial class NumericField : UserControl {
         Entry.GotFocus += (_, _) => BeginEdit();
         Entry.LostFocus += (_, _) => EndEdit();
         Entry.KeyDown += OnKeyDown;
+        Entry.AddHandler(KeyDownEvent, OnEscape, RoutingStrategies.Tunnel, handledEventsToo: true);
         Entry.AddHandler(RequestBringIntoViewEvent, OnEntryBringIntoView);
 
         Render();
@@ -114,17 +115,17 @@ public partial class NumericField : UserControl {
             Commit();
             ReleaseFocus();
             e.Handled = true;
-            return;
         }
+    }
 
-        // Escape abandons the edit, so a half-typed number can be backed out of without having to
-        // remember what was there. The value it restores is the one from before the edit, because
-        // Capture has already stored every digit typed since.
-        if (e.Key == Key.Escape) {
-            Value = _valueAtEditStart;
-            ReleaseFocus();
-            e.Handled = true;
-        }
+    // Tunnelled with handledEventsToo because the shell's Escape handler marks the key handled first.
+    private void OnEscape(object? sender, KeyEventArgs e) {
+        if (e.Key != Key.Escape)
+            return;
+
+        Value = _valueAtEditStart;
+        ReleaseFocus();
+        e.Handled = true;
     }
 
     /// <summary>

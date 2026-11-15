@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using DashDetective.Shared;
+using System;
 
 namespace DashDetective.Shared.Layout;
 
@@ -18,7 +19,7 @@ namespace DashDetective.Shared.Layout;
 /// </summary>
 public sealed class DragDropHint {
     private readonly Control _owner;
-    private readonly CornerRadius _radius;
+    private readonly double _radius;
     private OverlayLayer? _overlay;
     private Border? _hint;
 
@@ -26,7 +27,7 @@ public sealed class DragDropHint {
     /// <param name="radius">Corner rounding, to match the surface being previewed.</param>
     public DragDropHint(Control owner, double radius = 4) {
         _owner = owner;
-        _radius = new CornerRadius(radius);
+        _radius = radius;
     }
 
     /// <summary>Claims the window's overlay layer and puts an empty hint in it, returning the layer so
@@ -42,7 +43,7 @@ public sealed class DragDropHint {
             Background = new SolidColorBrush(accent, 0.18),
             BorderBrush = new SolidColorBrush(accent),
             BorderThickness = new Thickness(2),
-            CornerRadius = _radius,
+            CornerRadius = new CornerRadius(_radius),
             IsHitTestVisible = false,
             IsVisible = false,
         };
@@ -64,9 +65,17 @@ public sealed class DragDropHint {
 
     /// <summary>Moves the hint to this box, given in <paramref name="source"/>'s coordinates.</summary>
     public void ShowFrom(Visual source, Rect box) {
-        if (_overlay is null || source.TranslatePoint(box.Position, _overlay) is not { } origin)
+        if (_overlay is null || _hint is null || source.TransformToVisual(_overlay) is not { } toOverlay)
             return;
-        Show(new Rect(origin, box.Size));
+        var (mapped, radius) = Map(box, toOverlay, _radius);
+        _hint.CornerRadius = radius;
+        Show(mapped);
+    }
+
+    /// <summary>Maps a box and its rounding into the overlay, which sits outside the <c>ScaleHost</c>, so the whole box is transformed.</summary>
+    internal static (Rect Box, CornerRadius Radius) Map(Rect box, Matrix toOverlay, double radius) {
+        var scale = Math.Sqrt(toOverlay.M11 * toOverlay.M11 + toOverlay.M12 * toOverlay.M12);
+        return (box.TransformToAABB(toOverlay), new CornerRadius(radius * scale));
     }
 
     /// <summary>Takes the hint back out of the overlay. Reached from a release and from a lost capture

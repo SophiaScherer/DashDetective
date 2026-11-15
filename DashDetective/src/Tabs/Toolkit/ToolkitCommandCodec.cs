@@ -78,18 +78,24 @@ public static class ToolkitCommandCodec {
 
         // An unknown type is not guessable — the payload means something different for each — so the
         // record goes rather than being filed under a default that might run the wrong thing.
-        if (!Enum.TryParse<ToolkitCommandType>(fields[2], out var type))
+        if (!TryParseName<ToolkitCommandType>(fields[2], out var type))
             return null;
 
         // An unknown category, by contrast, only affects where the row is shown, so it degrades to "no
         // second section" and the command survives. "Custom" degrades the same way: a custom row is
         // already in that section, and a hand-edit asking for it twice should not get it twice.
         ToolkitCategory? category =
-            Enum.TryParse<ToolkitCategory>(fields[5], out var parsed) &&
+            TryParseName<ToolkitCategory>(fields[5], out var parsed) &&
             parsed != ToolkitCategory.Custom
                 ? parsed
                 : null;
 
         return new ToolkitCommand(title, fields[1], type, fields[3], fields[4], category);
+    }
+
+    // Names only: Enum.TryParse also takes "1" or "99", and a number is not what the codec wrote.
+    private static bool TryParseName<T>(string text, out T value) where T : struct, Enum {
+        value = default;
+        return Array.IndexOf(Enum.GetNames<T>(), text) >= 0 && Enum.TryParse(text, out value);
     }
 }

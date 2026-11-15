@@ -49,13 +49,63 @@ public class LinuxProcessorInfoProviderTests {
     public async Task GetAsync_ComposesBaseBoostFromTheRatedClock() =>
         Assert.StartsWith("3.6", (await Read(WithCpuInfo(ProcFixtures.ProcCpuInfo))).BaseBoost);
 
-    /// <summary>
-    /// Permanently "—". The socket designation lives in SMBIOS type 4, which the kernel does not surface
-    /// under <c>/sys/class/dmi/id</c> — only <c>dmidecode</c> reading <c>/dev/mem</c> as root can see it.
-    /// </summary>
+    /// <summary>Linux has no socket source (SMBIOS type 4 needs root), so the row is the catalog's rated socket.</summary>
     [Fact]
-    public async Task GetAsync_NeverReportsASocketDesignation() =>
-        Assert.Equal("—", (await Read(WithCpuInfo(ProcFixtures.AmdCpuInfo))).Socket);
+    public async Task GetAsync_ReportsTheCatalogSocket_SinceSysfsHasNone() =>
+        Assert.Equal("AM5", (await Read(WithCpuInfo(ProcFixtures.AmdCpuInfo))).Socket);
+
+    /// <summary>An unlisted part has no second source, so the row stays blank.</summary>
+    [Fact]
+    public async Task GetAsync_UnlistedPart_ReportsNoSocket() =>
+        Assert.Equal("—", (await Read(WithCpuInfo(ProcFixtures.ProcCpuInfo))).Socket);
+
+    /// <summary>A VM reports no cache topology or cpufreq but does name the chip, so both rows fill from the datasheet.</summary>
+    [Fact]
+    public async Task GetAsync_NoCacheTreeOrCpufreq_FillsFromTheCatalog() {
+        var info = await Read(WithCpuInfo(ProcFixtures.AmdCpuInfo));
+
+        Assert.Equal("32 MB", info.CacheL3);
+        Assert.Equal("4.7 / 5.3 GHz", info.BaseBoost);
+    }
+
+    /// <summary>Under amd-pstate <c>cpuinfo_max_freq</c> is the turbo ceiling and must not show as the base.</summary>
+    [Fact]
+    public async Task GetAsync_TurboCeilingOnly_ShowsTheDatasheetBase() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n");
+
+        Assert.Equal("4.7 / 5.3 GHz", (await Read(proc)).BaseBoost);
+    }
+
+    /// <summary>The machine's own base wins over the datasheet's, here from CPPC's nominal frequency.</summary>
+    [Fact]
+    public async Task GetAsync_CppcNominalFrequency_IsTheBase() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/cpuinfo_max_freq", "5300000\n")
+            .WithFile(CpuRoot + "/cpu0/acpi_cppc/nominal_freq", "4500\n");
+
+        Assert.Equal("4.5 / 5.3 GHz", (await Read(proc)).BaseBoost);
+    }
+
+    /// <summary>A throwing base file costs the reading, not a wrong one; staged against a fixture that would otherwise read.</summary>
+    [Fact]
+    public async Task GetAsync_BaseFrequencyDenied_ReportsUnknown() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cpufreq/base_frequency", "4500000\n")
+            .ThrowOn(CpuRoot + "/cpu0/cpufreq/base_frequency");
+
+        Assert.Same(ProcessorInfo.Unknown, await Read(proc));
+    }
+
+    /// <summary>The machine's own cache size wins over the datasheet — a fallback, never an override.</summary>
+    [Fact]
+    public async Task GetAsync_WithACacheTree_PrefersTheMachinesOwnSize() {
+        var proc = WithCpuInfo(ProcFixtures.AmdCpuInfo)
+            .WithFile(CpuRoot + "/cpu0/cache/index3/level", "3\n")
+            .WithFile(CpuRoot + "/cpu0/cache/index3/size", "16384K\n");
+
+        Assert.Equal("16 MB", (await Read(proc)).CacheL3);
+    }
 
     /// <summary>The card's own placeholder, not the Dashboard's — the two consumers of <c>CpuFacts</c>
     /// deliberately differ here.</summary>

@@ -41,7 +41,7 @@ public class DashboardRefreshHistoryTests {
                 volumes: () => Task.FromResult(Volumes())),
             gpuSampler, throughput);
 
-        await Task.Delay(100);
+        await viewModel.InitialLoad;
         await viewModel.LoadGpusAsync();
         await viewModel.LoadDisksAsync();
         return viewModel;

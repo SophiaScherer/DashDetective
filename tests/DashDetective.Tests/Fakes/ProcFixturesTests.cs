@@ -93,4 +93,22 @@ public class ProcFixturesTests {
         Assert.Equal("coretemp\n", fs.ReadAllText("/sys/class/hwmon/hwmon0/name"));
         Assert.Equal("acpitz\n", fs.ReadAllText("/sys/class/hwmon/hwmon1/name"));
     }
+
+    /// <summary><c>pci.ids</c> indents are tabs; spaces would make the parser read every line as a vendor.</summary>
+    [Fact]
+    public void PciIds_KeepsTheTabIndentsThatCarryTheFormat() {
+        var lines = new FakeProcFileSystem().WithPciIds().ReadAllLines("/usr/share/hwdata/pci.ids");
+
+        Assert.Contains("15ad  VMware", lines);
+        Assert.Contains("\t0405  SVGA II Adapter", lines);
+        Assert.Contains("\t\t1458 4067  RTX 3060 GAMING OC 12G", lines);
+    }
+
+    /// <summary>The class section must be present, or the parser's stop condition goes unexercised.</summary>
+    [Fact]
+    public void PciIds_EndsWithTheDeviceClassSection() {
+        var lines = new FakeProcFileSystem().WithPciIds().ReadAllLines("/usr/share/hwdata/pci.ids");
+
+        Assert.Contains("C 03  Display controller", lines);
+    }
 }

@@ -79,6 +79,27 @@ public class ToolkitCommandCodecTests {
         Assert.Empty(ToolkitCommandCodec.Decode(encoded));
     }
 
+    /// <summary>A numeric type is not a name the codec wrote, so the record goes even when the number matches a member.</summary>
+    [Theory]
+    [InlineData("1")]
+    [InlineData("99")]
+    public void Decode_NumericType_DropsTheCommand(string number) {
+        var encoded = ToolkitCommandCodec.Encode([Sample("Numeric")])
+            .Replace("FolderPath", number, System.StringComparison.Ordinal);
+
+        Assert.Empty(ToolkitCommandCodec.Decode(encoded));
+    }
+
+    /// <summary>A numeric category degrades like an unknown one: the command survives, unfiled.</summary>
+    [Fact]
+    public void Decode_NumericCategory_KeepsTheCommandWithoutOne() {
+        var encoded = ToolkitCommandCodec.Encode([
+            new("Ports", "", ToolkitCommandType.Capture, "netstat", "", ToolkitCategory.Diagnostics)])
+            .Replace("Diagnostics", "1", System.StringComparison.Ordinal);
+
+        Assert.Null(Assert.Single(ToolkitCommandCodec.Decode(encoded)).Category);
+    }
+
     /// <summary>An unknown category only affects where a row is shown, so it degrades to "no second
     /// section" and the command itself survives.</summary>
     [Fact]

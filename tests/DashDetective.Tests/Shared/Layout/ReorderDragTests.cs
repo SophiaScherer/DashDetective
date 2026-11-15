@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using DashDetective.Shared.Layout;
 using System.Collections.Generic;
 using Xunit;
@@ -112,5 +113,78 @@ public class ReorderDragTests {
         }
 
         Assert.Equal("narrow wide", Shown(board));
+    }
+
+    /// <summary>A chart dragged up over an unnamed card row stops below it.</summary>
+    [Fact]
+    public void MoveTo_AWidgetOverAChildWithNoId_StopsBelowIt() {
+        var row = new Border { MinWidth = 200, Height = 100 };
+        WidgetBoard.SetStretch(row, true);
+        var chart = Widget("chart", 1, 200, 400);
+        var board = Board(row, Widget("first", 1, 200, 400), chart);
+        Press(board, chart, chart.Bounds.Center);
+
+        board.Drag.MoveTo(new Point(chart.Bounds.Center.X, 20), null);
+        Layout(board);
+        board.Drag.Release(null);
+        Layout(board);
+
+        Assert.Equal(" chart first", Shown(board));
+    }
+
+    /// <summary>Detaching ends the press, or a release on another page leaves it pending.</summary>
+    [Fact]
+    public void Detach_WithAPressPending_DropsIt() {
+        var (board, narrow) = NarrowBesideWide();
+        Press(board, narrow, new Point(150, 50));
+
+        board.Drag.Detach();
+        board.Drag.MoveTo(new Point(450, 50), null);
+
+        Assert.False(board.Drag.IsDragging);
+    }
+
+    /// <summary>A move with the button already up is not a drag, whatever was left pending.</summary>
+    [Fact]
+    public void PointerMoved_WithNoButtonHeld_DropsAPendingPress() {
+        var (board, narrow) = NarrowBesideWide();
+        board.Drag.Attach();
+        Press(board, narrow, new Point(150, 50));
+
+        board.RaiseEvent(new PointerEventArgs(InputElement.PointerMovedEvent, board,
+                                              new Pointer(1, PointerType.Mouse, true), board,
+                                              new Point(450, 50), 0, new PointerPointProperties(),
+                                              KeyModifiers.None));
+
+        Assert.False(board.Drag.IsDragging);
+        board.Drag.MoveTo(new Point(450, 50), null);
+        Assert.False(board.Drag.IsDragging);
+    }
+
+    /// <summary>A confined strip keeps its dragged item inside itself.</summary>
+    [Fact]
+    public void DragBox_InAConfiningPanel_StaysInsideIt() {
+        var (board, narrow) = NarrowBesideWide();
+        board.ConfineDrag = true;
+        Press(board, narrow, new Point(150, 50));
+
+        board.Drag.MoveTo(new Point(150, 600), null);
+        Layout(board);
+
+        var box = board.Drag.DragBox();
+        Assert.True(board.Drag.IsDragging);
+        Assert.Equal(board.Bounds.Height - box.Height, box.Y, 6);
+        Assert.Equal(0, box.X, 6);
+    }
+
+    [Fact]
+    public void DragBox_InAPanelThatDoesNotConfine_FollowsThePointerOut() {
+        var (board, narrow) = NarrowBesideWide();
+        Press(board, narrow, new Point(150, 50));
+
+        board.Drag.MoveTo(new Point(150, 600), null);
+        Layout(board);
+
+        Assert.Equal(550, board.Drag.DragBox().Y, 6);
     }
 }
