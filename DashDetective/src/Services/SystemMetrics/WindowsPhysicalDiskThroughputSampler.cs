@@ -72,6 +72,7 @@ internal sealed class WindowsPhysicalDiskThroughputSampler : IPhysicalDiskThroug
     private readonly IntPtr _responseCounter;
     private readonly IntPtr _queueCounter;
     private readonly bool _ready;
+    private bool _disposed;
 
     /// <summary>Carries the attribute rather than the type: <see cref="Sample"/> and <see cref="Dispose"/>
     /// are guarded by <c>_ready</c> and genuinely callable anywhere, as is the pure
@@ -115,7 +116,7 @@ internal sealed class WindowsPhysicalDiskThroughputSampler : IPhysicalDiskThroug
     /// <summary>Returns per-disk read/write throughput at the moment of the call, one entry per physical
     /// disk instance. Any failure yields an empty set.</summary>
     public IReadOnlyList<DiskThroughputSample> Sample() {
-        if (!_ready || PdhCollectQueryData(_query) != ErrorSuccess)
+        if (_disposed || !_ready || PdhCollectQueryData(_query) != ErrorSuccess)
             return Array.Empty<DiskThroughputSample>();
 
         var reads = ReadArray(_readCounter);
@@ -181,8 +182,15 @@ internal sealed class WindowsPhysicalDiskThroughputSampler : IPhysicalDiskThroug
         return int.TryParse(head, NumberStyles.Integer, CultureInfo.InvariantCulture, out disk);
     }
 
-    /// <summary>Closes the PDH query handle. Safe to call more than once.</summary>
+    /// <summary>True once <see cref="Dispose"/> has run; <see cref="Sample"/> then returns empty without touching PDH.</summary>
+    internal bool IsDisposed => _disposed;
+
+    /// <summary>Closes the PDH query handle; the flag makes a second call a no-op rather than a double close.</summary>
     public void Dispose() {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         if (_query != IntPtr.Zero)
             PdhCloseQuery(_query);
     }
