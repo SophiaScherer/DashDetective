@@ -8,11 +8,7 @@ using Xunit;
 
 namespace DashDetective.Tests.Tabs.Performance;
 
-/// <summary>
-/// Pins <see cref="PerformanceViewModel.InitialLoad"/> as the thing tests await in place of a fixed sleep: it
-/// must not finish before the constructor's inventory load has built the rail's rows, or awaiting it races the
-/// rebuild again — the "Collection was modified" failure a slow CI runner hit.
-/// </summary>
+/// <summary>Pins <see cref="PerformanceViewModel.InitialLoad"/> as finishing only after the inventory load has built the rail's rows.</summary>
 public class PerformanceInitialLoadTests {
     private const string Amd = "0000:03:00.0";
 
