@@ -35,14 +35,14 @@ internal static class DesktopEntry {
         !content.Contains(HiddenKey, StringComparison.OrdinalIgnoreCase)
         && !content.Contains(GnomeDisabledKey, StringComparison.OrdinalIgnoreCase);
 
-    // Inside a quoted Exec value the spec reserves these four; each is escaped with a backslash. The
-    // backslash goes first, or it would double the ones the others just added.
+    // The backslash is replaced first so it does not re-escape the escapes added after it.
     private static string QuoteExec(string execPath) {
         var escaped = execPath
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal)
-            .Replace("`", "\\`", StringComparison.Ordinal)
-            .Replace("$", "\\$", StringComparison.Ordinal);
+            .Replace("\\", "\\\\\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\\\"", StringComparison.Ordinal)
+            .Replace("`", "\\\\`", StringComparison.Ordinal)
+            .Replace("$", "\\\\$", StringComparison.Ordinal)
+            .Replace("%", "%%", StringComparison.Ordinal);
 
         return $"\"{escaped}\"";
     }
