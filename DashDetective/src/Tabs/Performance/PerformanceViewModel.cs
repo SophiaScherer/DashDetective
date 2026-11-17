@@ -297,7 +297,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                   new[] {
                                       _cpuUtilTile, _cpuSpeedTile, _cpuProcessesTile,
                                       _cpuThreadsTile, _cpuHandlesTile, _cpuUptimeTile,
-                                  }, Select) {
+                                  }, SelectManually) {
             DeviceId = DeviceIds.Cpu, Link = HardwareLink(), StatOrder = StatOrderFor(ChartSeries.Cpu),
             Alert = _alerts.Cpu,
         };
@@ -307,7 +307,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                      new[] {
                                          _memInUseTile, _memAvailableTile,
                                          _memCachedTile, _memCommittedTile,
-                                     }, Select) {
+                                     }, SelectManually) {
             DeviceId = DeviceIds.Memory, Link = HardwareLink(),
             StatOrder = StatOrderFor(ChartSeries.Memory), Alert = _alerts.Memory,
         };
@@ -323,7 +323,7 @@ public partial class PerformanceViewModel : ViewModelBase,
                                       new[] {
                                           _netReceiveTile, _netSendTile,
                                           _netLinkTile = new StatTile("Link", linkSpeed), _netErrorsTile,
-                                      }, Select) {
+                                      }, SelectManually) {
             DeviceId = DeviceIds.Network,
             StatOrder = StatOrderFor(ChartSeries.NetDown),
             Series2 = ChartSeries.NetUp,
@@ -456,6 +456,7 @@ public partial class PerformanceViewModel : ViewModelBase,
     /// re-enumeration of the physical disks.</summary>
     public void Refresh() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         UpdateDisks();
         UpdateGpuAdapters();
         UpdateGpuSensors();
@@ -497,10 +498,15 @@ public partial class PerformanceViewModel : ViewModelBase,
         UpdateCpuUptime();
     }
 
-    /// <summary>Sampler-failure handler for the CPU channel: shows neutral placeholders.</summary>
+    /// <summary>Sampler-failure handler for the CPU channel: shows neutral placeholders, including the counts and up time keyed off its tick.</summary>
     private void OnCpuFailed() {
         _cpuRow.ValueText = "—";
         _cpuUtilTile.Value = "—";
+        // These ride the CPU tick, so a dead feed would leave them frozen or at their initial zeros.
+        _cpuProcessesTile.Value = "—";
+        _cpuThreadsTile.Value = "—";
+        _cpuHandlesTile.Value = "—";
+        _cpuUptimeTile.Value = "—";
     }
 
     private void UpdateCpu(double value) {
@@ -675,13 +681,14 @@ public partial class PerformanceViewModel : ViewModelBase,
             var history = _disksByNumber.TryGetValue(number, out var previous)
                 ? previous.History
                 : new MetricHistory(WindowSeconds);
-            var activeTile = new StatTile("Active", "0 %");
-            var readTile = new StatTile("Read", ByteRateFormatter.Format(0));
-            var writeTile = new StatTile("Write", ByteRateFormatter.Format(0));
-            var responseTile = new StatTile("Response", "0 ms");
-            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, "0", "%", ChartSeries.Storage,
+            // Seeded with the placeholder so a sampler that never reports does not leave an idle-looking 0.
+            var activeTile = new StatTile("Active", Placeholders.NoReading);
+            var readTile = new StatTile("Read", Placeholders.NoReading);
+            var writeTile = new StatTile("Write", Placeholders.NoReading);
+            var responseTile = new StatTile("Response", Placeholders.NoReading);
+            var row = new ResourceRow(disk.Name, disk.Sub, disk.Spec, Placeholders.NoReading, "", ChartSeries.Storage,
                                       history.Points(100),
-                                      new[] { activeTile, readTile, writeTile, responseTile }, Select) {
+                                      new[] { activeTile, readTile, writeTile, responseTile }, SelectManually) {
                 DeviceId = disk.Id, Link = StorageLink(disk.DiskNumber),
                 StatOrder = StatOrderFor(ChartSeries.Storage), Alert = _alerts.DiskActivity,
             };
@@ -733,7 +740,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             var tempTile = new StatTile("Temp", Placeholders.NoReading);
             var powerTile = new StatTile("Power", Placeholders.NoReading);
             var row = new ResourceRow(gpu.Name, gpu.Sub, gpu.Spec, Placeholders.NoReading, "", ChartSeries.Gpu,
-                                      history.Points(100), Array.Empty<StatTile>(), Select) {
+                                      history.Points(100), Array.Empty<StatTile>(), SelectManually) {
                 DeviceId = gpu.Id, IsDetailed = _gpuDetailed, Link = HardwareLink(),
                 StatOrder = StatOrderFor(ChartSeries.Gpu), Alert = _alerts.Gpu,
                 // A rebuilt row keeps its details list until LoadGpuDetailsAsync refills it.
@@ -1114,7 +1121,7 @@ public partial class PerformanceViewModel : ViewModelBase,
 
     /// <summary>Samples each disk and refreshes its row + tiles in place: rail value + chart + Active tile show
     /// Task Manager's "Active time" (0–100 %); Read/Write show throughput; Response shows the average transfer
-    /// time. Disks without a current reading are left unchanged.</summary>
+    /// time. Disks without a current reading are left unchanged, on the "—" they were built with.</summary>
     private void UpdateDisks() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (!_disksByNumber.TryGetValue(sample.DiskNumber, out var disk))
@@ -1122,6 +1129,7 @@ public partial class PerformanceViewModel : ViewModelBase,
             disk.History.Push(sample.ActivePercent);
             var rounded = Math.Round(sample.ActivePercent);
             disk.Row.ValueText = rounded.ToString(CultureInfo.InvariantCulture);
+            disk.Row.Unit = "%";
             disk.Row.Points = disk.History.Points(100);
             disk.Row.ChartStatus = ChartStatus.For(disk.History);
             disk.ActiveTile.Value = $"{rounded.ToString(CultureInfo.InvariantCulture)} %";
@@ -1236,6 +1244,12 @@ public partial class PerformanceViewModel : ViewModelBase,
         return mbps >= 1000
             ? $"{(mbps / 1000.0).ToString("0.#", CultureInfo.InvariantCulture)} Gbps"
             : $"{Math.Round(mbps).ToString(CultureInfo.InvariantCulture)} Mbps";
+    }
+
+    /// <summary>A click on a row: it supersedes any reveal still waiting for its row to be built.</summary>
+    private void SelectManually(ResourceRow row) {
+        _pendingReveal = null;
+        Select(row);
     }
 
     /// <summary>Selects a resource (single-select) so the detail pane swaps to it. No-ops when the

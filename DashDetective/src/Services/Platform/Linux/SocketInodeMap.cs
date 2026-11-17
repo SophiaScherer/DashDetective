@@ -31,12 +31,40 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
 
     private readonly Dictionary<long, int> _pidByInode = [];
 
+    /// <summary>Inodes no walk could attribute (another user's sockets), remembered so every poll does not walk twice looking for them.</summary>
+    private readonly HashSet<long> _unattributable = [];
+
+    /// <summary>Every inode asked about since the last walk, so one call's walk keeps the other's unattributable sockets.</summary>
+    private readonly HashSet<long> _askedSinceWalk = [];
+
     /// <summary>Rebuilds the map if any of <paramref name="inodes"/> is unknown, and at most once per call.
     /// A rebuild is wholesale, so inodes of closed sockets fall out rather than accumulating.</summary>
     internal void Refresh(IReadOnlyCollection<long> inodes) {
+        NoteAsked(inodes);
         if (!NeedsWalk(inodes))
             return;
 
+        Walk();
+
+        // Rebuilt from what was asked since the last walk, so a closed socket drops out.
+        _unattributable.Clear();
+        foreach (var inode in _askedSinceWalk) {
+            if (!_pidByInode.ContainsKey(inode))
+                _unattributable.Add(inode);
+        }
+
+        _askedSinceWalk.Clear();
+        NoteAsked(inodes);
+    }
+
+    private void NoteAsked(IReadOnlyCollection<long> inodes) {
+        foreach (var inode in inodes) {
+            if (inode != 0)
+                _askedSinceWalk.Add(inode);
+        }
+    }
+
+    private void Walk() {
         _pidByInode.Clear();
         foreach (var pid in ProcPids.List(proc)) {
             var fdRoot = ProcRoot + pid.ToString(CultureInfo.InvariantCulture) + "/fd";
@@ -85,11 +113,10 @@ internal sealed class SocketInodeMap(IProcFileSystem proc) {
             : null;
     }
 
-    /// <summary>Whether anything asked about is missing. Inode 0 is the kernel's "no inode" and is never
-    /// worth a walk.</summary>
+    /// <summary>Whether anything asked about is new, neither mapped nor unattributable; inode 0 is "no inode".</summary>
     private bool NeedsWalk(IReadOnlyCollection<long> inodes) {
         foreach (var inode in inodes) {
-            if (inode != 0 && !_pidByInode.ContainsKey(inode))
+            if (inode != 0 && !_pidByInode.ContainsKey(inode) && !_unattributable.Contains(inode))
                 return true;
         }
 

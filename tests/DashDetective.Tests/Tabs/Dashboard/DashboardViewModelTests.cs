@@ -2,6 +2,8 @@ using DashDetective.Services.Network;
 using DashDetective.Services.SystemMetrics;
 using DashDetective.Tabs.Dashboard;
 using DashDetective.Tests.Fakes;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -13,6 +15,14 @@ namespace DashDetective.Tests.Tabs.Dashboard;
 public class DashboardViewModelTests {
     private static DashboardViewModel Create(HardwareProviders providers) =>
         new(TestMetrics.Idle(), providers);
+
+    /// <summary>The card row and the charts persist and reset on separate keys.</summary>
+    [Fact]
+    public void SavedOrders_KeepTheCardRowApartFromTheWidgets() {
+        var viewModel = Create(StubHardwareProviders.Compose());
+
+        Assert.Equal(["dashboard", "dashboard.cards"], viewModel.SavedOrders.Select(order => order.Key));
+    }
 
     // ---- Soft-fail: a failed READ, as distinct from a successful read of an unknown machine ----
     //
@@ -125,5 +135,31 @@ public class DashboardViewModelTests {
 
         Assert.Contains("Unknown", viewModel.CpuModelText);
         Assert.Contains("Unknown", viewModel.OsText);
+    }
+
+    /// <summary>With no system disk identified, the report's Storage row is the placeholder, not a false "0% active  ()".</summary>
+    [Fact]
+    public void GetReportSections_NoSystemDisk_ReportsStorageAsNoReading() {
+        var viewModel = Create(StubHardwareProviders.Compose());
+
+        var storage = viewModel.GetReportSections()
+            .Single(section => section.Title == "Live metrics")
+            .Rows.Single(row => row.Key == "Storage");
+
+        Assert.Equal("—", storage.Value);
+    }
+
+    /// <summary>The clock is formatted with the app's number format, whatever the current culture's decimal separator.</summary>
+    [Fact]
+    public void FormatCpuModel_CommaCulture_StillUsesADecimalPoint() {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+        try {
+            var text = DashboardViewModel.FormatCpuModel(new CpuStaticInfo("Test CPU", 6, 12, 4700));
+
+            Assert.EndsWith("@ 4.70GHz", text);
+        } finally {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 }

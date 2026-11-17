@@ -139,4 +139,38 @@ public class HardwareCatalogTests {
     public void LookupGpu_UnknownModel_ReturnsNull() {
         Assert.Null(HardwareCatalog.LookupGpu("Definitely Not A Real GPU 9999"));
     }
+
+    /// <summary>The fallback columns are present in the shipped table.</summary>
+    [Fact]
+    public void LookupCpu_KnownModel_CarriesTheFallbackColumnsToo() {
+        var spec = HardwareCatalog.LookupCpu("AMD Ryzen 5 7600X 6-Core Processor");
+
+        Assert.NotNull(spec);
+        Assert.Equal("4.7 GHz", spec!.Base);
+        Assert.Equal("32 MB", spec.CacheL3);
+        Assert.Equal("AM5", spec.Socket);
+    }
+
+    /// <summary>A half-filled row would render a silent "—" indistinguishable from an unlisted part.</summary>
+    [Fact]
+    public void CpuCatalog_EveryEntry_FillsEveryColumn() {
+        foreach (var (key, spec) in CpuCatalog.Data) {
+            Assert.False(string.IsNullOrWhiteSpace(spec.Boost), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Tdp), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Base), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.CacheL3), key);
+            Assert.False(string.IsNullOrWhiteSpace(spec.Socket), key);
+        }
+    }
+
+    /// <summary>Catches base and boost transposed on a hand-entered row.</summary>
+    [Fact]
+    public void CpuCatalog_EveryEntry_RatesBaseBelowBoost() {
+        foreach (var (key, spec) in CpuCatalog.Data)
+            Assert.True(Ghz(spec.Base) < Ghz(spec.Boost), $"{key}: {spec.Base} / {spec.Boost}");
+    }
+
+    private static double Ghz(string clock) =>
+        double.Parse(
+            clock.Replace(" GHz", ""), System.Globalization.CultureInfo.InvariantCulture);
 }

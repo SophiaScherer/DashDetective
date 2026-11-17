@@ -228,9 +228,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// so like <see cref="_expandedPids"/> the set is what survives a poll, a re-sort and a filter.</summary>
     private readonly HashSet<int> _selectedPids = new();
 
-    /// <summary>Where a Shift-click measures its range from: the row a plain or Ctrl-click last landed
-    /// on. Zero when there is nothing to measure from.</summary>
-    private int _anchorPid;
+    /// <summary>The row a Shift-click measures from; null means none, so PID 0 (System Idle Process) must stay a valid anchor.</summary>
+    private int? _anchorPid;
 
     /// <summary>The primary row — the last one clicked. The selection can hold many; the things that can
     /// only act on one (Properties' shell dialog) act on this.</summary>
@@ -396,6 +395,11 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
         var path = new List<ProcessNode>();
         if (!TryFindPath(_lastRoots, pid, path))
             return;
+
+        // A folded group hides its rows, so selecting into one would pick a row nobody can see.
+        var group = path[0].Aggregate.Category;
+        if (_collapsedGroups.Contains(group))
+            ToggleGroup(group);
 
         // Reveal the ancestors before filtering so the single rebuild below shows the finished state.
         for (var i = 0; i < path.Count - 1; i++)
@@ -584,8 +588,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             live.Add(info.Pid);
 
         _selectedPids.IntersectWith(live);
-        if (!_selectedPids.Contains(_anchorPid))
-            _anchorPid = 0;
+        if (_anchorPid is not { } anchor || !_selectedPids.Contains(anchor))
+            _anchorPid = null;
     }
 
     private static void CollectExpandable(IReadOnlyList<ProcessNode> nodes, HashSet<int> into) {
@@ -831,8 +835,8 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// everything between the anchor and this row.
     /// </summary>
     public void SelectRow(ProcessRow row, bool extend, bool range) {
-        if (range && _anchorPid != 0) {
-            SelectRange(_anchorPid, row.Pid);
+        if (range && _anchorPid is { } anchor) {
+            SelectRange(anchor, row.Pid);
         } else if (extend) {
             if (!_selectedPids.Remove(row.Pid))
                 _selectedPids.Add(row.Pid);
@@ -892,7 +896,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
             return;
 
         _selectedPids.Clear();
-        _anchorPid = 0;
+        _anchorPid = null;
         SelectedRow = null;
         ApplySelection();
         ActionMessage = "";
@@ -900,6 +904,17 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Whether a row is the entire selection — the case where a plain click on it deselects.</summary>
     public bool IsOnlySelection(ProcessRow row) => _selectedPids.Count == 1 && _selectedPids.Contains(row.Pid);
+
+    /// <summary>Points the row menu at a right-clicked row: outside the selection it replaces it, inside one it only becomes primary.</summary>
+    public void PrepareContextMenu(ProcessRow row) {
+        if (!row.IsSelected) {
+            SelectRow(row);
+            return;
+        }
+
+        SelectedRow = row;
+        OnPropertyChanged(nameof(SelectedHasChildren));
+    }
 
     /// <summary>The selected PIDs, for the actions that operate on all of them.</summary>
     public IReadOnlyCollection<int> SelectedPids => _selectedPids;
@@ -1164,6 +1179,7 @@ public partial class ProcessesViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>Toolbar Refresh: re-sample the summary totals and reload the list once, even while paused.</summary>
     public void Refresh() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         _ = LoadAsync();
     }
 

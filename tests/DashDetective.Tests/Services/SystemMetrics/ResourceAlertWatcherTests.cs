@@ -380,6 +380,67 @@ public class ResourceAlertWatcherTests {
         Assert.Equal(AlertMetric.DiskSpace, Assert.Single(harness.Changes)!.Metric);
     }
 
+    // ----- Free space: a read that outlives the setting that asked for it -----
+
+    private static readonly IReadOnlyList<VolumeInfo> Full = [new VolumeInfo(0, 'C', "System", "NTFS", 1000, 10)];
+    private static readonly IReadOnlyList<VolumeInfo> Roomy = [new VolumeInfo(0, 'C', "System", "NTFS", 1000, 800)];
+
+    /// <summary>Hands out one unfinished volume read per tick, so a test decides when and in what order they land.</summary>
+    private static (HardwareProviders Hardware, List<System.Threading.Tasks.TaskCompletionSource<IReadOnlyList<VolumeInfo>>> Reads) SlowVolumes() {
+        var reads = new List<System.Threading.Tasks.TaskCompletionSource<IReadOnlyList<VolumeInfo>>>();
+        var hardware = StubHardwareProviders.Compose(volumes: () => {
+            var read = new System.Threading.Tasks.TaskCompletionSource<IReadOnlyList<VolumeInfo>>();
+            reads.Add(read);
+            return read.Task;
+        });
+        return (hardware, reads);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LowSpaceRead_BellSwitchedOffMidRead_RaisesNothing() {
+        var (hardware, reads) = SlowVolumes();
+        var harness = Create(hardware: hardware);
+        harness.SpaceTimer.RaiseTick();
+
+        harness.Watcher.Options = harness.Watcher.Options with { LowDiskFreePercent = 0 };
+        reads[0].SetResult(Full);
+        await System.Threading.Tasks.Task.Yield();
+
+        Assert.Null(harness.Watcher.Current);
+        Assert.Empty(harness.Changes);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LowSpaceRead_MasterSwitchOffMidRead_RaisesNothing() {
+        var (hardware, reads) = SlowVolumes();
+        var harness = Create(hardware: hardware);
+        harness.SpaceTimer.RaiseTick();
+
+        harness.Watcher.Enabled = false;
+        reads[0].SetResult(Full);
+        await System.Threading.Tasks.Task.Yield();
+
+        Assert.Null(harness.Watcher.Current);
+        Assert.Empty(harness.Changes);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LowSpaceRead_FinishingAfterANewerRead_IsDiscarded() {
+        var (hardware, reads) = SlowVolumes();
+        var harness = Create(hardware: hardware);
+        harness.SpaceTimer.RaiseTick();
+        harness.SpaceTimer.RaiseTick();
+
+        reads[1].SetResult(Full);
+        await System.Threading.Tasks.Task.Yield();
+        Assert.Equal(AlertMetric.DiskSpace, harness.Watcher.Current!.Metric);
+
+        reads[0].SetResult(Roomy);
+        await System.Threading.Tasks.Task.Yield();
+
+        Assert.Equal(AlertMetric.DiskSpace, harness.Watcher.Current!.Metric);
+    }
+
     // ----- Multi-device: the worst one wins, and it is named -----
 
     [Fact]

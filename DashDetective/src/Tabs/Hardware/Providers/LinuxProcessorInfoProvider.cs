@@ -9,14 +9,12 @@ namespace DashDetective.Tabs.Hardware;
 /// <summary>
 /// Processor facts from <c>/proc/cpuinfo</c> and sysfs. Name, core and thread counts and the rated clock
 /// come from <see cref="CpuFacts"/>, shared with the Dashboard's CPU tile so the two cards cannot disagree;
-/// L3 cache comes from <c>cpu0</c>'s <c>cache/index*</c> entries. Boost clock and TDP have no source on
+/// L3 cache is the package total, summed across its CCDs. Boost clock and TDP have no source on
 /// either platform, so they come from <see cref="HardwareCatalog"/> by model name and stay "—" when it has
 /// no entry — exactly as on Windows, and formatted through the same
 /// <see cref="ProcessorSpecFormatter"/> so the rows match.
 ///
-/// <b>Socket designation is permanently "—" on Linux.</b> It lives in SMBIOS type 4, which the kernel does
-/// not surface under <c>/sys/class/dmi/id</c>; only <c>dmidecode</c> reading <c>/dev/mem</c> as root can
-/// see it.
+/// The socket has no Linux source (SMBIOS type 4 needs root), so it falls back to the catalog.
 /// </summary>
 internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
     private readonly IProcFileSystem _proc;
@@ -43,10 +41,10 @@ internal sealed class LinuxProcessorInfoProvider : IProcessorInfoProvider {
                 Name: string.IsNullOrEmpty(facts.Name) ? "—" : facts.Name,
                 Cores: facts.PhysicalCores > 0 ? facts.PhysicalCores.ToString() : "—",
                 LogicalProcessors: facts.LogicalCores.ToString(),
-                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.MaxClockMhz, spec?.Boost),
-                CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc)),
-                Tdp: spec?.Tdp ?? "—",
-                Socket: "—");
+                BaseBoost: ProcessorSpecFormatter.BaseBoost(facts.BaseClockMhz, spec?.Boost, spec?.Base),
+                CacheL3: ProcessorSpecFormatter.CacheL3(CpuFacts.L3CacheKilobytes(_proc), spec?.CacheL3),
+                Tdp: ProcessorSpecFormatter.Spec(spec?.Tdp),
+                Socket: ProcessorSpecFormatter.Spec(spec?.Socket));
         } catch (Exception e) {
             Log.Warn("ProcessorInfoProvider read failed", e);
             return ProcessorInfo.Unknown;

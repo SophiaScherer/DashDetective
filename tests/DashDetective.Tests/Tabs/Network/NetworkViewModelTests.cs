@@ -71,6 +71,31 @@ public class NetworkViewModelTests {
         Assert.Equal(new[] { vm.DnsHost }, dns.Requests);
     }
 
+    /// <summary>Refresh repeats the lookup the user submitted, not whatever has since been typed in the box.</summary>
+    [Fact]
+    public void Refresh_AfterEditingTheBox_ReResolvesTheSubmittedHost() {
+        var (vm, dns) = Create();
+        vm.DnsHost = "a.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "b.test";
+
+        vm.Refresh();
+
+        Assert.Equal(["a.test", "a.test"], dns.Requests);
+    }
+
+    [Fact]
+    public void Refresh_AfterClearingTheBox_ReResolvesTheSubmittedHost() {
+        var (vm, dns) = Create();
+        vm.DnsHost = "a.test";
+        vm.LookupDnsCommand.Execute(null);
+        vm.DnsHost = "";
+
+        vm.Refresh();
+
+        Assert.Equal(["a.test", "a.test"], dns.Requests);
+    }
+
     [Fact]
     public void Refresh_BeforeAnyLookup_StillResolvesNothing() {
         var (vm, dns) = Create();
@@ -124,6 +149,22 @@ public class NetworkViewModelTests {
         vm.TogglePingCommand.Execute(null);
         Assert.False(vm.PingEnabled);
         Assert.Equal("Start", vm.PingButtonText);
+    }
+
+    /// <summary>A send in flight when Stop is pressed must not publish afterward. TEST-NET-1 never answers, so the send outlives the press.</summary>
+    [Fact]
+    public async Task StopPing_WhileASendIsInFlight_LeavesTheIdleSummary() {
+        var (vm, _) = Create();
+        await vm.PingTargetSeeded;
+        vm.PingTarget = "192.0.2.1";
+
+        vm.TogglePingCommand.Execute(null);
+        vm.TogglePingCommand.Execute(null);
+        await Task.Delay(2500);
+
+        Assert.False(vm.PingEnabled);
+        Assert.Equal("Press Start to ping", vm.PingSummary);
+        Assert.Equal("", vm.PingConsole);
     }
 
     // ---- DNS: the latest submit wins ----
@@ -235,14 +276,13 @@ public class NetworkViewModelTests {
         var (vm, dns) = CreateWithPendingDns();
         vm.DnsHost = "older.test";
         vm.LookupDnsCommand.Execute(null);
-        vm.DnsHost = "newer.test";
         vm.Refresh();
 
         dns.Complete("older.test");
         Assert.Equal("Resolving older.test…", vm.DnsFooter);
 
-        dns.Complete("newer.test");
-        Assert.Equal("Resolved newer.test", vm.DnsFooter);
+        dns.Complete("older.test");
+        Assert.Equal("Resolved older.test", vm.DnsFooter);
     }
 
     // ---- Soft-fail ----

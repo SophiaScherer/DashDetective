@@ -27,7 +27,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// <summary>This page's widget order, bound two-way to its WidgetBoard.</summary>
     public SavedOrder Widgets { get; } = new("dashboard");
 
-    public IEnumerable<SavedOrder> SavedOrders => [Widgets];
+    /// <summary>The stat card row's order, a flow separate from the charts'.</summary>
+    public SavedOrder CardOrder { get; } = new("dashboard.cards");
+
+    public IEnumerable<SavedOrder> SavedOrders => [Widgets, CardOrder];
 
     /// <summary>Width of the rolling CPU history, in seconds (one sample per second).</summary>
     private const int WindowSeconds = 60;
@@ -232,13 +235,14 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         // pill is on.
         _gate = new SamplingGate(ApplySampling);
 
-        // Load static CPU hardware info off the UI thread; results are applied when ready.
-        _ = LoadCpuInfoAsync();
-        _ = LoadMemoryInfoAsync();
-        _ = LoadGpusAsync();
-        _ = LoadSystemInfoAsync();
-        _ = LoadDisksAsync();
+        // Load static hardware info off the UI thread; results are applied when ready.
+        InitialLoad = Task.WhenAll(
+            LoadCpuInfoAsync(), LoadMemoryInfoAsync(), LoadGpusAsync(), LoadSystemInfoAsync(), LoadDisksAsync());
     }
+
+    /// <summary>The loads the constructor starts, so a test can await them instead of guessing how long
+    /// they take. Each soft-fails on its own, so this never faults.</summary>
+    internal Task InitialLoad { get; }
 
     /// <summary>
     /// Forces an immediate update of every metric and re-reads the static hardware/system info,
@@ -247,6 +251,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     /// </summary>
     public void RefreshNow() {
         _service.RefreshAll();
+        _subscriptions.Replay();
         UpdateUptime();
 
         _ = LoadCpuInfoAsync();
@@ -307,7 +312,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             new ReportRow("GPU", GpuValueText == Placeholders.NoReading
                 ? $"{Placeholders.NoReading}  ({GpuModelText})"
                 : $"{GpuValueText}%  ({GpuModelText})"),
-            new ReportRow("Storage", $"{StorageValueText}% active  ({StorageSubText})"),
+            // No system disk found means no reading; "0% active  ()" would claim an idle drive all session.
+            new ReportRow("Storage", _systemDiskNumber < 0
+                ? Placeholders.NoReading
+                : $"{StorageValueText}% active  ({StorageSubText})"),
             new ReportRow("Network", $"↓ {NetworkDownText} {NetworkDownUnit} / ↑ {NetworkUpText} {NetworkUpUnit}  ({NetworkAdapterName})"),
         ]),
     ];
@@ -408,8 +416,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same adapters; one still present keeps its accumulated trace.
             rebuilt.Add((
                 key,
-                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "%",
-                                  OpenInPerformance) { Sub = gpu.Sub },
+                // Built on the placeholder: a sampler with nothing to say must not leave a confident 0.
+                new DashboardCard(DeviceCategory.Gpu, gpu.Id, gpu.Name.ToUpperInvariant(), "",
+                                  OpenInPerformance) { Value = Placeholders.NoReading, Sub = gpu.Sub },
                 gpu.GpuPci?.VendorId,
                 _gpuHistories.TryGetValue(key, out var previous) ? previous : new MetricHistory(WindowSeconds)));
         }
@@ -485,10 +494,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     }
 
     /// <summary>Model plus base clock for the System Information row, e.g. "AMD Ryzen 5 7600X @ 4.70GHz".</summary>
-    private static string FormatCpuModel(CpuStaticInfo info) {
+    internal static string FormatCpuModel(CpuStaticInfo info) {
         var name = HardwareNameFormatter.ShortenCpu(info.Name);
         return info.MaxClockMhz > 0
-            ? $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz"
+            ? string.Create(CultureInfo.InvariantCulture, $"{name} @ {info.MaxClockMhz / 1000.0:F2}GHz")
             : name;
     }
 
@@ -509,6 +518,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuValueText = "—";
         CpuPercentText = "—";
         _cpuCard.Value = "—";
+        _cpuCard.Unit = "";
     }
 
     private void UpdateCpu(double value) {
@@ -519,6 +529,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         CpuPoints = _cpuHistory.Points(100);
         CpuChartStatus = ChartStatus.For(_cpuHistory);
         _cpuCard.Value = CpuValueText;
+        _cpuCard.Unit = "%";
         _cpuCard.Points = CpuPoints;
     }
 
@@ -617,7 +628,9 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnMemoryFailed() {
         MemoryValueText = "—";
         MemorySubText = "";
+        MemoryUtilizationText = "";
         _memoryCard.Value = "—";
+        _memoryCard.Unit = "";
         _memoryCard.Sub = "";
     }
 
@@ -636,6 +649,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
         MemoryPoints = _memoryHistory.Points(100);
         MemoryChartStatus = ChartStatus.For(_memoryHistory);
         _memoryCard.Value = MemoryValueText;
+        _memoryCard.Unit = "GB";
         _memoryCard.Sub = MemorySubText;
         _memoryCard.Points = MemoryPoints;
     }
@@ -644,7 +658,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
     private void OnNetworkFailed() {
         NetworkDownText = "—";
         NetworkUpText = "—";
+        NetworkSubText = "";
         _networkCard.Value = "—";
+        _networkCard.Unit = "";
+        _networkCard.Sub = "";
     }
 
     /// <summary>Network subscription callback: append the download + upload rates to their buffers, then
@@ -723,8 +740,10 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
             // A refresh re-enumerates the same disks; one still present keeps its accumulated trace.
             rebuilt.Add((
                 drive.DiskNumber,
+                // Built on the placeholder, as the GPU cards are; the first sample restores the unit.
                 new DashboardCard(DeviceCategory.Disk, DeviceIds.Disk(drive.DiskNumber),
-                                  drive.Name.ToUpperInvariant(), "%", OpenInPerformance) {
+                                  drive.Name.ToUpperInvariant(), "", OpenInPerformance) {
+                    Value = Placeholders.NoReading,
                     Sub = FormatCapacity(drive.UsedBytes, drive.UsedBytes + drive.FreeBytes),
                 },
                 _diskHistories.TryGetValue(drive.DiskNumber, out var previous)
@@ -773,7 +792,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
 
     /// <summary>Samples each disk's active time and refreshes its card's headline value + sparkline (Task
     /// Manager's disk "Active time", 0–100 %), and feeds the system drive's own reading to the report/CSV
-    /// surfaces. Disks without a current reading are left unchanged.</summary>
+    /// surfaces. Disks without a current reading are left unchanged, on the "—" they were built with.</summary>
     private void UpdateDiskThroughput() {
         foreach (var sample in _throughputSampler.Sample()) {
             if (sample.DiskNumber == _systemDiskNumber)
@@ -784,6 +803,7 @@ public partial class DashboardViewModel : ViewModelBase, IRefreshablePage, ILive
                 continue;
             history.Push(sample.ActivePercent);
             card.Value = Math.Round(sample.ActivePercent).ToString(CultureInfo.InvariantCulture);
+            card.Unit = "%";
             card.Points = history.Points(100);
         }
     }

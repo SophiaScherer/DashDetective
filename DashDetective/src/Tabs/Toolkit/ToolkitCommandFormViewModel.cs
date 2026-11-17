@@ -134,6 +134,12 @@ public partial class ToolkitCommandFormViewModel : ObservableObject {
         IsOpen = false;
     }
 
+    /// <summary>Closes the form if it is editing this command, which is going away; saving would otherwise drop the edit silently.</summary>
+    public void CancelIfEditing(ToolkitCommand command) {
+        if (ReferenceEquals(_editing, command))
+            Cancel();
+    }
+
     /// <summary>Opens the form on an existing command, ready to be changed. The fields are filled from
     /// what the user originally typed rather than from the action derived from it, which is why
     /// <see cref="ToolkitCommand"/> is what gets persisted.</summary>
